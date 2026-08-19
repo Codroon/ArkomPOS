@@ -7,15 +7,15 @@
  * Lives in apps/desktop (not packages/db): it needs @arkom/core for UUIDv7 and
  * §2's dependency rule keeps db importing only drizzle — apps compose packages.
  *
- * Everything runs in ONE transaction and every business row gets an oplog
- * "create" entry (ADR-0005: a write that skips the oplog is a bug) — the seed
- * mirrors what core's mutate() will guarantee once it exists.
+ * All writes go through core's mutate() envelope (§3/ADR-0005): one
+ * transaction, an oplog "create" entry per business row, enforced by core.
  *
  * Group names follow the ES seed list in docs/design/handoff/00-foundations.md
  * (accented Spanish), which refines the shorthand list in system-design §8.
  */
-import { uuidv7 } from "@arkom/core";
+import { mutate, toOplogJson, uuidv7, type MutationCtx } from "@arkom/core";
 import { schema as s, type ArkomDb } from "@arkom/db";
+import { makeMutateRunner } from "../src/main/mutate-runner";
 
 /* ---------- small deterministic helpers (UI-edge codes, not domain logic) ---------- */
 
@@ -38,13 +38,6 @@ function imei(base14: string): string {
     sum += d;
   }
   return base14 + String((10 - (sum % 10)) % 10);
-}
-
-/** Serialize a row for the oplog `after` payload (Date → epoch ms). */
-function asJson(row: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(row)) out[k] = v instanceof Date ? v.getTime() : v;
-  return out;
 }
 
 /* ---------------------------- seed dataset ---------------------------- */
@@ -124,23 +117,10 @@ export function seed(db: ArkomDb): { seeded: boolean; message: string } {
   const terminalId = uuidv7();
   let unitCount = 0;
 
-  db.transaction((tx) => {
+  const ctx: MutationCtx = { tenantId, locationId, terminalId, userId: null };
+  mutate(makeMutateRunner(db), ctx, (tx, log) => {
     const logCreate = (entity: string, entityId: string, after: Record<string, unknown>) => {
-      tx.insert(s.oplog)
-        .values({
-          opId: uuidv7(),
-          tenantId,
-          locationId,
-          terminalId,
-          entity,
-          entityId,
-          action: "create",
-          before: null,
-          after: asJson(after),
-          userId: null, // ADR-0010: no auth yet
-          createdAt: now,
-        })
-        .run();
+      log({ entity, entityId, action: "create", before: null, after: toOplogJson(after) });
     };
 
     const tenant = { id: tenantId, name: "Arkom Demo", createdAt: now };
