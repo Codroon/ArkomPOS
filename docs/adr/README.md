@@ -1,0 +1,21 @@
+# Arkom POS — Architecture Decision Records
+
+Decisions are frozen before code. Claude Code builds against these; it does not relitigate them.
+If a decision must change, the ADR is superseded by a new one — never silently edited.
+
+| # | Decision | Status |
+|---|----------|--------|
+| [0001](0001-hybrid-desktop-cloud-architecture.md) | Hybrid: offline-first desktop till + cloud web dashboard | Accepted |
+| [0002](0002-typescript-monorepo-stack.md) | All-TypeScript pnpm monorepo; Electron till, Next.js cloud | Accepted |
+| [0003](0003-sqlite-on-till-postgres-in-cloud.md) | SQLite on the till, Postgres (Supabase) in the cloud, Drizzle on both | Accepted |
+| [0004](0004-stock-as-insert-only-movement-ledger.md) | Stock is an insert-only movement ledger | Accepted |
+| [0005](0005-oplog-as-sync-outbox-and-audit-log.md) | One append-only oplog = sync outbox + audit log | Accepted |
+| [0006](0006-identifiers-and-money.md) | UUIDv7 ids, integer-cent money, basis-point tax rates | Accepted |
+| [0007](0007-tax-snapshot-on-lines.md) | Tax regime + rate + amounts snapshotted on every line | Accepted |
+| [0008](0008-document-numbering-per-till-series.md) | Gap-free document numbers allocated per till series, locally | Accepted |
+| [0009](0009-tenancy-and-location-keys-day-one.md) | tenant / location / terminal keys on every business row | Accepted |
+| [0010](0010-auth-deferred-nullable-actor-columns.md) | Auth & shifts deferred; nullable actor columns now | Accepted |
+
+Constraints common to all: team = one developer + Claude Code · Phase 1 = 2 weeks (sale screen, catalog, inventory) ·
+client = retail mobile shop in Spain (unreliable connectivity, Spanish fiscal rules ahead) · product intent = resell to
+similar retailers after first onboarding.
