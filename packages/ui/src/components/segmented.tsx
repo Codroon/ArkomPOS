@@ -1,4 +1,5 @@
 import { cn } from "../cn";
+import { useT } from "../i18n";
 import { LockBadge } from "./lock-badge";
 
 export interface SegmentOption<T extends string> {
@@ -18,6 +19,7 @@ export function Segmented<T extends string>({
   onChange: (next: T) => void;
   className?: string;
 }) {
+  const t = useT();
   return (
     <div className={cn("flex flex-wrap overflow-hidden rounded-[3px] border border-border-input bg-card", className)}>
       {options.map((opt) => (
@@ -25,7 +27,7 @@ export function Segmented<T extends string>({
           key={opt.value}
           type="button"
           disabled={opt.disabled}
-          title={opt.disabled ? "Próximamente" : undefined}
+          title={opt.disabled ? t("common.comingSoon") : undefined}
           onClick={() => onChange(opt.value)}
           className={cn(
             "flex items-center gap-1 border-r border-border px-2 py-1 text-[11px] last:border-r-0",

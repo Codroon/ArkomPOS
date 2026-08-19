@@ -24,7 +24,10 @@ repairs/used/agency/SIM screens. Schema already anticipates them — build nothi
 - **Tax is snapshotted on lines** (regime + rate_bp + amounts). Phase 1 = IVA21 only.
 - **Errors are typed codes** per the IPC contract — the UI never string-matches messages.
 - **No new dependencies without asking.** No Docker. No CSS frameworks beyond Tailwind/shadcn.
-- Language: UI copy Spanish-first (customer-facing), code/comments English.
+- Language: UI copy Spanish-first, code/comments English. All renderer strings live in the
+  typed dictionary (`packages/ui/src/i18n`, `es.ts` = source of truth, `en.ts` must satisfy
+  its key map) and render via `useT()` — never hardcoded (ADR-0011). The UI locale toggle is
+  staff-only: printed tickets/documents always render fixed Spanish strings, never `useT()`.
 
 ## Commands
 `pnpm dev` (desktop app w/ HMR) · `pnpm test` (Vitest, core) · `pnpm db:generate` / `db:migrate`

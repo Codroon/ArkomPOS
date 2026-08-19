@@ -11,6 +11,15 @@ import {
   type IpcError,
   type ProductRow,
 } from "@arkom/core";
+import type { TFn, TKey } from "@arkom/ui";
+
+/** Either a dictionary key (client/known-code errors) or a raw server message. */
+export type ErrorText = TKey | { raw: string };
+
+export function resolveErrorText(t: TFn, err: ErrorText | undefined): string | undefined {
+  if (err === undefined) return undefined;
+  return typeof err === "string" ? t(err) : err.raw;
+}
 
 export interface Draft {
   id: string | null;
@@ -37,7 +46,7 @@ export type DraftField =
   | "reorderPoint"
   | "lowStockThreshold";
 
-export type DraftErrors = Partial<Record<DraftField, string>>;
+export type DraftErrors = Partial<Record<DraftField, ErrorText>>;
 
 export function emptyDraft(): Draft {
   return {
@@ -80,24 +89,24 @@ export function validateDraft(d: Draft): { errors: DraftErrors; request: Catalog
   const errors: DraftErrors = {};
 
   const name = d.name.trim();
-  if (!name) errors.name = "El nombre es obligatorio.";
+  if (!name) errors.name = "val.nameRequired";
 
-  if (!d.groupId) errors.groupId = "El grupo es obligatorio."; // 4.1
+  if (!d.groupId) errors.groupId = "val.groupRequired"; // 4.1
 
   const cost = d.costInput.trim() === "" ? undefined : parseMoneyInput(d.costInput);
-  if (cost === undefined) errors.costCents = "El coste es obligatorio."; // 4.1
-  else if (cost === null) errors.costCents = "Importe no válido.";
+  if (cost === undefined) errors.costCents = "val.costRequired"; // 4.1
+  else if (cost === null) errors.costCents = "val.invalidAmount";
 
   const price = d.priceInput.trim() === "" ? undefined : parseMoneyInput(d.priceInput);
-  if (price === undefined) errors.priceCents = "El PVP es obligatorio."; // 4.1
-  else if (price === null) errors.priceCents = "Importe no válido.";
+  if (price === undefined) errors.priceCents = "val.priceRequired"; // 4.1
+  else if (price === null) errors.priceCents = "val.invalidAmount";
 
-  if (d.taxRegime !== "IVA21") errors.taxRegime = "El IVA es obligatorio."; // 4.1 (P1: IVA21)
+  if (d.taxRegime !== "IVA21") errors.taxRegime = "val.taxRequired"; // 4.1 (P1: IVA21)
 
   const reorder = parseIntField(d.reorderInput);
-  if (reorder === null) errors.reorderPoint = "Entero ≥ 0."; // 4.5
+  if (reorder === null) errors.reorderPoint = "val.intGteZero"; // 4.5
   const lowStock = parseIntField(d.lowStockInput);
-  if (lowStock === null) errors.lowStockThreshold = "Entero ≥ 0."; // 4.5
+  if (lowStock === null) errors.lowStockThreshold = "val.intGteZero"; // 4.5
 
   if (Object.keys(errors).length > 0) return { errors, request: null };
   return {
@@ -118,8 +127,14 @@ export function validateDraft(d: Draft): { errors: DraftErrors; request: Catalog
   };
 }
 
-/** Map a typed server error onto the editor field it belongs to. */
-export function serverErrorToDraftErrors(err: IpcError): { field: DraftField | null; message: string } {
+/**
+ * Map a typed server error onto the editor field it belongs to. Known codes
+ * resolve to dictionary keys (locale-aware); VALIDATION details keep the
+ * server's Spanish domain message verbatim (ADR-0011: domain messages are ES).
+ */
+export function serverErrorToDraftErrors(err: IpcError): { field: DraftField | null; message: ErrorText } {
+  if (err.code === "DUPLICATE_NAME") return { field: "name", message: "err.duplicateName" };
+  if (err.code === "DUPLICATE_BARCODE") return { field: "barcode", message: "err.duplicateBarcode" };
   const known: DraftField[] = [
     "name",
     "barcode",
@@ -132,11 +147,9 @@ export function serverErrorToDraftErrors(err: IpcError): { field: DraftField | n
     "lowStockThreshold",
   ];
   if (err.field && (known as string[]).includes(err.field)) {
-    return { field: err.field as DraftField, message: err.message };
+    return { field: err.field as DraftField, message: { raw: err.message } };
   }
-  if (err.code === "DUPLICATE_NAME") return { field: "name", message: err.message };
-  if (err.code === "DUPLICATE_BARCODE") return { field: "barcode", message: err.message };
-  return { field: null, message: err.message };
+  return { field: null, message: { raw: err.message } };
 }
 
 export function isDirty(draft: Draft, baseline: Draft | null): boolean {

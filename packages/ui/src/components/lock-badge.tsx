@@ -1,3 +1,4 @@
+import { useT } from "../i18n";
 import { cn } from "../cn";
 
 /**
@@ -5,6 +6,7 @@ import { cn } from "../cn";
  * (00-foundations: locked nav items / LockedButton).
  */
 export function LockBadge({ className }: { className?: string }) {
+  const t = useT();
   return (
     <span
       className={cn(
@@ -12,7 +14,7 @@ export function LockBadge({ className }: { className?: string }) {
         className,
       )}
     >
-      LOCK
+      {t("common.lock")}
     </span>
   );
 }

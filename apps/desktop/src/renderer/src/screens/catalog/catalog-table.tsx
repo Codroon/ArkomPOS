@@ -1,9 +1,10 @@
 /**
  * Catalog list table — handoff 02 "Table". Sticky header, per-cell FALTA
  * chips on missing fields (req 3.3), read-only Stock from product_stock.
+ * P1 deviation (handoff 02): plain scroll, no virtualization.
  */
 import { missingFields, type MissingField, type ProductRow } from "@arkom/core";
-import { Chip, cn, MoneyText } from "@arkom/ui";
+import { Chip, cn, MoneyText, useT, type TFn, type TKey } from "@arkom/ui";
 
 export type SortKey = "name" | "priceCents" | "onHand";
 export interface Sort {
@@ -11,37 +12,38 @@ export interface Sort {
   dir: 1 | -1;
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  stocked: "STOCK",
-  serialized: "SERIE", // 00-foundations ES label table
+const TYPE_CHIP_KEYS: Record<string, TKey> = {
+  stocked: "chip.stock",
+  serialized: "chip.serie",
 };
 
-function MissingCell() {
+function MissingCell({ t }: { t: TFn }) {
   return (
     <span className="inline-flex items-center gap-1">
-      <span className="text-faint">—</span>
-      <Chip variant="warn">FALTA</Chip>
+      <span className="text-faint">{t("common.dash")}</span>
+      <Chip variant="warn">{t("chip.falta")}</Chip>
     </span>
   );
 }
 
 function Th({
-  children,
+  labelKey,
   align = "left",
   sortKey,
   sort,
   onSort,
 }: {
-  children: string;
+  labelKey: TKey;
   align?: "left" | "right";
   sortKey?: SortKey;
   sort: Sort;
   onSort: (key: SortKey) => void;
 }) {
+  const t = useT();
   const active = sortKey && sort.key === sortKey;
   const label = (
     <>
-      {children}
+      {t(labelKey)}
       {active ? <span className="ml-1 text-faint">{sort.dir === 1 ? "▲" : "▼"}</span> : null}
     </>
   );
@@ -76,24 +78,26 @@ export function CatalogTable({
   sort: Sort;
   onSort: (key: SortKey) => void;
 }) {
+  const t = useT();
   return (
     <table className="w-full border-collapse text-[12px]">
       <thead>
         <tr>
-          <Th sort={sort} onSort={onSort}>Código</Th>
-          <Th sort={sort} onSort={onSort} sortKey="name">Nombre</Th>
-          <Th sort={sort} onSort={onSort}>Grupo</Th>
-          <Th sort={sort} onSort={onSort}>Tipo</Th>
-          <Th sort={sort} onSort={onSort} align="right">Coste</Th>
-          <Th sort={sort} onSort={onSort} sortKey="priceCents" align="right">PVP</Th>
-          <Th sort={sort} onSort={onSort} align="right">IVA</Th>
-          <Th sort={sort} onSort={onSort} sortKey="onHand" align="right">Stock</Th>
+          <Th sort={sort} onSort={onSort} labelKey="catalog.col.code" />
+          <Th sort={sort} onSort={onSort} labelKey="catalog.col.name" sortKey="name" />
+          <Th sort={sort} onSort={onSort} labelKey="catalog.col.group" />
+          <Th sort={sort} onSort={onSort} labelKey="catalog.col.type" />
+          <Th sort={sort} onSort={onSort} labelKey="catalog.col.cost" align="right" />
+          <Th sort={sort} onSort={onSort} labelKey="catalog.col.price" sortKey="priceCents" align="right" />
+          <Th sort={sort} onSort={onSort} labelKey="catalog.col.tax" align="right" />
+          <Th sort={sort} onSort={onSort} labelKey="catalog.col.stock" sortKey="onHand" align="right" />
         </tr>
       </thead>
       <tbody>
         {rows.map((row) => {
           const missing = new Set<MissingField>(missingFields(row));
           const isSelected = row.id === selectedId;
+          const typeKey = TYPE_CHIP_KEYS[row.itemType];
           return (
             <tr
               key={row.id}
@@ -105,26 +109,26 @@ export function CatalogTable({
               )}
             >
               <td className="px-3 py-1.5 font-mono text-[11px] tabular-nums text-faint">
-                {missing.has("barcode") ? <MissingCell /> : row.barcode}
+                {missing.has("barcode") ? <MissingCell t={t} /> : row.barcode}
               </td>
               <td className={cn("px-3 py-1.5", row.active ? "text-ink" : "text-faint")}>
                 {row.name}
-                {!row.active ? <Chip className="ml-1.5">INACTIVO</Chip> : null}
+                {!row.active ? <Chip className="ml-1.5">{t("chip.inactive")}</Chip> : null}
               </td>
               <td className="px-3 py-1.5 text-ink-3">
-                {missing.has("group") ? <MissingCell /> : row.groupName}
+                {missing.has("group") ? <MissingCell t={t} /> : row.groupName}
               </td>
               <td className="px-3 py-1.5">
-                <Chip>{TYPE_LABELS[row.itemType] ?? row.itemType.toUpperCase()}</Chip>
+                <Chip>{typeKey ? t(typeKey) : row.itemType.toUpperCase()}</Chip>
               </td>
               <td className="whitespace-nowrap px-3 py-1.5 text-right text-muted">
-                {missing.has("cost") ? <MissingCell /> : <MoneyText cents={row.costCents!} />}
+                {missing.has("cost") ? <MissingCell t={t} /> : <MoneyText cents={row.costCents!} />}
               </td>
               <td className="whitespace-nowrap px-3 py-1.5 text-right font-bold">
-                {missing.has("price") ? <MissingCell /> : <MoneyText cents={row.priceCents!} />}
+                {missing.has("price") ? <MissingCell t={t} /> : <MoneyText cents={row.priceCents!} />}
               </td>
               <td className="px-3 py-1.5 text-right tabular-nums text-ink-3">
-                {missing.has("tax") ? <MissingCell /> : `${(row.taxRateBp ?? 0) / 100}%`}
+                {missing.has("tax") ? <MissingCell t={t} /> : `${(row.taxRateBp ?? 0) / 100}%`}
               </td>
               <td className="px-3 py-1.5 text-right font-mono tabular-nums">{row.onHand}</td>
             </tr>

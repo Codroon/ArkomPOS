@@ -5,17 +5,19 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseIpcError, type CatalogListRequest, type EntityRef, type ProductRow } from "@arkom/core";
-import { cn, ConfirmDialog, GhostButton, PrimaryButton, SearchInput } from "@arkom/ui";
+import { cn, ConfirmDialog, GhostButton, PrimaryButton, SearchInput, useT } from "@arkom/ui";
 import { CatalogEditor } from "./catalog-editor";
 import { CatalogTable, type Sort, type SortKey } from "./catalog-table";
 import {
   draftFromRow,
   emptyDraft,
   isDirty,
+  resolveErrorText,
   serverErrorToDraftErrors,
   validateDraft,
   type Draft,
   type DraftErrors,
+  type ErrorText,
 } from "./model";
 
 interface Filters {
@@ -53,6 +55,7 @@ function FilterChip({
 }
 
 export function CatalogScreen() {
+  const t = useT();
   const [rows, setRows] = useState<ProductRow[]>([]);
   const [groups, setGroups] = useState<EntityRef[]>([]);
   const [searchText, setSearchText] = useState("");
@@ -63,7 +66,7 @@ export function CatalogScreen() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [baseline, setBaseline] = useState<Draft | null>(null);
   const [serverErrors, setServerErrors] = useState<DraftErrors>({});
-  const [generalError, setGeneralError] = useState<string | null>(null);
+  const [generalError, setGeneralError] = useState<ErrorText | null>(null);
   const [saving, setSaving] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
@@ -163,7 +166,7 @@ export function CatalogScreen() {
           else setGeneralError(message);
         } else {
           console.error("catalog:save failed", err);
-          setGeneralError("No se pudo guardar. Revisa la consola.");
+          setGeneralError("catalog.saveFailed");
         }
       })
       .finally(() => setSaving(false));
@@ -196,16 +199,16 @@ export function CatalogScreen() {
     <div className="flex min-h-0 flex-1 flex-col">
       {/* header */}
       <div className="flex flex-none items-center gap-3 border-b border-border-strong bg-panel px-4 py-2.5">
-        <div className="text-[15px] font-bold">Catálogo</div>
-        <div className="text-[11px] text-muted">{rows.length} artículos</div>
+        <div className="text-[15px] font-bold">{t("catalog.title")}</div>
+        <div className="text-[11px] text-muted">{t("catalog.count", { n: rows.length })}</div>
         <div className="flex-1" />
         <SearchInput
           className="w-[260px]"
-          placeholder="Buscar o escanear producto…"
+          placeholder={t("catalog.searchPlaceholder")}
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
         />
-        <PrimaryButton onClick={onNew}>+ Nuevo artículo</PrimaryButton>
+        <PrimaryButton onClick={onNew}>{t("catalog.new")}</PrimaryButton>
       </div>
 
       {/* filters row */}
@@ -215,7 +218,7 @@ export function CatalogScreen() {
           onChange={(e) => setFilters((f) => ({ ...f, groupId: e.target.value }))}
           className="h-6 rounded-[3px] border border-border-input bg-card px-1.5 text-[11px] text-ink-2 outline-none"
         >
-          <option value="">Grupo: todos</option>
+          <option value="">{t("catalog.filter.groupAll")}</option>
           {groups.map((g) => (
             <option key={g.id} value={g.id}>
               {g.name}
@@ -227,30 +230,32 @@ export function CatalogScreen() {
           onChange={(e) => setFilters((f) => ({ ...f, itemType: e.target.value as Filters["itemType"] }))}
           className="h-6 rounded-[3px] border border-border-input bg-card px-1.5 text-[11px] text-ink-2 outline-none"
         >
-          <option value="">Tipo: todos</option>
-          <option value="stocked">Stock</option>
-          <option value="serialized">Serializado</option>
+          <option value="">{t("catalog.filter.typeAll")}</option>
+          <option value="stocked">{t("catalog.filter.stocked")}</option>
+          <option value="serialized">{t("catalog.filter.serialized")}</option>
         </select>
         <FilterChip
           active={filters.lowStockOnly}
           onClick={() => setFilters((f) => ({ ...f, lowStockOnly: !f.lowStockOnly }))}
         >
-          Bajo mínimo
+          {t("catalog.filter.lowStock")}
         </FilterChip>
         <FilterChip
           active={filters.missingDataOnly}
           onClick={() => setFilters((f) => ({ ...f, missingDataOnly: !f.missingDataOnly }))}
         >
-          Datos incompletos
+          {t("catalog.filter.missingData")}
         </FilterChip>
         <div className="flex-1" />
         {activeFilterCount > 0 ? (
           <>
             <span className="text-[11px] text-muted">
-              {activeFilterCount} {activeFilterCount === 1 ? "filtro activo" : "filtros activos"}
+              {activeFilterCount === 1
+                ? t("catalog.filter.activeOne")
+                : t("catalog.filter.activeMany", { n: activeFilterCount })}
             </span>
             <GhostButton className="h-6 px-2 text-[11px]" onClick={clearFilters}>
-              Limpiar
+              {t("common.clear")}
             </GhostButton>
           </>
         ) : null}
@@ -272,9 +277,9 @@ export function CatalogScreen() {
           ) : (
             <div className="flex h-full items-center justify-center">
               <div className="text-center">
-                <div className="text-[12px] text-muted">Sin resultados</div>
+                <div className="text-[12px] text-muted">{t("catalog.noResults")}</div>
                 <GhostButton className="mt-2" onClick={clearFilters}>
-                  Limpiar filtros
+                  {t("catalog.clearFilters")}
                 </GhostButton>
               </div>
             </div>
@@ -287,7 +292,7 @@ export function CatalogScreen() {
             groups={groups}
             canSave={dirty && valid}
             saving={saving}
-            generalError={generalError}
+            generalError={resolveErrorText(t, generalError ?? undefined) ?? null}
             onPatch={(patch) => {
               setDraft((d) => (d ? { ...d, ...patch } : d));
               setServerErrors({});
@@ -300,10 +305,10 @@ export function CatalogScreen() {
 
       <ConfirmDialog
         open={pendingAction !== null}
-        title="¿Descartar cambios?"
-        body="Hay cambios sin guardar en el editor."
-        confirmLabel="Descartar"
-        cancelLabel="Seguir editando"
+        title={t("dirty.title")}
+        body={t("dirty.body")}
+        confirmLabel={t("dirty.discard")}
+        cancelLabel={t("dirty.keepEditing")}
         onConfirm={() => {
           pendingAction?.();
           setPendingAction(null);

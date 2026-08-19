@@ -53,6 +53,10 @@ Implement tokens as Tailwind theme extensions in `packages/ui` — components re
 - Dates: dd/mm/yyyy hh:mm. Language: ES labels below; code stays EN.
 
 ## ES label table (customer/staff-visible strings)
+> Since ADR-0011 these labels live as keys in the typed dictionary
+> (`packages/ui/src/i18n/es.ts` — this table remains the canonical Spanish values; `en.ts`
+> mirrors the key map). UI locale is staff-toggleable (ES/EN chip in the topbar); ticket
+> printing always uses fixed Spanish strings, independent of the toggle.
 Venta · Catálogo · Inventario · Buscar o escanear producto… · Grupo · Coste · PVP · IVA ·
 Stock · Tipo · Nuevo artículo · Guardar · Cancelar · Ticket · Subtotal (base) · IVA 21% ·
 TOTAL · Efectivo · Tarjeta · Bizum · Transferencia · Cobrar (F4) · Aparcar (F8) · Recuperar ·
