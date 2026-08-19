@@ -11,4 +11,7 @@ export { Switch } from "./components/switch";
 export { Segmented } from "./components/segmented";
 export type { SegmentOption } from "./components/segmented";
 export { SearchInput } from "./components/search-input";
+export { ScanInput } from "./components/scan-input";
+export type { ScanInputHandle } from "./components/scan-input";
+export { Toast } from "./components/toast";
 export { ConfirmDialog } from "./components/confirm-dialog";

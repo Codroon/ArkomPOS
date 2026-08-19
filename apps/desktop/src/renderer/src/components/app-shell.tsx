@@ -8,9 +8,9 @@
 import { useEffect, useState } from "react";
 import type { MetaContextResponse } from "@arkom/core";
 import { cn, LockBadge, useLocale, useT, type TKey } from "@arkom/ui";
+import { registerNavigator, type ScreenId } from "../lib/screen-bus";
 import { CatalogScreen } from "../screens/catalog/catalog-screen";
-
-type ScreenId = "venta" | "catalogo" | "inventario";
+import { InventoryScreen } from "../screens/inventory/inventory-screen";
 
 const NAV_ITEMS: ReadonlyArray<{ n: string; labelKey: TKey; id?: ScreenId }> = [
   { n: "01", labelKey: "nav.venta", id: "venta" },
@@ -63,6 +63,8 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
     const timer = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => registerNavigator(setScreen), []);
 
   return (
     <div className="flex h-full min-h-[860px] flex-col bg-app text-ink">
@@ -134,6 +136,8 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
         <main className="flex min-w-0 flex-1 flex-col bg-app">
           {screen === "catalogo" ? (
             <CatalogScreen />
+          ) : screen === "inventario" ? (
+            <InventoryScreen />
           ) : (
             <div className="flex flex-1 items-center justify-center">
               <div className="text-center">

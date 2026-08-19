@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseIpcError, type CatalogListRequest, type EntityRef, type ProductRow } from "@arkom/core";
 import { cn, ConfirmDialog, GhostButton, PrimaryButton, SearchInput, useT } from "@arkom/ui";
+import { consumeCatalogPrefill } from "../../lib/screen-bus";
 import { CatalogEditor } from "./catalog-editor";
 import { CatalogTable, type Sort, type SortKey } from "./catalog-table";
 import {
@@ -100,6 +101,10 @@ export function CatalogScreen() {
       .invoke("catalog:groups")
       .then(setGroups)
       .catch((err) => console.error("catalog:groups failed", err));
+    // scan-miss handoff: entrada's "Crear artículo" arrives with the code prefilled
+    const prefill = consumeCatalogPrefill();
+    if (prefill) openDraft({ ...emptyDraft(), barcode: prefill });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only
   }, []);
 
   const sorted = useMemo(() => {
