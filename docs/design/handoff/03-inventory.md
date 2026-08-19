@@ -6,7 +6,7 @@ Body: stock table; bottom band = **Entrada de stock** panel (mockup's stock-coun
 Quantities are display-only everywhere on this screen (req 5.1).
 
 ## Stock table (sticky header)
-Columns: Artículo (name + mono code) · Cantidad (bold tabular) · Punto de pedido (muted) · Estado (Chip `BAJO MÍNIMO` bordered when onHand ≤ reorderPoint, else "OK" faint) · Coste unitario (muted) · Valoración (onHand×cost). Serialized rows: Cantidad = live unit count, plus `SERIE` chip; their valuation = Σ unit costs.
+Columns: Artículo (name + mono code) · Cantidad (bold tabular) · Punto de pedido (muted) · Estado (Chip `BAJO MÍNIMO` bordered when reorderPoint > 0 ∧ onHand ≤ reorderPoint; reorderPoint 0 = tracking off, renders "OK" faint like healthy rows — rule codified with PRD 5.2, implemented once in `@arkom/core` isLowStock) · Coste unitario (muted) · Valoración (onHand×cost). Serialized rows: Cantidad = live unit count, plus `SERIE` chip; their valuation = Σ unit costs.
 Filters: Grupo · Tipo · Bajo mínimo. Search by name/code.
 Row click → **Movimientos drawer** (this is an addition the mockup omits; req 5.4 mandates it).
 

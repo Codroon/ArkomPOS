@@ -12,7 +12,7 @@ Columns: Código (mono, faint) · Nombre · Grupo · Tipo (Chip) · Coste (right
 - Missing-data rows: `bg #f6f6f7` + per-cell "—" with warning chip `FALTA` on the missing field(s); row always clickable to fix (req 3.3).
 - Stock cell is read-only display from `product_stock` (editing lives in Inventario).
 - Row click → load into editor; selected row `bg #eceef0`.
-- Virtualized; sort by Nombre default; header click sorts (Nombre, PVP, Stock).
+- Sort by Nombre default; header click sorts (Nombre, PVP, Stock). **P1 deviation:** no virtualization — plain scroll. A one-shop catalog is ≤ a few hundred rows; windowing (a dep or hand-rolled scroller) buys nothing at that scale. Same call applies to Venta's product grid. Revisit if a real catalog import lands thousands of rows.
 
 ## Editor panel (create/edit — `catalog:save`)
 Fields, top→down (Field component; required inputs use `border-input`-strong #71717a):

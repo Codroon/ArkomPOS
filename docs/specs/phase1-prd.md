@@ -62,7 +62,7 @@ Each exists in schema/enums where cheap (ADR-0007/0009) but gets zero UI.
 
 ### P0 — Inventario + Entrada (req 5, 6)
 - [ ] **5.1** No quantity is editable anywhere on the screen; quantities equal Σ movements (property-tested in core).
-- [ ] **5.2** Table shows qty, reorder point, BAJO MÍNIMO flag (qty ≤ reorder), unit cost, valuation; header shows total valuation and below-min count.
+- [ ] **5.2** Table shows qty, reorder point, BAJO MÍNIMO flag (qty ≤ reorder; a reorder point of 0 means "not tracked" and never flags — otherwise every untracked zero-stock row would drown the filter), unit cost, valuation; header shows total valuation and below-min count.
 - [ ] **5.3** No operation can drive on-hand below zero — enforced in `packages/core`, covered by tests, UI merely reports the typed error.
 - [ ] **5.4** Per-item drawer lists every movement: date, type, signed qty, cost, linked document number, user ("—" pre-auth); newest first; paginated.
 - [ ] **6.1** Entry by barcode scan; serialized products switch to IMEI capture, qty locked to 1, duplicate IMEI rejected.
