@@ -20,10 +20,22 @@ import {
   CatalogSaveResponseSchema,
   CatalogGroupsRequestSchema,
   CatalogGroupsResponseSchema,
+  InventoryListRequestSchema,
+  InventoryListResponseSchema,
+  InventoryMovementsRequestSchema,
+  InventoryMovementsResponseSchema,
+  StockAddRequestSchema,
+  StockAddResponseSchema,
+  SupplierListRequestSchema,
+  SupplierListResponseSchema,
+  SupplierCreateRequestSchema,
+  SupplierCreateResponseSchema,
 } from "@arkom/core";
 import type { ArkomDb } from "@arkom/db";
 import { tillContext } from "./context";
 import { getProduct, listGroups, listProducts, saveProduct } from "./repos/catalog";
+import { addStock, listInventory, listMovements } from "./repos/inventory";
+import { createSupplier, listSuppliers } from "./repos/suppliers";
 
 function asBridgeError(err: unknown): Error {
   if (err instanceof AppError) return toBridgeError(err);
@@ -70,5 +82,25 @@ export function registerIpcHandlers(db: ArkomDb): void {
 
   register("catalog:groups", CatalogGroupsRequestSchema, CatalogGroupsResponseSchema, () => {
     return listGroups(db, tillContext(db).ctx);
+  });
+
+  register("inventory:list", InventoryListRequestSchema, InventoryListResponseSchema, (filters) => {
+    return listInventory(db, tillContext(db).ctx, filters);
+  });
+
+  register("inventory:movements", InventoryMovementsRequestSchema, InventoryMovementsResponseSchema, (req) => {
+    return listMovements(db, tillContext(db).ctx, req);
+  });
+
+  register("stock:add", StockAddRequestSchema, StockAddResponseSchema, (input) => {
+    return addStock(db, tillContext(db).ctx, input);
+  });
+
+  register("supplier:list", SupplierListRequestSchema, SupplierListResponseSchema, () => {
+    return listSuppliers(db, tillContext(db).ctx);
+  });
+
+  register("supplier:create", SupplierCreateRequestSchema, SupplierCreateResponseSchema, ({ name }) => {
+    return createSupplier(db, tillContext(db).ctx, name);
   });
 }

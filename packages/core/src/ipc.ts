@@ -13,6 +13,11 @@ export const IPC_CHANNELS = [
   "catalog:get",
   "catalog:save",
   "catalog:groups",
+  "inventory:list",
+  "inventory:movements",
+  "stock:add",
+  "supplier:list",
+  "supplier:create",
 ] as const;
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
@@ -20,6 +25,7 @@ export type IpcChannel = (typeof IPC_CHANNELS)[number];
 export const ErrorCodeSchema = z.enum([
   "DUPLICATE_NAME",
   "DUPLICATE_BARCODE",
+  "DUPLICATE_IMEI",
   "NEGATIVE_STOCK",
   "UNIT_NOT_AVAILABLE",
   "TENDER_MISMATCH",
@@ -111,3 +117,87 @@ export const CatalogSaveRequestSchema = z.object({
 });
 export type CatalogSaveRequest = z.infer<typeof CatalogSaveRequestSchema>;
 export const CatalogSaveResponseSchema = ProductRowSchema;
+
+/* ---- inventory:* + stock:add + supplier:* — §4 ---- */
+
+export const InventoryListRequestSchema = z
+  .object({
+    search: z.string().optional(),
+    groupId: z.string().optional(),
+    itemType: CatalogItemTypeSchema.optional(),
+    lowStockOnly: z.boolean().optional(),
+  })
+  .optional();
+export type InventoryListRequest = z.infer<typeof InventoryListRequestSchema>;
+
+export const InventoryRowSchema = z.object({
+  productId: z.string(),
+  name: z.string(),
+  barcode: z.string().nullable(),
+  groupId: z.string().nullable(),
+  groupName: z.string().nullable(),
+  itemType: z.string(),
+  onHand: z.number().int(),
+  reorderPoint: z.number().int(),
+  lowStockThreshold: z.number().int(),
+  costCents: z.number().int().nullable(),
+  /** stocked: onHand × cost (0 when cost unknown) · serialized: Σ in-stock unit costs */
+  valuationCents: z.number().int(),
+  active: z.boolean(),
+});
+export type InventoryRow = z.infer<typeof InventoryRowSchema>;
+export const InventoryListResponseSchema = z.array(InventoryRowSchema);
+
+export const InventoryMovementsRequestSchema = z.object({
+  productId: z.string(),
+  cursor: z.string().nullish(), // keyset: movement id (UUIDv7 = time-ordered)
+});
+export type InventoryMovementsRequest = z.infer<typeof InventoryMovementsRequestSchema>;
+
+export const MovementRowSchema = z.object({
+  id: z.string(),
+  createdAtMs: z.number().int(),
+  movementType: z.string(),
+  qty: z.number().int(),
+  unitCostCents: z.number().int().nullable(),
+  documentNumber: z.string().nullable(), // "—" in P1 until Venta exists
+  imei: z.string().nullable(),
+  userId: z.string().nullable(), // "—" until auth (ADR-0010)
+});
+export type MovementRow = z.infer<typeof MovementRowSchema>;
+export const InventoryMovementsResponseSchema = z.object({
+  rows: z.array(MovementRowSchema),
+  nextCursor: z.string().nullable(),
+});
+export type InventoryMovementsResponse = z.infer<typeof InventoryMovementsResponseSchema>;
+
+export const StockAddEntrySchema = z
+  .object({
+    productId: z.string().optional(),
+    barcode: z.string().optional(),
+    qty: z.number().int().min(1),
+    unitCostCents: z.number().int().min(0), // req 6.2
+    supplierId: z.string().min(1), // req 6.3
+    imei: z.string().optional(), // serialized: creates the unit (§4)
+  })
+  .refine((e) => e.productId || e.barcode, { message: "productId or barcode required" });
+export type StockAddEntry = z.infer<typeof StockAddEntrySchema>;
+
+export const StockAddRequestSchema = z.object({
+  entries: z.array(StockAddEntrySchema).min(1),
+});
+export type StockAddRequest = z.infer<typeof StockAddRequestSchema>;
+
+export const StockAddResponseSchema = z.object({
+  lineCount: z.number().int(),
+  productIds: z.array(z.string()),
+});
+export type StockAddResponse = z.infer<typeof StockAddResponseSchema>;
+
+export const SupplierListRequestSchema = z.object({}).optional();
+export const SupplierListResponseSchema = z.array(EntityRefSchema);
+export const SupplierCreateRequestSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+});
+export type SupplierCreateRequest = z.infer<typeof SupplierCreateRequestSchema>;
+export const SupplierCreateResponseSchema = EntityRefSchema;

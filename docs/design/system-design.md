@@ -46,9 +46,11 @@ business rows + `product_stock` cache + `oplog` entry → typed result back.
 | `catalog:get` | {id} → ProductDetail | |
 | `catalog:groups` | {} → {id, name}[] | editor group select; venta group grid reuses it |
 | `catalog:save` | ProductInput → ProductRow | full req-4 validation; barcode auto-gen if blank; duplicate name/barcode → typed error |
-| `inventory:list` | filters → InventoryRow[] (onHand, reorder, lowStock, valuation) | reads `product_stock` cache |
-| `inventory:movements` | {productId, cursor?} → MovementRow[] | req 5.4 history |
-| `stock:add` | {entries:[{barcode\|productId, qty, unitCostCents, supplierId, imei?}]} → AddResult | purchase_in; IMEI creates unit (serialized) |
+| `inventory:list` | filters{search?, groupId?, itemType?, lowStockOnly?} → InventoryRow[] (onHand, reorder, lowStock, valuation) | reads `product_stock` cache; serialized valuation = Σ in-stock unit costs |
+| `inventory:movements` | {productId, cursor?} → {rows: MovementRow[], nextCursor} | req 5.4 history; keyset cursor = movement id (UUIDv7 time-ordered), newest first |
+| `stock:add` | {entries:[{barcode\|productId, qty, unitCostCents, supplierId, imei?}]} → {lineCount, productIds} | purchase_in; IMEI creates unit (serialized, qty 1); applies last-cost (6.5); one oplog row per movement |
+| `supplier:list` | {} → {id, name}[] | entrada supplier select (req 6.3) |
+| `supplier:create` | {name} → {id, name} | inline create from entrada; duplicate → DUPLICATE_NAME |
 | `sale:new` | {} → SaleDraft | draft document |
 | `sale:addLine` | {docId, barcode\|productId\|unitId, qty?} → SaleState | serialized ⇒ unit picked & reserved |
 | `sale:overridePrice` | {docId, lineId, newPriceCents, reason} → SaleState | gated, oplog'd (req 2.4) |
@@ -58,7 +60,7 @@ business rows + `product_stock` cache + `oplog` entry → typed result back.
 | `print:ticket` | {docId} → {ok} \| {pdfPath} | ESC/POS, PDF fallback |
 | `meta:context` | {} → {tenant, location, terminal} | injected config |
 
-Typed errors: `{code: 'DUPLICATE_NAME' | 'DUPLICATE_BARCODE' | 'NEGATIVE_STOCK' | 'UNIT_NOT_AVAILABLE' | 'TENDER_MISMATCH' | 'VALIDATION' , message, field?}` — renderer maps codes to UI, never parses strings. (DUPLICATE_NAME added with the catalog slice: req 4.4 wants name and barcode duplicates distinguished per field.)
+Typed errors: `{code: 'DUPLICATE_NAME' | 'DUPLICATE_BARCODE' | 'DUPLICATE_IMEI' | 'NEGATIVE_STOCK' | 'UNIT_NOT_AVAILABLE' | 'TENDER_MISMATCH' | 'VALIDATION' , message, field?}` — renderer maps codes to UI, never parses strings. (DUPLICATE_NAME added with the catalog slice: req 4.4 wants name and barcode duplicates distinguished per field. DUPLICATE_IMEI added with the inventory slice: req 6.1 rejects duplicate IMEIs at entry.)
 
 ## 5. Screen ↔ data (Phase 1)
 
