@@ -2,6 +2,7 @@
 import type {
   CatalogListRequest,
   CatalogSaveRequest,
+  EntityRef,
   MetaContextResponse,
   ProductRow,
 } from "@arkom/core";
@@ -14,6 +15,7 @@ declare global {
       invoke(channel: "catalog:list", payload?: CatalogListRequest): Promise<ProductRow[]>;
       invoke(channel: "catalog:get", payload: { id: string }): Promise<ProductRow>;
       invoke(channel: "catalog:save", payload: CatalogSaveRequest): Promise<ProductRow>;
+      invoke(channel: "catalog:groups", payload?: undefined): Promise<EntityRef[]>;
     };
   }
 }

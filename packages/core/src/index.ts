@@ -37,6 +37,8 @@ export {
   CatalogGetResponseSchema,
   CatalogSaveRequestSchema,
   CatalogSaveResponseSchema,
+  CatalogGroupsRequestSchema,
+  CatalogGroupsResponseSchema,
 } from "./ipc";
 export type {
   IpcChannel,

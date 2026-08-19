@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import type { MetaContextResponse } from "@arkom/core";
 import { cn, LockBadge } from "@arkom/ui";
+import { CatalogScreen } from "../screens/catalog/catalog-screen";
 
 type ScreenId = "venta" | "catalogo" | "inventario";
 
@@ -109,12 +110,16 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
 
         {/* main */}
         <main className="flex min-w-0 flex-1 flex-col bg-app">
-          <div className="flex flex-1 items-center justify-center">
-            <div className="text-center">
-              <div className="text-[15px] font-bold text-ink-2">{SCREEN_TITLES[screen]}</div>
-              <div className="mt-1 text-[12px] text-muted">Pantalla en construcción — Fase 1</div>
+          {screen === "catalogo" ? (
+            <CatalogScreen />
+          ) : (
+            <div className="flex flex-1 items-center justify-center">
+              <div className="text-center">
+                <div className="text-[15px] font-bold text-ink-2">{SCREEN_TITLES[screen]}</div>
+                <div className="mt-1 text-[12px] text-muted">Pantalla en construcción — Fase 1</div>
+              </div>
             </div>
-          </div>
+          )}
         </main>
       </div>
     </div>

@@ -44,6 +44,7 @@ business rows + `product_stock` cache + `oplog` entry → typed result back.
 |---|---|---|
 | `catalog:list` | filters{search?, groupId?, itemType?, lowStockOnly?, missingDataOnly?} → ProductRow[] | flags derived from NULLs (req 3.3) |
 | `catalog:get` | {id} → ProductDetail | |
+| `catalog:groups` | {} → {id, name}[] | editor group select; venta group grid reuses it |
 | `catalog:save` | ProductInput → ProductRow | full req-4 validation; barcode auto-gen if blank; duplicate name/barcode → typed error |
 | `inventory:list` | filters → InventoryRow[] (onHand, reorder, lowStock, valuation) | reads `product_stock` cache |
 | `inventory:movements` | {productId, cursor?} → MovementRow[] | req 5.4 history |

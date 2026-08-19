@@ -137,6 +137,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@arkom/core':
+        specifier: workspace:*
+        version: link:../core
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1

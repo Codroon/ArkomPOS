@@ -57,6 +57,15 @@ function selectRows(db: Reader, ctx: MutationCtx, extra?: SQL): ProductRow[] {
   return rows as ProductRow[];
 }
 
+export function listGroups(db: ArkomDb, ctx: MutationCtx): { id: string; name: string }[] {
+  return db
+    .select({ id: productGroups.id, name: productGroups.name })
+    .from(productGroups)
+    .where(eq(productGroups.tenantId, ctx.tenantId))
+    .orderBy(asc(productGroups.sortOrder))
+    .all();
+}
+
 export function listProducts(db: ArkomDb, ctx: MutationCtx, filters: CatalogListRequest): ProductRow[] {
   const conds: SQL[] = [];
   const f = filters ?? {};

@@ -1,2 +1,12 @@
 export { cn } from "./cn";
 export { LockBadge } from "./components/lock-badge";
+export { SectionLabel } from "./components/section-label";
+export { Chip } from "./components/chip";
+export { PrimaryButton, GhostButton, LockedButton } from "./components/buttons";
+export { Field, TextInput, SelectInput } from "./components/field";
+export { MoneyText } from "./components/money-text";
+export { Switch } from "./components/switch";
+export { Segmented } from "./components/segmented";
+export type { SegmentOption } from "./components/segmented";
+export { SearchInput } from "./components/search-input";
+export { ConfirmDialog } from "./components/confirm-dialog";

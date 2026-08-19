@@ -7,7 +7,13 @@
 import { z } from "zod";
 
 /** Channels implemented so far (allowlisted in the preload bridge). */
-export const IPC_CHANNELS = ["meta:context", "catalog:list", "catalog:get", "catalog:save"] as const;
+export const IPC_CHANNELS = [
+  "meta:context",
+  "catalog:list",
+  "catalog:get",
+  "catalog:save",
+  "catalog:groups",
+] as const;
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
 /** Typed error codes (§4) — the renderer maps codes to UI, never parses messages. */
@@ -85,6 +91,9 @@ export type ProductRow = z.infer<typeof ProductRowSchema>;
 export const CatalogListResponseSchema = z.array(ProductRowSchema);
 export const CatalogGetRequestSchema = z.object({ id: z.string() });
 export const CatalogGetResponseSchema = ProductRowSchema;
+
+export const CatalogGroupsRequestSchema = z.object({}).optional();
+export const CatalogGroupsResponseSchema = z.array(EntityRefSchema);
 
 /** req 4.1: cost, PVP, IVA and group are REQUIRED on every save (schema-level). */
 export const CatalogSaveRequestSchema = z.object({

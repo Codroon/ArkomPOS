@@ -18,10 +18,12 @@ import {
   CatalogGetResponseSchema,
   CatalogSaveRequestSchema,
   CatalogSaveResponseSchema,
+  CatalogGroupsRequestSchema,
+  CatalogGroupsResponseSchema,
 } from "@arkom/core";
 import type { ArkomDb } from "@arkom/db";
 import { tillContext } from "./context";
-import { getProduct, listProducts, saveProduct } from "./repos/catalog";
+import { getProduct, listGroups, listProducts, saveProduct } from "./repos/catalog";
 
 function asBridgeError(err: unknown): Error {
   if (err instanceof AppError) return toBridgeError(err);
@@ -64,5 +66,9 @@ export function registerIpcHandlers(db: ArkomDb): void {
 
   register("catalog:save", CatalogSaveRequestSchema, CatalogSaveResponseSchema, (input) => {
     return saveProduct(db, tillContext(db).ctx, input);
+  });
+
+  register("catalog:groups", CatalogGroupsRequestSchema, CatalogGroupsResponseSchema, () => {
+    return listGroups(db, tillContext(db).ctx);
   });
 }
