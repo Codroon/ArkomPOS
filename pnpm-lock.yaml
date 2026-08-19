@@ -22,6 +22,9 @@ importers:
       better-sqlite3:
         specifier: ^12.2.0
         version: 12.11.1
+      drizzle-orm:
+        specifier: ^0.44.4
+        version: 0.44.7(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)
       electron-updater:
         specifier: ^6.6.2
         version: 6.8.9(supports-color@7.2.0)

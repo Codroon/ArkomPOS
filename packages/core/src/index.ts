@@ -14,11 +14,38 @@ export {
 export { ean13CheckDigit, isValidEan13, generateInternalEan13 } from "./barcode";
 export { AppError, appError, toBridgeError, parseIpcError } from "./errors";
 export {
+  TAX_RATE_BP,
+  missingFields,
+  isMissingData,
+  isLowStock,
+  assertTypeChangeAllowed,
+} from "./catalog";
+export type { MissingField } from "./catalog";
+export {
   IPC_CHANNELS,
   ErrorCodeSchema,
   IpcErrorSchema,
   EntityRefSchema,
   MetaContextRequestSchema,
   MetaContextResponseSchema,
+  CatalogItemTypeSchema,
+  TaxRegimeP1Schema,
+  CatalogListRequestSchema,
+  ProductRowSchema,
+  CatalogListResponseSchema,
+  CatalogGetRequestSchema,
+  CatalogGetResponseSchema,
+  CatalogSaveRequestSchema,
+  CatalogSaveResponseSchema,
 } from "./ipc";
-export type { IpcChannel, ErrorCode, IpcError, EntityRef, MetaContextResponse } from "./ipc";
+export type {
+  IpcChannel,
+  ErrorCode,
+  IpcError,
+  EntityRef,
+  MetaContextResponse,
+  CatalogItemType,
+  CatalogListRequest,
+  ProductRow,
+  CatalogSaveRequest,
+} from "./ipc";

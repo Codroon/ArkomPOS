@@ -20,6 +20,7 @@
     "@arkom/db": "workspace:*",
     "@arkom/ui": "workspace:*",
     "better-sqlite3": "^12.2.0",
+    "drizzle-orm": "^0.44.4",
     "electron-updater": "^6.6.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

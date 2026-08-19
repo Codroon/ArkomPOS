@@ -57,7 +57,7 @@ business rows + `product_stock` cache + `oplog` entry → typed result back.
 | `print:ticket` | {docId} → {ok} \| {pdfPath} | ESC/POS, PDF fallback |
 | `meta:context` | {} → {tenant, location, terminal} | injected config |
 
-Typed errors: `{code: 'DUPLICATE_BARCODE' | 'NEGATIVE_STOCK' | 'UNIT_NOT_AVAILABLE' | 'TENDER_MISMATCH' | 'VALIDATION' , message, field?}` — renderer maps codes to UI, never parses strings.
+Typed errors: `{code: 'DUPLICATE_NAME' | 'DUPLICATE_BARCODE' | 'NEGATIVE_STOCK' | 'UNIT_NOT_AVAILABLE' | 'TENDER_MISMATCH' | 'VALIDATION' , message, field?}` — renderer maps codes to UI, never parses strings. (DUPLICATE_NAME added with the catalog slice: req 4.4 wants name and barcode duplicates distinguished per field.)
 
 ## 5. Screen ↔ data (Phase 1)
 

@@ -3,6 +3,12 @@ import { join } from "node:path";
 import { initDb } from "./db";
 import { registerIpcHandlers } from "./ipc";
 
+// dev-only: ARKOM_DEBUG_PORT opens Chrome DevTools Protocol for scripted
+// driving/screenshots of the running app (never set in packaged builds)
+if (!app.isPackaged && process.env.ARKOM_DEBUG_PORT) {
+  app.commandLine.appendSwitch("remote-debugging-port", process.env.ARKOM_DEBUG_PORT);
+}
+
 // 00-foundations: fixed desktop layout, min window 1280×860 (till hardware)
 function createWindow(): void {
   const win = new BrowserWindow({

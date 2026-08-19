@@ -1,35 +1,68 @@
 /**
  * IPC handlers — contract in docs/design/system-design.md §4, schemas in
- * @arkom/core ipc.ts. Handlers do no business math (that lives in core);
- * requests and results are Zod-parsed on this side of the bridge, and failures
- * cross as typed error envelopes (the renderer maps codes, never messages).
+ * @arkom/core ipc.ts. Every request AND response is Zod-parsed here; failures
+ * cross the bridge as typed envelopes (the renderer maps codes, never strings).
+ * Handlers do no business math — that lives in core; writes go through mutate().
  */
 import { ipcMain } from "electron";
+import { z, ZodError } from "zod";
 import {
+  AppError,
+  appError,
+  toBridgeError,
   MetaContextRequestSchema,
   MetaContextResponseSchema,
-  type IpcError,
+  CatalogListRequestSchema,
+  CatalogListResponseSchema,
+  CatalogGetRequestSchema,
+  CatalogGetResponseSchema,
+  CatalogSaveRequestSchema,
+  CatalogSaveResponseSchema,
 } from "@arkom/core";
-import { schema, type ArkomDb } from "@arkom/db";
+import type { ArkomDb } from "@arkom/db";
+import { tillContext } from "./context";
+import { getProduct, listProducts, saveProduct } from "./repos/catalog";
 
-/** Throw a typed IPC error — Electron serializes the message across the bridge. */
-function ipcError(error: IpcError): never {
-  throw new Error(JSON.stringify(error));
+function asBridgeError(err: unknown): Error {
+  if (err instanceof AppError) return toBridgeError(err);
+  if (err instanceof ZodError) {
+    const issue = err.issues[0];
+    const field = issue && issue.path.length > 0 ? issue.path.join(".") : undefined;
+    return toBridgeError(appError("VALIDATION", issue?.message ?? "Datos no válidos.", field));
+  }
+  console.error("[ipc] unexpected error:", err);
+  return err instanceof Error ? err : new Error(String(err));
+}
+
+function register<Req, Res>(
+  channel: string,
+  reqSchema: z.ZodType<Req>,
+  resSchema: z.ZodType<Res>,
+  handler: (req: Req) => Res,
+): void {
+  ipcMain.handle(channel, (_event, payload: unknown) => {
+    try {
+      return resSchema.parse(handler(reqSchema.parse(payload)));
+    } catch (err) {
+      throw asBridgeError(err);
+    }
+  });
 }
 
 export function registerIpcHandlers(db: ArkomDb): void {
-  ipcMain.handle("meta:context", (_event, payload: unknown) => {
-    MetaContextRequestSchema.parse(payload);
-    const tenant = db.select().from(schema.tenants).limit(1).all()[0];
-    const location = db.select().from(schema.locations).limit(1).all()[0];
-    const terminal = db.select().from(schema.terminals).limit(1).all()[0];
-    if (!tenant || !location || !terminal) {
-      ipcError({ code: "VALIDATION", message: "Base de datos vacía — ejecuta `pnpm db:seed`." });
-    }
-    return MetaContextResponseSchema.parse({
-      tenant: { id: tenant.id, name: tenant.name },
-      location: { id: location.id, name: location.name },
-      terminal: { id: terminal.id, name: terminal.name },
-    });
+  register("meta:context", MetaContextRequestSchema, MetaContextResponseSchema, () => {
+    return tillContext(db).meta;
+  });
+
+  register("catalog:list", CatalogListRequestSchema, CatalogListResponseSchema, (filters) => {
+    return listProducts(db, tillContext(db).ctx, filters);
+  });
+
+  register("catalog:get", CatalogGetRequestSchema, CatalogGetResponseSchema, ({ id }) => {
+    return getProduct(db, tillContext(db).ctx, id);
+  });
+
+  register("catalog:save", CatalogSaveRequestSchema, CatalogSaveResponseSchema, (input) => {
+    return saveProduct(db, tillContext(db).ctx, input);
   });
 }
