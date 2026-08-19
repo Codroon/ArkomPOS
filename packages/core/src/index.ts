@@ -11,7 +11,16 @@ export {
   marginCents,
   marginPct,
 } from "./money";
-export { ean13CheckDigit, isValidEan13, generateInternalEan13 } from "./barcode";
+export { ean13CheckDigit, isValidEan13, ean13WithCheckDigit, generateInternalEan13 } from "./barcode";
+export { imeiCheckDigit, imeiWithCheckDigit, isValidImei } from "./imei";
+export {
+  P1_MOVEMENT_TYPES,
+  buildMovement,
+  applyMovements,
+  stockKey,
+  nextCostCents,
+} from "./ledger";
+export type { P1MovementType, MovementInput, MovementDraft, StockLevels } from "./ledger";
 export { AppError, appError, toBridgeError, parseIpcError } from "./errors";
 export {
   TAX_RATE_BP,

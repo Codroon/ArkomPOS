@@ -13,32 +13,16 @@
  * Group names follow the ES seed list in docs/design/handoff/00-foundations.md
  * (accented Spanish), which refines the shorthand list in system-design §8.
  */
-import { mutate, toOplogJson, uuidv7, type MutationCtx } from "@arkom/core";
+import {
+  ean13WithCheckDigit,
+  imeiWithCheckDigit,
+  mutate,
+  toOplogJson,
+  uuidv7,
+  type MutationCtx,
+} from "@arkom/core";
 import { schema as s, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner } from "../src/main/mutate-runner";
-
-/* ---------- small deterministic helpers (UI-edge codes, not domain logic) ---------- */
-
-/** EAN-13 from a 12-digit base (appends the check digit). */
-function ean13(base12: string): string {
-  let sum = 0;
-  for (let i = 0; i < 12; i++) sum += Number(base12[i]) * (i % 2 === 0 ? 1 : 3);
-  return base12 + String((10 - (sum % 10)) % 10);
-}
-
-/** IMEI from a 14-digit base (appends the Luhn check digit). */
-function imei(base14: string): string {
-  let sum = 0;
-  for (let i = 0; i < 14; i++) {
-    let d = Number(base14[i]);
-    if (i % 2 === 1) {
-      d *= 2;
-      if (d > 9) d -= 9;
-    }
-    sum += d;
-  }
-  return base14 + String((10 - (sum % 10)) % 10);
-}
 
 /* ---------------------------- seed dataset ---------------------------- */
 
@@ -170,7 +154,7 @@ export function seed(db: ArkomDb): { seeded: boolean; message: string } {
       const barcode =
         spec.barcode === null
           ? null
-          : ean13(`8437123${String(++barcodeSerial).padStart(5, "0")}`);
+          : ean13WithCheckDigit(`8437123${String(++barcodeSerial).padStart(5, "0")}`);
       const product = {
         id: productId,
         tenantId,
@@ -202,7 +186,7 @@ export function seed(db: ArkomDb): { seeded: boolean; message: string } {
             tenantId,
             locationId,
             productId,
-            imei: imei(base),
+            imei: imeiWithCheckDigit(base),
             status: "in_stock" as const,
             costCents: spec.costCents!,
             soldDocumentId: null,

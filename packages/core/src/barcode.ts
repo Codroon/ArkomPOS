@@ -18,6 +18,10 @@ export function isValidEan13(code: string): boolean {
   return /^\d{13}$/.test(code) && ean13CheckDigit(code.slice(0, 12)) === Number(code[12]);
 }
 
+export function ean13WithCheckDigit(base12: string): string {
+  return base12 + ean13CheckDigit(base12).toString();
+}
+
 function cryptoDigits(count: number): string {
   const bytes = new Uint8Array(count);
   crypto.getRandomValues(bytes);
