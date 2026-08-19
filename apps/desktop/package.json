@@ -1,0 +1,43 @@
+{
+  "name": "@arkom/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Arkom POS till (Electron). Main = IPC handlers + repositories; renderer never touches DB/Node.",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "node scripts/dev.cjs dev",
+    "start": "node scripts/dev.cjs preview",
+    "build": "electron-vite build",
+    "build:win": "electron-vite build && electron-builder --win",
+    "db:migrate": "node scripts/run-db-task.cjs migrate",
+    "db:seed": "node scripts/run-db-task.cjs seed",
+    "db:stats": "node scripts/run-db-task.cjs stats",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "@arkom/core": "workspace:*",
+    "@arkom/db": "workspace:*",
+    "@arkom/ui": "workspace:*",
+    "better-sqlite3": "^12.2.0",
+    "electron-updater": "^6.6.2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^4.0.14",
+    "zustand": "^5.0.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.11",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "electron": "37.10.3",
+    "electron-builder": "^26.0.12",
+    "electron-vite": "^4.0.0",
+    "esbuild": "^0.25.0",
+    "tailwindcss": "^4.1.11",
+    "typescript": "^5.9.2",
+    "vite": "^7.0.0"
+  }
+}

@@ -1,0 +1,24 @@
+# deps / build output
+node_modules/
+out/
+dist/
+release/
+.next/
+
+# local dev database (seeded via pnpm db:seed)
+.data/
+*.db
+*.db-wal
+*.db-shm
+
+# misc
+*.log
+*.tsbuildinfo
+.DS_Store
+
+# Source doc bundles (already merged into ./docs and ./packages/db/src/schema.ts —
+# safe to delete once you no longer need the originals)
+arkom-pos-adr-set/
+arkom-pos-design-kit/
+arkom-pos-design-handoff/
+arkom-pos-phase1-prd/

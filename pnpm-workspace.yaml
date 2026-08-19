@@ -1,0 +1,19 @@
+packages:
+  - apps/*
+  - packages/*
+
+# NOTE: pnpm's default isolated layout is used deliberately. `nodeLinker: hoisted`
+# (recommended by some electron-builder guides) deadlocks pnpm 11.22 on this
+# machine; isolated installs work — electron-builder install-app-deps rebuilds
+# better-sqlite3 fine. Revisit only if `pnpm build:win` hits symlink issues.
+
+# pnpm >=11 blocks dependency build scripts unless approved here.
+# electron: downloads its binary · better-sqlite3: native module (rebuilt for the
+# Electron ABI by electron-builder install-app-deps) · esbuild: binary check ·
+# electron-winstaller/sharp: electron-builder tooling.
+allowBuilds:
+  better-sqlite3: true
+  electron: true
+  electron-winstaller: true
+  esbuild: true
+  sharp: true

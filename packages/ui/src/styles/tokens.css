@@ -1,0 +1,36 @@
+/*
+ * Arkom POS design tokens — docs/design/handoff/00-foundations.md.
+ * Wireframe-grade zinc ramp, monochrome BY DESIGN: no accent colors in P1.
+ * Components reference these tokens (bg-app, text-ink, border-border-strong, …),
+ * never raw hex.
+ */
+@theme {
+  /* surfaces */
+  --color-app: #e8e8ea;            /* main canvas */
+  --color-panel: #f4f4f5;          /* topbar, nav, right panels */
+  --color-panel-2: #efeff0;        /* table headers, totals strip, search band */
+  --color-card: #ffffff;           /* cards, rows, inputs */
+
+  /* borders */
+  --color-border: #d4d4d8;         /* cards, row dividers */
+  --color-border-light: #e4e4e7;   /* light rows */
+  --color-border-strong: #b8b8bd;  /* structural separators */
+  --color-border-input: #a1a1aa;   /* inputs */
+  --color-border-input-required: #71717a;
+
+  /* nav states (mockup left nav) */
+  --color-nav-active: #e0e0e3;
+  --color-nav-hover: #ececee;
+
+  /* ink ramp */
+  --color-ink: #18181b;            /* primary text */
+  --color-ink-2: #3f3f46;          /* secondary text, primary buttons bg */
+  --color-ink-3: #52525b;          /* tertiary */
+  --color-muted: #6b6b70;          /* labels */
+  --color-faint: #9a9aa0;          /* placeholders, hints */
+  --color-faint-2: #a1a1aa;
+
+  /* type */
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}

@@ -1,0 +1,27 @@
+@import "tailwindcss";
+@import "@arkom/ui/styles/tokens.css";
+
+/* scan shared UI package for class usage */
+@source "../../../../../packages/ui/src";
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-app);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* 00-foundations: fixed desktop layout; window resizable but layout clamps */
+#root {
+  min-width: 1280px;
+  min-height: 860px;
+}

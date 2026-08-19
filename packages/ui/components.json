@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/styles/tokens.css",
+    "baseColor": "zinc",
+    "cssVariables": false,
+    "prefix": ""
+  },
+  "aliases": {
+    "components": "@arkom/ui/components",
+    "ui": "@arkom/ui/components",
+    "utils": "@arkom/ui/cn",
+    "lib": "@arkom/ui",
+    "hooks": "@arkom/ui/hooks"
+  }
+}

@@ -1,0 +1,20 @@
+appId: com.arkom.pos
+productName: Arkom POS
+directories:
+  output: release
+files:
+  - out/**
+# native module (better-sqlite3) must stay outside the asar archive
+asarUnpack:
+  - "**/*.node"
+# drizzle migrations ship next to the app; main resolves them via process.resourcesPath
+extraResources:
+  - from: ../../packages/db/drizzle
+    to: drizzle
+win:
+  target: nsis
+nsis:
+  oneClick: true
+  perMachine: false
+# electron-updater feed configured when updates are wired up
+publish: null

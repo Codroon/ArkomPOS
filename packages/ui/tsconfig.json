@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "paths": {
+      "@arkom/ui": ["./src/index.ts"],
+      "@arkom/ui/*": ["./src/*"]
+    }
+  },
+  "include": ["src"]
+}

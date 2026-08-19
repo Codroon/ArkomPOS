@@ -1,0 +1,18 @@
+import { cn } from "../cn";
+
+/**
+ * Monospace LOCK badge for features rendered but out of Phase-1 scope
+ * (00-foundations: locked nav items / LockedButton).
+ */
+export function LockBadge({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "rounded-[2px] border border-border-input px-1 py-px font-mono text-[8px] font-bold tracking-[.08em] text-faint",
+        className,
+      )}
+    >
+      LOCK
+    </span>
+  );
+}
