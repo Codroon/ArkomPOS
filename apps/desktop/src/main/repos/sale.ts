@@ -524,7 +524,10 @@ export function listParked(db: ArkomDb, ctx: MutationCtx): ParkedSale[] {
       label: documents.parkedLabel,
       totalCents: documents.totalCents,
       createdAt: documents.createdAt,
-      lineCount: sql<number>`(select count(*) from ${documentLines} where ${documentLines.documentId} = ${documents.id})`,
+      // NOTE: must be `${documents}.id`, not `${documents.id}` — in a join-free
+      // select drizzle renders the latter unqualified ("id"), which SQLite then
+      // resolves to dl.id inside the subquery and the count is always 0.
+      lineCount: sql<number>`(select count(*) from document_lines dl where dl.document_id = ${documents}.id)`,
     })
     .from(documents)
     .where(
