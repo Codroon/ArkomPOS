@@ -21,6 +21,15 @@ export {
   nextCostCents,
 } from "./ledger";
 export type { P1MovementType, MovementInput, MovementDraft, StockLevels } from "./ledger";
+export {
+  roundHalfUpDiv,
+  computeLine,
+  computeDocumentTotals,
+  tenderSummary,
+  validateCompletion,
+  allocateNumber,
+} from "./sale";
+export type { LineMoney, TenderMethod, TenderDraft, TenderSummary, SeriesState } from "./sale";
 export { AppError, appError, toBridgeError, parseIpcError } from "./errors";
 export {
   TAX_RATE_BP,
