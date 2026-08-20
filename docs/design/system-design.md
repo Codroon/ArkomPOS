@@ -51,12 +51,14 @@ business rows + `product_stock` cache + `oplog` entry → typed result back.
 | `stock:add` | {entries:[{barcode\|productId, qty, unitCostCents, supplierId, imei?}]} → {lineCount, productIds} | purchase_in; IMEI creates unit (serialized, qty 1); applies last-cost (6.5); one oplog row per movement |
 | `supplier:list` | {} → {id, name}[] | entrada supplier select (req 6.3) |
 | `supplier:create` | {name} → {id, name} | inline create from entrada; duplicate → DUPLICATE_NAME |
-| `sale:new` | {} → SaleDraft | draft document |
-| `sale:addLine` | {docId, barcode\|productId\|unitId, qty?} → SaleState | serialized ⇒ unit picked & reserved |
+| `sale:current` | {} → SaleState \| null | the terminal's live draft (boot restore / power-cut). Drafts are created LAZILY by the first addLine — no empty-draft rows; `sale:new` was folded into this. |
+| `sale:addLine` | {docId?, barcode\|productId\|unitId, qty?} → {kind:'state', state} \| {kind:'unitPick', units[]} | scan text resolves barcode→product, else direct IMEI→unit; serialized product ⇒ unitPick payload for the modal; picking (unitId) reserves the unit |
+| `sale:setQty` | {docId, lineId, qty} → SaleState | ticket stepper; serialized lines locked at 1 |
 | `sale:overridePrice` | {docId, lineId, newPriceCents, reason} → SaleState | gated, oplog'd (req 2.4) |
-| `sale:removeLine` | {docId, lineId} → SaleState | |
-| `sale:park` / `sale:resume` / `sale:listParked` | … | req 2.8 |
-| `sale:complete` | {docId, tenders:[{method, amountCents, cardReference?}]} → CompletedSale | tx: totals check, sale_out moves, unit→sold, number alloc, oplog |
+| `sale:removeLine` | {docId, lineId} → SaleState | releases unit reservations |
+| `sale:park` / `sale:resume` / `sale:listParked` | park {docId, label?} → {docId, parkedLabel} · resume {docId} → SaleState (auto-parks a non-empty current draft) · list {} → [{docId, label, lineCount, totalCents, createdAtMs}] | req 2.8; parked keeps units reserved |
+| `sale:complete` | {docId, tenders:[{method, amountCents, cardReference?}]} → CompletedSale | ONE tx: totals+tender revalidation (core), sale_out moves through the ledger guard, unit→sold, gap-free number alloc (ADR-0008), oplog per write; NEGATIVE_STOCK/UNIT_NOT_AVAILABLE roll back and leave the sale open |
+| `sale:peek` | {docId} → TicketPeek | read-only ticket view (drawer Documento links) |
 | `print:ticket` | {docId} → {ok} \| {pdfPath} | ESC/POS, PDF fallback |
 | `meta:context` | {} → {tenant, location, terminal} | injected config |
 

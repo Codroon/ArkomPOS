@@ -30,12 +30,41 @@ import {
   SupplierListResponseSchema,
   SupplierCreateRequestSchema,
   SupplierCreateResponseSchema,
+  SaleCurrentRequestSchema,
+  SaleCurrentResponseSchema,
+  SaleAddLineRequestSchema,
+  SaleAddLineResponseSchema,
+  SaleSetQtyRequestSchema,
+  SaleRemoveLineRequestSchema,
+  SaleOverridePriceRequestSchema,
+  SaleParkRequestSchema,
+  SaleParkResponseSchema,
+  SaleResumeRequestSchema,
+  SaleStateSchema,
+  SaleListParkedRequestSchema,
+  SaleListParkedResponseSchema,
+  SaleCompleteRequestSchema,
+  CompletedSaleSchema,
+  SalePeekRequestSchema,
+  TicketPeekSchema,
 } from "@arkom/core";
 import type { ArkomDb } from "@arkom/db";
 import { tillContext } from "./context";
 import { getProduct, listGroups, listProducts, saveProduct } from "./repos/catalog";
 import { addStock, listInventory, listMovements } from "./repos/inventory";
 import { createSupplier, listSuppliers } from "./repos/suppliers";
+import {
+  addLine,
+  complete,
+  currentDraft,
+  listParked,
+  overridePrice,
+  park,
+  peek,
+  removeLine,
+  resume,
+  setQty,
+} from "./repos/sale";
 
 function asBridgeError(err: unknown): Error {
   if (err instanceof AppError) return toBridgeError(err);
@@ -102,5 +131,45 @@ export function registerIpcHandlers(db: ArkomDb): void {
 
   register("supplier:create", SupplierCreateRequestSchema, SupplierCreateResponseSchema, ({ name }) => {
     return createSupplier(db, tillContext(db).ctx, name);
+  });
+
+  register("sale:current", SaleCurrentRequestSchema, SaleCurrentResponseSchema, () => {
+    return currentDraft(db, tillContext(db).ctx);
+  });
+
+  register("sale:addLine", SaleAddLineRequestSchema, SaleAddLineResponseSchema, (req) => {
+    return addLine(db, tillContext(db).ctx, req);
+  });
+
+  register("sale:setQty", SaleSetQtyRequestSchema, SaleStateSchema, (req) => {
+    return setQty(db, tillContext(db).ctx, req);
+  });
+
+  register("sale:removeLine", SaleRemoveLineRequestSchema, SaleStateSchema, (req) => {
+    return removeLine(db, tillContext(db).ctx, req);
+  });
+
+  register("sale:overridePrice", SaleOverridePriceRequestSchema, SaleStateSchema, (req) => {
+    return overridePrice(db, tillContext(db).ctx, req);
+  });
+
+  register("sale:park", SaleParkRequestSchema, SaleParkResponseSchema, (req) => {
+    return park(db, tillContext(db).ctx, req);
+  });
+
+  register("sale:resume", SaleResumeRequestSchema, SaleStateSchema, (req) => {
+    return resume(db, tillContext(db).ctx, req);
+  });
+
+  register("sale:listParked", SaleListParkedRequestSchema, SaleListParkedResponseSchema, () => {
+    return listParked(db, tillContext(db).ctx);
+  });
+
+  register("sale:complete", SaleCompleteRequestSchema, CompletedSaleSchema, (req) => {
+    return complete(db, tillContext(db).ctx, req);
+  });
+
+  register("sale:peek", SalePeekRequestSchema, TicketPeekSchema, ({ docId }) => {
+    return peek(db, tillContext(db).ctx, docId);
   });
 }

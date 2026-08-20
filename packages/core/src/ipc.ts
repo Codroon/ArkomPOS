@@ -18,6 +18,16 @@ export const IPC_CHANNELS = [
   "stock:add",
   "supplier:list",
   "supplier:create",
+  "sale:current",
+  "sale:addLine",
+  "sale:setQty",
+  "sale:removeLine",
+  "sale:overridePrice",
+  "sale:park",
+  "sale:resume",
+  "sale:listParked",
+  "sale:complete",
+  "sale:peek",
 ] as const;
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
@@ -160,7 +170,8 @@ export const MovementRowSchema = z.object({
   movementType: z.string(),
   qty: z.number().int(),
   unitCostCents: z.number().int().nullable(),
-  documentNumber: z.string().nullable(), // "—" in P1 until Venta exists
+  documentId: z.string().nullable(), // link target for the ticket peek
+  documentNumber: z.string().nullable(),
   imei: z.string().nullable(),
   userId: z.string().nullable(), // "—" until auth (ADR-0010)
 });
@@ -193,6 +204,147 @@ export const StockAddResponseSchema = z.object({
   productIds: z.array(z.string()),
 });
 export type StockAddResponse = z.infer<typeof StockAddResponseSchema>;
+
+/* ---- sale:* — §4. Drafts are real documents, created lazily on the first
+   addLine; totals are ALWAYS computed server-side (the renderer never
+   recomputes money) and travel inside SaleState. ---- */
+
+export const TenderMethodSchema = z.enum(["cash", "card", "bizum", "transfer"]);
+
+export const SaleLineRowSchema = z.object({
+  id: z.string(),
+  lineNo: z.number().int(),
+  lineType: z.string(), // "product" | "serialized_unit" in P1
+  productId: z.string().nullable(),
+  unitId: z.string().nullable(),
+  description: z.string(),
+  barcode: z.string().nullable(),
+  imei: z.string().nullable(),
+  qty: z.number().int(),
+  unitPriceCents: z.number().int(),
+  priceOverridden: z.boolean(),
+  overrideReason: z.string().nullable(),
+  originalPriceCents: z.number().int().nullable(), // catalog PVP for the "PVP original" sub-line
+  taxRegime: z.string(),
+  taxRateBp: z.number().int(),
+  baseCents: z.number().int(),
+  taxCents: z.number().int(),
+  totalCents: z.number().int(),
+});
+export type SaleLineRow = z.infer<typeof SaleLineRowSchema>;
+
+export const SaleStateSchema = z.object({
+  docId: z.string(),
+  status: z.enum(["draft", "parked"]),
+  lines: z.array(SaleLineRowSchema),
+  subtotalCents: z.number().int(),
+  taxCents: z.number().int(),
+  totalCents: z.number().int(),
+});
+export type SaleState = z.infer<typeof SaleStateSchema>;
+
+export const SaleCurrentRequestSchema = z.object({}).optional();
+export const SaleCurrentResponseSchema = SaleStateSchema.nullable();
+
+export const SaleAddLineRequestSchema = z
+  .object({
+    docId: z.string().nullish(), // null → lazy-create (or attach to the terminal's draft)
+    barcode: z.string().optional(), // scan text: product barcode or a direct IMEI
+    productId: z.string().optional(),
+    unitId: z.string().optional(),
+    qty: z.number().int().min(1).optional(),
+  })
+  .refine((r) => r.barcode || r.productId || r.unitId, { message: "barcode, productId or unitId required" });
+export type SaleAddLineRequest = z.infer<typeof SaleAddLineRequestSchema>;
+
+export const UnitPickOptionSchema = z.object({
+  unitId: z.string(),
+  imei: z.string(),
+  createdAtMs: z.number().int(), // cost-in date shown in the pick modal
+});
+export const SaleAddLineResponseSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("state"), state: SaleStateSchema }),
+  z.object({
+    kind: z.literal("unitPick"),
+    productId: z.string(),
+    productName: z.string(),
+    units: z.array(UnitPickOptionSchema),
+  }),
+]);
+export type SaleAddLineResponse = z.infer<typeof SaleAddLineResponseSchema>;
+
+export const SaleSetQtyRequestSchema = z.object({
+  docId: z.string(),
+  lineId: z.string(),
+  qty: z.number().int().min(1),
+});
+export const SaleRemoveLineRequestSchema = z.object({ docId: z.string(), lineId: z.string() });
+export const SaleOverridePriceRequestSchema = z.object({
+  docId: z.string(),
+  lineId: z.string(),
+  newPriceCents: z.number().int().min(0),
+  reason: z.string().trim().min(1), // req 2.4: gated with reason
+});
+
+export const SaleParkRequestSchema = z.object({
+  docId: z.string(),
+  label: z.string().trim().max(60).nullish(), // default: time stamp, set server-side
+});
+export const SaleParkResponseSchema = z.object({ docId: z.string(), parkedLabel: z.string() });
+export const SaleResumeRequestSchema = z.object({ docId: z.string() });
+export const SaleListParkedRequestSchema = z.object({}).optional();
+export const ParkedSaleSchema = z.object({
+  docId: z.string(),
+  label: z.string(),
+  lineCount: z.number().int(),
+  totalCents: z.number().int(),
+  createdAtMs: z.number().int(),
+});
+export const SaleListParkedResponseSchema = z.array(ParkedSaleSchema);
+export type ParkedSale = z.infer<typeof ParkedSaleSchema>;
+
+export const SaleTenderSchema = z.object({
+  method: TenderMethodSchema,
+  amountCents: z.number().int().min(1),
+  cardReference: z.string().nullish(),
+});
+export const SaleCompleteRequestSchema = z.object({
+  docId: z.string(),
+  tenders: z.array(SaleTenderSchema).min(1),
+});
+export const CompletedSaleSchema = z.object({
+  docId: z.string(),
+  docNumber: z.string(),
+  number: z.number().int(),
+  totalCents: z.number().int(),
+  changeCents: z.number().int(),
+  completedAtMs: z.number().int(),
+});
+export type CompletedSale = z.infer<typeof CompletedSaleSchema>;
+
+export const SalePeekRequestSchema = z.object({ docId: z.string() });
+export const TicketPeekSchema = z.object({
+  docId: z.string(),
+  docNumber: z.string().nullable(),
+  status: z.string(),
+  completedAtMs: z.number().int().nullable(),
+  lines: z.array(
+    z.object({
+      description: z.string(),
+      qty: z.number().int(),
+      unitPriceCents: z.number().int(),
+      totalCents: z.number().int(),
+      imei: z.string().nullable(),
+      priceOverridden: z.boolean(),
+    }),
+  ),
+  subtotalCents: z.number().int(),
+  taxCents: z.number().int(),
+  totalCents: z.number().int(),
+  tenders: z.array(z.object({ method: z.string(), amountCents: z.number().int(), cardReference: z.string().nullable() })),
+  changeCents: z.number().int(),
+});
+export type TicketPeek = z.infer<typeof TicketPeekSchema>;
 
 export const SupplierListRequestSchema = z.object({}).optional();
 export const SupplierListResponseSchema = z.array(EntityRefSchema);

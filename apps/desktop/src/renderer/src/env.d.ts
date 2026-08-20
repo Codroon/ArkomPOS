@@ -2,15 +2,22 @@
 import type {
   CatalogListRequest,
   CatalogSaveRequest,
+  CompletedSale,
   EntityRef,
   InventoryListRequest,
   InventoryMovementsRequest,
   InventoryMovementsResponse,
   InventoryRow,
   MetaContextResponse,
+  ParkedSale,
   ProductRow,
+  SaleAddLineRequest,
+  SaleAddLineResponse,
+  SaleState,
   StockAddRequest,
   StockAddResponse,
+  TenderDraft,
+  TicketPeek,
 } from "@arkom/core";
 
 declare global {
@@ -27,6 +34,22 @@ declare global {
       invoke(channel: "stock:add", payload: StockAddRequest): Promise<StockAddResponse>;
       invoke(channel: "supplier:list", payload?: undefined): Promise<EntityRef[]>;
       invoke(channel: "supplier:create", payload: { name: string }): Promise<EntityRef>;
+      invoke(channel: "sale:current", payload?: undefined): Promise<SaleState | null>;
+      invoke(channel: "sale:addLine", payload: SaleAddLineRequest): Promise<SaleAddLineResponse>;
+      invoke(channel: "sale:setQty", payload: { docId: string; lineId: string; qty: number }): Promise<SaleState>;
+      invoke(channel: "sale:removeLine", payload: { docId: string; lineId: string }): Promise<SaleState>;
+      invoke(
+        channel: "sale:overridePrice",
+        payload: { docId: string; lineId: string; newPriceCents: number; reason: string },
+      ): Promise<SaleState>;
+      invoke(
+        channel: "sale:park",
+        payload: { docId: string; label?: string | null },
+      ): Promise<{ docId: string; parkedLabel: string }>;
+      invoke(channel: "sale:resume", payload: { docId: string }): Promise<SaleState>;
+      invoke(channel: "sale:listParked", payload?: undefined): Promise<ParkedSale[]>;
+      invoke(channel: "sale:complete", payload: { docId: string; tenders: TenderDraft[] }): Promise<CompletedSale>;
+      invoke(channel: "sale:peek", payload: { docId: string }): Promise<TicketPeek>;
     };
   }
 }
