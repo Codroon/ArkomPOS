@@ -11,6 +11,7 @@ import { cn, LockBadge, useLocale, useT, type TKey } from "@arkom/ui";
 import { registerNavigator, type ScreenId } from "../lib/screen-bus";
 import { CatalogScreen } from "../screens/catalog/catalog-screen";
 import { InventoryScreen } from "../screens/inventory/inventory-screen";
+import { SaleScreen } from "../screens/sale/sale-screen";
 
 const NAV_ITEMS: ReadonlyArray<{ n: string; labelKey: TKey; id?: ScreenId }> = [
   { n: "01", labelKey: "nav.venta", id: "venta" },
@@ -25,12 +26,6 @@ const NAV_ITEMS: ReadonlyArray<{ n: string; labelKey: TKey; id?: ScreenId }> = [
   { n: "10", labelKey: "nav.informes" },
   { n: "11", labelKey: "nav.ajustes" },
 ];
-
-const SCREEN_TITLE_KEYS: Record<ScreenId, TKey> = {
-  venta: "nav.venta",
-  catalogo: "nav.catalogo",
-  inventario: "nav.inventario",
-};
 
 function formatNow(d: Date): string {
   const p = (n: number) => String(n).padStart(2, "0");
@@ -134,17 +129,12 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
 
         {/* main */}
         <main className="flex min-w-0 flex-1 flex-col bg-app">
-          {screen === "catalogo" ? (
+          {screen === "venta" ? (
+            <SaleScreen terminalName={context?.terminal.name ?? t("common.dash")} />
+          ) : screen === "catalogo" ? (
             <CatalogScreen />
-          ) : screen === "inventario" ? (
-            <InventoryScreen />
           ) : (
-            <div className="flex flex-1 items-center justify-center">
-              <div className="text-center">
-                <div className="text-[15px] font-bold text-ink-2">{t(SCREEN_TITLE_KEYS[screen])}</div>
-                <div className="mt-1 text-[12px] text-muted">{t("shell.underConstruction")}</div>
-              </div>
-            </div>
+            <InventoryScreen />
           )}
         </main>
       </div>

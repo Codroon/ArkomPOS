@@ -150,7 +150,7 @@ export const en: Record<TKey, string> = {
   "drawer.onHand": "{n} in stock",
   "drawer.col.date": "Date",
   "drawer.col.type": "Type",
-  "drawer.col.qty": "Quantity",
+  "drawer.col.qty": "Qty",
   "drawer.col.cost": "Cost",
   "drawer.col.doc": "Document",
   "drawer.col.user": "User",
@@ -182,4 +182,74 @@ export const en: Record<TKey, string> = {
   "val.imeiInvalid": "Invalid IMEI (15 digits).",
   "val.imeiDupStaged": "That IMEI is already in this entry.",
   "val.supplierRequired": "Supplier is required.",
+
+  /* mapped server errors (sale) */
+  "err.negativeStock": "Stock cannot go negative.",
+  "err.unitNotAvailable": "That unit is not available.",
+  "err.tenderMismatch": "Non-cash payments cannot exceed the total.",
+
+  /* venta */
+  "sale.draftState": "Ticket in progress",
+  "sale.kbdHints": "F2 search · F4 charge · F8 park",
+  "sale.groupAll": "All",
+  "sale.noMatch": "No results for {code}",
+  "sale.emptyCatalog": "Catalog is empty",
+  "sale.goToCatalog": "Go to Catalog",
+  "sale.ticket": "Ticket",
+  "sale.lineCountOne": "1 line",
+  "sale.lineCountMany": "{n} lines",
+  "sale.emptyTicket": "Scan or tap a product to start.",
+  "sale.pvpOriginal": "Original price {price} · reason: {reason}",
+  "chip.modificado": "MODIFIED",
+  "sale.modifyPrice": "Modify price",
+  "sale.removeLine": "Remove line",
+  "sale.subtotal": "Subtotal (net)",
+  "sale.iva21": "VAT 21%",
+  "sale.total": "TOTAL",
+
+  /* payment */
+  "pay.cash": "Cash",
+  "pay.card": "Card",
+  "pay.bizum": "Bizum",
+  "pay.transfer": "Transfer",
+  "pay.pending": "Due",
+  "pay.change": "Change",
+  "pay.cardRef": "Terminal reference",
+  "pay.cardRefHint": "At least 4 characters.",
+  "pay.charge": "Charge (F4)",
+  "pay.charging": "Charging…",
+  "pay.removeTender": "Remove payment",
+
+  /* completed */
+  "done.title": "Sale completed",
+  "done.print": "Print ticket",
+  "done.new": "New sale",
+  "done.autoHint": "Enter or wait a few seconds to start another.",
+
+  /* park */
+  "park.button": "Park (F8)",
+  "park.title": "Park ticket",
+  "park.labelPlaceholder": "Label (optional)",
+  "park.confirm": "Park",
+  "park.chip": "Parked ({n})",
+  "park.popoverTitle": "Parked tickets",
+  "park.resume": "Resume",
+  "park.empty": "No parked tickets.",
+
+  /* override modal */
+  "ovr.title": "Modify price",
+  "ovr.newPrice": "New price",
+  "ovr.reason": "Reason",
+  "ovr.reasonRequired": "A reason is required.",
+  "ovr.apply": "Apply",
+
+  /* unit pick modal */
+  "pick.title": "Select unit — {name}",
+  "pick.filterPlaceholder": "Scan or type an IMEI…",
+  "pick.inSince": "In since",
+  "pick.empty": "No unit matches.",
+
+  /* ticket peek */
+  "peek.tenders": "Payments",
+  "peek.close": "Close",
 };

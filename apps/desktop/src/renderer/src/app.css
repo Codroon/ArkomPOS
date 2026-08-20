@@ -25,3 +25,13 @@ body {
   min-width: 1280px;
   min-height: 860px;
 }
+
+/* scan-miss feedback (handoff 01) */
+@keyframes arkom-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
+}
+.arkom-shake {
+  animation: arkom-shake 0.3s ease-in-out;
+}

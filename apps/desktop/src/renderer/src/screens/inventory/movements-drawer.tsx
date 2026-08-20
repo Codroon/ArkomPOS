@@ -1,11 +1,13 @@
 /**
  * Movimientos drawer (right, 420px) — handoff 03 / req 5.4. Newest first,
- * infinite scroll over inventory:movements' keyset cursor. Documento renders
- * "—" until Venta exists; Usuario "—" until auth (ADR-0010). Esc closes.
+ * infinite scroll over inventory:movements' keyset cursor. Documento links
+ * open the read-only ticket peek; Usuario "—" until auth (ADR-0010).
+ * Fixed-layout table so 420px never overflows horizontally. Esc closes.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { InventoryRow, MovementRow } from "@arkom/core";
 import { Chip, cn, MoneyText, useT, type TKey } from "@arkom/ui";
+import { TicketPeekModal } from "../../components/ticket-peek-modal";
 
 const TYPE_KEYS: Record<string, TKey> = {
   purchase_in: "mov.entrada",
@@ -25,6 +27,7 @@ export function MovementsDrawer({ product, onClose }: { product: InventoryRow; o
   const [cursor, setCursor] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [peekDocId, setPeekDocId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const loadPage = useCallback(
@@ -52,11 +55,11 @@ export function MovementsDrawer({ product, onClose }: { product: InventoryRow; o
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !peekDocId) onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, peekDocId]);
 
   const onScroll = () => {
     const el = scrollRef.current;
@@ -85,7 +88,15 @@ export function MovementsDrawer({ product, onClose }: { product: InventoryRow; o
           {rows.length === 0 && !loading ? (
             <div className="p-6 text-center text-[12px] text-muted">{t("drawer.empty")}</div>
           ) : (
-            <table className="w-full border-collapse text-[11px]">
+            <table className="w-full table-fixed border-collapse text-[11px]">
+              <colgroup>
+                <col className="w-[66px]" />
+                <col />
+                <col className="w-[46px]" />
+                <col className="w-[64px]" />
+                <col className="w-[84px]" />
+                <col className="w-[54px]" />
+              </colgroup>
               <thead>
                 <tr>
                   {(["drawer.col.date", "drawer.col.type", "drawer.col.qty", "drawer.col.cost", "drawer.col.doc", "drawer.col.user"] as TKey[]).map(
@@ -93,7 +104,7 @@ export function MovementsDrawer({ product, onClose }: { product: InventoryRow; o
                       <th
                         key={key}
                         className={cn(
-                          "sticky top-0 border-b border-border-strong bg-panel-2 px-2 py-1.5 text-[9px] font-bold uppercase tracking-[.1em] text-muted",
+                          "sticky top-0 overflow-hidden border-b border-border-strong bg-panel-2 px-1.5 py-1.5 text-[9px] font-bold uppercase tracking-[.1em] text-muted",
                           i >= 2 && i <= 3 ? "text-right" : "text-left",
                         )}
                       >
@@ -107,31 +118,41 @@ export function MovementsDrawer({ product, onClose }: { product: InventoryRow; o
                 {rows.map((m) => {
                   const typeKey = TYPE_KEYS[m.movementType];
                   return (
-                    <tr key={m.id} className="border-b border-border-light bg-card">
-                      <td className="whitespace-nowrap px-2 py-1.5 font-mono tabular-nums text-muted">
+                    <tr key={m.id} className="border-b border-border-light bg-card align-top">
+                      <td className="whitespace-nowrap px-1.5 py-1.5 font-mono text-[10px] tabular-nums text-muted">
                         {formatShort(m.createdAtMs)}
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td className="px-1.5 py-1.5">
                         <Chip>{typeKey ? t(typeKey) : m.movementType.toUpperCase()}</Chip>
                         {m.imei ? (
-                          <div className="mt-0.5 font-mono text-[9px] tabular-nums text-faint">{m.imei}</div>
+                          <div className="mt-0.5 truncate font-mono text-[9px] tabular-nums text-faint">{m.imei}</div>
                         ) : null}
                       </td>
                       <td
                         className={cn(
-                          "px-2 py-1.5 text-right font-mono tabular-nums",
+                          "px-1.5 py-1.5 text-right font-mono tabular-nums",
                           m.qty > 0 ? "font-bold text-ink" : "text-ink-2",
                         )}
                       >
                         {m.qty > 0 ? `+${m.qty}` : m.qty}
                       </td>
-                      <td className="whitespace-nowrap px-2 py-1.5 text-right text-muted">
+                      <td className="whitespace-nowrap px-1.5 py-1.5 text-right text-[10px] text-muted">
                         {m.unitCostCents == null ? t("common.dash") : <MoneyText cents={m.unitCostCents} />}
                       </td>
-                      <td className="px-2 py-1.5 font-mono tabular-nums text-ink-3">
-                        {m.documentNumber ?? t("common.dash")}
+                      <td className="truncate px-1.5 py-1.5 font-mono text-[10px] tabular-nums">
+                        {m.documentId && m.documentNumber ? (
+                          <button
+                            type="button"
+                            className="text-ink-2 underline hover:text-ink"
+                            onClick={() => setPeekDocId(m.documentId)}
+                          >
+                            {m.documentNumber}
+                          </button>
+                        ) : (
+                          <span className="text-ink-3">{t("common.dash")}</span>
+                        )}
                       </td>
-                      <td className="px-2 py-1.5 text-faint">{m.userId ?? t("common.dash")}</td>
+                      <td className="px-1.5 py-1.5 text-faint">{m.userId ?? t("common.dash")}</td>
                     </tr>
                   );
                 })}
@@ -145,6 +166,7 @@ export function MovementsDrawer({ product, onClose }: { product: InventoryRow; o
           {t("drawer.footerNote")}
         </div>
       </div>
+      {peekDocId ? <TicketPeekModal docId={peekDocId} onClose={() => setPeekDocId(null)} /> : null}
     </div>
   );
 }

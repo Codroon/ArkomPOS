@@ -152,7 +152,7 @@ export const es = {
   "drawer.onHand": "{n} en stock",
   "drawer.col.date": "Fecha",
   "drawer.col.type": "Tipo",
-  "drawer.col.qty": "Cantidad",
+  "drawer.col.qty": "Cant.",
   "drawer.col.cost": "Coste",
   "drawer.col.doc": "Documento",
   "drawer.col.user": "Usuario",
@@ -184,6 +184,76 @@ export const es = {
   "val.imeiInvalid": "IMEI no válido (15 dígitos).",
   "val.imeiDupStaged": "Ese IMEI ya está en la entrada.",
   "val.supplierRequired": "El proveedor es obligatorio.",
+
+  /* mapped server errors (sale) */
+  "err.negativeStock": "El stock no puede quedar en negativo.",
+  "err.unitNotAvailable": "Esa unidad no está disponible.",
+  "err.tenderMismatch": "Los pagos no en efectivo no pueden superar el total.",
+
+  /* venta */
+  "sale.draftState": "Ticket en curso",
+  "sale.kbdHints": "F2 buscar · F4 cobrar · F8 aparcar",
+  "sale.groupAll": "Todos",
+  "sale.noMatch": "Sin resultados para {code}",
+  "sale.emptyCatalog": "Catálogo vacío",
+  "sale.goToCatalog": "Ir a Catálogo",
+  "sale.ticket": "Ticket",
+  "sale.lineCountOne": "1 línea",
+  "sale.lineCountMany": "{n} líneas",
+  "sale.emptyTicket": "Escanea o toca un producto para empezar.",
+  "sale.pvpOriginal": "PVP original {price} · motivo: {reason}",
+  "chip.modificado": "MODIFICADO",
+  "sale.modifyPrice": "Modificar precio",
+  "sale.removeLine": "Eliminar línea",
+  "sale.subtotal": "Subtotal (base)",
+  "sale.iva21": "IVA 21%",
+  "sale.total": "TOTAL",
+
+  /* payment */
+  "pay.cash": "Efectivo",
+  "pay.card": "Tarjeta",
+  "pay.bizum": "Bizum",
+  "pay.transfer": "Transferencia",
+  "pay.pending": "Pendiente",
+  "pay.change": "Cambio",
+  "pay.cardRef": "Referencia (datáfono)",
+  "pay.cardRefHint": "Mínimo 4 caracteres.",
+  "pay.charge": "Cobrar (F4)",
+  "pay.charging": "Cobrando…",
+  "pay.removeTender": "Quitar pago",
+
+  /* completed */
+  "done.title": "Venta completada",
+  "done.print": "Imprimir ticket",
+  "done.new": "Nueva venta",
+  "done.autoHint": "Enter o espera unos segundos para empezar otra.",
+
+  /* park */
+  "park.button": "Aparcar (F8)",
+  "park.title": "Aparcar ticket",
+  "park.labelPlaceholder": "Etiqueta (opcional)",
+  "park.confirm": "Aparcar",
+  "park.chip": "Aparcadas ({n})",
+  "park.popoverTitle": "Tickets aparcados",
+  "park.resume": "Recuperar",
+  "park.empty": "No hay tickets aparcados.",
+
+  /* override modal */
+  "ovr.title": "Modificar precio",
+  "ovr.newPrice": "Nuevo precio",
+  "ovr.reason": "Motivo",
+  "ovr.reasonRequired": "El motivo es obligatorio.",
+  "ovr.apply": "Aplicar",
+
+  /* unit pick modal */
+  "pick.title": "Selecciona unidad — {name}",
+  "pick.filterPlaceholder": "Escanea o escribe IMEI…",
+  "pick.inSince": "Alta",
+  "pick.empty": "Ninguna unidad coincide.",
+
+  /* ticket peek */
+  "peek.tenders": "Pagos",
+  "peek.close": "Cerrar",
 } as const;
 
 export type TKey = keyof typeof es;
