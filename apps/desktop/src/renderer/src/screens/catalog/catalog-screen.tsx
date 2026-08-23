@@ -5,7 +5,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseIpcError, type CatalogListRequest, type EntityRef, type ProductRow } from "@arkom/core";
-import { cn, ConfirmDialog, GhostButton, PrimaryButton, SearchInput, useT } from "@arkom/ui";
+import { cn, ConfirmDialog, GhostButton, PrimaryButton, SearchInput, useDataLabel, useT } from "@arkom/ui";
 import { consumeCatalogPrefill } from "../../lib/screen-bus";
 import { CatalogEditor } from "./catalog-editor";
 import { CatalogTable, type Sort, type SortKey } from "./catalog-table";
@@ -57,6 +57,7 @@ function FilterChip({
 
 export function CatalogScreen() {
   const t = useT();
+  const dataLabel = useDataLabel();
   const [rows, setRows] = useState<ProductRow[]>([]);
   const [groups, setGroups] = useState<EntityRef[]>([]);
   const [searchText, setSearchText] = useState("");
@@ -226,7 +227,7 @@ export function CatalogScreen() {
           <option value="">{t("catalog.filter.groupAll")}</option>
           {groups.map((g) => (
             <option key={g.id} value={g.id}>
-              {g.name}
+              {dataLabel(g.name)}
             </option>
           ))}
         </select>

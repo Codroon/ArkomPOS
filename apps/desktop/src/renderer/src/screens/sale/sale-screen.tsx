@@ -15,7 +15,7 @@ import {
   type SaleLineRow,
   type SaleState,
 } from "@arkom/core";
-import { cn, GhostButton, ScanInput, Toast, useT, type ScanInputHandle } from "@arkom/ui";
+import { cn, GhostButton, ScanInput, Toast, useDataLabel, useT, type ScanInputHandle } from "@arkom/ui";
 import { errorMessage, ipcOf } from "../../lib/errors";
 import { openCatalogWithBarcode } from "../../lib/screen-bus";
 import { ProductGrid } from "./product-grid";
@@ -25,6 +25,7 @@ import { OverrideModal, ParkModal, ParkedPopover, UnitPickModal, type UnitPickSt
 
 export function SaleScreen({ terminalName }: { terminalName: string }) {
   const t = useT();
+  const dataLabel = useDataLabel();
   const scanRef = useRef<ScanInputHandle>(null);
 
   const [sale, setSale] = useState<SaleState | null>(null);
@@ -352,7 +353,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
                     : "border-border-input bg-card text-ink-2 hover:border-ink-3",
                 )}
               >
-                {group.name}
+                {dataLabel(group.name)}
               </button>
             ))}
           </div>

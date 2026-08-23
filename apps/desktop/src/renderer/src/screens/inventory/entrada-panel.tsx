@@ -26,6 +26,7 @@ import {
   SectionLabel,
   SelectInput,
   TextInput,
+  useDataLabel,
   useT,
   type ScanInputHandle,
   type TKey,
@@ -54,6 +55,7 @@ export function EntradaPanel({
   onCreateArticle: (barcode: string) => void;
 }) {
   const t = useT();
+  const dataLabel = useDataLabel();
   const scanRef = useRef<ScanInputHandle>(null);
   const imeiRef = useRef<HTMLInputElement>(null);
 
@@ -200,15 +202,17 @@ export function EntradaPanel({
     <div className={`flex-none border-t border-border-strong bg-panel px-4 py-3 ${submitting ? "pointer-events-none opacity-60" : ""}`}>
       <SectionLabel className="mb-2">{t("entry.section")}</SectionLabel>
       <div className="flex items-start gap-3">
-        {/* 1. scan + per-entry fields */}
+        {/* 1. scan + per-entry fields — labelled like the supplier column so the controls align */}
         <div className="flex w-[440px] flex-none flex-col gap-2">
-          <ScanInput
-            ref={scanRef}
-            value={scanText}
-            onChange={(e) => setScanText(e.target.value)}
-            onScan={resolve}
-            placeholder={t("entry.scanPlaceholder")}
-          />
+          <Field label={t("entry.scanLabel")} required>
+            <ScanInput
+              ref={scanRef}
+              value={scanText}
+              onChange={(e) => setScanText(e.target.value)}
+              onScan={resolve}
+              placeholder={t("entry.scanPlaceholder")}
+            />
+          </Field>
           {unknownCode ? (
             <div className="text-[11px] text-ink-2">
               <span className="font-mono tabular-nums">{unknownCode}</span> · {t("entry.unknownCode")} ·{" "}
@@ -297,7 +301,7 @@ export function EntradaPanel({
                 <option value="">{t("entry.supplierPlaceholder")}</option>
                 {suppliers.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.name}
+                    {dataLabel(s.name)}
                   </option>
                 ))}
               </SelectInput>

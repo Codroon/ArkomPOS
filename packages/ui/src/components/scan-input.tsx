@@ -28,7 +28,7 @@ export const ScanInput = forwardRef<
       <input
         ref={inputRef}
         type="text"
-        className="h-8 w-full rounded-[3px] border border-border-input bg-card pl-6 pr-14 font-mono text-[12px] tabular-nums text-ink outline-none placeholder:font-sans placeholder:text-faint focus:border-ink-2"
+        className="h-7 w-full rounded-[3px] border border-border-input bg-card pl-6 pr-14 font-mono text-[12px] tabular-nums text-ink outline-none placeholder:font-sans placeholder:text-faint focus:border-ink-2"
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();

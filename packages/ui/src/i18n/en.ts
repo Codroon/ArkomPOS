@@ -162,6 +162,7 @@ export const en: Record<TKey, string> = {
 
   /* entrada de stock */
   "entry.section": "Stock entry",
+  "entry.scanLabel": "Item",
   "entry.scanPlaceholder": "Scan a code or enter an IMEI…",
   "entry.unknownCode": "Not found",
   "entry.createArticle": "Create item",
@@ -252,4 +253,20 @@ export const en: Record<TKey, string> = {
   /* ticket peek */
   "peek.tenders": "Payments",
   "peek.close": "Close",
+};
+
+/**
+ * Display labels for KNOWN seed data (group + supplier names). These are rows
+ * in the shop's database, not UI copy: anything the shop types itself shows
+ * exactly as typed. Only the demo dataset is mapped so the staff toggle flips
+ * the whole screen during walkthroughs.
+ */
+export const enDataLabels: Record<string, string> = {
+  "Móviles": "Phones",
+  "Protectores": "Protectors",
+  "Cargadores y Cables": "Chargers & Cables",
+  "Auriculares": "Headphones",
+  "Memoria y Ordenador": "Memory & Computing",
+  "Distribuidora Madrid Móvil": "Madrid Mobile Distributors",
+  "TecnoImport Levante": "TecnoImport Levante",
 };

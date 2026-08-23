@@ -10,7 +10,7 @@
  */
 import { useCallback, useSyncExternalStore } from "react";
 import { es, type TKey } from "./es";
-import { en } from "./en";
+import { en, enDataLabels } from "./en";
 
 export type { TKey };
 export type Locale = "es" | "en";
@@ -71,4 +71,19 @@ export type TFn = (key: TKey, vars?: Record<string, string | number>) => string;
 export function useT(): TFn {
   const [locale] = useLocale();
   return useCallback<TFn>((key, vars) => translate(locale, key, vars), [locale]);
+}
+
+/**
+ * Display label for a DATA name (group/supplier): mapped only for the known
+ * seed dataset, otherwise shown exactly as stored. Spanish = identity.
+ */
+export function translateData(locale: Locale, name: string): string {
+  return locale === "en" ? (enDataLabels[name] ?? name) : name;
+}
+
+export type DataLabelFn = (name: string) => string;
+
+export function useDataLabel(): DataLabelFn {
+  const [locale] = useLocale();
+  return useCallback<DataLabelFn>((name) => translateData(locale, name), [locale]);
 }

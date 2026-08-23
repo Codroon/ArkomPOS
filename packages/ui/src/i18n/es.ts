@@ -164,6 +164,7 @@ export const es = {
 
   /* entrada de stock */
   "entry.section": "Entrada de stock",
+  "entry.scanLabel": "Artículo",
   "entry.scanPlaceholder": "Escanea código o introduce IMEI…",
   "entry.unknownCode": "No existe",
   "entry.createArticle": "Crear artículo",

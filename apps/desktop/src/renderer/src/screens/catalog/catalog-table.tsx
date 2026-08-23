@@ -4,7 +4,7 @@
  * P1 deviation (handoff 02): plain scroll, no virtualization.
  */
 import { missingFields, type MissingField, type ProductRow } from "@arkom/core";
-import { Chip, cn, MoneyText, useT, type TFn, type TKey } from "@arkom/ui";
+import { Chip, cn, MoneyText, useDataLabel, useT, type TFn, type TKey } from "@arkom/ui";
 
 export type SortKey = "name" | "priceCents" | "onHand";
 export interface Sort {
@@ -79,6 +79,7 @@ export function CatalogTable({
   onSort: (key: SortKey) => void;
 }) {
   const t = useT();
+  const dataLabel = useDataLabel();
   return (
     <table className="w-full border-collapse text-[12px]">
       <thead>
@@ -116,7 +117,7 @@ export function CatalogTable({
                 {!row.active ? <Chip className="ml-1.5">{t("chip.inactive")}</Chip> : null}
               </td>
               <td className="px-3 py-1.5 text-ink-3">
-                {missing.has("group") ? <MissingCell t={t} /> : row.groupName}
+                {missing.has("group") ? <MissingCell t={t} /> : dataLabel(row.groupName ?? "")}
               </td>
               <td className="px-3 py-1.5">
                 <Chip>{typeKey ? t(typeKey) : row.itemType.toUpperCase()}</Chip>

@@ -4,7 +4,7 @@
  */
 import { useMemo } from "react";
 import { type EntityRef, type ProductRow } from "@arkom/core";
-import { Chip, cn, GhostButton, MoneyText, SectionLabel, useT } from "@arkom/ui";
+import { Chip, cn, GhostButton, MoneyText, SectionLabel, useDataLabel, useT } from "@arkom/ui";
 import { navigateTo } from "../../lib/screen-bus";
 
 function Card({ product, onAdd }: { product: ProductRow; onAdd: (p: ProductRow) => void }) {
@@ -39,6 +39,7 @@ export function ProductGrid({
   onAdd: (p: ProductRow) => void;
 }) {
   const t = useT();
+  const dataLabel = useDataLabel();
 
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -74,7 +75,7 @@ export function ProductGrid({
       {sections.map(({ group, items }) => (
         <div key={group.id} className="mb-4">
           <SectionLabel className="mb-1.5">
-            {group.name} <span className="font-normal text-faint">({items.length})</span>
+            {dataLabel(group.name)} <span className="font-normal text-faint">({items.length})</span>
           </SectionLabel>
           <div className="grid grid-cols-4 gap-2">
             {items.map((p) => (

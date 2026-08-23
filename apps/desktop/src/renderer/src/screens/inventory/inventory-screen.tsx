@@ -7,7 +7,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isLowStock, type EntityRef, type InventoryRow } from "@arkom/core";
-import { cn, GhostButton, MoneyText, SearchInput, Toast, useT } from "@arkom/ui";
+import { cn, GhostButton, MoneyText, SearchInput, Toast, useDataLabel, useT } from "@arkom/ui";
 import { openCatalogWithBarcode } from "../../lib/screen-bus";
 import { EntradaPanel } from "./entrada-panel";
 import { InventoryTable } from "./inventory-table";
@@ -21,6 +21,7 @@ interface Filters {
 
 export function InventoryScreen() {
   const t = useT();
+  const dataLabel = useDataLabel();
   const [allRows, setAllRows] = useState<InventoryRow[] | null>(null); // null = loading
   const [groups, setGroups] = useState<EntityRef[]>([]);
   const [searchText, setSearchText] = useState("");
@@ -118,7 +119,7 @@ export function InventoryScreen() {
           <option value="">{t("catalog.filter.groupAll")}</option>
           {groups.map((g) => (
             <option key={g.id} value={g.id}>
-              {g.name}
+              {dataLabel(g.name)}
             </option>
           ))}
         </select>

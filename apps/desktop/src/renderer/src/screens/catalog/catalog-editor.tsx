@@ -23,6 +23,7 @@ import {
   SelectInput,
   Switch,
   TextInput,
+  useDataLabel,
   useT,
   type SegmentOption,
 } from "@arkom/ui";
@@ -50,6 +51,7 @@ export function CatalogEditor({
   onCancel: () => void;
 }) {
   const t = useT();
+  const dataLabel = useDataLabel();
 
   if (!draft) {
     return (
@@ -129,7 +131,7 @@ export function CatalogEditor({
             <option value="">{t("editor.groupPlaceholder")}</option>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
-                {g.name}
+                {dataLabel(g.name)}
               </option>
             ))}
           </SelectInput>
