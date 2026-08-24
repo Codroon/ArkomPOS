@@ -1,150 +1,155 @@
 # Arkom POS
 
-Offline-first point of sale for a retail mobile shop in Spain. The till is an
-Electron desktop app that never depends on the internet: sales, catalog and
-stock all run against a local SQLite file, every mutation is written to an
-append-only audit log, and document numbers are allocated gap-free on the till
-itself. A cloud dashboard and sync layer are designed (see `docs/`) and land in
-Phase 2 — the schema and oplog already anticipate them.
+An offline-first Windows point-of-sale for a mobile phone shop in Spain: sell
+phones by IMEI and accessories by quantity, keep stock honest, print a legal
+ticket. A cloud dashboard is planned for Phase 2 — the till is built so that
+syncing to it later needs no rewrite. Built by [Codroon](https://codroon.com).
 
-**Stack:** pnpm workspaces · Electron + Vite + React + TypeScript · Tailwind 4 ·
-Zod-validated typed IPC · Drizzle ORM + better-sqlite3 (WAL) · Vitest.
-All architectural decisions are frozen as ADRs in [`docs/adr/`](docs/adr/).
+**The till runs completely offline.** No account, no server, no internet. The
+shop's data lives in one SQLite file on the counter PC.
 
-## Running it
+---
 
-Requirements: **Node ≥ 20.19** (developed on Node 24) and **pnpm ≥ 10**
-(`npm i -g pnpm`). Primary target platform is Windows.
+## Current state — v0.9.0
+
+Phase 1 is complete and packaged. Verified on a clean Windows machine end to
+end, with one exception noted below.
+
+### Built
+
+| Area | What works |
+|---|---|
+| **Sale** | Scan or tap, mixed tickets, serialized units picked by IMEI, price override with reason, park/resume, split tender (cash · card · Bizum · transfer), change, gap-free per-till numbering |
+| **Catalog** | Products, groups, multiple scannable codes per product, incomplete-data flags, deactivate |
+| **Inventory** | Insert-only stock ledger, receiving drawer with per-IMEI entry, movement history, low-stock and reorder points |
+| **Tickets** | ESC/POS over the Windows RAW spooler, branded PDF fallback, reprints stamped COPIA, cash-drawer pulse |
+| **Ajustes** | Printer, paper width, command set, the shop's legal block, demo-data removal, backups |
+| **Backups** | Nightly + on close via SQLite's online backup API, each one verified, last 14 kept, optional second destination |
+| **First run** | Fresh install asks the shop who it is, then migrates and starts — no seed step on a client machine |
+| **Audit** | `db:audit --verify` checks every invariant the design rests on |
+
+### Not built yet
+
+Auth / login / shifts · refunds and voids · full invoices (tickets only) ·
+card-terminal SDK integration (references are typed in) · sync and the web
+dashboard · repairs, used devices, agency and SIM sales.
+
+The schema already anticipates all of these — nullable actor columns, tenancy
+keys, document types — so they extend rather than replace what is here.
+
+### Known gaps
+
+- **The thermal printer has never touched paper.** The ESC/POS path is written
+  and its byte delivery is verified against the Windows spooler, but no Citizen
+  CT-S310S has printed from it. That happens at the shop visit. The PDF path is
+  fully working and is how tickets are checked today.
+- **The installer is unsigned**, so Windows SmartScreen shows a warning. See
+  [DEPLOYMENT.md](DEPLOYMENT.md) §2.
+
+---
+
+## Architecture
+
+An Electron desktop app over a local SQLite database. The renderer never touches
+the database, Node, or the filesystem — everything crosses a typed IPC bridge
+validated with Zod **on both sides**. All business logic lives in a
+framework-free core package that knows nothing about Electron or SQL, which is
+what makes it testable and what will let the Phase-2 cloud reuse it unchanged.
+
+Every write goes through one envelope, `mutate()`, which wraps the business rows
+and their audit entries in a single transaction. A write that records nothing in
+the audit log throws — skipping the trail is impossible by construction rather
+than by discipline.
+
+### Layout
+
+| Package | What it is | May depend on |
+|---|---|---|
+| `apps/desktop` | The Electron till: main process, IPC handlers, repositories, screens | everything |
+| `apps/web` | Next.js placeholder for the Phase-2 dashboard | `core`, `ui` |
+| `packages/core` | Domain logic, money, IDs, the IPC contract, the ticket renderer. **No SQL, no Electron, no React** | nothing |
+| `packages/db` | Drizzle schema, client, migrations. **Only drizzle** | nothing |
+| `packages/ui` | Design tokens, vendored fonts, shared components, the i18n dictionary | nothing |
+
+**The dependency rule:** packages never import from apps, and never from each
+other except `ui`/`db` → nothing. Apps compose packages. If core needs a
+database, it takes a function as an argument instead.
+
+### Stack
+
+Electron 37 · React 19 · TypeScript · Vite / electron-vite · Tailwind 4 ·
+Zustand · Drizzle ORM · better-sqlite3 (WAL) · Zod · Vitest · electron-builder ·
+node-thermal-printer · pnpm workspaces
+
+---
+
+## Getting started
+
+**Prerequisites:** Windows 10/11 · Node ≥ 20.19 · pnpm 11.22 · a C++ toolchain
+for `better-sqlite3` (Visual Studio Build Tools, or just install and let the
+prebuilt binary do the work).
 
 ```bash
-pnpm install    # native build scripts are pre-approved in pnpm-workspace.yaml
-pnpm db:seed    # creates + migrates .data/arkom-pos.db and loads the demo dataset
-pnpm dev        # boots the till with hot reload
+pnpm install          # postinstall rebuilds better-sqlite3 for Electron's ABI
+pnpm db:migrate       # create/upgrade the dev database at .data/arkom-pos.db
+pnpm db:seed          # 29 sample products, stock, IMEI units — dev only
+pnpm dev              # launch the till with HMR
 ```
-
-The demo dataset is a small phone shop: 5 product groups, 26 products
-(3 serialized phone models with IMEI-tracked units), 2 suppliers and opening
-stock. The UI is Spanish by default; the **ES · EN** chip in the top bar
-switches the interface language (staff-only — printed documents will always be
-Spanish, per ADR-0011).
 
 | Command | What it does |
 |---|---|
-| `pnpm dev` | run the desktop till (HMR) |
-| `pnpm test` | Vitest suite for the domain layer (`packages/core`) |
-| `pnpm typecheck` | `tsc --noEmit` across every package |
-| `pnpm db:seed` | migrate + seed the local dev database (idempotent) |
-| `pnpm db:generate` / `db:migrate` / `db:stats` | drizzle migrations & quick row counts |
-| `pnpm build:win` | Windows installer via electron-builder *(not yet exercised — Day 10)* |
-| `pnpm dev:web` | Next.js cloud dashboard placeholder (Phase 2) |
+| `pnpm dev` | Run the desktop app with hot reload |
+| `pnpm test` | Vitest over `packages/core` (145 tests) |
+| `pnpm -r typecheck` | Typecheck every package |
+| `pnpm db:generate` | Generate a migration after editing `schema.ts` |
+| `pnpm db:migrate` | Apply pending migrations |
+| `pnpm db:seed` | Fill a dev database (thin wrapper over the same code first run uses) |
+| `pnpm db:stats` | Row counts per table |
+| `pnpm db:audit` | Read the audit trail — `--entity`, `--action`, `--since`, `--diff` |
+| `pnpm db:audit --verify` | Check every invariant; exits non-zero on any failure |
+| `pnpm imei:gen` | Generate valid test IMEIs (Luhn check digit) |
+| `pnpm build:win` | Build the NSIS installer into `apps/desktop/release/` |
 
-Notes for a fresh clone:
-- Database scripts run under **Electron's Node** automatically (better-sqlite3
-  is compiled for Electron's ABI). If the native module ever complains after a
-  dependency change: `pnpm --filter @arkom/desktop exec electron-builder install-app-deps`.
-- `pnpm dev` goes through a small wrapper that strips `ELECTRON_RUN_AS_NODE`
-  from the environment — some shells (VS Code tasks) leak it and it breaks
-  Electron startup.
-- The dev database lives in `.data/` (gitignored). Delete it and re-run
-  `pnpm db:seed` for a clean slate.
+A **client install runs none of these.** It migrates on first launch and asks
+the shop who it is. `db:seed` is a developer convenience.
 
-## What's done (Phase 1, Days 1–8)
+> Point the dev database somewhere else with `ARKOM_DB_PATH`. Useful for
+> testing first-run against an empty file.
 
-**Foundations**
-- pnpm monorepo per the system design: `packages/core` (pure domain logic),
-  `packages/db` (schema + migrations), `packages/ui` (design tokens +
-  primitives), `apps/desktop` (Electron till), `apps/web` (Phase-2 placeholder).
-- Every write goes through a single `mutate()` envelope: one SQLite
-  transaction = business rows + stock cache + oplog entries with before/after
-  JSON. Skipping the audit log is impossible by construction.
-- Money is integer cents end-to-end; IDs are UUIDv7; typed error codes cross
-  the IPC bridge (the UI never string-matches messages).
-- Typed ES/EN dictionary — a missing translation fails the type check.
+---
 
-**Venta (sale screen)**
-- Scan-first flow: barcode fast-entry, direct IMEI scan adds that exact unit,
-  unknown codes offer "create item" prefilled into the catalog.
-- Product grid with group chips; serialized products open an IMEI pick modal
-  and reserve the chosen unit.
-- Ticket panel: quantity stepper (serialized locked at 1), price override
-  gated behind a required reason (audited), server-computed totals only.
-- Payment: split tenders across cash / card / Bizum / transfer; change only
-  from cash over-tender; card payments require the standalone terminal
-  reference; completion is a single transaction that posts stock movements,
-  marks units sold, allocates the gap-free ticket number (`T1-000123`) and
-  writes the audit rows. Failed completions roll back cleanly and never
-  consume a number.
-- Park / resume with labels; parked tickets survive restarts. A hard app kill
-  mid-draft restores the exact ticket on relaunch (power-cut behavior, tested).
-- Keyboard: F2 search · F4 charge · F8 park.
+## Documentation
 
-**Catálogo (catalog screen)**
-- List with search + combinable filters (group, type, low stock, missing
-  data); per-field "FALTA" flags on incomplete rows.
-- Editor with full validation (cost, price, VAT, group required), barcode
-  generation (valid internal EAN-13), duplicate name/barcode rejected with
-  field-level errors, item-type switch blocked once stock or units exist,
-  deactivation via the Activo switch (delete is intentionally locked).
+Read in roughly this order.
 
-**Inventario (inventory screen)**
-- Live quantities from the movement ledger (nothing is ever edited in place),
-  total valuation at cost, below-minimum flags and filter.
-- Per-item movement history drawer (type, signed qty, cost, linked ticket
-  number with a read-only ticket peek, paginated).
-- Stock entry panel: scan to receive, serialized products switch to
-  one-row-per-IMEI capture with duplicate rejection, supplier select with
-  inline create, last-cost rule applied on confirm, single-transaction post.
+| Document | Read it for |
+|---|---|
+| [`CLAUDE.md`](CLAUDE.md) | The house rules and the authority order. **Start here.** |
+| [`docs/adr/`](docs/adr/) | The eleven frozen decisions and why. Changing one needs a superseding ADR |
+| [`docs/design/system-design.md`](docs/design/system-design.md) | Boundaries, the write path, and the full IPC contract (§4) |
+| [`docs/specs/phase1-prd.md`](docs/specs/phase1-prd.md) | What Phase 1 promised, requirement by requirement, with what is still owed by the client |
+| [`docs/design/handoff/`](docs/design/handoff/) | Per-screen specs: foundations (brand tokens, the one-blue rule), sale, catalog, inventory |
+| [`TESTING.md`](TESTING.md) | Manual walkthroughs in plain Spanish/English, for the owner to drive |
+| [`DEPLOYMENT.md`](DEPLOYMENT.md) | Installing on the shop PC, printer and scanner setup, backups, restore, the shop-visit checklist |
 
-## Testing
+---
 
-`pnpm test` runs **110 Vitest cases** over the domain layer, including:
-- money rounding against hand-computed values (IVA-inclusive PVP, half-up
-  base/VAT split) plus a reconstruction sweep (`base + tax ≡ total`),
-- a property-style ledger suite: 300 randomized multi-product batch sequences
-  asserting on-hand ≡ Σ movements, with the negative-stock guard rejecting
-  exactly at the boundary,
-- tender math (split payments, change, non-cash over-tender rejection, card
-  reference rules) and gap-free number allocation across 250 chained calls,
-- the `mutate()` envelope (no-oplog writes throw; rollbacks leave nothing),
-  EAN-13 / IMEI check-digit math, UUIDv7 format & monotonicity, typed-error
-  round-trips.
+## Conventions that matter
 
-Beyond unit tests, every screen flow has been driven end-to-end against the
-real running app (scan → unit pick → override → split tender → completion →
-audit trail), including the mid-draft kill/restore test. There is no automated
-E2E suite yet — see below.
+Break one of these and something is quietly wrong rather than loudly broken.
 
-## What's remaining
+| Rule | Why |
+|---|---|
+| **Money is integer cents.** Never floats, never strings in logic | Formatting happens once, at the UI and print edge |
+| **IDs are UUIDv7** from `@arkom/core` | Time-ordered, so they double as pagination cursors. Never `Math.random`, never autoincrement |
+| **Every write goes through `mutate()`** and lands in the oplog | One transaction: business rows + stock cache + audit entries. A build that logs nothing throws |
+| **Stock changes are `stock_movements` inserts only** | Never UPDATE a quantity. On-hand is a derived cache; negative stock is rejected in core, not the UI |
+| **Tax is snapshotted on each line** (regime + rate + amounts) | A ticket must still be readable after the VAT rate changes. Phase 1 is IVA21 only |
+| **Ticket numbers are per-till and gap-free** | Allocated inside the completion transaction. The prefix is permanent once selling starts |
+| **Errors are typed codes** | The renderer maps codes to its own strings and never parses messages |
+| **Brand tokens only** — no raw hex in components | Signal Blue lands on exactly one element per screen. **White-on-blue is banned**, and so is blue body text on Bone |
+| **Spanish first**, via the typed dictionary | `es.ts` is the source of truth; `en.ts` must satisfy the same key map or typecheck fails. Printed tickets are always Spanish regardless of the UI toggle |
 
-**Phase 1 (to finish the two-week scope)**
-- **Day 9 — printing & audit:** ESC/POS ticket printing with PDF fallback
-  (auto-print on completion, reprint; fixed Spanish strings regardless of the
-  UI language toggle — the "Imprimir ticket" button is currently rendered
-  locked), and a small script/dev screen to dump the oplog for verification.
-- **Day 10 — hardening & delivery:** exercise `pnpm build:win`, verify the
-  installer on a clean Windows machine, seed-to-first-sale walkthrough, and the
-  scripted demo (12 sales incl. serialized, park/resume, override, stock
-  entries).
-- **Testing debt:** an automated end-to-end harness for the flows currently
-  verified manually, and repository-level tests against a real SQLite file
-  (the completion transaction, reservation lifecycle).
+---
 
-**Phase 2 (designed, deliberately not built)**
-- Oplog-based sync to Postgres/Supabase and the Next.js cloud dashboard.
-- Auth, users & shifts; refunds/voids as credit notes; full invoices and the
-  Spanish fiscal module (Verifactu/TicketBAI); card-terminal integration;
-  repairs, used devices, trade-ins, agency services and SIM/top-up modules —
-  the schema and enums already reserve space for all of these.
-
-## Repository map
-
-```
-docs/adr/            frozen architecture decisions (ADR-0001 … ADR-0011)
-docs/design/         system design (boundaries, write path, IPC contract) + UI handoffs + mockup
-docs/specs/          Phase-1 PRD with acceptance criteria
-packages/core        domain: money, tax, ledger, sale, numbering, ids, IPC schemas (all tested)
-packages/db          drizzle schema + migrations + SQLite client
-packages/ui          design tokens, shared components, ES/EN dictionary
-apps/desktop         Electron till (main = IPC handlers/repositories, renderer = screens)
-apps/web             Phase-2 dashboard placeholder
-```
+© Codroon. Not currently licensed for redistribution.

@@ -11,6 +11,13 @@ release/
 *.db-wal
 *.db-shm
 
+# runtime data — these live in userData on a real till, never in the repo, but
+# a dev pointing userData at the working tree must not be able to commit a
+# shop's tickets, takings or backups
+backups/
+tickets/
+logs/
+
 # misc
 *.log
 *.tsbuildinfo
