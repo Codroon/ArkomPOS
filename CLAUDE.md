@@ -37,7 +37,10 @@ repairs/used/agency/SIM screens. Schema already anticipates them — build nothi
 
 ## Commands
 `pnpm dev` (desktop app w/ HMR) · `pnpm test` (Vitest, core) · `pnpm db:generate` / `db:migrate`
-(drizzle-kit) · `pnpm db:seed` · `pnpm build:win` (installer). Keep these working at all times.
+(drizzle-kit) · `pnpm db:seed` · `pnpm db:audit [--verify]` · `pnpm build:win` (installer).
+Keep these working at all times. A CLIENT install runs none of them: it migrates on first
+launch and asks the shop who it is (see DEPLOYMENT.md). `db:seed` is a dev convenience that
+calls the same createShop()/insertDemoData() first run uses — keep it that way.
 
 ## Definition of done (every feature)
 1. Domain logic in `packages/core` with Vitest cases (esp. money rounding, ledger guards).

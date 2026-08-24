@@ -459,7 +459,52 @@ still balances.
 
 ---
 
-## 10. Final check
+## 10. The installed version
+
+Everything above runs the app from the code. This checks the thing the shop
+actually gets. Full instructions are in **DEPLOYMENT.md** — this is the short
+version, for confirming a build is sound before it leaves.
+
+Build it:
+
+```bash
+pnpm build:win
+```
+
+The installer lands in `apps/desktop/release/Arkom POS Setup 0.9.0.exe` (~94 MB).
+
+### The clean-machine walk
+
+| Step | What should happen |
+|---|---|
+| Run the installer | Windows shows a SmartScreen box → **More info** → **Run anyway**. No administrator password is ever asked for. It installs and launches itself. |
+| First launch | The **welcome screen**, not the till. Fill in a shop name, NIF and address, pick a ticket prefix, choose **Cargar datos de ejemplo**, press **Empezar**. |
+| The till opens | The catalogue has the 29 sample items. The topbar carries the till name you typed. |
+| Sell something | A phone and an accessory, cash, with change. The ticket number uses **your prefix**. |
+| The ticket | No printer configured yet → the red **No se pudo imprimir** message with **Guardar PDF**. Save it, press **Abrir**, check the shop name you typed is on it. |
+| Close the app | It closes. It does not hang. |
+| Open it again | Straight to the till — **no welcome screen** — and the sale you made is still in the books. |
+| A backup exists | `%APPDATA%\Arkom POS\backups\` has a file, written when the app closed. |
+| Uninstall | *Settings → Apps → Arkom POS → Uninstall*. The program goes; `%APPDATA%\Arkom POS\` and its database **stay**. |
+
+### Where the data lives
+
+Paste this into the Explorer address bar (`AppData` is hidden):
+
+```
+%APPDATA%\Arkom POS
+```
+
+`arkom-pos.db` is the whole business. `tickets\`, `backups\` and `logs\` sit
+beside it. Ajustes has a button for each of the first three.
+
+> If anything above behaves differently, that is worth reporting — the packaged
+> build is what the shop runs, and it is the only version whose paths, installer
+> and permissions are real.
+
+---
+
+## 11. Final check
 
 ```bash
 pnpm db:audit --verify
