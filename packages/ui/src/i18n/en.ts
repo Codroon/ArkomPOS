@@ -307,6 +307,40 @@ export const en: Record<TKey, string> = {
   "entry.stagedEmpty": "No lines added yet.",
   "entry.stagedUnits": "{n} units",
   "entry.stagedTotal": "Total",
+
+  /* ajustes (settings) */
+  "set.title": "Settings",
+  "set.subtitle": "Printing and shop details",
+  "set.printingSection": "Printing",
+  "set.shopSection": "Shop details",
+  "set.printer": "Printer",
+  "set.printerNone": "No printer (PDF only)",
+  "set.printerHint": "Tickets go to PDF while no printer is set.",
+  "set.paperWidth": "Paper width",
+  "set.paper80": "80 mm",
+  "set.paper58": "58 mm",
+  "set.commandSet": "Command set",
+  "set.testPrint": "Test print",
+  "set.testPrinting": "Printing…",
+  "set.testSavePdf": "Test as PDF",
+  "set.legalName": "Legal name",
+  "set.nif": "Tax ID (NIF)",
+  "set.address": "Registered address",
+  "set.footer": "Ticket footer line",
+  "set.footerHint": "Printed above “Gracias por su visita”.",
+  "set.pendingHint": "Awaiting the client's details.",
+  "set.saved": "Settings saved",
+  "set.ticketsFolder": "PDFs are saved in this machine's tickets folder.",
+
+  /* printing feedback */
+  "print.printing": "Printing…",
+  "print.printed": "Ticket printed",
+  "print.pdfSaved": "PDF saved: {path}",
+  "print.failed": "Could not print",
+  "print.retry": "Retry",
+  "print.savePdf": "Save PDF",
+  "print.reprint": "Reprint",
+  "print.copyNote": "A reprint is stamped COPIA.",
 };
 
 /**

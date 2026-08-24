@@ -1,8 +1,8 @@
 /**
  * App frame — docs/design/handoff/00-foundations.md ("App shell") + mockup.
  * Topbar 44px: brand · spacer · locale toggle · Till chip · date (no
- * shift/cashier chips — ADR-0010). Left nav 186px: 01–03 enabled in Phase 1,
- * the rest muted with a LOCK badge, non-navigable. All strings via useT()
+ * shift/cashier chips — ADR-0010). Left nav 186px: 01–03 and 11 (Ajustes)
+ * enabled in Phase 1, the rest muted with a LOCK badge, non-navigable. All strings via useT()
  * (ADR-0011); the date format stays dd/mm/yyyy hh:mm regardless of locale.
  */
 import { useEffect, useState } from "react";
@@ -12,6 +12,7 @@ import { registerNavigator, type ScreenId } from "../lib/screen-bus";
 import { CatalogScreen } from "../screens/catalog/catalog-screen";
 import { InventoryScreen } from "../screens/inventory/inventory-screen";
 import { SaleScreen } from "../screens/sale/sale-screen";
+import { SettingsScreen } from "../screens/settings/settings-screen";
 
 const NAV_ITEMS: ReadonlyArray<{ n: string; labelKey: TKey; id?: ScreenId }> = [
   { n: "01", labelKey: "nav.venta", id: "venta" },
@@ -24,7 +25,7 @@ const NAV_ITEMS: ReadonlyArray<{ n: string; labelKey: TKey; id?: ScreenId }> = [
   { n: "08", labelKey: "nav.transferencias" },
   { n: "09", labelKey: "nav.caja" },
   { n: "10", labelKey: "nav.informes" },
-  { n: "11", labelKey: "nav.ajustes" },
+  { n: "11", labelKey: "nav.ajustes", id: "ajustes" },
 ];
 
 function formatNow(d: Date): string {
@@ -141,6 +142,8 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
             <SaleScreen terminalName={context?.terminal.name ?? t("common.dash")} />
           ) : screen === "catalogo" ? (
             <CatalogScreen />
+          ) : screen === "ajustes" ? (
+            <SettingsScreen />
           ) : (
             <InventoryScreen />
           )}

@@ -23,6 +23,10 @@ import type {
   StockAddResponse,
   TenderDraft,
   TicketPeek,
+  Settings,
+  PrinterInfo,
+  PrintTicketInput,
+  PrintTicketResponse,
 } from "@arkom/core";
 
 declare global {
@@ -59,6 +63,11 @@ declare global {
       invoke(channel: "sale:listParked", payload?: undefined): Promise<ParkedSale[]>;
       invoke(channel: "sale:complete", payload: { docId: string; tenders: TenderDraft[] }): Promise<CompletedSale>;
       invoke(channel: "sale:peek", payload: { docId: string }): Promise<TicketPeek>;
+      invoke(channel: "settings:get", payload?: undefined): Promise<Settings>;
+      invoke(channel: "settings:save", payload: Partial<Settings>): Promise<Settings>;
+      invoke(channel: "print:printers", payload?: undefined): Promise<PrinterInfo[]>;
+      invoke(channel: "print:ticket", payload: PrintTicketInput): Promise<PrintTicketResponse>;
+      invoke(channel: "print:test", payload?: { target?: "auto" | "pdf" }): Promise<PrintTicketResponse>;
     };
   }
 }

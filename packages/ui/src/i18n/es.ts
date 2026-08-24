@@ -309,6 +309,40 @@ export const es = {
   "entry.stagedEmpty": "Todavía no has añadido líneas.",
   "entry.stagedUnits": "{n} unidades",
   "entry.stagedTotal": "Total",
+
+  /* ajustes (settings) */
+  "set.title": "Ajustes",
+  "set.subtitle": "Impresión y datos de la tienda",
+  "set.printingSection": "Impresión",
+  "set.shopSection": "Datos de la tienda",
+  "set.printer": "Impresora",
+  "set.printerNone": "Sin impresora (solo PDF)",
+  "set.printerHint": "Los tickets van al PDF mientras no haya impresora.",
+  "set.paperWidth": "Ancho de papel",
+  "set.paper80": "80 mm",
+  "set.paper58": "58 mm",
+  "set.commandSet": "Juego de comandos",
+  "set.testPrint": "Imprimir prueba",
+  "set.testPrinting": "Imprimiendo…",
+  "set.testSavePdf": "Prueba en PDF",
+  "set.legalName": "Razón social",
+  "set.nif": "NIF",
+  "set.address": "Dirección fiscal",
+  "set.footer": "Línea del pie del ticket",
+  "set.footerHint": "Se imprime encima de «Gracias por su visita».",
+  "set.pendingHint": "Pendiente de los datos del cliente.",
+  "set.saved": "Ajustes guardados",
+  "set.ticketsFolder": "Los PDF se guardan en la carpeta tickets del equipo.",
+
+  /* printing feedback */
+  "print.printing": "Imprimiendo…",
+  "print.printed": "Ticket impreso",
+  "print.pdfSaved": "PDF guardado: {path}",
+  "print.failed": "No se pudo imprimir",
+  "print.retry": "Reintentar",
+  "print.savePdf": "Guardar PDF",
+  "print.reprint": "Reimprimir",
+  "print.copyNote": "La reimpresión sale marcada COPIA.",
 } as const;
 
 export type TKey = keyof typeof es;

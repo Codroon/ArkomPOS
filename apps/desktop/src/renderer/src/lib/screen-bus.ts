@@ -3,7 +3,7 @@
  * Catálogo with the unknown code prefilled (handoff 03 §1 / handoff 02 last
  * line). AppShell registers the navigator; CatalogScreen consumes the prefill.
  */
-export type ScreenId = "venta" | "catalogo" | "inventario";
+export type ScreenId = "venta" | "catalogo" | "inventario" | "ajustes";
 
 let navigator: ((screen: ScreenId) => void) | null = null;
 let pendingCatalogBarcode: string | null = null;
