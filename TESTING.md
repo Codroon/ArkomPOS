@@ -360,7 +360,106 @@ blue is only ever the fill behind a button.
 
 ---
 
-## 9. Final check
+## 9. Printing the ticket, with no printer attached
+
+You have no thermal printer yet, and that is fine — this whole section runs
+without one. The paper path gets its real test at the shop, on the Citizen.
+What you are checking here is that the till behaves properly when printing
+**fails**, because that is the case that must never cost you a sale.
+
+### (a) Turn the printer off
+
+Go to **11 Ajustes**. Under **Impresión**, set **Impresora** to
+**Sin impresora**. Leave the paper at **80 mm** and the command set at
+**Epson**. It saves as you go — there is no Save button and nothing to forget.
+
+While you are there, look at **Datos de la tienda** below. All three fields say
+`PENDIENTE`. That is on purpose: your shop's real registered name, NIF and
+address still have to come from you, and until they do, every ticket prints the
+word PENDIENTE where they belong so nobody can ship this by accident.
+
+### (b) Sell something
+
+Go to **01 Venta**, put two or three items on a ticket — include a phone, so
+there is an IMEI on the paper — take **Efectivo**, and press **Cobrar**.
+
+The sale completes as normal: you get a ticket number, and change if you
+overpaid. A second later a red message appears bottom-right:
+
+> **No se pudo imprimir** · [Reintentar] [Guardar PDF] [✕]
+
+**This is the point of the exercise.** The sale is done. The money is counted,
+the stock has moved, the ticket number is used. The printer failing did not
+undo any of it — it only means no paper came out.
+
+Note the message does **not** disappear on its own. Four seconds after a sale
+the till moves on to the next customer, and if the message vanished with it you
+would lose the only way to recover the ticket.
+
+### (c) Save it as a PDF instead
+
+Click **Guardar PDF**. The message turns dark and tells you where the file went:
+
+```
+Ticket guardado en C:\Users\<tú>\AppData\Roaming\@arkom\desktop\tickets\T1-00000X.pdf
+```
+
+Open that file. Check it against what you sold:
+
+| On the PDF | Should be |
+|---|---|
+| Top | **ARKOM** in the heavy brand type, on a blue line. It is the only blue on the page. |
+| Under it | The three `PENDIENTE` lines — your shop data, still owed. |
+| Ticket number + date | Matches what the till showed. |
+| Each item | Name, then `qty × price`, then the line total on the right. |
+| The phone's line | Its **IMEI**, printed underneath the name. |
+| A price you changed | The word **MODIFICADO** beside it. |
+| **TOTAL** | The biggest thing on the page, with **IVA INCLUIDO** under it — the prices already include VAT, they are not added on top. |
+| Payment | What you paid with, and your change. |
+| Bottom | Your footer line, then *Gracias por su visita*. |
+
+If any line above is wrong, say so — that is the ticket the customer keeps.
+
+### (d) Reprint it later
+
+Now pretend the customer came back tomorrow without their receipt.
+
+Go to **03 Inventario**, open any item that moved, and in **Movimientos** click
+the **Documento** link for that sale. The ticket opens. Click **Reimprimir**.
+
+It fails the same way (still no printer), so click **Guardar PDF** again. Open
+the new file — it is the same ticket with **C O P I A** stamped across the top,
+and it saved under a different name (`…-COPIA.pdf`) so the original is intact.
+
+A reprint also does *not* open the cash drawer. The money was already counted
+once; a copy must not pop the till open again.
+
+### (e) Check the books are still straight
+
+```bash
+pnpm db:audit --action print --diff
+```
+
+Every attempt is listed — the failed ones say `ok = false`, the PDFs say where
+they went. Nothing about printing is invisible.
+
+Then the full check:
+
+```bash
+pnpm db:audit --verify
+```
+
+✅ It must pass. A failed print must leave **no** mark on the sale itself: the
+numbering is still gap-free, the stock still matches its movements, the sale
+still balances.
+
+> **At the shop:** pick the Citizen CT-S310S in Ajustes, press
+> **Imprimir prueba**, and paper should come out and cut. That button prints a
+> sample — it does not use up a ticket number or leave a fake sale in your books.
+
+---
+
+## 10. Final check
 
 ```bash
 pnpm db:audit --verify

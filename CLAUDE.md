@@ -9,7 +9,9 @@ Operating instructions for Claude Code in this repo. Read before writing anythin
 4. This file.
 
 ## What we are building right now (Phase 1 only)
-Desktop till (Electron) with three screens: **Sale**, **Catalog**, **Inventory (+ minimal add-stock)**.
+Desktop till (Electron): **Sale**, **Catalog**, **Inventory (+ minimal add-stock)**, and **Ajustes-lite**
+(printer + paper + command set + the shop's legal block; nav 11 unlocks this and nothing else).
+Ticket printing is in: ESC/POS through the Windows RAW spooler, PDF fallback, reprints stamped COPIA.
 NOT in Phase 1: auth/login/shifts, refunds/voids, full invoices, card-terminal SDK, sync, web app,
 repairs/used/agency/SIM screens. Schema already anticipates them — build nothing for them.
 
