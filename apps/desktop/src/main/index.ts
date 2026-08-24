@@ -9,6 +9,13 @@ if (!app.isPackaged && process.env.ARKOM_DEBUG_PORT) {
   app.commandLine.appendSwitch("remote-debugging-port", process.env.ARKOM_DEBUG_PORT);
 }
 
+/**
+ * Graphite 900. The only hex outside tokens.css: this paints the native window
+ * before the renderer has loaded, and the main process cannot read CSS tokens.
+ * Keep it equal to --color-inverse.
+ */
+const GRAPHITE_900 = "#15181B";
+
 /** The Arkom mark, for the taskbar, Alt-Tab and the window itself. */
 function brandIcon(): string {
   return app.isPackaged
@@ -25,7 +32,7 @@ function createWindow(): void {
     minHeight: 860,
     useContentSize: true,
     autoHideMenuBar: true,
-    backgroundColor: "#15181B", // Graphite 900 — the topbar paints first
+    backgroundColor: GRAPHITE_900, // the topbar's colour, so the flash on open is the brand
     title: "Arkom POS",
     icon: brandIcon(),
     webPreferences: {

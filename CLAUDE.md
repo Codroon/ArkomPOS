@@ -23,6 +23,10 @@ repairs/used/agency/SIM screens. Schema already anticipates them — build nothi
 - **Renderer never touches DB/Node.** Everything crosses typed IPC validated with Zod on both sides.
 - **Tax is snapshotted on lines** (regime + rate_bp + amounts). Phase 1 = IVA21 only.
 - **Errors are typed codes** per the IPC contract — the UI never string-matches messages.
+- **Brand tokens only.** Colours and faces come from `packages/ui/src/styles/tokens.css` by
+  meaning (`canvas`, `ink`, `accent`, `warning-bg`…). No raw hex in components. Signal Blue lands
+  on exactly **one** element per screen — the primary action. **White-on-blue is banned** (text on
+  blue is always `accent-ink`, Graphite 900); **blue body text on Bone is banned**. See handoff 00.
 - **No new dependencies without asking.** No Docker. No CSS frameworks beyond Tailwind/shadcn.
 - Language: UI copy Spanish-first, code/comments English. All renderer strings live in the
   typed dictionary (`packages/ui/src/i18n`, `es.ts` = source of truth, `en.ts` must satisfy

@@ -340,7 +340,27 @@ pnpm db:audit --verify
 
 ---
 
-## 8. Final check
+## 8. Sixty-second look at the branding
+
+Nothing to click. Just look, and if any line below is wrong, say so.
+
+| Look at | It should be |
+|---|---|
+| **The taskbar / Alt-Tab** | The Arkom mark — dark tile, cream **A**, blue bar through it. Not the default Electron atom. |
+| **The bar across the top** | Near-black, with **ARKOM** in the heavy brand type, and a thin blue line running the full width underneath it. |
+| **The menu down the left** | The page you are on is a black block with cream text. Nothing in the menu is blue. |
+| **Blue, on any screen** | Exactly **one** blue thing, and it is the main button: **Cobrar** on Venta, **Confirmar entrada** in the receiving panel, **Guardar** in Catálogo. Two blue things = wrong. |
+| **The writing on that blue button** | Black and bold. If it is white, that is wrong — say so. |
+| **BAJO MÍNIMO on Inventario** | An amber badge with dark brown writing, readable from a step or two back from the counter. |
+| **Prices and totals** | Typewriter-style digits, bold, columns of them lining up on the decimal point. |
+| **TOTAL on the ticket** | The heavy brand type, clearly the biggest number on the screen. |
+
+Also worth a glance: nothing anywhere should be blue *writing* on the cream background —
+blue is only ever the fill behind a button.
+
+---
+
+## 9. Final check
 
 ```bash
 pnpm db:audit --verify
