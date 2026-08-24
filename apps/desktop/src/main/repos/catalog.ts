@@ -11,18 +11,24 @@ import {
   isLowStock,
   isMissingData,
   mutate,
+  normalizeScanCode,
   toOplogJson,
   uuidv7,
   TAX_RATE_BP,
+  type CatalogAddCodeRequest,
+  type CatalogAddCodeResponse,
   type CatalogListRequest,
   type CatalogSaveRequest,
+  type CatalogSaveResponse,
   type MutationCtx,
+  type ProductCode,
   type ProductRow,
 } from "@arkom/core";
 import { schema, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner, type DbTx } from "../mutate-runner";
+import { productsHoldingCode } from "./scan";
 
-const { products, productGroups, productStock, units } = schema;
+const { products, productCodes, productGroups, productStock, units } = schema;
 
 type Reader = ArkomDb | DbTx;
 
@@ -90,8 +96,85 @@ export function getProduct(db: Reader, ctx: MutationCtx, id: string): ProductRow
   return row;
 }
 
-export function saveProduct(db: ArkomDb, ctx: MutationCtx, input: CatalogSaveRequest): ProductRow {
-  return mutate(makeMutateRunner(db), ctx, (tx, log) => {
+/* ------------------------- additional product codes ------------------------- */
+
+export function listCodes(db: ArkomDb, ctx: MutationCtx, productId: string): ProductCode[] {
+  return db
+    .select({ id: productCodes.id, code: productCodes.code, createdAt: productCodes.createdAt })
+    .from(productCodes)
+    .where(and(eq(productCodes.tenantId, ctx.tenantId), eq(productCodes.productId, productId)))
+    .orderBy(asc(productCodes.createdAt))
+    .all()
+    .map((row) => ({ id: row.id, code: row.code, createdAtMs: row.createdAt.getTime() }));
+}
+
+export function addCode(db: ArkomDb, ctx: MutationCtx, input: CatalogAddCodeRequest): CatalogAddCodeResponse {
+  const code = normalizeScanCode(input.code);
+  if (code === "") throw appError("VALIDATION", "Código vacío.", "code");
+
+  const product = db
+    .select()
+    .from(products)
+    .where(and(eq(products.tenantId, ctx.tenantId), eq(products.id, input.productId)))
+    .all()[0];
+  if (!product) throw appError("VALIDATION", "Artículo no encontrado.");
+  if (product.barcode === code) {
+    throw appError("VALIDATION", "Ese código ya es el código principal de este artículo.", "code");
+  }
+  if (listCodes(db, ctx, input.productId).some((c) => c.code === code)) {
+    throw appError("VALIDATION", "Ese código ya está en este artículo.", "code");
+  }
+
+  // shared-code check runs BEFORE the transaction: a warning is not a mutation
+  const conflicts = productsHoldingCode(db, ctx, code, input.productId);
+  if (conflicts.length > 0 && !input.confirmed) {
+    return { kind: "sharedWarning", code, conflicts };
+  }
+
+  mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    const row = {
+      id: uuidv7(),
+      tenantId: ctx.tenantId,
+      productId: input.productId,
+      code,
+      createdAt: new Date(),
+    };
+    tx.insert(productCodes).values(row).run();
+    log({ entity: "product_code", entityId: row.id, action: "create", before: null, after: toOplogJson(row) });
+  });
+  return { kind: "added", codes: listCodes(db, ctx, input.productId) };
+}
+
+export function removeCode(db: ArkomDb, ctx: MutationCtx, productId: string, codeId: string): ProductCode[] {
+  mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    const row = tx
+      .select()
+      .from(productCodes)
+      .where(
+        and(
+          eq(productCodes.tenantId, ctx.tenantId),
+          eq(productCodes.productId, productId),
+          eq(productCodes.id, codeId),
+        ),
+      )
+      .all()[0];
+    if (!row) throw appError("VALIDATION", "Código no encontrado.");
+    tx.delete(productCodes).where(eq(productCodes.id, codeId)).run();
+    log({ entity: "product_code", entityId: codeId, action: "delete", before: toOplogJson(row), after: null });
+  });
+  return listCodes(db, ctx, productId);
+}
+
+export function saveProduct(db: ArkomDb, ctx: MutationCtx, input: CatalogSaveRequest): CatalogSaveResponse {
+  // req 4.4 (amended): a barcode already in use WARNS; the client confirms.
+  // Checked outside the transaction — a warning must not open (or abort) one.
+  const typedBarcode = normalizeScanCode(input.barcode ?? "");
+  if (typedBarcode !== "" && !input.confirmed) {
+    const conflicts = productsHoldingCode(db, ctx, typedBarcode, input.id ?? undefined);
+    if (conflicts.length > 0) return { kind: "barcodeWarning", code: typedBarcode, conflicts };
+  }
+
+  const product = mutate(makeMutateRunner(db), ctx, (tx, log) => {
     const now = new Date();
     const name = input.name.trim();
     let barcode = input.barcode?.trim() || null;
@@ -148,22 +231,25 @@ export function saveProduct(db: ArkomDb, ctx: MutationCtx, input: CatalogSaveReq
       .all()[0];
     if (nameClash) throw appError("DUPLICATE_NAME", "Ya existe un artículo con ese nombre.", "name");
 
-    const barcodeTaken = (code: string): boolean =>
+    // A typed barcode may now be shared (the caller already confirmed the
+    // warning). Codes WE generate must still be unique across both spaces.
+    const codeTaken = (code: string): boolean =>
       tx
         .select({ id: products.id })
         .from(products)
         .where(and(eq(products.tenantId, ctx.tenantId), eq(products.barcode, code), notSelf))
+        .all().length > 0 ||
+      tx
+        .select({ id: productCodes.id })
+        .from(productCodes)
+        .where(and(eq(productCodes.tenantId, ctx.tenantId), eq(productCodes.code, code)))
         .all().length > 0;
 
-    if (barcode) {
-      if (barcodeTaken(barcode)) {
-        throw appError("DUPLICATE_BARCODE", "Ese código de barras ya existe.", "barcode");
-      }
-    } else {
+    if (!barcode) {
       // req 4.2: blank barcode → internal EAN-13, unique within tenant
       do {
         barcode = generateInternalEan13();
-      } while (barcodeTaken(barcode));
+      } while (codeTaken(barcode));
     }
 
     const values = {
@@ -202,4 +288,5 @@ export function saveProduct(db: ArkomDb, ctx: MutationCtx, input: CatalogSaveReq
 
     return getProduct(tx, ctx, id);
   });
+  return { kind: "saved", product };
 }

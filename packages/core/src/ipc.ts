@@ -13,6 +13,10 @@ export const IPC_CHANNELS = [
   "catalog:get",
   "catalog:save",
   "catalog:groups",
+  "catalog:codes",
+  "catalog:addCode",
+  "catalog:removeCode",
+  "scan:resolve",
   "inventory:list",
   "inventory:movements",
   "stock:add",
@@ -124,9 +128,86 @@ export const CatalogSaveRequestSchema = z.object({
   reorderPoint: z.number().int().min(0), // req 4.5
   lowStockThreshold: z.number().int().min(0), // req 4.5
   active: z.boolean(),
+  /** re-send with true to accept a shared-barcode warning (req 4.4 amended) */
+  confirmed: z.boolean().optional(),
 });
 export type CatalogSaveRequest = z.infer<typeof CatalogSaveRequestSchema>;
-export const CatalogSaveResponseSchema = ProductRowSchema;
+
+/** A product named in a shared-code warning. */
+export const ProductRefSchema = z.object({ productId: z.string(), name: z.string() });
+export type ProductRef = z.infer<typeof ProductRefSchema>;
+
+/**
+ * req 4.4 (amended): a duplicate barcode WARNS instead of blocking — real box
+ * EANs legitimately sit on sibling variants. The client re-sends with
+ * confirmed:true to go ahead. Duplicate NAMES are still a hard block.
+ */
+export const CatalogSaveResponseSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("saved"), product: ProductRowSchema }),
+  z.object({ kind: z.literal("barcodeWarning"), code: z.string(), conflicts: z.array(ProductRefSchema) }),
+]);
+export type CatalogSaveResponse = z.infer<typeof CatalogSaveResponseSchema>;
+
+/* ---- product codes (additional scannable codes) ---- */
+
+export const ProductCodeSchema = z.object({
+  id: z.string(),
+  code: z.string(),
+  createdAtMs: z.number().int(),
+});
+export type ProductCode = z.infer<typeof ProductCodeSchema>;
+
+export const CatalogCodesRequestSchema = z.object({ productId: z.string() });
+export const CatalogCodesResponseSchema = z.array(ProductCodeSchema);
+
+export const CatalogAddCodeRequestSchema = z.object({
+  productId: z.string(),
+  code: z.string().trim().min(1).max(64),
+  confirmed: z.boolean().optional(),
+});
+export type CatalogAddCodeRequest = z.infer<typeof CatalogAddCodeRequestSchema>;
+export const CatalogAddCodeResponseSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("added"), codes: z.array(ProductCodeSchema) }),
+  z.object({ kind: z.literal("sharedWarning"), code: z.string(), conflicts: z.array(ProductRefSchema) }),
+]);
+export type CatalogAddCodeResponse = z.infer<typeof CatalogAddCodeResponseSchema>;
+
+export const CatalogRemoveCodeRequestSchema = z.object({ productId: z.string(), codeId: z.string() });
+export const CatalogRemoveCodeResponseSchema = z.array(ProductCodeSchema);
+
+/* ---- scan:resolve — one code, one answer (or a picker) ---- */
+
+export const ScanProductSchema = z.object({
+  productId: z.string(),
+  name: z.string(),
+  itemType: z.string(),
+  priceCents: z.number().int().nullable(),
+  onHand: z.number().int(),
+  active: z.boolean(),
+});
+export const ScanUnitSchema = z.object({
+  unitId: z.string(),
+  imei: z.string(),
+  status: z.string(),
+});
+const ScanProductMatchSchema = z.object({
+  kind: z.literal("product"),
+  product: ScanProductSchema,
+  matchedVia: z.enum(["primary", "alias"]),
+});
+const ScanUnitMatchSchema = z.object({
+  kind: z.literal("unit"),
+  unit: ScanUnitSchema,
+  product: ScanProductSchema,
+});
+export const ScanMatchSchema = z.discriminatedUnion("kind", [ScanProductMatchSchema, ScanUnitMatchSchema]);
+export const ScanResolutionSchema = z.discriminatedUnion("kind", [
+  ScanProductMatchSchema,
+  ScanUnitMatchSchema,
+  z.object({ kind: z.literal("ambiguous"), code: z.string(), matches: z.array(ScanMatchSchema) }),
+  z.object({ kind: z.literal("none"), code: z.string() }),
+]);
+export const ScanResolveRequestSchema = z.object({ code: z.string() });
 
 /* ---- inventory:* + stock:add + supplier:* — §4 ---- */
 
@@ -182,16 +263,29 @@ export const InventoryMovementsResponseSchema = z.object({
 });
 export type InventoryMovementsResponse = z.infer<typeof InventoryMovementsResponseSchema>;
 
+/**
+ * One staged entry line. A stocked line carries `qty`; a SERIALIZED line
+ * carries `expectedQty` plus exactly that many `imeis` — the panel captures
+ * them in a loop and the server refuses any mismatch (req 6.1).
+ */
 export const StockAddEntrySchema = z
   .object({
     productId: z.string().optional(),
     barcode: z.string().optional(),
-    qty: z.number().int().min(1),
     unitCostCents: z.number().int().min(0), // req 6.2
     supplierId: z.string().min(1), // req 6.3
-    imei: z.string().optional(), // serialized: creates the unit (§4)
+    qty: z.number().int().min(1).optional(), // stocked lines
+    expectedQty: z.number().int().min(1).optional(), // serialized lines
+    imeis: z.array(z.string()).optional(),
   })
-  .refine((e) => e.productId || e.barcode, { message: "productId or barcode required" });
+  .refine((e) => e.productId || e.barcode, { message: "productId or barcode required" })
+  .refine((e) => (e.qty == null) !== (e.expectedQty == null), {
+    message: "exactly one of qty (stocked) or expectedQty (serialized) is required",
+  })
+  .refine((e) => e.expectedQty == null || (e.imeis?.length ?? 0) === e.expectedQty, {
+    message: "a serialized line needs one IMEI per expected unit",
+    path: ["imeis"],
+  });
 export type StockAddEntry = z.infer<typeof StockAddEntrySchema>;
 
 export const StockAddRequestSchema = z.object({

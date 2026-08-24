@@ -14,6 +14,9 @@ export interface ScanProduct {
   itemType: string;
   priceCents: number | null;
   onHand: number;
+  /** inactive products still resolve — the operation reports why, instead of
+   *  the scan looking like an unknown code and offering to create a duplicate */
+  active: boolean;
 }
 
 export interface ScanUnit {

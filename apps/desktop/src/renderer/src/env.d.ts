@@ -1,8 +1,13 @@
 /// <reference types="vite/client" />
 import type {
+  CatalogAddCodeRequest,
+  CatalogAddCodeResponse,
   CatalogListRequest,
   CatalogSaveRequest,
+  CatalogSaveResponse,
   CompletedSale,
+  ProductCode,
+  ScanResolution,
   EntityRef,
   InventoryListRequest,
   InventoryMovementsRequest,
@@ -27,8 +32,12 @@ declare global {
       invoke(channel: "meta:context", payload?: undefined): Promise<MetaContextResponse>;
       invoke(channel: "catalog:list", payload?: CatalogListRequest): Promise<ProductRow[]>;
       invoke(channel: "catalog:get", payload: { id: string }): Promise<ProductRow>;
-      invoke(channel: "catalog:save", payload: CatalogSaveRequest): Promise<ProductRow>;
+      invoke(channel: "catalog:save", payload: CatalogSaveRequest): Promise<CatalogSaveResponse>;
       invoke(channel: "catalog:groups", payload?: undefined): Promise<EntityRef[]>;
+      invoke(channel: "catalog:codes", payload: { productId: string }): Promise<ProductCode[]>;
+      invoke(channel: "catalog:addCode", payload: CatalogAddCodeRequest): Promise<CatalogAddCodeResponse>;
+      invoke(channel: "catalog:removeCode", payload: { productId: string; codeId: string }): Promise<ProductCode[]>;
+      invoke(channel: "scan:resolve", payload: { code: string }): Promise<ScanResolution>;
       invoke(channel: "inventory:list", payload?: InventoryListRequest): Promise<InventoryRow[]>;
       invoke(channel: "inventory:movements", payload: InventoryMovementsRequest): Promise<InventoryMovementsResponse>;
       invoke(channel: "stock:add", payload: StockAddRequest): Promise<StockAddResponse>;

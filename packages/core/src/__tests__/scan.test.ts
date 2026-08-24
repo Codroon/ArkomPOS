@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { normalizeScanCode, resolveScan, type ScanProduct, type ScanUnit } from "../scan";
 
-const cable: ScanProduct = { productId: "p-cable", name: "Cable Lightning 1m", itemType: "stocked", priceCents: 990, onHand: 22 };
-const protector15: ScanProduct = { productId: "p-15", name: "Protector iPhone 15 Pro Max", itemType: "stocked", priceCents: 1290, onHand: 8 };
-const protector16: ScanProduct = { productId: "p-16", name: "Protector iPhone 16 Pro Max", itemType: "stocked", priceCents: 1390, onHand: 6 };
-const phone: ScanProduct = { productId: "p-17", name: "Apple iPhone 17 Pro Max 256GB Negro", itemType: "serialized", priceCents: 149900, onHand: 5 };
+const cable: ScanProduct = { productId: "p-cable", name: "Cable Lightning 1m", itemType: "stocked", priceCents: 990, onHand: 22, active: true };
+const protector15: ScanProduct = { productId: "p-15", name: "Protector iPhone 15 Pro Max", itemType: "stocked", priceCents: 1290, onHand: 8, active: true };
+const protector16: ScanProduct = { productId: "p-16", name: "Protector iPhone 16 Pro Max", itemType: "stocked", priceCents: 1390, onHand: 6, active: true };
+const phone: ScanProduct = { productId: "p-17", name: "Apple iPhone 17 Pro Max 256GB Negro", itemType: "serialized", priceCents: 149900, onHand: 5, active: true };
 
 const inStock = (unitId: string, imei: string): ScanUnit => ({ unitId, imei, status: "in_stock" });
 

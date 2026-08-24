@@ -45,10 +45,14 @@ business rows + `product_stock` cache + `oplog` entry → typed result back.
 | `catalog:list` | filters{search?, groupId?, itemType?, lowStockOnly?, missingDataOnly?} → ProductRow[] | flags derived from NULLs (req 3.3) |
 | `catalog:get` | {id} → ProductDetail | |
 | `catalog:groups` | {} → {id, name}[] | editor group select; venta group grid reuses it |
-| `catalog:save` | ProductInput → ProductRow | full req-4 validation; barcode auto-gen if blank; duplicate name/barcode → typed error |
+| `catalog:save` | ProductInput{…, confirmed?} → {kind:'saved', product} \| {kind:'barcodeWarning', code, conflicts[]} | full req-4 validation; barcode auto-gen if blank; duplicate **name** → typed error; duplicate **barcode** → warning payload, re-sent with `confirmed:true` (PRD 4.4 amended) |
+| `catalog:codes` | {productId} → ProductCode[] | additional scannable codes on a product |
+| `catalog:addCode` | {productId, code, confirmed?} → {kind:'added', codes[]} \| {kind:'sharedWarning', code, conflicts[]} | attaching a code already on other products warns first; oplog `product_code.create` |
+| `catalog:removeCode` | {productId, codeId} → ProductCode[] | oplog `product_code.delete` |
+| `scan:resolve` | {code} → {kind:'product', product, matchedVia} \| {kind:'unit', unit, product} \| {kind:'ambiguous', code, matches[]} \| {kind:'none', code} | THE scan entry point for sale, stock entry and catalog search: primary barcodes ∪ product_codes ∪ in-stock unit IMEIs. Ambiguity is expected (one EAN can sit on sibling variants) — the UI shows a picker, the domain never guesses |
 | `inventory:list` | filters{search?, groupId?, itemType?, lowStockOnly?} → InventoryRow[] (onHand, reorder, lowStock, valuation) | reads `product_stock` cache; serialized valuation = Σ in-stock unit costs |
 | `inventory:movements` | {productId, cursor?} → {rows: MovementRow[], nextCursor} | req 5.4 history; keyset cursor = movement id (UUIDv7 time-ordered), newest first |
-| `stock:add` | {entries:[{barcode\|productId, qty, unitCostCents, supplierId, imei?}]} → {lineCount, productIds} | purchase_in; IMEI creates unit (serialized, qty 1); applies last-cost (6.5); one oplog row per movement |
+| `stock:add` | {entries:[{barcode\|productId, unitCostCents, supplierId, **qty** (stocked) \| **expectedQty + imeis[]** (serialized)}]} → {lineCount, productIds} | purchase_in; a serialized line brings in `expectedQty` units in ONE line and is rejected unless `imeis.length === expectedQty` (req 6.1); each IMEI creates a unit + its own +1 movement; applies last-cost (6.5); one oplog row per movement |
 | `supplier:list` | {} → {id, name}[] | entrada supplier select (req 6.3) |
 | `supplier:create` | {name} → {id, name} | inline create from entrada; duplicate → DUPLICATE_NAME |
 | `sale:current` | {} → SaleState \| null | the terminal's live draft (boot restore / power-cut). Drafts are created LAZILY by the first addLine — no empty-draft rows; `sale:new` was folded into this. |

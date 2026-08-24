@@ -20,6 +20,14 @@ import {
   CatalogSaveResponseSchema,
   CatalogGroupsRequestSchema,
   CatalogGroupsResponseSchema,
+  CatalogCodesRequestSchema,
+  CatalogCodesResponseSchema,
+  CatalogAddCodeRequestSchema,
+  CatalogAddCodeResponseSchema,
+  CatalogRemoveCodeRequestSchema,
+  CatalogRemoveCodeResponseSchema,
+  ScanResolveRequestSchema,
+  ScanResolutionSchema,
   InventoryListRequestSchema,
   InventoryListResponseSchema,
   InventoryMovementsRequestSchema,
@@ -50,7 +58,8 @@ import {
 } from "@arkom/core";
 import type { ArkomDb } from "@arkom/db";
 import { tillContext } from "./context";
-import { getProduct, listGroups, listProducts, saveProduct } from "./repos/catalog";
+import { addCode, getProduct, listCodes, listGroups, listProducts, removeCode, saveProduct } from "./repos/catalog";
+import { resolveScanCode } from "./repos/scan";
 import { addStock, listInventory, listMovements } from "./repos/inventory";
 import { createSupplier, listSuppliers } from "./repos/suppliers";
 import {
@@ -111,6 +120,22 @@ export function registerIpcHandlers(db: ArkomDb): void {
 
   register("catalog:groups", CatalogGroupsRequestSchema, CatalogGroupsResponseSchema, () => {
     return listGroups(db, tillContext(db).ctx);
+  });
+
+  register("catalog:codes", CatalogCodesRequestSchema, CatalogCodesResponseSchema, ({ productId }) => {
+    return listCodes(db, tillContext(db).ctx, productId);
+  });
+
+  register("catalog:addCode", CatalogAddCodeRequestSchema, CatalogAddCodeResponseSchema, (req) => {
+    return addCode(db, tillContext(db).ctx, req);
+  });
+
+  register("catalog:removeCode", CatalogRemoveCodeRequestSchema, CatalogRemoveCodeResponseSchema, (req) => {
+    return removeCode(db, tillContext(db).ctx, req.productId, req.codeId);
+  });
+
+  register("scan:resolve", ScanResolveRequestSchema, ScanResolutionSchema, ({ code }) => {
+    return resolveScanCode(db, tillContext(db).ctx, code);
   });
 
   register("inventory:list", InventoryListRequestSchema, InventoryListResponseSchema, (filters) => {

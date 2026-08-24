@@ -9,7 +9,7 @@ import {
   applyMovements,
   buildMovement,
   isLowStock,
-  isValidImei,
+  validateImeiBatch,
   mutate,
   nextCostCents,
   stockKey,
@@ -26,6 +26,7 @@ import {
 } from "@arkom/core";
 import { schema, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner } from "../mutate-runner";
+import { resolveScanCode } from "./scan";
 
 const { products, productGroups, productStock, stockMovements, units, documents } = schema;
 
@@ -120,10 +121,20 @@ export function listMovements(
 
 interface ResolvedEntry {
   product: typeof products.$inferSelect;
-  qty: number;
   unitCostCents: number;
   supplierId: string;
+  /** stocked: the quantity received · serialized: how many units (= imeis.length) */
+  qty: number;
+  /** serialized only: one IMEI per unit this line brings in */
+  imeis: string[];
+}
+
+/** One ledger movement to write: a stocked line makes one, a serialized line one per unit. */
+interface PlannedMovement {
+  entry: ResolvedEntry;
   imei: string | null;
+  unitId: string | null;
+  draft: MovementDraft;
 }
 
 /**
@@ -138,15 +149,20 @@ export function addStock(db: ArkomDb, ctx: MutationCtx, input: StockAddRequest):
     const resolved: ResolvedEntry[] = [];
     const batchImeis = new Set<string>();
     for (const entry of input.entries) {
+      let productId = entry.productId ?? null;
+      if (!productId) {
+        // same resolver the screens use: primary code ∪ additional codes ∪ IMEIs
+        const resolution = resolveScanCode(db, ctx, entry.barcode!);
+        if (resolution.kind === "product") productId = resolution.product.productId;
+        else if (resolution.kind === "unit") productId = resolution.product.productId;
+        else if (resolution.kind === "ambiguous") {
+          throw appError("VALIDATION", "Ese código está en varios artículos; elige uno.", "barcode");
+        } else throw appError("VALIDATION", "No existe ese código.", "barcode");
+      }
       const product = tx
         .select()
         .from(products)
-        .where(
-          and(
-            eq(products.tenantId, ctx.tenantId),
-            entry.productId ? eq(products.id, entry.productId) : eq(products.barcode, entry.barcode!),
-          ),
-        )
+        .where(and(eq(products.tenantId, ctx.tenantId), eq(products.id, productId)))
         .all()[0];
       if (!product) throw appError("VALIDATION", "No existe ese código.", "barcode");
       if (!product.active) {
@@ -154,27 +170,41 @@ export function addStock(db: ArkomDb, ctx: MutationCtx, input: StockAddRequest):
       }
 
       if (product.itemType === "serialized") {
-        const imei = entry.imei?.trim() ?? "";
-        if (!imei) throw appError("VALIDATION", "IMEI obligatorio para artículos serializados.", "imei");
-        if (!isValidImei(imei)) throw appError("VALIDATION", "IMEI no válido (15 dígitos).", "imei");
-        if (entry.qty !== 1) throw appError("VALIDATION", "Los artículos serializados entran de 1 en 1.", "qty");
-        if (batchImeis.has(imei)) throw appError("DUPLICATE_IMEI", "Ese IMEI ya está en la entrada.", "imei");
-        const taken = tx
-          .select({ id: units.id })
-          .from(units)
-          .where(and(eq(units.tenantId, ctx.tenantId), eq(units.imei, imei)))
-          .all()[0];
-        if (taken) throw appError("DUPLICATE_IMEI", "Ese IMEI ya está registrado.", "imei");
-        batchImeis.add(imei);
-        resolved.push({ product, qty: 1, unitCostCents: entry.unitCostCents, supplierId: entry.supplierId, imei });
+        if (entry.expectedQty == null) {
+          throw appError("VALIDATION", "Los artículos serializados necesitan un IMEI por unidad.", "imeis");
+        }
+        // core owns the count/Luhn/in-batch-duplicate rules (req 6.1)
+        const imeis = validateImeiBatch({ expectedQty: entry.expectedQty, imeis: entry.imeis ?? [] });
+        for (const imei of imeis) {
+          if (batchImeis.has(imei)) {
+            throw appError("DUPLICATE_IMEI", "Ese IMEI está repetido en la entrada.", "imei");
+          }
+          const taken = tx
+            .select({ id: units.id })
+            .from(units)
+            .where(and(eq(units.tenantId, ctx.tenantId), eq(units.imei, imei)))
+            .all()[0];
+          if (taken) throw appError("DUPLICATE_IMEI", "Ese IMEI ya está registrado.", "imei");
+          batchImeis.add(imei);
+        }
+        resolved.push({
+          product,
+          qty: imeis.length,
+          unitCostCents: entry.unitCostCents,
+          supplierId: entry.supplierId,
+          imeis,
+        });
       } else {
-        if (entry.imei) throw appError("VALIDATION", "Este artículo no lleva IMEI.", "imei");
+        if (entry.imeis && entry.imeis.length > 0) {
+          throw appError("VALIDATION", "Este artículo no lleva IMEI.", "imeis");
+        }
+        if (entry.qty == null) throw appError("VALIDATION", "La cantidad es obligatoria.", "qty");
         resolved.push({
           product,
           qty: entry.qty,
           unitCostCents: entry.unitCostCents,
           supplierId: entry.supplierId,
-          imei: null,
+          imeis: [],
         });
       }
     }
@@ -190,34 +220,52 @@ export function addStock(db: ArkomDb, ctx: MutationCtx, input: StockAddRequest):
         .all()[0];
       levels[stockKey(pid, ctx.locationId)] = row?.onHand ?? 0;
     }
-    const drafts: { draft: MovementDraft; entry: ResolvedEntry; unitId: string | null }[] = resolved.map(
-      (entry) => {
-        const unitId = entry.imei ? uuidv7() : null;
-        return {
+    // a serialized line explodes into one +1 movement per unit (ADR-0004)
+    const drafts: PlannedMovement[] = [];
+    for (const entry of resolved) {
+      if (entry.imeis.length > 0) {
+        for (const imei of entry.imeis) {
+          const unitId = uuidv7();
+          drafts.push({
+            entry,
+            imei,
+            unitId,
+            draft: buildMovement({
+              productId: entry.product.id,
+              locationId: ctx.locationId,
+              movementType: "purchase_in",
+              qty: 1,
+              unitCostCents: entry.unitCostCents,
+              unitId,
+            }),
+          });
+        }
+      } else {
+        drafts.push({
           entry,
-          unitId,
+          imei: null,
+          unitId: null,
           draft: buildMovement({
             productId: entry.product.id,
             locationId: ctx.locationId,
             movementType: "purchase_in",
             qty: entry.qty,
             unitCostCents: entry.unitCostCents,
-            unitId,
           }),
-        };
-      },
-    );
+        });
+      }
+    }
     const finalLevels = applyMovements(levels, drafts.map((d) => d.draft));
 
     /* -- writes: units, movements (+oplog each), last-cost, cache -- */
-    for (const { entry, draft, unitId } of drafts) {
-      if (unitId && entry.imei) {
+    for (const { entry, draft, unitId, imei } of drafts) {
+      if (unitId && imei) {
         const unit = {
           id: unitId,
           tenantId: ctx.tenantId,
           locationId: ctx.locationId,
           productId: entry.product.id,
-          imei: entry.imei,
+          imei,
           status: "in_stock" as const,
           costCents: entry.unitCostCents,
           soldDocumentId: null,

@@ -168,13 +168,11 @@ export function EntradaPanel({
     if (!canConfirm) return;
     setSubmitting(true);
     setConfirmError(null);
-    const entries: StockAddEntry[] = staged.map((l) => ({
-      productId: l.productId,
-      qty: l.qty,
-      unitCostCents: l.unitCostCents,
-      supplierId,
-      ...(l.imei ? { imei: l.imei } : {}),
-    }));
+    const entries: StockAddEntry[] = staged.map((l) =>
+      l.imei
+        ? { productId: l.productId, expectedQty: 1, imeis: [l.imei], unitCostCents: l.unitCostCents, supplierId }
+        : { productId: l.productId, qty: l.qty, unitCostCents: l.unitCostCents, supplierId },
+    );
     window.arkom
       .invoke("stock:add", { entries })
       .then((res) => {

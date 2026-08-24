@@ -160,8 +160,13 @@ export function CatalogScreen() {
     setGeneralError(null);
     window.arkom
       .invoke("catalog:save", request)
-      .then((saved) => {
-        openDraft(draftFromRow(saved));
+      .then((result) => {
+        if (result.kind === "barcodeWarning") {
+          // req 4.4 amended: shared barcodes warn; the confirm dialog lands with the editor rework
+          setGeneralError({ raw: result.conflicts.map((c) => c.name).join(", ") });
+          return;
+        }
+        openDraft(draftFromRow(result.product));
         return refresh();
       })
       .catch((err) => {
