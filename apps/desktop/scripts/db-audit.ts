@@ -1,5 +1,17 @@
 /**
- * `pnpm db:audit` — dump the audit trail. `pnpm db:audit --verify` — check the
+ * `pnpm db:audit` — reconcile the books against the audit trail.
+ *
+ *   pnpm db:audit                          last 30 entries
+ *   pnpm db:audit --entity document        only documents
+ *   pnpm db:audit --action print           only print attempts
+ *   pnpm db:audit --id <entityId>          one row's whole history
+ *   pnpm db:audit --since 2026-08-24       from that date (inclusive)
+ *   pnpm db:audit --until 2026-08-25       to the end of that date
+ *   pnpm db:audit --limit 100              how many
+ *   pnpm db:audit --diff                   what actually changed, in words
+ *   pnpm db:audit --verify                 check the invariants, exit non-zero on any failure
+ *
+ * `--verify` checks the
  * invariants the whole design rests on and exit non-zero if any fails:
  *
  *   1. stock cache ≡ Σ movements, and never negative (ADR-0004)
@@ -14,22 +26,144 @@ import { isValidImei } from "@arkom/core";
 import { openDb } from "@arkom/db";
 
 const dbPath = process.env.ARKOM_DB_PATH!;
-const verify = process.argv.includes("--verify");
+const argv = process.argv.slice(2);
+const verify = argv.includes("--verify");
+const showDiff = argv.includes("--diff");
+
+/** `--flag value`; returns undefined when absent. */
+const flag = (name: string): string | undefined => {
+  const at = argv.indexOf(`--${name}`);
+  return at >= 0 ? argv[at + 1] : undefined;
+};
+
+/** A date the owner would type (yyyy-mm-dd), or a full ISO instant. */
+const parseDate = (raw: string | undefined, endOfDay: boolean): number | undefined => {
+  if (!raw) return undefined;
+  const ms = Date.parse(
+    /^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}` : raw,
+  );
+  if (Number.isNaN(ms)) {
+    console.error(`Fecha no válida: ${raw} (usa yyyy-mm-dd)`);
+    process.exit(2);
+  }
+  return ms;
+};
+
 const { sqlite } = openDb(dbPath);
 
 const q = <T = Record<string, unknown>>(sql: string, ...params: unknown[]): T[] =>
   sqlite.prepare(sql).all(...params) as T[];
 
+/* ---------------- reading the trail back (filters + diffs) ---------------- */
+
+/** Money-shaped keys become "12,90 €"; timestamps become dates; the rest is itself. */
+function readable(key: string, value: unknown): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "number") {
+    if (key.endsWith("Cents") || key.endsWith("_cents")) {
+      return `${(value / 100).toFixed(2).replace(".", ",")} €`;
+    }
+    // epoch-ms timestamps, not quantities
+    if (/(^|_|[a-z])(at|At)$/.test(key) && value > 1e12) {
+      return new Date(value).toISOString().replace("T", " ").slice(0, 19);
+    }
+  }
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+/** Keys that say nothing about what a human changed. */
+const NOISE = new Set(["id", "tenantId", "locationId", "terminalId", "updatedAt", "createdAt", "userId"]);
+
+/**
+ * What actually changed, in words. A create lists the fields worth seeing; an
+ * update lists only the keys whose value moved, as "old → new". This is the
+ * difference between an audit log you can read and one you merely have.
+ */
+function describeChange(before: unknown, after: unknown): string[] {
+  const b = (before ?? {}) as Record<string, unknown>;
+  const a = (after ?? {}) as Record<string, unknown>;
+  const keys = [...new Set([...Object.keys(b), ...Object.keys(a)])].filter((k) => !NOISE.has(k));
+
+  if (before === null) {
+    // empties are dropped as noise, but `false` is kept: "ok = false" on a print
+    // attempt is precisely what someone reading this log came to find
+    return keys
+      .filter((k) => a[k] !== null && a[k] !== undefined && a[k] !== "")
+      .map((k) => `${k} = ${readable(k, a[k])}`);
+  }
+  return keys
+    .filter((k) => JSON.stringify(b[k]) !== JSON.stringify(a[k]))
+    .map((k) => `${k}: ${readable(k, b[k])} → ${readable(k, a[k])}`);
+}
+
 if (!verify) {
-  const limit = Number(process.env.ARKOM_AUDIT_LIMIT ?? 30);
-  const rows = q<{ seq: number; entity: string; entity_id: string; action: string; created_at: number; user_id: string | null }>(
-    "SELECT seq, entity, entity_id, action, created_at, user_id FROM oplog ORDER BY seq DESC LIMIT ?",
+  const limit = Number(flag("limit") ?? process.env.ARKOM_AUDIT_LIMIT ?? 30);
+  const entity = flag("entity");
+  const action = flag("action");
+  const entityId = flag("id");
+  const since = parseDate(flag("since"), false);
+  const until = parseDate(flag("until"), true);
+
+  const where: string[] = [];
+  const params: unknown[] = [];
+  const add = (clause: string, value: unknown) => {
+    where.push(clause);
+    params.push(value);
+  };
+  if (entity) add("entity = ?", entity);
+  if (action) add("action = ?", action);
+  if (entityId) add("entity_id = ?", entityId);
+  if (since !== undefined) add("created_at >= ?", since);
+  if (until !== undefined) add("created_at <= ?", until);
+  const clause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+
+  const total = q<{ n: number }>(`SELECT COUNT(*) n FROM oplog ${clause}`, ...params)[0]!.n;
+  const rows = q<{
+    seq: number;
+    entity: string;
+    entity_id: string;
+    action: string;
+    created_at: number;
+    user_id: string | null;
+    before: string | null;
+    after: string | null;
+  }>(
+    `SELECT seq, entity, entity_id, action, created_at, user_id, before, after
+     FROM oplog ${clause} ORDER BY seq DESC LIMIT ?`,
+    ...params,
     limit,
   );
-  console.log(`Últimas ${rows.length} entradas del oplog (de ${q<{ n: number }>("SELECT COUNT(*) n FROM oplog")[0]!.n}):\n`);
+
+  const filters = [
+    entity ? `entidad=${entity}` : null,
+    action ? `acción=${action}` : null,
+    entityId ? `id=${entityId}` : null,
+    flag("since") ? `desde=${flag("since")}` : null,
+    flag("until") ? `hasta=${flag("until")}` : null,
+  ].filter(Boolean);
+
+  console.log(
+    `Oplog: ${rows.length} de ${total} entrada(s)` +
+      (filters.length > 0 ? ` · filtros: ${filters.join(" · ")}` : "") +
+      (showDiff ? "" : " · añade --diff para ver los cambios") +
+      "\n",
+  );
+
   for (const r of rows.reverse()) {
     const when = new Date(r.created_at).toISOString().replace("T", " ").slice(0, 19);
     console.log(`  #${String(r.seq).padStart(5)}  ${when}  ${r.entity}.${r.action}  ${r.entity_id}  ${r.user_id ?? "—"}`);
+    if (!showDiff) continue;
+    const changes = describeChange(
+      r.before === null ? null : JSON.parse(r.before),
+      r.after === null ? null : JSON.parse(r.after),
+    );
+    if (changes.length === 0) console.log("           (sin cambios de campo)");
+    else for (const line of changes) console.log(`           ${line}`);
+  }
+
+  if (total > rows.length) {
+    console.log(`\n  … ${total - rows.length} entrada(s) más. Usa --limit para ver más.`);
   }
   sqlite.close();
   process.exit(0);
