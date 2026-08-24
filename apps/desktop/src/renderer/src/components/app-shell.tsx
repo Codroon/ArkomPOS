@@ -40,11 +40,11 @@ function LocaleToggle() {
       type="button"
       title={t("shell.localeToggle")}
       onClick={() => setLocale(locale === "es" ? "en" : "es")}
-      className="flex items-center gap-1 self-center rounded-[3px] border border-border-input bg-card px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-[.06em]"
+      className="flex items-center gap-1 self-center rounded-[3px] border border-line-strong bg-card px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-[.06em]"
     >
-      <span className={locale === "es" ? "text-ink" : "text-faint"}>ES</span>
-      <span className="text-faint">·</span>
-      <span className={locale === "en" ? "text-ink" : "text-faint"}>EN</span>
+      <span className={locale === "es" ? "text-ink" : "text-subtle"}>ES</span>
+      <span className="text-subtle">·</span>
+      <span className={locale === "en" ? "text-ink" : "text-subtle"}>EN</span>
     </button>
   );
 }
@@ -62,29 +62,29 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
   useEffect(() => registerNavigator(setScreen), []);
 
   return (
-    <div className="flex h-full min-h-[860px] flex-col bg-app text-ink">
+    <div className="flex h-full min-h-[860px] flex-col bg-canvas text-ink">
       {/* topbar */}
-      <header className="flex h-11 flex-none items-stretch border-b border-border-strong bg-panel text-[12px]">
-        <div className="flex items-center gap-2 border-r border-border px-3.5 font-bold tracking-[.14em]">
+      <header className="flex h-11 flex-none items-stretch border-b border-line-strong bg-surface text-[12px]">
+        <div className="flex items-center gap-2 border-r border-line px-3.5 font-bold tracking-[.14em]">
           {t("shell.brand")}
-          <span className="text-[10px] font-normal tracking-[.08em] text-faint">{t("shell.brandSuffix")}</span>
+          <span className="text-[10px] font-normal tracking-[.08em] text-subtle">{t("shell.brandSuffix")}</span>
         </div>
         <div className="flex-1" />
-        <div className="flex items-center border-l border-border px-3.5">
+        <div className="flex items-center border-l border-line px-3.5">
           <LocaleToggle />
         </div>
-        <div className="flex items-center border-l border-border px-3.5 text-muted">
+        <div className="flex items-center border-l border-line px-3.5 text-muted">
           {context?.terminal.name ?? t("common.dash")}
         </div>
-        <div className="flex items-center border-l border-border px-3.5 font-mono text-[11px] tabular-nums text-ink-2">
+        <div className="flex items-center border-l border-line px-3.5 font-mono text-[11px] tabular-nums text-ink-2">
           {formatNow(now)}
         </div>
       </header>
 
       <div className="flex min-h-0 flex-1">
         {/* left nav */}
-        <aside className="flex w-[186px] flex-none flex-col border-r border-border-strong bg-panel">
-          <div className="px-3 pb-1 pt-2.5 text-[9px] font-bold tracking-[.12em] text-faint">{t("shell.menu")}</div>
+        <aside className="flex w-[186px] flex-none flex-col border-r border-line-strong bg-surface">
+          <div className="px-3 pb-1 pt-2.5 text-[9px] font-bold tracking-[.12em] text-subtle">{t("shell.menu")}</div>
           {NAV_ITEMS.map((item) =>
             item.id ? (
               <button
@@ -94,14 +94,14 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
                 className={cn(
                   "flex items-center gap-[9px] border-l-[3px] px-3 py-2 text-left",
                   screen === item.id
-                    ? "border-ink-2 bg-nav-active font-bold text-ink"
-                    : "border-transparent text-ink-2 hover:border-border hover:bg-nav-hover hover:text-ink",
+                    ? "border-ink-2 bg-active font-bold text-ink"
+                    : "border-transparent text-ink-2 hover:border-line hover:bg-hover hover:text-ink",
                 )}
               >
                 <span
                   className={cn(
                     "w-4 text-center text-[11px] tabular-nums",
-                    screen === item.id ? "text-ink-3" : "text-faint",
+                    screen === item.id ? "text-muted" : "text-subtle",
                   )}
                 >
                   {item.n}
@@ -113,22 +113,22 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
               <div
                 key={item.n}
                 aria-disabled="true"
-                className="flex cursor-default items-center gap-[9px] border-l-[3px] border-transparent px-3 py-2 text-faint"
+                className="flex cursor-default items-center gap-[9px] border-l-[3px] border-transparent px-3 py-2 text-subtle"
               >
-                <span className="w-4 text-center text-[11px] tabular-nums text-faint-2">{item.n}</span>
+                <span className="w-4 text-center text-[11px] tabular-nums text-subtle">{item.n}</span>
                 <span className="flex-1">{t(item.labelKey)}</span>
                 <LockBadge />
               </div>
             ),
           )}
           <div className="flex-1" />
-          <div className="border-t border-border px-3 py-2.5 text-[10px] leading-normal text-faint">
+          <div className="border-t border-line px-3 py-2.5 text-[10px] leading-normal text-subtle">
             {context ? `${context.location.name} · ${context.terminal.name}` : t("shell.noContext")}
           </div>
         </aside>
 
         {/* main */}
-        <main className="flex min-w-0 flex-1 flex-col bg-app">
+        <main className="flex min-w-0 flex-1 flex-col bg-canvas">
           {screen === "venta" ? (
             <SaleScreen terminalName={context?.terminal.name ?? t("common.dash")} />
           ) : screen === "catalogo" ? (

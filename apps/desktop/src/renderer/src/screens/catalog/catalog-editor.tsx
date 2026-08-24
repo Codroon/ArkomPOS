@@ -1,5 +1,5 @@
 /**
- * Editor panel (380px, bg-panel) — handoff 02 "Editor panel". Doubles for
+ * Editor panel (380px, bg-surface) — handoff 02 "Editor panel". Doubles for
  * create/edit; Guardar disabled until dirty ∧ valid; Eliminar rendered locked
  * (P1: deactivation via the Activo switch is the only path). Strings via
  * useT() (ADR-0011).
@@ -108,12 +108,12 @@ function ExtraCodesField({ productId, productName }: { productId: string | null;
       </div>
       <div className="mt-1 flex flex-wrap gap-1">
         {codes.length === 0 ? (
-          <span className="text-[10px] text-faint">{t("editor.noExtraCodes")}</span>
+          <span className="text-[10px] text-subtle">{t("editor.noExtraCodes")}</span>
         ) : (
           codes.map((code) => (
             <span
               key={code.id}
-              className="inline-flex items-center gap-1 rounded-[2px] border border-border-input bg-card px-1 py-px font-mono text-[10px] tabular-nums"
+              className="inline-flex items-center gap-1 rounded-[2px] border border-line-strong bg-card px-1 py-px font-mono text-[10px] tabular-nums"
             >
               {code.code}
               <button type="button" className="text-muted hover:text-ink" onClick={() => setRemoving(code)}>
@@ -178,7 +178,7 @@ export function CatalogEditor({
       <div className="flex flex-1 items-center justify-center p-6">
         <div className="text-center text-[12px] text-muted">
           {t("editor.emptyTitle")}
-          <div className="mt-1 text-[11px] text-faint">{t("editor.emptyHint")}</div>
+          <div className="mt-1 text-[11px] text-subtle">{t("editor.emptyHint")}</div>
         </div>
       </div>
     );
@@ -207,7 +207,7 @@ export function CatalogEditor({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="border-b border-border px-4 py-2.5">
+      <div className="border-b border-line px-4 py-2.5">
         <div className="text-[13px] font-bold">{draft.id ? t("editor.editTitle") : t("editor.newTitle")}</div>
       </div>
 
@@ -310,7 +310,7 @@ export function CatalogEditor({
               {marginRatio !== null ? ` · ${String(marginRatio).replace(".", ",")}%` : ""}
             </span>
           ) : (
-            <span className="text-faint">{t("common.dash")}</span>
+            <span className="text-subtle">{t("common.dash")}</span>
           )}
         </div>
 
@@ -326,7 +326,7 @@ export function CatalogEditor({
           {err("itemType") ? (
             <div className="text-[11px] leading-snug text-ink-2">{err("itemType")}</div>
           ) : draft.itemType === "serialized" ? (
-            <div className="text-[11px] leading-snug text-faint">{t("editor.serializedHint")}</div>
+            <div className="text-[11px] leading-snug text-subtle">{t("editor.serializedHint")}</div>
           ) : null}
         </div>
 
@@ -349,7 +349,7 @@ export function CatalogEditor({
           </Field>
         </div>
 
-        <div className="flex items-center justify-between border-t border-border pt-3">
+        <div className="flex items-center justify-between border-t border-line pt-3">
           <SectionLabel>{t("editor.active")}</SectionLabel>
           <Switch
             checked={draft.active}
@@ -358,11 +358,11 @@ export function CatalogEditor({
           />
         </div>
         {!draft.active ? (
-          <div className="text-[11px] leading-snug text-faint">{t("editor.inactiveHint")}</div>
+          <div className="text-[11px] leading-snug text-subtle">{t("editor.inactiveHint")}</div>
         ) : null}
       </div>
 
-      <div className="border-t border-border-strong bg-panel-2 px-4 py-2.5">
+      <div className="border-t border-line-strong bg-surface-2 px-4 py-2.5">
         {generalError ? <div className="mb-2 text-[11px] text-ink-2">{generalError}</div> : null}
         <div className="flex items-center gap-2">
           <PrimaryButton onClick={onSave} disabled={!canSave || saving}>

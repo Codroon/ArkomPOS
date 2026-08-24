@@ -1,40 +1,74 @@
 /*
- * Arkom POS design tokens — docs/design/handoff/00-foundations.md.
- * Wireframe-grade zinc ramp, monochrome BY DESIGN: no accent colors in P1.
- * Components reference these tokens (bg-app, text-ink, border-border-strong, …),
- * never raw hex.
+ * Arkom design tokens — the brand identity manual (v1.0) expressed as the only
+ * colours and typefaces this app may use. Components reference tokens by their
+ * MEANING (canvas, ink, accent, warning…), never a raw hex value.
+ *
+ * Palette, straight from the manual:
+ *   Signal Blue #2F9BFF · Graphite 900 #15181B · Graphite 700 #2A2F35
+ *   Gray 400   #70777D · Bone        #F1EFE9
+ *
+ * THE ONE-BLUE RULE (manual, page 03):
+ *   "Blue appears on ONE piece per surface. Everything else is neutral."
+ *   In this app that one piece is the screen's primary action — Cobrar on
+ *   Venta, Confirmar entrada in the receiving drawer, Guardar in Catálogo.
+ *   If you are adding a second blue thing to a screen, the answer is no.
+ *
+ * TWO CONTRAST BANS, both non-negotiable:
+ *   1. WHITE ON BLUE IS BANNED. Signal Blue is a light, bright blue (~#2F9BFF);
+ *      white text on it fails contrast. Text on blue is always Graphite 900 —
+ *      use `--color-accent-ink`.
+ *   2. BLUE BODY TEXT ON BONE IS BANNED. Signal Blue on the Bone canvas is far
+ *      too weak to read. Blue is a *surface* colour for the one primary action,
+ *      never a text colour for prose, labels, links or data.
  */
+@import "./fonts.css";
+
 @theme {
-  /* surfaces */
-  --color-app: #e8e8ea;            /* main canvas */
-  --color-panel: #f4f4f5;          /* topbar, nav, right panels */
-  --color-panel-2: #efeff0;        /* table headers, totals strip, search band */
-  --color-card: #ffffff;           /* cards, rows, inputs */
+  /* ---- surfaces (warm, from Bone) ---- */
+  --color-canvas: #f1efe9; /* Bone — the main working surface */
+  --color-surface: #eae7de; /* chrome: topbar-adjacent panels, nav, drawers */
+  --color-surface-2: #e4e1d7; /* table headers, totals strips, footers */
+  --color-card: #ffffff; /* rows, cards, inputs — paper on the counter */
 
-  /* borders */
-  --color-border: #d4d4d8;         /* cards, row dividers */
-  --color-border-light: #e4e4e7;   /* light rows */
-  --color-border-strong: #b8b8bd;  /* structural separators */
-  --color-border-input: #a1a1aa;   /* inputs */
-  --color-border-input-required: #71717a;
+  /* ---- inverse surface (Graphite) — topbar, brand chrome ---- */
+  --color-inverse: #15181b; /* Graphite 900 */
+  --color-inverse-2: #2a2f35; /* Graphite 700 — hairlines on dark */
+  --color-inverse-ink: #f1efe9; /* Bone text on graphite */
+  --color-inverse-muted: #70777d; /* Gray 400 on graphite */
 
-  /* nav states (mockup left nav) */
-  --color-nav-active: #e0e0e3;
-  --color-nav-hover: #ececee;
+  /* ---- ink ramp ---- */
+  --color-ink: #15181b; /* Graphite 900 — primary text */
+  --color-ink-2: #2a2f35; /* Graphite 700 — secondary text */
+  --color-muted: #70777d; /* Gray 400 — labels, tertiary */
+  --color-subtle: #9b9a92; /* warm gray — placeholders, hints */
 
-  /* table row states (handoff 02) */
-  --color-row-missing: #f6f6f7;
-  --color-row-selected: #eceef0;
+  /* ---- borders: two warm neutrals derived from Bone ---- */
+  --color-line: #dcd8cd; /* hairlines, row dividers */
+  --color-line-strong: #c4bfb1; /* structural separators, input borders */
 
-  /* ink ramp */
-  --color-ink: #18181b;            /* primary text */
-  --color-ink-2: #3f3f46;          /* secondary text, primary buttons bg */
-  --color-ink-3: #52525b;          /* tertiary */
-  --color-muted: #6b6b70;          /* labels */
-  --color-faint: #9a9aa0;          /* placeholders, hints */
-  --color-faint-2: #a1a1aa;
+  /* ---- accent: the one blue ---- */
+  --color-accent: #2f9bff; /* Signal Blue */
+  --color-accent-ink: #15181b; /* ALWAYS this on blue — never white */
+  --color-focus: #2f9bff; /* focus ring */
 
-  /* type */
-  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  /* ---- functional pairs: tint background + strong dark text ---- */
+  --color-warning-bg: #f6e7c3;
+  --color-warning-ink: #6a4a05; /* BAJO MÍNIMO must read across the shop */
+  --color-danger-bg: #f7dbd6;
+  --color-danger-ink: #7a2015;
+  --color-success-bg: #d9ead9;
+  --color-success-ink: #1d5127;
+  --color-info-bg: #dceeff; /* blue TINT is allowed as a surface… */
+  --color-info-ink: #0b3a66; /* …with dark ink on top, never blue text */
+
+  /* ---- interaction states, re-derived from Bone ---- */
+  --color-hover: #e7e4da;
+  --color-active: #ddd9cd;
+  --color-row-selected: #e4e1d7;
+  --color-row-flagged: #f7f5ef; /* rows missing data */
+
+  /* ---- type ---- */
+  --font-display: "Archivo Black", "Archivo", system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
 }

@@ -22,15 +22,15 @@ function Card({
       type="button"
       onClick={() => onAdd(product)}
       className={cn(
-        "flex flex-col gap-1 rounded-[3px] border border-border bg-card p-2 text-left hover:border-border-input-required",
-        shake && "arkom-shake border-border-input-required",
+        "flex flex-col gap-1 rounded-[3px] border border-line bg-card p-2 text-left hover:border-line-strong",
+        shake && "arkom-shake border-line-strong",
       )}
     >
       <div className="line-clamp-2 min-h-[28px] text-[11px] leading-snug text-ink">
         {product.name}
         {product.itemType === "serialized" ? <Chip className="ml-1">{t("chip.serie")}</Chip> : null}
       </div>
-      <div className="truncate font-mono text-[9px] tabular-nums text-faint">{product.barcode ?? ""}</div>
+      <div className="truncate font-mono text-[9px] tabular-nums text-subtle">{product.barcode ?? ""}</div>
       <MoneyText cents={product.priceCents ?? 0} className="text-[12px] font-bold" />
     </button>
   );
@@ -89,7 +89,7 @@ export function ProductGrid({
       {sections.map(({ group, items }) => (
         <div key={group.id} className="mb-4">
           <SectionLabel className="mb-1.5">
-            {dataLabel(group.name)} <span className="font-normal text-faint">({items.length})</span>
+            {dataLabel(group.name)} <span className="font-normal text-subtle">({items.length})</span>
           </SectionLabel>
           <div className="grid grid-cols-4 gap-2">
             {items.map((p) => (

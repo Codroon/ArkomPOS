@@ -21,7 +21,7 @@ export function Segmented<T extends string>({
 }) {
   const t = useT();
   return (
-    <div className={cn("flex flex-wrap overflow-hidden rounded-[3px] border border-border-input bg-card", className)}>
+    <div className={cn("flex flex-wrap overflow-hidden rounded-[3px] border border-line-strong bg-card", className)}>
       {options.map((opt) => (
         <button
           key={opt.value}
@@ -30,12 +30,12 @@ export function Segmented<T extends string>({
           title={opt.disabled ? t("common.comingSoon") : undefined}
           onClick={() => onChange(opt.value)}
           className={cn(
-            "flex items-center gap-1 border-r border-border px-2 py-1 text-[11px] last:border-r-0",
+            "flex items-center gap-1 border-r border-line px-2 py-1 text-[11px] last:border-r-0",
             value === opt.value
               ? "bg-ink-2 font-bold text-white"
               : opt.disabled
-                ? "cursor-default bg-panel-2 text-faint"
-                : "text-ink-2 hover:bg-nav-hover",
+                ? "cursor-default bg-surface-2 text-subtle"
+                : "text-ink-2 hover:bg-hover",
           )}
         >
           {opt.label}

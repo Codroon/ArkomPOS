@@ -287,12 +287,12 @@ export function EntradaDrawer({
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={onTrapKeyDown}
         className={cn(
-          "flex h-full w-[480px] flex-col border-l border-border-strong bg-panel shadow-lg",
+          "flex h-full w-[480px] flex-col border-l border-line-strong bg-surface shadow-lg",
           submitting && "pointer-events-none opacity-70",
         )}
       >
         {/* header */}
-        <div className="flex flex-none items-center gap-2 border-b border-border-strong bg-panel-2 px-4 py-2.5">
+        <div className="flex flex-none items-center gap-2 border-b border-line-strong bg-surface-2 px-4 py-2.5">
           <div className="text-[13px] font-bold">{t("entry.section")}</div>
           <div className="flex-1" />
           <button type="button" className="text-[13px] text-muted hover:text-ink" onClick={onClose}>
@@ -315,17 +315,17 @@ export function EntradaDrawer({
               />
             </Field>
             {!product && searchMatches.length > 0 ? (
-              <div className="absolute top-[52px] z-20 w-full overflow-hidden rounded-[3px] border border-border-strong bg-card shadow-md">
+              <div className="absolute top-[52px] z-20 w-full overflow-hidden rounded-[3px] border border-line-strong bg-card shadow-md">
                 {searchMatches.map((row) => (
                   <button
                     key={row.productId}
                     type="button"
                     onClick={() => selectProduct(toScanProduct(row))}
-                    className="flex w-full items-center gap-2 border-b border-border-light px-2 py-1.5 text-left last:border-b-0 hover:bg-nav-hover"
+                    className="flex w-full items-center gap-2 border-b border-line px-2 py-1.5 text-left last:border-b-0 hover:bg-hover"
                   >
                     <span className="min-w-0 flex-1 truncate text-[12px]">{row.name}</span>
                     {row.itemType === "serialized" ? <Chip>{t("chip.serie")}</Chip> : null}
-                    <span className="font-mono text-[10px] tabular-nums text-faint">{row.onHand}</span>
+                    <span className="font-mono text-[10px] tabular-nums text-subtle">{row.onHand}</span>
                   </button>
                 ))}
               </div>
@@ -334,14 +334,14 @@ export function EntradaDrawer({
 
           {/* 2 · the resolved item */}
           {product ? (
-            <div className="rounded-[3px] border border-border bg-card px-3 py-2">
+            <div className="rounded-[3px] border border-line bg-card px-3 py-2">
               <div className="flex items-start gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[12px] font-bold">
                     {product.name}
                     {serialized ? <Chip className="ml-1.5">{t("chip.serie")}</Chip> : null}
                   </div>
-                  <div className="font-mono text-[10px] tabular-nums text-faint">
+                  <div className="font-mono text-[10px] tabular-nums text-subtle">
                     {knownRow?.barcode ?? t("common.dash")} · {t("entry.currentStock", { n: product.onHand })}
                   </div>
                 </div>
@@ -359,7 +359,7 @@ export function EntradaDrawer({
               </div>
             </div>
           ) : (
-            <div className="rounded-[3px] border border-dashed border-border px-3 py-4 text-center text-[11px] text-faint">
+            <div className="rounded-[3px] border border-dashed border-line px-3 py-4 text-center text-[11px] text-subtle">
               {t("entry.idleHint")}
             </div>
           )}
@@ -403,7 +403,7 @@ export function EntradaDrawer({
 
           {/* 3b · serialized: the quantity is the IMEI target */}
           {serialized ? (
-            <div className="rounded-[3px] border border-border bg-card px-3 py-2">
+            <div className="rounded-[3px] border border-line bg-card px-3 py-2">
               <Field
                 label={t("entry.imeiLoop", { n: Math.min(imeis.length + 1, qty), total: qty })}
                 required
@@ -430,7 +430,7 @@ export function EntradaDrawer({
                 {imeis.map((imei) => (
                   <span
                     key={imei}
-                    className="inline-flex items-center gap-1 rounded-[2px] border border-border bg-panel-2 px-1 py-px font-mono text-[10px] tabular-nums"
+                    className="inline-flex items-center gap-1 rounded-[2px] border border-line bg-surface-2 px-1 py-px font-mono text-[10px] tabular-nums"
                   >
                     {imei}
                     <button
@@ -443,7 +443,7 @@ export function EntradaDrawer({
                   </span>
                 ))}
               </div>
-              <div className="mt-1 text-[10px] text-faint">
+              <div className="mt-1 text-[10px] text-subtle">
                 {imeis.length === qty
                   ? t("entry.imeiCaptured", { n: imeis.length, total: qty })
                   : t("entry.imeiPending", { n: Math.max(0, qty - imeis.length) })}
@@ -498,17 +498,17 @@ export function EntradaDrawer({
           </GhostButton>
 
           {/* 6 · staged lines, with room to breathe */}
-          <div className="min-h-[120px] flex-1 rounded-[3px] border border-border bg-card p-1">
+          <div className="min-h-[120px] flex-1 rounded-[3px] border border-line bg-card p-1">
             {staged.length === 0 ? (
-              <div className="flex h-full items-center justify-center px-2 text-center text-[11px] text-faint">
+              <div className="flex h-full items-center justify-center px-2 text-center text-[11px] text-subtle">
                 {t("entry.stagedEmpty")}
               </div>
             ) : (
               staged.map((l) => (
-                <div key={l.key} className="flex items-start gap-2 border-b border-border-light px-2 py-1.5 last:border-b-0">
+                <div key={l.key} className="flex items-start gap-2 border-b border-line px-2 py-1.5 last:border-b-0">
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[12px]">{l.name}</div>
-                    <div className="font-mono text-[10px] tabular-nums text-faint">
+                    <div className="font-mono text-[10px] tabular-nums text-subtle">
                       {l.imeis.length > 0 ? t("entry.stagedUnits", { n: l.imeis.length }) : l.code ?? ""}
                     </div>
                   </div>
@@ -530,7 +530,7 @@ export function EntradaDrawer({
         </div>
 
         {/* footer */}
-        <div className="flex-none border-t border-border-strong bg-panel-2 px-4 py-3">
+        <div className="flex-none border-t border-line-strong bg-surface-2 px-4 py-3">
           {confirmError ? <div className="mb-2 text-[11px] text-ink-2">{confirmError}</div> : null}
           <div className="mb-2 flex items-baseline justify-between">
             <SectionLabel>{t("entry.stagedTotal")}</SectionLabel>

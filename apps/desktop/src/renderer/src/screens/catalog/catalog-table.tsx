@@ -20,7 +20,7 @@ const TYPE_CHIP_KEYS: Record<string, TKey> = {
 function MissingCell({ t }: { t: TFn }) {
   return (
     <span className="inline-flex items-center gap-1">
-      <span className="text-faint">{t("common.dash")}</span>
+      <span className="text-subtle">{t("common.dash")}</span>
       <Chip variant="warn">{t("chip.falta")}</Chip>
     </span>
   );
@@ -44,13 +44,13 @@ function Th({
   const label = (
     <>
       {t(labelKey)}
-      {active ? <span className="ml-1 text-faint">{sort.dir === 1 ? "▲" : "▼"}</span> : null}
+      {active ? <span className="ml-1 text-subtle">{sort.dir === 1 ? "▲" : "▼"}</span> : null}
     </>
   );
   return (
     <th
       className={cn(
-        "sticky top-0 z-10 border-b border-border-strong bg-panel-2 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.1em] text-muted",
+        "sticky top-0 z-10 border-b border-line-strong bg-surface-2 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.1em] text-muted",
         align === "right" ? "text-right" : "text-left",
       )}
     >
@@ -104,19 +104,19 @@ export function CatalogTable({
               key={row.id}
               onClick={() => onSelect(row)}
               className={cn(
-                "cursor-pointer border-b border-border-light",
-                isSelected ? "bg-row-selected" : missing.size > 0 ? "bg-row-missing" : "bg-card",
-                !isSelected && "hover:bg-nav-hover",
+                "cursor-pointer border-b border-line",
+                isSelected ? "bg-row-selected" : missing.size > 0 ? "bg-row-flagged" : "bg-card",
+                !isSelected && "hover:bg-hover",
               )}
             >
-              <td className="px-3 py-1.5 font-mono text-[11px] tabular-nums text-faint">
+              <td className="px-3 py-1.5 font-mono text-[11px] tabular-nums text-subtle">
                 {missing.has("barcode") ? <MissingCell t={t} /> : row.barcode}
               </td>
-              <td className={cn("px-3 py-1.5", row.active ? "text-ink" : "text-faint")}>
+              <td className={cn("px-3 py-1.5", row.active ? "text-ink" : "text-subtle")}>
                 {row.name}
                 {!row.active ? <Chip className="ml-1.5">{t("chip.inactive")}</Chip> : null}
               </td>
-              <td className="px-3 py-1.5 text-ink-3">
+              <td className="px-3 py-1.5 text-muted">
                 {missing.has("group") ? <MissingCell t={t} /> : dataLabel(row.groupName ?? "")}
               </td>
               <td className="px-3 py-1.5">
@@ -128,7 +128,7 @@ export function CatalogTable({
               <td className="whitespace-nowrap px-3 py-1.5 text-right font-bold">
                 {missing.has("price") ? <MissingCell t={t} /> : <MoneyText cents={row.priceCents!} />}
               </td>
-              <td className="px-3 py-1.5 text-right tabular-nums text-ink-3">
+              <td className="px-3 py-1.5 text-right tabular-nums text-muted">
                 {missing.has("tax") ? <MissingCell t={t} /> : `${(row.taxRateBp ?? 0) / 100}%`}
               </td>
               <td className="px-3 py-1.5 text-right font-mono tabular-nums">{row.onHand}</td>

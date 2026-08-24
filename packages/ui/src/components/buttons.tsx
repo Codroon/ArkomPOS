@@ -12,7 +12,7 @@ export function PrimaryButton({ className, ...props }: ButtonProps) {
   return (
     <button
       type="button"
-      className={cn(base, "bg-ink-2 font-bold text-white hover:bg-ink disabled:bg-faint-2", className)}
+      className={cn(base, "bg-ink-2 font-bold text-white hover:bg-ink disabled:bg-subtle", className)}
       {...props}
     />
   );
@@ -25,7 +25,7 @@ export function GhostButton({ className, ...props }: ButtonProps) {
       type="button"
       className={cn(
         base,
-        "border border-border-input bg-card text-ink-2 hover:border-ink-3 hover:text-ink disabled:border-border disabled:text-faint",
+        "border border-line-strong bg-card text-ink-2 hover:border-muted hover:text-ink disabled:border-line disabled:text-subtle",
         className,
       )}
       {...props}
@@ -40,7 +40,7 @@ export function LockedButton({ className, children, ...props }: ButtonProps) {
       type="button"
       disabled
       aria-disabled="true"
-      className={cn(base, "border border-border bg-panel-2 text-faint", className)}
+      className={cn(base, "border border-line bg-surface-2 text-subtle", className)}
       {...props}
     >
       {children}

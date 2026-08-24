@@ -70,10 +70,10 @@ export function MovementsDrawer({ product, onClose }: { product: InventoryRow; o
   return (
     <div className="fixed inset-0 z-40 flex justify-end bg-ink/10" onMouseDown={onClose}>
       <div
-        className="flex h-full w-[420px] flex-col border-l border-border-strong bg-panel shadow-lg"
+        className="flex h-full w-[420px] flex-col border-l border-line-strong bg-surface shadow-lg"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-baseline gap-2 border-b border-border-strong bg-panel-2 px-4 py-2.5">
+        <div className="flex items-baseline gap-2 border-b border-line-strong bg-surface-2 px-4 py-2.5">
           <div className="text-[13px] font-bold">{product.name}</div>
           <div className="font-mono text-[11px] tabular-nums text-muted">
             {t("drawer.onHand", { n: product.onHand })}
@@ -104,7 +104,7 @@ export function MovementsDrawer({ product, onClose }: { product: InventoryRow; o
                       <th
                         key={key}
                         className={cn(
-                          "sticky top-0 overflow-hidden border-b border-border-strong bg-panel-2 px-1.5 py-1.5 text-[9px] font-bold uppercase tracking-[.1em] text-muted",
+                          "sticky top-0 overflow-hidden border-b border-line-strong bg-surface-2 px-1.5 py-1.5 text-[9px] font-bold uppercase tracking-[.1em] text-muted",
                           i >= 2 && i <= 3 ? "text-right" : "text-left",
                         )}
                       >
@@ -118,14 +118,14 @@ export function MovementsDrawer({ product, onClose }: { product: InventoryRow; o
                 {rows.map((m) => {
                   const typeKey = TYPE_KEYS[m.movementType];
                   return (
-                    <tr key={m.id} className="border-b border-border-light bg-card align-top">
+                    <tr key={m.id} className="border-b border-line bg-card align-top">
                       <td className="whitespace-nowrap px-1.5 py-1.5 font-mono text-[10px] tabular-nums text-muted">
                         {formatShort(m.createdAtMs)}
                       </td>
                       <td className="px-1.5 py-1.5">
                         <Chip>{typeKey ? t(typeKey) : m.movementType.toUpperCase()}</Chip>
                         {m.imei ? (
-                          <div className="mt-0.5 truncate font-mono text-[9px] tabular-nums text-faint">{m.imei}</div>
+                          <div className="mt-0.5 truncate font-mono text-[9px] tabular-nums text-subtle">{m.imei}</div>
                         ) : null}
                       </td>
                       <td
@@ -149,20 +149,20 @@ export function MovementsDrawer({ product, onClose }: { product: InventoryRow; o
                             {m.documentNumber}
                           </button>
                         ) : (
-                          <span className="text-ink-3">{t("common.dash")}</span>
+                          <span className="text-muted">{t("common.dash")}</span>
                         )}
                       </td>
-                      <td className="px-1.5 py-1.5 text-faint">{m.userId ?? t("common.dash")}</td>
+                      <td className="px-1.5 py-1.5 text-subtle">{m.userId ?? t("common.dash")}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           )}
-          {loading ? <div className="p-3 text-center text-[11px] text-faint">…</div> : null}
+          {loading ? <div className="p-3 text-center text-[11px] text-subtle">…</div> : null}
         </div>
 
-        <div className="border-t border-border bg-panel-2 px-4 py-2 text-[10px] text-faint">
+        <div className="border-t border-line bg-surface-2 px-4 py-2 text-[10px] text-subtle">
           {t("drawer.footerNote")}
         </div>
       </div>

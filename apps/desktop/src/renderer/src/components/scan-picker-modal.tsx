@@ -34,10 +34,10 @@ export function ScanPickerModal({
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/25" onMouseDown={onClose}>
       <div
-        className="flex max-h-[70vh] w-[420px] flex-col rounded-[3px] border border-border-strong bg-card shadow-lg"
+        className="flex max-h-[70vh] w-[420px] flex-col rounded-[3px] border border-line-strong bg-card shadow-lg"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="border-b border-border-strong bg-panel-2 px-4 py-2.5">
+        <div className="border-b border-line-strong bg-surface-2 px-4 py-2.5">
           <div className="text-[13px] font-bold">{t("pick.scanTitle")}</div>
           <div className="text-[11px] text-muted">{t("pick.scanSubtitle", { code })}</div>
         </div>
@@ -50,7 +50,7 @@ export function ScanPickerModal({
                 key={isUnit ? match.unit.unitId : product.productId}
                 type="button"
                 onClick={() => onPick(match)}
-                className="flex w-full items-center gap-2 border-b border-border-light px-4 py-2.5 text-left hover:bg-nav-hover"
+                className="flex w-full items-center gap-2 border-b border-line px-4 py-2.5 text-left hover:bg-hover"
               >
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[12px]">
@@ -60,7 +60,7 @@ export function ScanPickerModal({
                     ) : null}
                     {!product.active ? <Chip className="ml-1.5">{t("chip.inactive")}</Chip> : null}
                   </div>
-                  <div className="font-mono text-[10px] tabular-nums text-faint">
+                  <div className="font-mono text-[10px] tabular-nums text-subtle">
                     {isUnit ? `IMEI ${match.unit.imei}` : t("pick.stock", { n: product.onHand })}
                   </div>
                 </div>

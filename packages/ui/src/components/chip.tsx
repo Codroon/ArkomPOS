@@ -20,8 +20,8 @@ export function Chip({
       className={cn(
         "inline-flex items-center rounded-[2px] border px-1 py-px align-middle font-mono text-[9px] font-bold leading-[1.4] tracking-[.06em]",
         variant === "warn"
-          ? "border-border-input-required bg-panel-2 text-ink-2"
-          : "border-border bg-card text-ink-3",
+          ? "border-line-strong bg-surface-2 text-ink-2"
+          : "border-line bg-card text-muted",
         className,
       )}
     >

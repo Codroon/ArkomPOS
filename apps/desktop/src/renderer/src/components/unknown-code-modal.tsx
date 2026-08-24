@@ -88,10 +88,10 @@ export function UnknownCodeModal({
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/25" onMouseDown={onClose}>
       <div
-        className="flex max-h-[70vh] w-[420px] flex-col rounded-[3px] border border-border-strong bg-card shadow-lg"
+        className="flex max-h-[70vh] w-[420px] flex-col rounded-[3px] border border-line-strong bg-card shadow-lg"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="border-b border-border-strong bg-panel-2 px-4 py-2.5">
+        <div className="border-b border-line-strong bg-surface-2 px-4 py-2.5">
           <div className="text-[13px] font-bold">
             {mode === "choice" ? t("unknown.title") : t("unknown.attachTitle", { code })}
           </div>
@@ -127,7 +127,7 @@ export function UnknownCodeModal({
           )
         ) : (
           <>
-            <div className="border-b border-border px-4 py-2">
+            <div className="border-b border-line px-4 py-2">
               <SearchInput
                 autoFocus
                 placeholder={t("unknown.searchPlaceholder")}
@@ -144,14 +144,14 @@ export function UnknownCodeModal({
                     key={row.id}
                     type="button"
                     onClick={() => attach(row, false)}
-                    className="flex w-full items-center gap-2 border-b border-border-light px-4 py-2 text-left hover:bg-nav-hover"
+                    className="flex w-full items-center gap-2 border-b border-line px-4 py-2 text-left hover:bg-hover"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[12px]">
                         {row.name}
                         {row.itemType === "serialized" ? <Chip className="ml-1.5">{t("chip.serie")}</Chip> : null}
                       </div>
-                      <div className="font-mono text-[10px] tabular-nums text-faint">{row.barcode ?? ""}</div>
+                      <div className="font-mono text-[10px] tabular-nums text-subtle">{row.barcode ?? ""}</div>
                     </div>
                     {row.priceCents != null ? <MoneyText cents={row.priceCents} className="text-[11px]" /> : null}
                   </button>
@@ -161,11 +161,11 @@ export function UnknownCodeModal({
           </>
         )}
 
-        {error ? <div className="border-t border-border px-4 py-2 text-[11px] text-ink-2">{error}</div> : null}
+        {error ? <div className="border-t border-line px-4 py-2 text-[11px] text-ink-2">{error}</div> : null}
 
         {/* shared-code confirmation, inline so the picker stays put behind it */}
         {conflicts && pending ? (
-          <div className="border-t border-border-strong bg-panel-2 px-4 py-3">
+          <div className="border-t border-line-strong bg-surface-2 px-4 py-3">
             <div className="text-[12px] font-bold">{t("shared.title")}</div>
             <div className="mt-1 text-[11px] text-muted">
               {t("shared.body", { code, names: conflicts.join(", ") })}

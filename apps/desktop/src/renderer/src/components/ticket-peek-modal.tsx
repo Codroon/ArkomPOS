@@ -44,10 +44,10 @@ export function TicketPeekModal({ docId, onClose }: { docId: string; onClose: ()
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/25" onMouseDown={onClose}>
       <div
-        className="flex max-h-[80vh] w-[380px] flex-col rounded-[3px] border border-border-strong bg-card shadow-lg"
+        className="flex max-h-[80vh] w-[380px] flex-col rounded-[3px] border border-line-strong bg-card shadow-lg"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-baseline gap-2 border-b border-border-strong bg-panel-2 px-4 py-2.5">
+        <div className="flex items-baseline gap-2 border-b border-line-strong bg-surface-2 px-4 py-2.5">
           <div className="font-mono text-[14px] font-bold tabular-nums">{peek?.docNumber ?? "…"}</div>
           {peek?.completedAtMs ? (
             <div className="font-mono text-[10px] tabular-nums text-muted">{formatDate(peek.completedAtMs)}</div>
@@ -58,10 +58,10 @@ export function TicketPeekModal({ docId, onClose }: { docId: string; onClose: ()
           {peek ? (
             <>
               {peek.lines.map((line, i) => (
-                <div key={i} className="flex items-baseline gap-2 border-b border-border-light py-1.5 text-[12px]">
+                <div key={i} className="flex items-baseline gap-2 border-b border-line py-1.5 text-[12px]">
                   <div className="min-w-0 flex-1">
                     <div className="truncate">{line.description}</div>
-                    <div className="font-mono text-[10px] tabular-nums text-faint">
+                    <div className="font-mono text-[10px] tabular-nums text-subtle">
                       {line.imei ? `IMEI ${line.imei} · ` : ""}
                       {line.qty} × <MoneyText cents={line.unitPriceCents} />
                     </div>
@@ -90,7 +90,7 @@ export function TicketPeekModal({ docId, onClose }: { docId: string; onClose: ()
                     <span>
                       {t(METHOD_KEYS[tender.method] ?? "pay.cash")}
                       {tender.cardReference ? (
-                        <span className="ml-1 font-mono text-[10px] text-faint">{tender.cardReference}</span>
+                        <span className="ml-1 font-mono text-[10px] text-subtle">{tender.cardReference}</span>
                       ) : null}
                     </span>
                     <MoneyText cents={tender.amountCents} />
@@ -107,7 +107,7 @@ export function TicketPeekModal({ docId, onClose }: { docId: string; onClose: ()
           ) : null}
         </div>
 
-        <div className="flex justify-end border-t border-border bg-panel-2 px-4 py-2">
+        <div className="flex justify-end border-t border-line bg-surface-2 px-4 py-2">
           <GhostButton onClick={onClose}>{t("peek.close")}</GhostButton>
         </div>
       </div>

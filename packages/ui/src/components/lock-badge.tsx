@@ -10,7 +10,7 @@ export function LockBadge({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "rounded-[2px] border border-border-input px-1 py-px font-mono text-[8px] font-bold tracking-[.08em] text-faint",
+        "rounded-[2px] border border-line-strong px-1 py-px font-mono text-[8px] font-bold tracking-[.08em] text-subtle",
         className,
       )}
     >

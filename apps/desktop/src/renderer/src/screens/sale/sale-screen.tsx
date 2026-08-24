@@ -338,7 +338,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       {/* header strip */}
-      <div className="flex flex-none items-center gap-3 border-b border-border-strong bg-panel px-4 py-2.5">
+      <div className="flex flex-none items-center gap-3 border-b border-line-strong bg-surface px-4 py-2.5">
         <div className="text-[15px] font-bold">
           {t("nav.venta")} — {terminalName}
         </div>
@@ -354,19 +354,19 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
           <button
             type="button"
             onClick={() => setParkedOpen((o) => !o)}
-            className="h-6 rounded-[3px] border border-border-input bg-card px-2 text-[11px] font-bold text-ink-2 hover:border-ink-3"
+            className="h-6 rounded-[3px] border border-line-strong bg-card px-2 text-[11px] font-bold text-ink-2 hover:border-muted"
           >
             {t("park.chip", { n: parkedList.length })}
           </button>
         ) : null}
-        <div className="font-mono text-[10px] text-faint">{t("sale.kbdHints")}</div>
+        <div className="font-mono text-[10px] text-subtle">{t("sale.kbdHints")}</div>
       </div>
       {parkedOpen ? <ParkedPopover parked={parkedList} onResume={onResume} onClose={() => setParkedOpen(false)} /> : null}
 
       <div className="flex min-h-0 flex-1">
         {/* left: find products */}
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className={cn("flex-none border-b border-border bg-panel-2 px-4 py-2", shake && "arkom-shake")}>
+          <div className={cn("flex-none border-b border-line bg-surface-2 px-4 py-2", shake && "arkom-shake")}>
             <ScanInput
               ref={scanRef}
               autoFocus
@@ -383,7 +383,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
           </div>
 
           {/* group chips */}
-          <div className="flex flex-none flex-wrap gap-1.5 border-b border-border bg-panel-2 px-4 py-2">
+          <div className="flex flex-none flex-wrap gap-1.5 border-b border-line bg-surface-2 px-4 py-2">
             <button
               type="button"
               onClick={() => setActiveGroup("")}
@@ -391,7 +391,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
                 "h-6 rounded-[3px] border px-2 text-[11px] font-bold",
                 activeGroup === ""
                   ? "border-ink-2 bg-ink-2 text-white"
-                  : "border-border-input bg-card text-ink-2 hover:border-ink-3",
+                  : "border-line-strong bg-card text-ink-2 hover:border-muted",
               )}
             >
               {t("sale.groupAll")}
@@ -405,7 +405,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
                   "h-6 rounded-[3px] border px-2 text-[11px] font-bold",
                   activeGroup === group.id
                     ? "border-ink-2 bg-ink-2 text-white"
-                    : "border-border-input bg-card text-ink-2 hover:border-ink-3",
+                    : "border-line-strong bg-card text-ink-2 hover:border-muted",
                 )}
               >
                 {dataLabel(group.name)}
@@ -424,7 +424,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
         </div>
 
         {/* right: ticket + payment (400px fixed) */}
-        <aside className="flex w-[400px] flex-none flex-col border-l border-border-strong bg-panel">
+        <aside className="flex w-[400px] flex-none flex-col border-l border-line-strong bg-surface">
           {completed ? (
             <CompletedPanel completed={completed} onNew={resetForNewSale} />
           ) : (
@@ -437,7 +437,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
                 onOverride={setOverrideLine}
                 onRemove={onRemove}
               />
-              <div className="flex-none border-t border-border bg-panel px-3 pt-2">
+              <div className="flex-none border-t border-line bg-surface px-3 pt-2">
                 <GhostButton
                   className="h-7 w-full"
                   disabled={!sale || sale.lines.length === 0}

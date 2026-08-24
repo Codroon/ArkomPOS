@@ -1,0 +1,54 @@
+/*
+ * Arkom typefaces — vendored locally (see ./fonts/*.woff2). Never a CDN: the
+ * till runs offline and the renderer's CSP is `default-src 'self'`.
+ *
+ * Manual: Archivo Black = signage/headline · IBM Plex Sans = body/interface ·
+ * IBM Plex Mono 700 = prices · IBM Plex Mono 500 = labels/data.
+ * Latin subset only (U+0000–00FF + punctuation + €) — covers Spanish fully.
+ * Licences: SIL OFL 1.1, see ./fonts/LICENSE-*.txt
+ */
+
+@font-face {
+  font-family: "Archivo Black";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block; /* the wordmark must never flash in a fallback face */
+  src: url("../fonts/archivo-black-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/ibm-plex-sans-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../fonts/ibm-plex-sans-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../fonts/ibm-plex-sans-600.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../fonts/ibm-plex-mono-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/ibm-plex-mono-700.woff2") format("woff2");
+}

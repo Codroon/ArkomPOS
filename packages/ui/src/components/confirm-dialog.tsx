@@ -35,7 +35,7 @@ export function ConfirmDialog({
       onMouseDown={onCancel}
     >
       <div
-        className="w-[360px] rounded-[3px] border border-border-strong bg-card p-4 shadow-lg"
+        className="w-[360px] rounded-[3px] border border-line-strong bg-card p-4 shadow-lg"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="text-[13px] font-bold text-ink">{title}</div>

@@ -60,7 +60,7 @@ export function PaymentPanel({
     !!sale && sale.lines.length > 0 && !!parsed && !!summary && summary.remainingCents === 0 && !summary.nonCashExcess && cardRefsOk && !charging;
 
   return (
-    <div className={cn("border-t border-border-strong bg-panel px-3 py-2.5", charging && "pointer-events-none opacity-70")}>
+    <div className={cn("border-t border-line-strong bg-surface px-3 py-2.5", charging && "pointer-events-none opacity-70")}>
       {/* tiles stay inert on an empty ticket: a 0,00 tender would be invalid and
           would silently keep Cobrar disabled with nothing on screen to explain it */}
       <div className="grid grid-cols-4 gap-1.5">
@@ -70,7 +70,7 @@ export function PaymentPanel({
             type="button"
             disabled={total <= 0}
             onClick={() => onChange([...entries, newTenderEntry(method, remaining)])}
-            className="rounded-[3px] border border-border-input bg-card px-1 py-2 text-[11px] font-bold text-ink-2 hover:border-ink-3 hover:text-ink disabled:border-border disabled:text-faint disabled:hover:border-border"
+            className="rounded-[3px] border border-line-strong bg-card px-1 py-2 text-[11px] font-bold text-ink-2 hover:border-muted hover:text-ink disabled:border-line disabled:text-subtle disabled:hover:border-line"
           >
             {t(METHOD_KEYS[method])}
           </button>
@@ -80,7 +80,7 @@ export function PaymentPanel({
       {entries.length > 0 ? (
         <div className="mt-2 space-y-1.5">
           {entries.map((entry) => (
-            <div key={entry.key} className="rounded-[3px] border border-border bg-card p-1.5">
+            <div key={entry.key} className="rounded-[3px] border border-line bg-card p-1.5">
               <div className="flex items-center gap-1.5">
                 <span className="w-[86px] text-[11px] font-bold text-ink-2">{t(METHOD_KEYS[entry.method])}</span>
                 <TextInput
@@ -138,7 +138,7 @@ export function PaymentPanel({
         ) : (
           <>
             <span className="font-sans text-muted">{t("pay.pending")}</span>
-            <MoneyText cents={remaining} className={remaining > 0 ? "text-ink-2" : "text-faint"} />
+            <MoneyText cents={remaining} className={remaining > 0 ? "text-ink-2" : "text-subtle"} />
           </>
         )}
       </div>
@@ -168,7 +168,7 @@ export function CompletedPanel({ completed, onNew }: { completed: CompletedSale;
         <LockedButton>{t("done.print")}</LockedButton>
         <PrimaryButton onClick={onNew}>{t("done.new")}</PrimaryButton>
       </div>
-      <div className="text-[10px] text-faint">{t("done.autoHint")}</div>
+      <div className="text-[10px] text-subtle">{t("done.autoHint")}</div>
     </div>
   );
 }

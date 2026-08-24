@@ -91,7 +91,7 @@ export function InventoryScreen() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* header */}
-      <div className="flex flex-none items-center gap-3 border-b border-border-strong bg-panel px-4 py-2.5">
+      <div className="flex flex-none items-center gap-3 border-b border-line-strong bg-surface px-4 py-2.5">
         <div className="text-[15px] font-bold">{t("inv.title")}</div>
         <div className="text-[11px] text-muted">
           {t("inv.valuation")}{" "}
@@ -109,7 +109,7 @@ export function InventoryScreen() {
               "h-6 rounded-[3px] border px-2 text-[11px] font-bold",
               filters.lowStockOnly
                 ? "border-ink-2 bg-ink-2 text-white"
-                : "border-border-input-required bg-panel-2 text-ink-2 hover:border-ink-3",
+                : "border-line-strong bg-surface-2 text-ink-2 hover:border-muted",
             )}
           >
             {belowMinCount === 1 ? t("inv.belowMinOne") : t("inv.belowMinMany", { n: belowMinCount })}
@@ -127,11 +127,11 @@ export function InventoryScreen() {
       </div>
 
       {/* filters row */}
-      <div className="flex flex-none items-center gap-2 border-b border-border bg-panel-2 px-4 py-2">
+      <div className="flex flex-none items-center gap-2 border-b border-line bg-surface-2 px-4 py-2">
         <select
           value={filters.groupId}
           onChange={(e) => setFilters((f) => ({ ...f, groupId: e.target.value }))}
-          className="h-6 rounded-[3px] border border-border-input bg-card px-1.5 text-[11px] text-ink-2 outline-none"
+          className="h-6 rounded-[3px] border border-line-strong bg-card px-1.5 text-[11px] text-ink-2 outline-none"
         >
           <option value="">{t("catalog.filter.groupAll")}</option>
           {groups.map((g) => (
@@ -143,7 +143,7 @@ export function InventoryScreen() {
         <select
           value={filters.itemType}
           onChange={(e) => setFilters((f) => ({ ...f, itemType: e.target.value as Filters["itemType"] }))}
-          className="h-6 rounded-[3px] border border-border-input bg-card px-1.5 text-[11px] text-ink-2 outline-none"
+          className="h-6 rounded-[3px] border border-line-strong bg-card px-1.5 text-[11px] text-ink-2 outline-none"
         >
           <option value="">{t("catalog.filter.typeAll")}</option>
           <option value="stocked">{t("catalog.filter.stocked")}</option>
@@ -156,7 +156,7 @@ export function InventoryScreen() {
             "h-6 rounded-[3px] border px-2 text-[11px] font-bold",
             filters.lowStockOnly
               ? "border-ink-2 bg-ink-2 text-white"
-              : "border-border-input bg-card text-ink-2 hover:border-ink-3",
+              : "border-line-strong bg-card text-ink-2 hover:border-muted",
           )}
         >
           {t("catalog.filter.lowStock")}

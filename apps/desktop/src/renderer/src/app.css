@@ -12,7 +12,7 @@ body,
 
 body {
   margin: 0;
-  background: var(--color-app);
+  background: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-size: 13px;
@@ -34,4 +34,11 @@ body {
 }
 .arkom-shake {
   animation: arkom-shake 0.3s ease-in-out;
+}
+
+/* Focus is the brand blue ring — the one place blue appears without being the
+   primary action, because accessibility outranks the one-blue rule. */
+:where(button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
 }

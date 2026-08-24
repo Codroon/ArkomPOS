@@ -11,7 +11,7 @@ function Th({ labelKey, align = "left" }: { labelKey: TKey; align?: "left" | "ri
   return (
     <th
       className={cn(
-        "sticky top-0 z-10 border-b border-border-strong bg-panel-2 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.1em] text-muted",
+        "sticky top-0 z-10 border-b border-line-strong bg-surface-2 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.1em] text-muted",
         align === "right" ? "text-right" : "text-left",
       )}
     >
@@ -47,9 +47,9 @@ export function InventoryTable({
       <tbody>
         {loading
           ? [0, 1, 2].map((i) => (
-              <tr key={i} className="border-b border-border-light">
+              <tr key={i} className="border-b border-line">
                 <td colSpan={6} className="px-3 py-2">
-                  <div className="h-4 animate-pulse rounded-[2px] bg-panel-2" />
+                  <div className="h-4 animate-pulse rounded-[2px] bg-surface-2" />
                 </td>
               </tr>
             ))
@@ -60,14 +60,14 @@ export function InventoryTable({
                   key={row.productId}
                   onClick={() => onSelect(row)}
                   className={cn(
-                    "cursor-pointer border-b border-border-light transition-colors duration-500",
-                    flashIds.has(row.productId) ? "bg-panel-2" : "bg-card hover:bg-nav-hover",
+                    "cursor-pointer border-b border-line transition-colors duration-500",
+                    flashIds.has(row.productId) ? "bg-surface-2" : "bg-card hover:bg-hover",
                   )}
                 >
                   <td className="px-3 py-1.5">
-                    <span className={row.active ? "text-ink" : "text-faint"}>{row.name}</span>
+                    <span className={row.active ? "text-ink" : "text-subtle"}>{row.name}</span>
                     {row.itemType === "serialized" ? <Chip className="ml-1.5">{t("chip.serie")}</Chip> : null}
-                    <div className="font-mono text-[10px] tabular-nums text-faint">
+                    <div className="font-mono text-[10px] tabular-nums text-subtle">
                       {row.barcode ?? t("common.dash")}
                     </div>
                   </td>
@@ -81,7 +81,7 @@ export function InventoryTable({
                     {low ? (
                       <Chip variant="warn">{t("chip.bajoMinimo")}</Chip>
                     ) : (
-                      <span className="text-[11px] text-faint">{t("inv.ok")}</span>
+                      <span className="text-[11px] text-subtle">{t("inv.ok")}</span>
                     )}
                   </td>
                   <td className="whitespace-nowrap px-3 py-1.5 text-right text-muted">

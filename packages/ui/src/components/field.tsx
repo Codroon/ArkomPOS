@@ -23,17 +23,17 @@ export function Field({
     <div className={cn("flex flex-col gap-1", className)}>
       <SectionLabel>
         {label}
-        {required ? <span className="text-ink-3">*</span> : null}
+        {required ? <span className="text-muted">*</span> : null}
       </SectionLabel>
       {children}
       {error ? <div className="text-[11px] leading-snug text-ink-2">{error}</div> : null}
-      {!error && hint ? <div className="text-[11px] leading-snug text-faint">{hint}</div> : null}
+      {!error && hint ? <div className="text-[11px] leading-snug text-subtle">{hint}</div> : null}
     </div>
   );
 }
 
 const controlBase =
-  "h-7 w-full rounded-[3px] border bg-card px-2 text-[12px] text-ink outline-none placeholder:text-faint focus:border-ink-2 disabled:bg-panel-2 disabled:text-faint";
+  "h-7 w-full rounded-[3px] border bg-card px-2 text-[12px] text-ink outline-none placeholder:text-subtle focus:border-ink-2 disabled:bg-surface-2 disabled:text-subtle";
 
 export const TextInput = forwardRef<
   HTMLInputElement,
@@ -44,7 +44,7 @@ export const TextInput = forwardRef<
       ref={ref}
       className={cn(
         controlBase,
-        requiredStyle ? "border-border-input-required" : "border-border-input",
+        requiredStyle ? "border-line-strong" : "border-line-strong",
         invalid && "border-ink",
         mono && "font-mono tabular-nums",
         className,
@@ -64,7 +64,7 @@ export function SelectInput({
       className={cn(
         controlBase,
         "appearance-none pr-6",
-        requiredStyle ? "border-border-input-required" : "border-border-input",
+        requiredStyle ? "border-line-strong" : "border-line-strong",
         className,
       )}
       {...props}

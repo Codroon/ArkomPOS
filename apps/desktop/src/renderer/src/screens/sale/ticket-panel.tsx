@@ -27,9 +27,9 @@ function LineRow({
   return (
     <div
       className={cn(
-        "relative border-b border-border-light bg-card px-3 py-2 transition-colors duration-500",
-        serialized && "border-l-[3px] border-l-ink-3",
-        flash && "bg-panel-2",
+        "relative border-b border-line bg-card px-3 py-2 transition-colors duration-500",
+        serialized && "border-l-[3px] border-l-muted",
+        flash && "bg-surface-2",
       )}
     >
       <div className="flex items-start gap-2">
@@ -43,7 +43,7 @@ function LineRow({
               </Chip>
             ) : null}
           </div>
-          <div className="font-mono text-[10px] tabular-nums text-faint">
+          <div className="font-mono text-[10px] tabular-nums text-subtle">
             {serialized ? `IMEI ${line.imei ?? "—"}` : line.barcode ?? "—"} · {line.qty} ×{" "}
             {formatCents(line.unitPriceCents)}
           </div>
@@ -62,7 +62,7 @@ function LineRow({
           {!serialized ? (
             <button
               type="button"
-              className="h-5 w-5 rounded-[2px] border border-border-input text-[11px] leading-none text-ink-2 hover:border-ink-3 disabled:text-faint"
+              className="h-5 w-5 rounded-[2px] border border-line-strong text-[11px] leading-none text-ink-2 hover:border-muted disabled:text-subtle"
               disabled={line.qty <= 1}
               onClick={() => onSetQty(line, line.qty - 1)}
             >
@@ -73,7 +73,7 @@ function LineRow({
           {!serialized ? (
             <button
               type="button"
-              className="h-5 w-5 rounded-[2px] border border-border-input text-[11px] leading-none text-ink-2 hover:border-ink-3"
+              className="h-5 w-5 rounded-[2px] border border-line-strong text-[11px] leading-none text-ink-2 hover:border-muted"
               onClick={() => onSetQty(line, line.qty + 1)}
             >
               +
@@ -94,12 +94,12 @@ function LineRow({
 
       {menuOpen ? (
         <div
-          className="absolute right-2 top-7 z-20 flex flex-col rounded-[3px] border border-border-strong bg-card shadow-md"
+          className="absolute right-2 top-7 z-20 flex flex-col rounded-[3px] border border-line-strong bg-card shadow-md"
           onMouseLeave={() => setMenuOpen(false)}
         >
           <button
             type="button"
-            className="px-3 py-1.5 text-left text-[11px] text-ink-2 hover:bg-nav-hover"
+            className="px-3 py-1.5 text-left text-[11px] text-ink-2 hover:bg-hover"
             onClick={() => {
               setMenuOpen(false);
               onOverride(line);
@@ -109,7 +109,7 @@ function LineRow({
           </button>
           <button
             type="button"
-            className="border-t border-border-light px-3 py-1.5 text-left text-[11px] text-ink-2 hover:bg-nav-hover"
+            className="border-t border-line px-3 py-1.5 text-left text-[11px] text-ink-2 hover:bg-hover"
             onClick={() => {
               setMenuOpen(false);
               onRemove(line);
@@ -143,7 +143,7 @@ export function TicketPanel({
 
   return (
     <div className={cn("flex min-h-0 flex-1 flex-col", shake && "arkom-shake")}>
-      <div className="flex items-baseline gap-2 border-b border-border px-3 py-2">
+      <div className="flex items-baseline gap-2 border-b border-line px-3 py-2">
         <div className="text-[13px] font-bold">{t("sale.ticket")}</div>
         <div className="text-[11px] text-muted">
           {lines.length === 1 ? t("sale.lineCountOne") : t("sale.lineCountMany", { n: lines.length })}
@@ -168,7 +168,7 @@ export function TicketPanel({
       </div>
 
       {/* totals strip — always server state (handoff 01) */}
-      <div className="border-t border-border-strong bg-panel-2 px-3 py-2 font-mono tabular-nums">
+      <div className="border-t border-line-strong bg-surface-2 px-3 py-2 font-mono tabular-nums">
         <div className="flex justify-between text-[11px] text-muted">
           <span className="font-sans">{t("sale.subtotal")}</span>
           <MoneyText cents={sale?.subtotalCents ?? 0} />

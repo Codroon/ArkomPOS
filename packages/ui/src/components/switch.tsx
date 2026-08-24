@@ -23,7 +23,7 @@ export function Switch({
       <span
         className={cn(
           "relative h-4 w-7 rounded-full border transition-colors",
-          checked ? "border-ink-2 bg-ink-2" : "border-border-input bg-panel-2",
+          checked ? "border-ink-2 bg-ink-2" : "border-line-strong bg-surface-2",
         )}
       >
         <span

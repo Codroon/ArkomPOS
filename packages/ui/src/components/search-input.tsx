@@ -5,10 +5,10 @@ import { cn } from "../cn";
 export function SearchInput({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <div className={cn("relative", className)}>
-      <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[12px] text-faint">⌕</span>
+      <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[12px] text-subtle">⌕</span>
       <input
         type="text"
-        className="h-7 w-full rounded-[3px] border border-border-input bg-card pl-6 pr-2 text-[12px] text-ink outline-none placeholder:text-faint focus:border-ink-2"
+        className="h-7 w-full rounded-[3px] border border-line-strong bg-card pl-6 pr-2 text-[12px] text-ink outline-none placeholder:text-subtle focus:border-ink-2"
         {...props}
       />
     </div>

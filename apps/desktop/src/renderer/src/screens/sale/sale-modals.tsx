@@ -21,7 +21,7 @@ function ModalShell({ children, onClose, width = 380 }: { children: React.ReactN
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/25" onMouseDown={onClose}>
       <div
         style={{ width }}
-        className="rounded-[3px] border border-border-strong bg-card p-4 shadow-lg"
+        className="rounded-[3px] border border-line-strong bg-card p-4 shadow-lg"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {children}
@@ -78,10 +78,10 @@ export function UnitPickModal({
               key={unit.unitId}
               type="button"
               onClick={() => onPick(unit.unitId)}
-              className="flex w-full items-baseline justify-between border-b border-border-light px-2 py-2 text-left hover:bg-nav-hover"
+              className="flex w-full items-baseline justify-between border-b border-line px-2 py-2 text-left hover:bg-hover"
             >
               <span className="font-mono text-[12px] tabular-nums">{unit.imei}</span>
-              <span className="text-[10px] text-faint">
+              <span className="text-[10px] text-subtle">
                 {t("pick.inSince")} <span className="font-mono tabular-nums">{formatDay(unit.createdAtMs)}</span>
               </span>
             </button>
@@ -188,18 +188,18 @@ export function ParkedPopover({
 }) {
   const t = useT();
   return (
-    <div className="absolute right-3 top-9 z-40 w-[300px] rounded-[3px] border border-border-strong bg-card shadow-lg" onMouseLeave={onClose}>
-      <div className="border-b border-border bg-panel-2 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.1em] text-muted">
+    <div className="absolute right-3 top-9 z-40 w-[300px] rounded-[3px] border border-line-strong bg-card shadow-lg" onMouseLeave={onClose}>
+      <div className="border-b border-line bg-surface-2 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.1em] text-muted">
         {t("park.popoverTitle")}
       </div>
       {parked.length === 0 ? (
         <div className="p-3 text-center text-[11px] text-muted">{t("park.empty")}</div>
       ) : (
         parked.map((p) => (
-          <div key={p.docId} className="flex items-center gap-2 border-b border-border-light px-3 py-2 last:border-b-0">
+          <div key={p.docId} className="flex items-center gap-2 border-b border-line px-3 py-2 last:border-b-0">
             <div className="min-w-0 flex-1">
               <div className="truncate text-[12px]">{p.label}</div>
-              <div className="text-[10px] text-faint">
+              <div className="text-[10px] text-subtle">
                 {p.lineCount === 1 ? t("sale.lineCountOne") : t("sale.lineCountMany", { n: p.lineCount })} ·{" "}
                 <MoneyText cents={p.totalCents} />
               </div>
