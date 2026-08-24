@@ -139,6 +139,18 @@ export {
   CompletedSaleSchema,
   SalePeekRequestSchema,
   TicketPeekSchema,
+  PaperWidthSchema,
+  CommandSetSchema,
+  SettingsSchema,
+  SettingsGetRequestSchema,
+  SettingsGetResponseSchema,
+  SettingsSaveRequestSchema,
+  SettingsSaveResponseSchema,
+  PrintPrintersRequestSchema,
+  PrinterInfoSchema,
+  PrintPrintersResponseSchema,
+  PrintTicketRequestSchema,
+  PrintTicketResponseSchema,
 } from "./ipc";
 export type {
   IpcChannel,
@@ -171,4 +183,8 @@ export type {
   ParkedSale,
   CompletedSale,
   TicketPeek,
+  Settings,
+  PrinterInfo,
+  PrintTicketRequest,
+  PrintTicketResponse,
 } from "./ipc";

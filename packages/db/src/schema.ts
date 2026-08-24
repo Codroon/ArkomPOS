@@ -9,7 +9,7 @@
  * arrive incomplete, req 3.3 flags them). Completeness is enforced at the domain
  * layer on every save (req 4.1) — never "fixed" by tightening the DB.
  */
-import { sqliteTable, text, integer, uniqueIndex, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, uniqueIndex, index, primaryKey } from "drizzle-orm/sqlite-core";
 
 /* ---------------- enums: single source of truth ---------------- */
 export const ITEM_TYPES = ["stocked", "serialized", "used_device", "service", "repair", "agency", "sim", "topup"] as const;
@@ -245,3 +245,16 @@ export const syncCursor = sqliteTable("sync_cursor", {
   lastAckedSeq: integer("last_acked_seq").notNull().default(0),
   lastSyncAt: ts("last_sync_at"),
 });
+
+/* ---------------- settings: a per-tenant KV store (Ajustes) ----------------
+ * Deliberately schemaless-in-a-column: Phase 1 needs the printer target and the
+ * shop's legal block, Phase 2 will want fiscal region and sync endpoints, and
+ * none of that is worth a migration each. Values are strings; the typed shape
+ * lives in the IPC contract, which is where the renderer reads it anyway.
+ * Changes are oplog'd like any other write (entity "setting", id = the key). */
+export const settings = sqliteTable("settings", {
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  key: text("key").notNull(),
+  value: text("value").notNull(),
+  updatedAt: ts("updated_at").notNull(),
+}, (t) => [primaryKey({ columns: [t.tenantId, t.key] })]);

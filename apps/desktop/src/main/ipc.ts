@@ -55,6 +55,10 @@ import {
   CompletedSaleSchema,
   SalePeekRequestSchema,
   TicketPeekSchema,
+  SettingsGetRequestSchema,
+  SettingsGetResponseSchema,
+  SettingsSaveRequestSchema,
+  SettingsSaveResponseSchema,
 } from "@arkom/core";
 import type { ArkomDb } from "@arkom/db";
 import { tillContext } from "./context";
@@ -62,6 +66,7 @@ import { addCode, getProduct, listCodes, listGroups, listProducts, removeCode, s
 import { resolveScanCode } from "./repos/scan";
 import { addStock, listInventory, listMovements } from "./repos/inventory";
 import { createSupplier, listSuppliers } from "./repos/suppliers";
+import { getSettings, saveSettings } from "./repos/settings";
 import {
   addLine,
   complete,
@@ -196,5 +201,13 @@ export function registerIpcHandlers(db: ArkomDb): void {
 
   register("sale:peek", SalePeekRequestSchema, TicketPeekSchema, ({ docId }) => {
     return peek(db, tillContext(db).ctx, docId);
+  });
+
+  register("settings:get", SettingsGetRequestSchema, SettingsGetResponseSchema, () => {
+    return getSettings(db, tillContext(db).ctx);
+  });
+
+  register("settings:save", SettingsSaveRequestSchema, SettingsSaveResponseSchema, (patch) => {
+    return saveSettings(db, tillContext(db).ctx, patch);
   });
 }

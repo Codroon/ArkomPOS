@@ -103,6 +103,17 @@ const UNIT_IMEI_BASES: Record<string, string[]> = {
 
 /* ------------------------------- seeding ------------------------------- */
 
+/** Ajustes seed — printer off (everything goes to PDF), shop data still owed. */
+const SETTINGS_PLACEHOLDERS: Record<string, string> = {
+  printerName: "",
+  paperWidthMm: "80",
+  commandSet: "epson",
+  shopLegalName: "PENDIENTE — Razón social",
+  shopNif: "PENDIENTE — NIF",
+  shopAddress: "PENDIENTE — Dirección fiscal",
+  ticketFooter: "Precios claros. Sin letra pequeña.",
+};
+
 export function seed(db: ArkomDb): { seeded: boolean; message: string } {
   const existing = db.select({ id: s.tenants.id }).from(s.tenants).limit(1).all();
   if (existing.length > 0) {
@@ -261,12 +272,21 @@ export function seed(db: ArkomDb): { seeded: boolean; message: string } {
       tx.insert(s.productStock).values({ productId, locationId, onHand, updatedAt: now }).run();
     });
 
+    /* Ajustes defaults. The shop's real fiscal data is blocking for go-live but
+       not for build (PRD open question 1), so the seed says PENDIENTE out loud:
+       a test ticket then shows exactly which fields are still owed by the
+       client, which no plausible-looking placeholder would. */
+    for (const [key, value] of Object.entries(SETTINGS_PLACEHOLDERS)) {
+      tx.insert(s.settings).values({ tenantId, key, value, updatedAt: now }).run();
+      logCreate("setting", key, { key, value });
+    }
+
     // single-row sync cursor (Phase 2 uses it)
     tx.insert(s.syncCursor).values({ id: 1, lastAckedSeq: 0, lastSyncAt: null }).run();
   });
 
   return {
     seeded: true,
-    message: `Seeded: Arkom Demo / Tienda / Till 1 (T1-), ${GROUPS.length} groups, ${PRODUCTS.length} products, ${unitCount} IMEI units, ${SUPPLIERS.length} suppliers, opening stock + oplog.`,
+    message: `Seeded: Arkom Demo / Tienda / Till 1 (T1-), ${GROUPS.length} groups, ${PRODUCTS.length} products, ${unitCount} IMEI units, ${SUPPLIERS.length} suppliers, opening stock, Ajustes placeholders + oplog.`,
   };
 }

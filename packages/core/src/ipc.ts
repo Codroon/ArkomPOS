@@ -32,11 +32,16 @@ export const IPC_CHANNELS = [
   "sale:listParked",
   "sale:complete",
   "sale:peek",
+  "settings:get",
+  "settings:save",
+  "print:printers",
+  "print:ticket",
 ] as const;
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
 /** Typed error codes (§4) — the renderer maps codes to UI, never parses messages. */
 export const ErrorCodeSchema = z.enum([
+  "PRINT_FAILED",
   "DUPLICATE_NAME",
   "DUPLICATE_BARCODE",
   "DUPLICATE_IMEI",
@@ -453,3 +458,63 @@ export const SupplierCreateRequestSchema = z.object({
 });
 export type SupplierCreateRequest = z.infer<typeof SupplierCreateRequestSchema>;
 export const SupplierCreateResponseSchema = EntityRefSchema;
+
+/* ---------------------------------------------------- settings + printing --- */
+
+/** Rolls the shop can load; the ticket renderer maps these to column counts. */
+export const PaperWidthSchema = z.union([z.literal(80), z.literal(58)]);
+
+/** The command sets node-thermal-printer speaks. Epson is the CT-S310S's mode. */
+export const CommandSetSchema = z.enum(["epson", "star", "tanca", "daruma", "brother"]);
+
+/**
+ * Everything Ajustes stores. Persisted as a KV table, but it crosses the bridge
+ * as one typed object — the renderer never assembles keys by hand.
+ * `printerName: ""` means "no printer", which is a legitimate configuration:
+ * the till still sells, and every ticket goes to PDF.
+ */
+export const SettingsSchema = z.object({
+  printerName: z.string().max(200),
+  paperWidthMm: PaperWidthSchema,
+  commandSet: CommandSetSchema,
+  shopLegalName: z.string().max(200),
+  shopNif: z.string().max(40),
+  shopAddress: z.string().max(300),
+  ticketFooter: z.string().max(200),
+});
+export type Settings = z.infer<typeof SettingsSchema>;
+
+export const SettingsGetRequestSchema = z.object({}).optional();
+export const SettingsGetResponseSchema = SettingsSchema;
+/** Partial save: Ajustes sends only the fields it touched, the repo merges. */
+export const SettingsSaveRequestSchema = SettingsSchema.partial();
+export const SettingsSaveResponseSchema = SettingsSchema;
+
+export const PrintPrintersRequestSchema = z.object({}).optional();
+export const PrinterInfoSchema = z.object({
+  name: z.string(),
+  displayName: z.string(),
+  isDefault: z.boolean(),
+});
+export const PrintPrintersResponseSchema = z.array(PrinterInfoSchema);
+export type PrinterInfo = z.infer<typeof PrinterInfoSchema>;
+
+/**
+ * `target` decides where a ticket goes:
+ *   "auto" — the configured printer, failing with PRINT_FAILED if there is none
+ *            or the spooler rejects it (the UI then offers Reintentar / PDF);
+ *   "pdf"  — straight to a file, which is what "Guardar PDF" does and what the
+ *            dev machine (no printer) uses for every check.
+ * `copy` stamps COPIA and withholds the drawer pulse.
+ */
+export const PrintTicketRequestSchema = z.object({
+  docId: z.string(),
+  copy: z.boolean().default(false),
+  target: z.enum(["auto", "pdf"]).default("auto"),
+});
+export const PrintTicketResponseSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("printed"), printer: z.string() }),
+  z.object({ kind: z.literal("pdf"), path: z.string() }),
+]);
+export type PrintTicketRequest = z.infer<typeof PrintTicketRequestSchema>;
+export type PrintTicketResponse = z.infer<typeof PrintTicketResponseSchema>;
