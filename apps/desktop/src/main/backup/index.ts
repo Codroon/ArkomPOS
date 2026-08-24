@@ -252,8 +252,14 @@ export function startNightlyBackups(db: ArkomDb, getCtx: () => MutationCtx): voi
   const arm = () => {
     if (nightlyTimer) clearTimeout(nightlyTimer);
     nightlyTimer = setTimeout(() => {
-      void runBackup(db, getCtx(), "nightly")
-        .catch((err) => console.error("[backup] nightly failed:", err))
+      // getCtx() throws on a till that has not been set up. Inside the async
+      // wrapper that is a rejection the catch handles; outside it, it would
+      // escape the timer AND skip the re-arm, silently ending nightly backups
+      // for the life of the process.
+      void (async () => {
+        await runBackup(db, getCtx(), "nightly");
+      })()
+        .catch((err) => console.error("[backup] nightly skipped:", err))
         .finally(arm);
     }, msUntilNextNightly(new Date()));
   };

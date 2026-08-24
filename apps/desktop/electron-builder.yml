@@ -4,6 +4,8 @@ directories:
   output: release
 files:
   - out/**
+  # node_modules is included by default; better-sqlite3 is the only native one
+copyright: © Codroon
 # native module (better-sqlite3) must stay outside the asar archive
 asarUnpack:
   - "**/*.node"
@@ -23,8 +25,14 @@ win:
   target: nsis
   icon: build/icon.ico
 nsis:
+  # per-user install: no admin prompt, which matters on a shop PC where nobody
+  # knows the administrator password
   oneClick: true
   perMachine: false
+  allowElevation: false
+  # the shop's data lives in userData, NOT here — an uninstall must not take the
+  # business with it (documented in DEPLOYMENT.md)
+  deleteAppDataOnUninstall: false
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
   # taskbar / start-menu shortcut name

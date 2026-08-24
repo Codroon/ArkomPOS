@@ -1,23 +1,23 @@
 {
   "name": "arkom-pos",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.9.0",
   "description": "Arkom POS — offline-first desktop till + cloud dashboard (see docs/adr, docs/design/system-design.md)",
   "packageManager": "pnpm@11.22.0",
   "engines": {
     "node": ">=20.19"
   },
   "scripts": {
-    "dev": "pnpm --filter @arkom/desktop dev",
+    "dev": "pnpm --filter arkom-pos dev",
     "dev:web": "pnpm --filter @arkom/web dev",
     "test": "pnpm --filter @arkom/core test",
     "typecheck": "pnpm -r typecheck",
     "db:generate": "pnpm --filter @arkom/db db:generate",
-    "db:migrate": "pnpm --filter @arkom/desktop db:migrate",
-    "db:seed": "pnpm --filter @arkom/desktop db:seed",
-    "db:stats": "pnpm --filter @arkom/desktop db:stats",
-    "db:audit": "pnpm --filter @arkom/desktop db:audit",
-    "imei:gen": "pnpm --filter @arkom/desktop imei:gen",
-    "build:win": "pnpm --filter @arkom/desktop build:win"
+    "db:migrate": "pnpm --filter arkom-pos db:migrate",
+    "db:seed": "pnpm --filter arkom-pos db:seed",
+    "db:stats": "pnpm --filter arkom-pos db:stats",
+    "db:audit": "pnpm --filter arkom-pos db:audit",
+    "imei:gen": "pnpm --filter arkom-pos imei:gen",
+    "build:win": "pnpm --filter arkom-pos build:win"
   }
 }

@@ -1,9 +1,28 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, screen } from "electron";
 import { join } from "node:path";
 import { initDb } from "./db";
 import { registerIpcHandlers } from "./ipc";
 import { runBackup, startNightlyBackups, stopNightlyBackups } from "./backup";
 import { tillContext } from "./context";
+import { isSetupNeeded } from "./setup";
+import {
+  hardenApp,
+  installErrorLogging,
+  loadWindowState,
+  logEvent,
+  trackWindowState,
+  visibleOnSomeDisplay,
+} from "./hardening";
+
+/**
+ * Name the app before anything asks Electron for a path.
+ *
+ * userData defaults to the package name, which put the shop's database, tickets
+ * and backups under %APPDATA%@arkomdesktop — a path that looks like a
+ * mistake and that a client would never find. Dev gets its own suffix so a
+ * developer's tickets and backups never mix with a real till's.
+ */
+app.setName(app.isPackaged ? "Arkom POS" : "Arkom POS (dev)");
 
 /** How long the app will wait for the closing backup before letting go. */
 const CLOSE_BACKUP_TIMEOUT_MS = 10_000;
@@ -32,10 +51,16 @@ function brandIcon(): string {
 }
 
 // 00-foundations: fixed desktop layout, min window 1280×860 (till hardware)
-function createWindow(): void {
+async function createWindow(): Promise<void> {
+  const state = await loadWindowState();
+  // a remembered position on a monitor that is no longer plugged in would put
+  // the window somewhere nobody can reach it
+  const placed = visibleOnSomeDisplay(state, screen.getAllDisplays());
+
   const win = new BrowserWindow({
-    width: 1280,
-    height: 860,
+    width: state.width,
+    height: state.height,
+    ...(placed && state.x !== undefined ? { x: state.x, y: state.y } : {}),
     minWidth: 1280,
     minHeight: 860,
     useContentSize: true,
@@ -50,6 +75,9 @@ function createWindow(): void {
       nodeIntegration: false,
     },
   });
+
+  if (state.maximized) win.maximize();
+  trackWindowState(win);
 
   if (!app.isPackaged) {
     // surface renderer console in the dev terminal (this repo is driven from a CLI)
@@ -69,10 +97,22 @@ function createWindow(): void {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.whenReady().then(() => {
+  // someone double-clicking the shortcut again should get the till they already
+  // have, not nothing at all
+  app.on("second-instance", () => {
+    const [win] = BrowserWindow.getAllWindows();
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.focus();
+  });
+
+  app.whenReady().then(async () => {
+    installErrorLogging();
+    hardenApp();
+
     const db = initDb();
     registerIpcHandlers(db);
-    createWindow();
+    await createWindow();
 
     // the till may not be configured yet, so the context is read per run rather
     // than captured here — first run creates the tenant this depends on
@@ -94,16 +134,27 @@ if (!app.requestSingleInstanceLock()) {
       stopNightlyBackups();
 
       const guard = new Promise((resolve) => setTimeout(resolve, CLOSE_BACKUP_TIMEOUT_MS));
-      Promise.race([
-        runBackup(db, tillContext(db).ctx, "close").catch((err) =>
-          console.error("[backup] on close failed:", err),
-        ),
-        guard,
-      ]).finally(() => app.quit());
+
+      /*
+       * Everything here is inside the async wrapper on purpose. tillContext()
+       * THROWS on a till that has not been set up yet, and it used to be called
+       * while building the argument list — synchronously, after
+       * preventDefault(), so the throw escaped the handler and app.quit() was
+       * never reached. A freshly installed till could not be closed at all.
+       * Found on the packaged clean-machine walk; the rule it earns is that
+       * nothing in this handler may throw before app.quit() is guaranteed.
+       */
+      const backup = (async () => {
+        // no shop yet means no data worth copying, and no identity to ask for
+        if (isSetupNeeded(db)) return;
+        await runBackup(db, tillContext(db).ctx, "close");
+      })().catch((err) => logEvent("backup-on-close", err));
+
+      Promise.race([backup, guard]).finally(() => app.quit());
     });
 
     app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+      if (BrowserWindow.getAllWindows().length === 0) void createWindow();
     });
   });
 
