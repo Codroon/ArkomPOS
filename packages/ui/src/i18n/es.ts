@@ -79,10 +79,20 @@ export const es = {
   "editor.emptyHint": "o crea uno con “+ Nuevo artículo”.",
   "editor.name": "Nombre",
   "editor.namePlaceholder": "Nombre del artículo",
-  "editor.barcode": "Código de barras",
+  "editor.barcode": "Código de barras (el de la caja)",
   "editor.barcodePlaceholder": "Escanear o escribir",
-  "editor.generate": "Generar",
-  "editor.barcodeHint": "Vacío = se genera al guardar.",
+  "editor.barcodeHelper": "Escanea aquí el código real del producto.",
+  "editor.generate": "Generar código interno (solo si no tiene código)",
+  "editor.barcodeHint": "Vacío = se genera uno interno al guardar.",
+  "editor.extraCodes": "Códigos adicionales",
+  "editor.extraCodesHint": "Otros códigos que también identifican a este artículo.",
+  "editor.extraCodePlaceholder": "Escanea o escribe otro código…",
+  "editor.addCode": "Añadir código",
+  "editor.saveFirstForCodes": "Guarda el artículo para poder añadir códigos.",
+  "editor.removeCodeTitle": "¿Quitar este código?",
+  "editor.removeCodeBody": "{code} dejará de identificar a «{name}».",
+  "editor.removeCodeConfirm": "Quitar",
+  "editor.noExtraCodes": "Ninguno todavía.",
   "editor.group": "Grupo",
   "editor.groupPlaceholder": "— Selecciona —",
   "editor.cost": "Coste",
@@ -255,6 +265,41 @@ export const es = {
   /* ticket peek */
   "peek.tenders": "Pagos",
   "peek.close": "Cerrar",
+
+  /* shared code warning (catálogo + rescate) */
+  "shared.title": "Ese código ya está en otro artículo",
+  "shared.body": "{code} también está en: {names}.",
+  "shared.attachAnyway": "Asignar igualmente",
+  "shared.saveAnyway": "Guardar igualmente",
+
+  /* ambiguity picker */
+  "pick.scanTitle": "¿Qué artículo es?",
+  "pick.scanSubtitle": "El código {code} está en varios artículos.",
+  "pick.stock": "{n} en stock",
+
+  /* unknown code rescue */
+  "unknown.title": "Código no encontrado",
+  "unknown.body": "Ningún artículo responde a {code}.",
+  "unknown.create": "Crear artículo nuevo",
+  "unknown.attach": "Asignar a un artículo existente",
+  "unknown.attachTitle": "Asignar {code} a…",
+  "unknown.searchPlaceholder": "Busca por nombre o código…",
+  "unknown.noProducts": "Sin resultados.",
+  "unknown.attached": "{code} asignado a {name}",
+  "unknown.unitSold": "Ese IMEI es de un «{name}» que ya está vendido.",
+  "unknown.unitReserved": "Ese IMEI es de un «{name}» que ya está en un ticket en curso.",
+
+  /* entrada de stock (rebuilt panel) */
+  "entry.searchOrScan": "Escanea un código o busca por nombre…",
+  "entry.idleHint": "Escanea un código o busca el artículo para empezar.",
+  "entry.changeProduct": "Cambiar artículo",
+  "entry.imeiLoop": "IMEI {n} de {total}",
+  "entry.imeiCaptured": "{n} de {total} IMEIs",
+  "entry.imeiPending": "Faltan {n} IMEIs",
+  "entry.addToList": "Añadir a la lista",
+  "entry.stagedEmpty": "Todavía no has añadido líneas.",
+  "entry.stagedUnits": "{n} unidades",
+  "entry.stagedTotal": "Total",
 } as const;
 
 export type TKey = keyof typeof es;

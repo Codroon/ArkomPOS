@@ -77,10 +77,20 @@ export const en: Record<TKey, string> = {
   "editor.emptyHint": "or create one with “+ New item”.",
   "editor.name": "Name",
   "editor.namePlaceholder": "Item name",
-  "editor.barcode": "Barcode",
+  "editor.barcode": "Barcode (code on the box)",
   "editor.barcodePlaceholder": "Scan or type",
-  "editor.generate": "Generate",
-  "editor.barcodeHint": "Empty = generated on save.",
+  "editor.barcodeHelper": "Scan the product's real barcode here.",
+  "editor.generate": "Generate internal code (only if the item has no barcode)",
+  "editor.barcodeHint": "Empty = an internal code is generated on save.",
+  "editor.extraCodes": "Additional codes",
+  "editor.extraCodesHint": "Other codes this item also answers to.",
+  "editor.extraCodePlaceholder": "Scan or type another code…",
+  "editor.addCode": "Add code",
+  "editor.saveFirstForCodes": "Save the item first to add codes.",
+  "editor.removeCodeTitle": "Remove this code?",
+  "editor.removeCodeBody": "{code} will no longer identify “{name}”.",
+  "editor.removeCodeConfirm": "Remove",
+  "editor.noExtraCodes": "None yet.",
   "editor.group": "Group",
   "editor.groupPlaceholder": "— Select —",
   "editor.cost": "Cost",
@@ -253,6 +263,41 @@ export const en: Record<TKey, string> = {
   /* ticket peek */
   "peek.tenders": "Payments",
   "peek.close": "Close",
+
+  /* shared code warning (catalog + rescue) */
+  "shared.title": "That code is already on another item",
+  "shared.body": "{code} is also on: {names}.",
+  "shared.attachAnyway": "Attach anyway",
+  "shared.saveAnyway": "Save anyway",
+
+  /* ambiguity picker */
+  "pick.scanTitle": "Which item is it?",
+  "pick.scanSubtitle": "Code {code} matches several items.",
+  "pick.stock": "{n} in stock",
+
+  /* unknown code rescue */
+  "unknown.title": "Code not found",
+  "unknown.body": "No item answers to {code}.",
+  "unknown.create": "Create new product",
+  "unknown.attach": "Attach code to an existing product",
+  "unknown.attachTitle": "Attach {code} to…",
+  "unknown.searchPlaceholder": "Search by name or code…",
+  "unknown.noProducts": "No results.",
+  "unknown.attached": "{code} attached to {name}",
+  "unknown.unitSold": "That IMEI belongs to a “{name}” that is already sold.",
+  "unknown.unitReserved": "That IMEI belongs to a “{name}” already on a ticket in progress.",
+
+  /* stock entry (rebuilt panel) */
+  "entry.searchOrScan": "Scan a code or search by name…",
+  "entry.idleHint": "Scan a code or search for the item to start.",
+  "entry.changeProduct": "Change item",
+  "entry.imeiLoop": "IMEI {n} of {total}",
+  "entry.imeiCaptured": "{n} of {total} IMEIs",
+  "entry.imeiPending": "{n} IMEIs still needed",
+  "entry.addToList": "Add to list",
+  "entry.stagedEmpty": "No lines added yet.",
+  "entry.stagedUnits": "{n} units",
+  "entry.stagedTotal": "Total",
 };
 
 /**

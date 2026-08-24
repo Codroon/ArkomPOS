@@ -2,6 +2,7 @@
 import { parseIpcError, type IpcError } from "@arkom/core";
 import type { TFn } from "@arkom/ui";
 
+/** The typed envelope behind a bridge rejection, or null for an untyped failure. */
 export function ipcOf(err: unknown): IpcError | null {
   return parseIpcError(err);
 }

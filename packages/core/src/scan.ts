@@ -46,7 +46,10 @@ export type ScanResolution =
   | { kind: "product"; product: ScanProduct; matchedVia: ScanProductVia }
   | { kind: "unit"; unit: ScanUnit; product: ScanProduct }
   | { kind: "ambiguous"; code: string; matches: ScanMatch[] }
-  | { kind: "none"; code: string };
+  /** `unavailableUnit` explains a near-miss: the code IS a known IMEI, but that
+   *  phone is sold or already on a ticket — so the UI says so instead of
+   *  offering to create a product for it. */
+  | { kind: "none"; code: string; unavailableUnit?: { imei: string; status: string; productName: string } };
 
 /** Scanners emit stray whitespace/newlines; normalize once, here. */
 export function normalizeScanCode(raw: string): string {
@@ -90,7 +93,20 @@ export function resolveScan(
       .map((c): ScanMatch => ({ kind: "unit", unit: c.unit, product: c.product })),
   ];
 
-  if (matches.length === 0) return { kind: "none", code };
+  if (matches.length === 0) {
+    const unavailable = candidates.units.find((c) => c.unit.status !== "in_stock");
+    return unavailable
+      ? {
+          kind: "none",
+          code,
+          unavailableUnit: {
+            imei: unavailable.unit.imei,
+            status: unavailable.unit.status,
+            productName: unavailable.product.name,
+          },
+        }
+      : { kind: "none", code };
+  }
   if (matches.length === 1) {
     const only = matches[0]!;
     return only.kind === "product"

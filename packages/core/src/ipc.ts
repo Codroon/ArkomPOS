@@ -205,7 +205,13 @@ export const ScanResolutionSchema = z.discriminatedUnion("kind", [
   ScanProductMatchSchema,
   ScanUnitMatchSchema,
   z.object({ kind: z.literal("ambiguous"), code: z.string(), matches: z.array(ScanMatchSchema) }),
-  z.object({ kind: z.literal("none"), code: z.string() }),
+  z.object({
+    kind: z.literal("none"),
+    code: z.string(),
+    unavailableUnit: z
+      .object({ imei: z.string(), status: z.string(), productName: z.string() })
+      .optional(),
+  }),
 ]);
 export const ScanResolveRequestSchema = z.object({ code: z.string() });
 

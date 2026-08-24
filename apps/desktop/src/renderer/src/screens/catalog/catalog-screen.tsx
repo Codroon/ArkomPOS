@@ -71,6 +71,7 @@ export function CatalogScreen() {
   const [generalError, setGeneralError] = useState<ErrorText | null>(null);
   const [saving, setSaving] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+  const [barcodeWarning, setBarcodeWarning] = useState<{ code: string; names: string[] } | null>(null);
 
   const dirty = draft !== null && isDirty(draft, baseline);
   const dirtyRef = useRef(dirty);
@@ -151,19 +152,20 @@ export function CatalogScreen() {
   const visibleErrors: DraftErrors = { ...(dirty ? clientErrors : {}), ...serverErrors };
   const valid = draft !== null && validateDraft(draft).request !== null;
 
-  const onSave = useCallback(() => {
-    if (!draft) return;
-    const { request } = validateDraft(draft);
-    if (!request) return;
-    setSaving(true);
-    setServerErrors({});
-    setGeneralError(null);
-    window.arkom
-      .invoke("catalog:save", request)
+  const submit = useCallback(
+    (confirmed: boolean) => {
+      if (!draft) return;
+      const { request } = validateDraft(draft);
+      if (!request) return;
+      setSaving(true);
+      setServerErrors({});
+      setGeneralError(null);
+      window.arkom
+        .invoke("catalog:save", { ...request, confirmed })
       .then((result) => {
+        // req 4.4 amended: a barcode already in use warns instead of blocking
         if (result.kind === "barcodeWarning") {
-          // req 4.4 amended: shared barcodes warn; the confirm dialog lands with the editor rework
-          setGeneralError({ raw: result.conflicts.map((c) => c.name).join(", ") });
+          setBarcodeWarning({ code: result.code, names: result.conflicts.map((c) => c.name) });
           return;
         }
         openDraft(draftFromRow(result.product));
@@ -180,8 +182,12 @@ export function CatalogScreen() {
           setGeneralError("catalog.saveFailed");
         }
       })
-      .finally(() => setSaving(false));
-  }, [draft, openDraft, refresh]);
+        .finally(() => setSaving(false));
+    },
+    [draft, openDraft, refresh],
+  );
+
+  const onSave = useCallback(() => submit(false), [submit]);
 
   const onCancel = useCallback(() => {
     if (draft?.id && baseline) {
@@ -325,6 +331,23 @@ export function CatalogScreen() {
           setPendingAction(null);
         }}
         onCancel={() => setPendingAction(null)}
+      />
+
+      <ConfirmDialog
+        open={barcodeWarning !== null}
+        title={t("shared.title")}
+        body={
+          barcodeWarning
+            ? t("shared.body", { code: barcodeWarning.code, names: barcodeWarning.names.join(", ") })
+            : ""
+        }
+        confirmLabel={t("shared.saveAnyway")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={() => {
+          setBarcodeWarning(null);
+          submit(true);
+        }}
+        onCancel={() => setBarcodeWarning(null)}
       />
     </div>
   );

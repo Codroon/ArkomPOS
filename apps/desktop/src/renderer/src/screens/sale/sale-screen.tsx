@@ -7,7 +7,6 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  isValidImei,
   type CompletedSale,
   type EntityRef,
   type ProductRow,
@@ -16,8 +15,9 @@ import {
   type SaleState,
 } from "@arkom/core";
 import { cn, GhostButton, ScanInput, Toast, useDataLabel, useT, type ScanInputHandle } from "@arkom/ui";
-import { errorMessage, ipcOf } from "../../lib/errors";
+import { errorMessage } from "../../lib/errors";
 import { openCatalogWithBarcode } from "../../lib/screen-bus";
+import { useScanFlow } from "../../lib/use-scan-flow";
 import { ProductGrid } from "./product-grid";
 import { TicketPanel } from "./ticket-panel";
 import { CompletedPanel, PaymentPanel, parseTenders, type TenderEntry } from "./payment-panel";
@@ -29,6 +29,8 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
   const scanRef = useRef<ScanInputHandle>(null);
 
   const [sale, setSale] = useState<SaleState | null>(null);
+  const saleRef = useRef<SaleState | null>(null);
+  saleRef.current = sale; // scan callbacks must see the live draft, not a stale closure
   const [completed, setCompleted] = useState<CompletedSale | null>(null);
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [groups, setGroups] = useState<EntityRef[]>([]);
@@ -98,36 +100,63 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
     [applyState],
   );
 
+  const addByProduct = useCallback(
+    (productId: string) => {
+      window.arkom
+        .invoke("sale:addLine", { docId: saleRef.current?.docId ?? null, productId })
+        .then(handleAddResponse) // a serialized product answers with its unit list
+        .catch((err) => showToast(errorMessage(t, err)));
+    },
+    [handleAddResponse, showToast, t],
+  );
+
+  const addByUnit = useCallback(
+    (unitId: string) => {
+      window.arkom
+        .invoke("sale:addLine", { docId: saleRef.current?.docId ?? null, unitId })
+        .then(handleAddResponse)
+        .catch((err) => showToast(errorMessage(t, err)));
+    },
+    [handleAddResponse, showToast, t],
+  );
+
+  // every scan goes through the shared pipeline: instant when unambiguous,
+  // picker when one code means several things, rescue when it means nothing
+  const { resolve, modals: scanModals } = useScanFlow({
+    onProduct: (product) => {
+      setNoMatch(null);
+      setSearchText("");
+      addByProduct(product.productId);
+    },
+    onUnit: (unit) => {
+      setNoMatch(null);
+      setSearchText("");
+      addByUnit(unit.unitId);
+    },
+    onCreateProduct: (code) => openCatalogWithBarcode(code),
+    onError: (message) => showToast(message),
+    onAttached: (product, code) => showToast(t("unknown.attached", { code, name: product.name })),
+    onUnknown: (code) => {
+      setNoMatch(code);
+      setShake(true);
+      setTimeout(() => setShake(false), 350);
+    },
+  });
+
   const onScan = useCallback(
     (code: string) => {
       setNoMatch(null);
-      setSearchText("");
-      window.arkom
-        .invoke("sale:addLine", { docId: sale?.docId ?? null, barcode: code })
-        .then(handleAddResponse)
-        .catch((err) => {
-          const ipc = ipcOf(err);
-          if (ipc?.code === "VALIDATION" && ipc.field === "barcode") {
-            setNoMatch(code);
-            setShake(true);
-            setTimeout(() => setShake(false), 350);
-          } else {
-            showToast(errorMessage(t, err));
-          }
-        });
+      resolve(code);
     },
-    [sale, handleAddResponse, showToast, t],
+    [resolve],
   );
 
   const onAddProduct = useCallback(
     (product: ProductRow) => {
       setNoMatch(null);
-      window.arkom
-        .invoke("sale:addLine", { docId: sale?.docId ?? null, productId: product.id })
-        .then(handleAddResponse)
-        .catch((err) => showToast(errorMessage(t, err)));
+      addByProduct(product.id);
     },
-    [sale, handleAddResponse, showToast, t],
+    [addByProduct],
   );
 
   const onPickUnit = useCallback(
@@ -308,23 +337,8 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
               onScan={onScan}
               placeholder={t("catalog.searchPlaceholder")}
             />
-            {noMatch ? (
-              <div className="mt-1 text-[11px] text-ink-2">
-                {t("sale.noMatch", { code: noMatch })}
-                {/^\d{8,}$/.test(noMatch) && !isValidImei(noMatch) ? (
-                  <>
-                    {" · "}
-                    <button
-                      type="button"
-                      className="font-bold underline hover:text-ink"
-                      onClick={() => openCatalogWithBarcode(noMatch)}
-                    >
-                      {t("entry.createArticle")}
-                    </button>
-                  </>
-                ) : null}
-              </div>
-            ) : null}
+            {/* the rescue modal carries both ways out; this is the trace it leaves behind */}
+            {noMatch ? <div className="mt-1 text-[11px] text-ink-2">{t("sale.noMatch", { code: noMatch })}</div> : null}
           </div>
 
           {/* group chips */}
@@ -395,6 +409,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
         <OverrideModal line={overrideLine} onApply={onOverrideApply} onClose={() => setOverrideLine(null)} />
       ) : null}
       {parkOpen ? <ParkModal onPark={onPark} onClose={() => setParkOpen(false)} /> : null}
+      {scanModals}
       <Toast message={toast} />
     </div>
   );

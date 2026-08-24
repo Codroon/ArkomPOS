@@ -1,11 +1,16 @@
 /**
- * Entrada de stock panel — handoff 03 §Entrada. Scan resolves the product;
- * serialized products switch to the IMEI branch (qty locked to 1, one staged
- * row per IMEI, staged duplicates rejected inline). Confirmar posts one
- * stock:add transaction; on success the parent refreshes, flashes changed
- * rows and focus returns to the scan input.
+ * Entrada de stock — handoff 03, rebuilt for discoverability.
+ *
+ * The whole shape is ALWAYS visible (find · quantity · cost · supplier ·
+ * staged lines · Confirmar) with the fields disabled until an item resolves,
+ * so nothing about the feature is hidden behind a successful scan. Finding is
+ * scan-or-search through `scan:resolve` (primary code, additional codes, IMEI,
+ * or a name search), with the ambiguity picker and the unknown-code rescue
+ * wired in. Quantity comes first: for a serialized product the quantity IS the
+ * IMEI target and an "IMEI n of N" capture loop appears — Confirmar stays
+ * disabled until the captured IMEIs match the quantity.
  */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   centsToInput,
   formatCents,
@@ -15,10 +20,12 @@ import {
   uuidv7,
   type EntityRef,
   type InventoryRow,
+  type ScanProduct,
   type StockAddEntry,
 } from "@arkom/core";
 import {
   Chip,
+  cn,
   Field,
   GhostButton,
   PrimaryButton,
@@ -31,16 +38,17 @@ import {
   type ScanInputHandle,
   type TKey,
 } from "@arkom/ui";
+import { errorMessage } from "../../lib/errors";
+import { useScanFlow } from "../../lib/use-scan-flow";
 
 interface StagedLine {
   key: string;
   productId: string;
   name: string;
-  barcode: string | null;
-  serialized: boolean;
+  code: string | null;
   qty: number;
   unitCostCents: number;
-  imei: string | null;
+  imeis: string[];
 }
 
 type LineErrors = Partial<Record<"cost" | "qty" | "imei", TKey>>;
@@ -57,15 +65,17 @@ export function EntradaPanel({
   const t = useT();
   const dataLabel = useDataLabel();
   const scanRef = useRef<ScanInputHandle>(null);
+  const qtyRef = useRef<HTMLInputElement>(null);
   const imeiRef = useRef<HTMLInputElement>(null);
 
   const [scanText, setScanText] = useState("");
-  const [unknownCode, setUnknownCode] = useState<string | null>(null);
-  const [product, setProduct] = useState<InventoryRow | null>(null);
+  const [product, setProduct] = useState<ScanProduct | null>(null);
   const [costInput, setCostInput] = useState("");
   const [qtyInput, setQtyInput] = useState("1");
   const [imeiInput, setImeiInput] = useState("");
+  const [imeis, setImeis] = useState<string[]>([]);
   const [lineErrors, setLineErrors] = useState<LineErrors>({});
+  const [notice, setNotice] = useState<string | null>(null);
 
   const [staged, setStaged] = useState<StagedLine[]>([]);
   const [suppliers, setSuppliers] = useState<EntityRef[]>([]);
@@ -83,20 +93,66 @@ export function EntradaPanel({
       .catch((err) => console.error("supplier:list failed", err));
   }, []);
 
-  const resolve = (code: string) => {
-    const found = rows.find((r) => r.barcode === code);
-    setScanText("");
-    if (!found) {
-      setUnknownCode(code);
+  const serialized = product?.itemType === "serialized";
+  const qty = /^\d+$/.test(qtyInput.trim()) ? Number(qtyInput.trim()) : 0;
+
+  const selectProduct = useCallback(
+    (next: ScanProduct) => {
+      setProduct(next);
+      setScanText("");
+      setNotice(null);
+      setLineErrors({});
+      setImeis([]);
+      setImeiInput("");
+      setQtyInput("1");
+      // last cost prefill, from the row the inventory table already has
+      const known = rows.find((r) => r.productId === next.productId);
+      setCostInput(known?.costCents == null ? "" : centsToInput(known.costCents));
+      setTimeout(() => qtyRef.current?.select(), 0); // quantity first
+    },
+    [rows],
+  );
+
+  const { resolve, modals } = useScanFlow({
+    onProduct: selectProduct,
+    onUnit: () => setNotice(t("err.duplicateImei")), // that IMEI is already in stock
+    onCreateProduct: onCreateArticle,
+    onError: (message) => setNotice(message),
+    onAttached: (p, code) => setNotice(t("unknown.attached", { code, name: p.name })),
+  });
+
+  /** Typing a name (not a code) filters the catalog inline — search works too. */
+  const searchMatches = useMemo(() => {
+    const needle = scanText.trim().toLowerCase();
+    if (needle.length < 2 || /^\d{6,}$/.test(needle)) return [];
+    return rows
+      .filter((r) => r.active && (r.name.toLowerCase().includes(needle) || (r.barcode ?? "").includes(needle)))
+      .slice(0, 6);
+  }, [scanText, rows]);
+
+  const toScanProduct = (row: InventoryRow): ScanProduct => ({
+    productId: row.productId,
+    name: row.name,
+    itemType: row.itemType,
+    priceCents: null,
+    onHand: row.onHand,
+    active: row.active,
+  });
+
+  const captureImei = () => {
+    const imei = imeiInput.trim();
+    if (!isValidImei(imei)) {
+      setLineErrors({ imei: "val.imeiInvalid" });
       return;
     }
-    setUnknownCode(null);
-    setProduct(found);
-    setCostInput(found.costCents == null ? "" : centsToInput(found.costCents)); // last cost prefill
-    setQtyInput("1");
-    setImeiInput("");
+    if (imeis.includes(imei) || staged.some((l) => l.imeis.includes(imei))) {
+      setLineErrors({ imei: "val.imeiDupStaged" });
+      return;
+    }
     setLineErrors({});
-    if (found.itemType === "serialized") setTimeout(() => imeiRef.current?.focus(), 0);
+    setImeis((prev) => [...prev, imei]);
+    setImeiInput("");
+    setTimeout(() => imeiRef.current?.focus(), 0);
   };
 
   const stageLine = () => {
@@ -104,17 +160,8 @@ export function EntradaPanel({
     const errors: LineErrors = {};
     const cost = parseMoneyInput(costInput);
     if (cost === null) errors.cost = costInput.trim() === "" ? "val.costRequired" : "val.invalidAmount";
-    const serialized = product.itemType === "serialized";
-    let qty = 1;
-    let imei: string | null = null;
-    if (serialized) {
-      imei = imeiInput.trim();
-      if (!isValidImei(imei)) errors.imei = "val.imeiInvalid";
-      else if (staged.some((l) => l.imei === imei)) errors.imei = "val.imeiDupStaged";
-    } else {
-      qty = /^\d+$/.test(qtyInput.trim()) ? Number(qtyInput.trim()) : 0;
-      if (qty < 1) errors.qty = "val.qtyMin1";
-    }
+    if (qty < 1) errors.qty = "val.qtyMin1";
+    if (serialized && imeis.length !== qty) errors.imei = "val.imeiInvalid";
     setLineErrors(errors);
     if (Object.keys(errors).length > 0 || cost === null) return;
 
@@ -124,23 +171,19 @@ export function EntradaPanel({
         key: uuidv7(),
         productId: product.productId,
         name: product.name,
-        barcode: product.barcode,
-        serialized,
+        code: rows.find((r) => r.productId === product.productId)?.barcode ?? null,
         qty,
         unitCostCents: cost,
-        imei,
+        imeis: serialized ? imeis : [],
       },
     ]);
     setConfirmError(null);
-    if (serialized) {
-      setImeiInput(""); // one row per IMEI: keep the product, take the next IMEI
-      setTimeout(() => imeiRef.current?.focus(), 0);
-    } else {
-      setProduct(null);
-      setCostInput("");
-      setQtyInput("1");
-      scanRef.current?.focus();
-    }
+    setProduct(null);
+    setCostInput("");
+    setQtyInput("1");
+    setImeis([]);
+    setImeiInput("");
+    scanRef.current?.focus();
   };
 
   const createSupplier = () => {
@@ -162,6 +205,8 @@ export function EntradaPanel({
   };
 
   const totalCents = staged.reduce((a, l) => a + l.qty * l.unitCostCents, 0);
+  const canStage =
+    product !== null && qty >= 1 && parseMoneyInput(costInput) !== null && (!serialized || imeis.length === qty);
   const canConfirm = staged.length > 0 && supplierId !== "" && !submitting;
 
   const confirm = () => {
@@ -169,113 +214,184 @@ export function EntradaPanel({
     setSubmitting(true);
     setConfirmError(null);
     const entries: StockAddEntry[] = staged.map((l) =>
-      l.imei
-        ? { productId: l.productId, expectedQty: 1, imeis: [l.imei], unitCostCents: l.unitCostCents, supplierId }
+      l.imeis.length > 0
+        ? {
+            productId: l.productId,
+            expectedQty: l.qty,
+            imeis: l.imeis,
+            unitCostCents: l.unitCostCents,
+            supplierId,
+          }
         : { productId: l.productId, qty: l.qty, unitCostCents: l.unitCostCents, supplierId },
     );
     window.arkom
       .invoke("stock:add", { entries })
       .then((res) => {
-        const ids = res.productIds;
         setStaged([]);
         setProduct(null);
         setCostInput("");
         setQtyInput("1");
+        setImeis([]);
         setImeiInput("");
-        onConfirmed(ids, res.lineCount);
+        onConfirmed(res.productIds, res.lineCount);
         scanRef.current?.focus();
       })
-      .catch((err) => {
-        const ipc = parseIpcError(err);
-        setConfirmError(
-          ipc ? (ipc.code === "DUPLICATE_IMEI" ? t("err.duplicateImei") : ipc.message) : t("catalog.saveFailed"),
-        );
-      })
+      .catch((err) => setConfirmError(errorMessage(t, err)))
       .finally(() => setSubmitting(false));
   };
 
   const lineErr = (k: keyof LineErrors) => (lineErrors[k] ? t(lineErrors[k]!) : undefined);
+  const disabled = product === null;
 
   return (
-    <div className={`flex-none border-t border-border-strong bg-panel px-4 py-3 ${submitting ? "pointer-events-none opacity-60" : ""}`}>
+    <div
+      className={cn(
+        "flex-none border-t border-border-strong bg-panel px-4 py-3",
+        submitting && "pointer-events-none opacity-60",
+      )}
+    >
       <SectionLabel className="mb-2">{t("entry.section")}</SectionLabel>
+
       <div className="flex items-start gap-3">
-        {/* 1. scan + per-entry fields — labelled like the supplier column so the controls align */}
-        <div className="flex w-[440px] flex-none flex-col gap-2">
+        {/* find: scan OR search by name — always enabled */}
+        <div className="relative flex w-[300px] flex-none flex-col gap-1">
           <Field label={t("entry.scanLabel")} required>
             <ScanInput
               ref={scanRef}
               value={scanText}
               onChange={(e) => setScanText(e.target.value)}
               onScan={resolve}
-              placeholder={t("entry.scanPlaceholder")}
+              placeholder={t("entry.searchOrScan")}
             />
           </Field>
-          {unknownCode ? (
-            <div className="text-[11px] text-ink-2">
-              <span className="font-mono tabular-nums">{unknownCode}</span> · {t("entry.unknownCode")} ·{" "}
+          {product ? (
+            <div className="flex items-center gap-1.5 rounded-[3px] border border-border bg-card px-2 py-1 text-[12px]">
+              <span className="min-w-0 flex-1 truncate font-bold">{product.name}</span>
+              {serialized ? <Chip>{t("chip.serie")}</Chip> : null}
               <button
                 type="button"
-                className="font-bold underline hover:text-ink"
-                onClick={() => onCreateArticle(unknownCode)}
+                className="text-[10px] text-muted underline hover:text-ink"
+                onClick={() => {
+                  setProduct(null);
+                  setImeis([]);
+                  scanRef.current?.focus();
+                }}
               >
-                {t("entry.createArticle")}
+                {t("entry.changeProduct")}
               </button>
             </div>
-          ) : null}
-          {product ? (
-            <div className="rounded-[3px] border border-border bg-card p-2">
-              <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-bold">
-                {product.name}
-                {product.itemType === "serialized" ? <Chip>{t("chip.serie")}</Chip> : null}
-              </div>
-              <div className="flex items-end gap-2">
-                <Field label={t("entry.unitCost")} required error={lineErr("cost")} className="w-32">
-                  <TextInput
-                    mono
-                    requiredStyle
-                    value={costInput}
-                    onChange={(e) => setCostInput(e.target.value)}
-                    placeholder={t("editor.moneyPlaceholder")}
-                  />
-                </Field>
-                {product.itemType === "serialized" ? (
-                  <Field label={t("entry.imei")} required error={lineErr("imei")} className="flex-1">
-                    <TextInput
-                      ref={imeiRef}
-                      mono
-                      requiredStyle
-                      value={imeiInput}
-                      onChange={(e) => setImeiInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          stageLine();
-                        }
-                      }}
-                      placeholder={t("entry.imeiPlaceholder")}
-                      maxLength={15}
-                    />
-                  </Field>
-                ) : (
-                  <Field label={t("entry.qty")} required error={lineErr("qty")} className="w-24">
-                    <TextInput
-                      mono
-                      requiredStyle
-                      inputMode="numeric"
-                      value={qtyInput}
-                      onChange={(e) => setQtyInput(e.target.value)}
-                    />
-                  </Field>
-                )}
-                <GhostButton onClick={stageLine}>{t("entry.addLine")}</GhostButton>
-              </div>
+          ) : searchMatches.length > 0 ? (
+            <div className="absolute top-[54px] z-20 w-full overflow-hidden rounded-[3px] border border-border-strong bg-card shadow-md">
+              {searchMatches.map((row) => (
+                <button
+                  key={row.productId}
+                  type="button"
+                  onClick={() => selectProduct(toScanProduct(row))}
+                  className="flex w-full items-center gap-2 border-b border-border-light px-2 py-1.5 text-left last:border-b-0 hover:bg-nav-hover"
+                >
+                  <span className="min-w-0 flex-1 truncate text-[12px]">{row.name}</span>
+                  {row.itemType === "serialized" ? <Chip>{t("chip.serie")}</Chip> : null}
+                  <span className="font-mono text-[10px] tabular-nums text-faint">{row.onHand}</span>
+                </button>
+              ))}
             </div>
-          ) : null}
+          ) : (
+            <div className="text-[10px] leading-snug text-faint">{t("entry.idleHint")}</div>
+          )}
+          {notice ? <div className="text-[11px] text-ink-2">{notice}</div> : null}
         </div>
 
-        {/* 3. supplier */}
-        <div className="w-[240px] flex-none">
+        {/* quantity first, then cost — disabled until an item resolves */}
+        <div className="w-[92px] flex-none">
+          <Field label={t("entry.qty")} required error={lineErr("qty")}>
+            <TextInput
+              ref={qtyRef}
+              mono
+              requiredStyle
+              inputMode="numeric"
+              disabled={disabled}
+              value={qtyInput}
+              onChange={(e) => setQtyInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && serialized) {
+                  e.preventDefault();
+                  imeiRef.current?.focus();
+                }
+              }}
+            />
+          </Field>
+        </div>
+        <div className="w-[110px] flex-none">
+          <Field label={t("entry.unitCost")} required error={lineErr("cost")}>
+            <TextInput
+              mono
+              requiredStyle
+              disabled={disabled}
+              value={costInput}
+              onChange={(e) => setCostInput(e.target.value)}
+              placeholder={t("editor.moneyPlaceholder")}
+            />
+          </Field>
+        </div>
+
+        {/* serialized: the quantity becomes the IMEI target */}
+        {serialized ? (
+          <div className="w-[210px] flex-none">
+            <Field
+              label={t("entry.imeiLoop", { n: Math.min(imeis.length + 1, qty), total: qty })}
+              required
+              error={lineErr("imei")}
+            >
+              <TextInput
+                ref={imeiRef}
+                mono
+                requiredStyle
+                disabled={disabled || imeis.length >= qty}
+                value={imeiInput}
+                onChange={(e) => setImeiInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    captureImei();
+                  }
+                }}
+                placeholder={t("entry.imeiPlaceholder")}
+                maxLength={15}
+              />
+            </Field>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {imeis.map((imei) => (
+                <span
+                  key={imei}
+                  className="inline-flex items-center gap-1 rounded-[2px] border border-border bg-card px-1 font-mono text-[9px] tabular-nums"
+                >
+                  {imei}
+                  <button
+                    type="button"
+                    className="text-muted hover:text-ink"
+                    onClick={() => setImeis((prev) => prev.filter((x) => x !== imei))}
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="mt-0.5 text-[10px] text-faint">
+              {imeis.length === qty
+                ? t("entry.imeiCaptured", { n: imeis.length, total: qty })
+                : t("entry.imeiPending", { n: Math.max(0, qty - imeis.length) })}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="flex-none pt-[18px]">
+          <GhostButton disabled={!canStage} onClick={stageLine}>
+            {t("entry.addToList")}
+          </GhostButton>
+        </div>
+
+        {/* supplier */}
+        <div className="w-[190px] flex-none">
           <Field label={t("entry.supplier")} required error={supplierError}>
             {newSupplierMode ? (
               <div className="flex gap-1.5">
@@ -317,37 +433,44 @@ export function EntradaPanel({
           </button>
         </div>
 
-        {/* 4. staged lines + 5. confirm */}
+        {/* staged lines + confirm */}
         <div className="min-w-0 flex-1">
-          {staged.length > 0 ? (
-            <table className="w-full border-collapse text-[11px]">
-              <tbody>
-                {staged.map((l) => (
-                  <tr key={l.key} className="border-b border-border-light bg-card">
-                    <td className="px-2 py-1">
-                      {l.name}
-                      <span className="ml-1.5 font-mono text-[9px] tabular-nums text-faint">
-                        {l.imei ?? l.barcode ?? ""}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-2 py-1 text-right font-mono tabular-nums">
-                      {l.qty} × {formatCents(l.unitCostCents)}
-                    </td>
-                    <td className="w-6 px-1 py-1 text-center">
-                      <button
-                        type="button"
-                        aria-label={t("entry.removeLine")}
-                        className="text-muted hover:text-ink"
-                        onClick={() => setStaged((prev) => prev.filter((x) => x.key !== l.key))}
-                      >
-                        ✕
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : null}
+          <SectionLabel className="mb-1">{t("entry.stagedTotal")}</SectionLabel>
+          <div className="max-h-[92px] overflow-y-auto">
+            {staged.length === 0 ? (
+              <div className="text-[11px] text-faint">{t("entry.stagedEmpty")}</div>
+            ) : (
+              <table className="w-full border-collapse text-[11px]">
+                <tbody>
+                  {staged.map((l) => (
+                    <tr key={l.key} className="border-b border-border-light bg-card">
+                      <td className="px-2 py-1">
+                        <span className="truncate">{l.name}</span>
+                        {l.imeis.length > 0 ? (
+                          <span className="ml-1.5 font-mono text-[9px] text-faint">
+                            {t("entry.stagedUnits", { n: l.imeis.length })}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="whitespace-nowrap px-2 py-1 text-right font-mono tabular-nums">
+                        {l.qty} × {formatCents(l.unitCostCents)}
+                      </td>
+                      <td className="w-6 px-1 py-1 text-center">
+                        <button
+                          type="button"
+                          aria-label={t("entry.removeLine")}
+                          className="text-muted hover:text-ink"
+                          onClick={() => setStaged((prev) => prev.filter((x) => x.key !== l.key))}
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
           {confirmError ? <div className="mt-1 text-[11px] text-ink-2">{confirmError}</div> : null}
           <div className="mt-2 flex justify-end">
             <PrimaryButton onClick={confirm} disabled={!canConfirm}>
@@ -356,6 +479,8 @@ export function EntradaPanel({
           </div>
         </div>
       </div>
+
+      {modals}
     </div>
   );
 }

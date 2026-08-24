@@ -79,16 +79,23 @@ describe("resolveScan", () => {
 
   it("ignores units that are not in stock (reserved or already sold)", () => {
     const sold: ScanUnit = { unitId: "u2", imei: "353287119902456", status: "sold" };
-    expect(
-      resolveScan("353287119902456", { products: [], units: [{ unit: sold, product: phone }] }).kind,
-    ).toBe("none");
+    const result = resolveScan("353287119902456", { products: [], units: [{ unit: sold, product: phone }] });
+    expect(result.kind).toBe("none");
+    // …but it says WHY, so the UI never offers to create a product for a sold phone
+    if (result.kind === "none") {
+      expect(result.unavailableUnit).toEqual({
+        imei: "353287119902456",
+        status: "sold",
+        productName: phone.name,
+      });
+    }
 
     const reserved: ScanUnit = { unitId: "u3", imei: "353287119902464", status: "reserved" };
-    const result = resolveScan("353287119902464", {
+    const withProduct = resolveScan("353287119902464", {
       products: [{ product: cable, matchedVia: "primary" }],
       units: [{ unit: reserved, product: phone }],
     });
-    expect(result.kind).toBe("product"); // the reserved unit does not make it ambiguous
+    expect(withProduct.kind).toBe("product"); // the reserved unit does not make it ambiguous
   });
 
   it("trims scanner whitespace and treats an empty scan as none", () => {
