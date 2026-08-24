@@ -98,6 +98,31 @@ Lagging (post go-live, Phase 2 territory): zero stock discrepancies attributable
 3. **Ahmer (Phase 2, ask now):** shop's region — standard AEAT (Verifactu) vs Basque (TicketBAI) — decides the fiscal module.
 4. **Internal (non-blocking):** printer library behavior on the client's exact model — PDF fallback is the safety net.
 
+## Decisions closed during build
+Questions raised by live testing and settled by the client. Recorded here so they are not
+relitigated; none of them is an ADR because none changes an architectural boundary.
+
+- **Per-piece serial numbers for accessories — rejected (2026-08-25).** Asked after seeing IMEI
+  tracking on phones: should cables and protectors get individual serials too? No. A shop sells
+  accessories by the handful and they are interchangeable — tracking a specific unit adds counting
+  work at every till operation and yields nothing anyone would ever query. Phones earn per-piece
+  identity because each one carries a warranty, a price band and a legal trail; a €9,90 protector
+  does not. Accessories stay counted by model (`stocked`), and the schema keeps `serialized` for
+  the item types that genuinely need it.
+- **Shared barcodes: per-product sticker labels are the Phase-2 answer (2026-08-25).** Sibling
+  variants legitimately share a manufacturer EAN (see PRD 4.4 amended), and the ambiguity picker
+  handles it correctly today — one extra click, no wrong data. The permanent fix is not a smarter
+  guess: it is printing our own label with the product's internal code and sticking it on the box,
+  so the scan is unambiguous at the till. That waits for the label printer, which arrives with the
+  Phase-2 hardware work alongside ticket printing. Until then the picker is the answer, and
+  "Generar código interno" already produces the code such a label would carry.
+- **Cashier attribution arrives with auth (2026-08-25).** "Who did this?" is already recorded on
+  every oplog row and every movement — the column is simply `null` until there are users to name
+  (ADR-0010). No interim workaround (no name box, no PIN prompt): a typed-in name that nobody
+  verifies is worse than an honest blank, because it looks like evidence. Attribution becomes real
+  when auth and shifts land in Phase 2, and the history written now fills in retroactively by
+  terminal and timestamp.
+
 ## Timeline
 Per the approved two-week one-pager: D1–2 foundations · D3–4 catálogo · D5 inventario · D6 entrada ·
 D7–8 venta · D9 ticket+audit · D10 hardening/installer/demo. Serialized selling is the designated
