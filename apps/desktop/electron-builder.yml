@@ -1,4 +1,4 @@
-appId: com.arkom.pos
+appId: com.codroon.arkompos
 productName: Arkom POS
 directories:
   output: release
@@ -11,10 +11,18 @@ asarUnpack:
 extraResources:
   - from: ../../packages/db/drizzle
     to: drizzle
+  # the window asks for this by path at runtime
+  - from: build/icon.ico
+    to: icon.ico
 win:
   target: nsis
+  icon: build/icon.ico
 nsis:
   oneClick: true
   perMachine: false
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  # taskbar / start-menu shortcut name
+  shortcutName: Arkom POS
 # electron-updater feed configured when updates are wired up
 publish: null

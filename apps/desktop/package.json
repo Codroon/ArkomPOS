@@ -15,7 +15,8 @@
     "db:audit": "node scripts/run-db-task.cjs audit",
     "imei:gen": "node scripts/imei-gen.cjs",
     "typecheck": "tsc --noEmit",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps",
+    "icons:build": "node scripts/run-icons.cjs"
   },
   "dependencies": {
     "@arkom/core": "workspace:*",

@@ -9,6 +9,13 @@ if (!app.isPackaged && process.env.ARKOM_DEBUG_PORT) {
   app.commandLine.appendSwitch("remote-debugging-port", process.env.ARKOM_DEBUG_PORT);
 }
 
+/** The Arkom mark, for the taskbar, Alt-Tab and the window itself. */
+function brandIcon(): string {
+  return app.isPackaged
+    ? join(process.resourcesPath, "icon.ico")
+    : join(__dirname, "../../build/icon.ico");
+}
+
 // 00-foundations: fixed desktop layout, min window 1280×860 (till hardware)
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -18,8 +25,9 @@ function createWindow(): void {
     minHeight: 860,
     useContentSize: true,
     autoHideMenuBar: true,
-    backgroundColor: "#e8e8ea",
+    backgroundColor: "#15181B", // Graphite 900 — the topbar paints first
     title: "Arkom POS",
+    icon: brandIcon(),
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,

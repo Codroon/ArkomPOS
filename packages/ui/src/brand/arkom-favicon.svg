@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Favicon / 16px variant: the bar is REINFORCED (15u instead of 11u) and the
+       counter widened, so the mark survives at taskbar and tab sizes. -->
+  <rect width="100" height="100" fill="#15181B"/>
+  <path fill-rule="evenodd" d="M38 14 L62 14 L86 86 L14 86 Z M50 34 L66 86 L34 86 Z" fill="#F1EFE9"/>
+  <rect x="6" y="52" width="88" height="16" fill="#2F9BFF"/>
+</svg>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Arkom app mark: Graphite 900 tile, Archivo Black "A" in Bone,
+       Signal Blue bar across the optical centre (brand manual, page 01). -->
+  <rect width="100" height="100" fill="#15181B"/>
+  <path fill-rule="evenodd" d="M40 16 L60 16 L82 84 L18 84 Z M50 32 L64 84 L36 84 Z" fill="#F1EFE9"/>
+  <rect x="10" y="55" width="80" height="11" fill="#2F9BFF"/>
+</svg>
