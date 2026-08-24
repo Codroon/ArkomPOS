@@ -330,12 +330,16 @@ export const en: Record<TKey, string> = {
   "set.footerHint": "Printed above “Gracias por su visita”.",
   "set.pendingHint": "Awaiting the client's details.",
   "set.saved": "Settings saved",
-  "set.ticketsFolder": "PDFs are saved in this machine's tickets folder.",
+  "set.ticketsFolder": "Tickets folder",
+  "set.ticketsFolderHint": "Ticket PDFs are saved here.",
+  "set.openTicketsFolder": "Open folder",
 
   /* printing feedback */
   "print.printing": "Printing…",
   "print.printed": "Ticket printed",
-  "print.pdfSaved": "PDF saved: {path}",
+  "print.pdfSaved": "PDF saved: {file}",
+  "print.openPdf": "Open",
+  "print.showFolder": "Show folder",
   "print.failed": "Could not print",
   "print.retry": "Retry",
   "print.savePdf": "Save PDF",

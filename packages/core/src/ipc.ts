@@ -37,6 +37,8 @@ export const IPC_CHANNELS = [
   "print:printers",
   "print:ticket",
   "print:test",
+  "print:reveal",
+  "print:ticketsDir",
 ] as const;
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
@@ -536,3 +538,22 @@ export const PrintTestRequestSchema = z
   .default({ target: "auto" });
 export const PrintTestResponseSchema = PrintTicketResponseSchema;
 export type PrintTestRequest = z.infer<typeof PrintTestRequestSchema>;
+
+/**
+ * Open a saved ticket, or show it in the file manager.
+ *
+ * The tickets folder lives under userData, which on Windows sits inside a
+ * hidden AppData tree — printing its path in a toast is not the same as the
+ * owner being able to reach it. The main process resolves the path against the
+ * tickets directory before handing it to the shell, so this cannot be used to
+ * open anything else.
+ */
+export const PrintRevealRequestSchema = z.object({
+  path: z.string().min(1),
+  mode: z.enum(["open", "folder"]).default("open"),
+});
+export const PrintRevealResponseSchema = z.object({ ok: z.boolean() });
+
+/** Where tickets are saved — shown in Ajustes with a button to open it. */
+export const PrintTicketsDirRequestSchema = z.object({}).optional();
+export const PrintTicketsDirResponseSchema = z.object({ path: z.string() });

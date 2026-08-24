@@ -22,6 +22,7 @@ import { useScanFlow } from "../../lib/use-scan-flow";
 import { ProductGrid } from "./product-grid";
 import { TicketPanel } from "./ticket-panel";
 import { useTicketPrint } from "../../lib/use-ticket-print";
+import { PrintToast } from "../../lib/print-toast";
 import { CompletedPanel, PaymentPanel, parseTenders, type TenderEntry } from "./payment-panel";
 import { OverrideModal, ParkModal, ParkedPopover, UnitPickModal, type UnitPickState } from "./sale-modals";
 
@@ -478,39 +479,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
       {parkOpen ? <ParkModal onPark={onPark} onClose={() => setParkOpen(false)} /> : null}
       {scanModals}
       <Toast message={toast?.text ?? null} tone={toast?.tone ?? "neutral"} />
-      <Toast
-        message={printer.state.message}
-        tone={printer.state.tone}
-        className={toast ? "bottom-16" : undefined}
-        actions={
-          printer.state.failedDocId ? (
-            <>
-              <button
-                type="button"
-                onClick={printer.retry}
-                className="rounded-[2px] border border-danger-ink/40 px-1.5 py-0.5 text-[11px] font-bold hover:bg-danger-ink/10"
-              >
-                {t("print.retry")}
-              </button>
-              <button
-                type="button"
-                onClick={printer.savePdfForFailed}
-                className="rounded-[2px] border border-danger-ink/40 px-1.5 py-0.5 text-[11px] font-bold hover:bg-danger-ink/10"
-              >
-                {t("print.savePdf")}
-              </button>
-              <button
-                type="button"
-                onClick={printer.dismiss}
-                aria-label={t("peek.close")}
-                className="px-1 text-[12px] font-bold opacity-60 hover:opacity-100"
-              >
-                ✕
-              </button>
-            </>
-          ) : null
-        }
-      />
+      <PrintToast printer={printer} className={toast ? "bottom-16" : undefined} />
     </div>
   );
 }

@@ -153,6 +153,10 @@ export {
   PrintTicketResponseSchema,
   PrintTestRequestSchema,
   PrintTestResponseSchema,
+  PrintRevealRequestSchema,
+  PrintRevealResponseSchema,
+  PrintTicketsDirRequestSchema,
+  PrintTicketsDirResponseSchema,
 } from "./ipc";
 export type {
   IpcChannel,

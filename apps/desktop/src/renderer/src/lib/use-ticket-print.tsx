@@ -21,9 +21,21 @@ export interface PrintState {
   /** the ticket a failed attempt was for — what Reintentar retries */
   failedDocId: string | null;
   failedCopy: boolean;
+  /** the PDF a successful save produced — what Abrir opens */
+  savedPath: string | null;
 }
 
-const IDLE: PrintState = { busy: false, message: null, tone: "neutral", failedDocId: null, failedCopy: false };
+const IDLE: PrintState = {
+  busy: false,
+  message: null,
+  tone: "neutral",
+  failedDocId: null,
+  failedCopy: false,
+  savedPath: null,
+};
+
+/** "…\tickets\T1-000042.pdf" → "T1-000042.pdf" */
+export const fileNameOf = (path: string): string => path.split(/[\\/]/).pop() ?? path;
 
 export function useTicketPrint() {
   const t = useT();
@@ -58,16 +70,22 @@ export function useTicketPrint() {
         if (!alive.current) return;
         setState({
           ...IDLE,
-          message: res.kind === "pdf" ? t("print.pdfSaved", { path: res.path }) : t("print.printed"),
+          // the file NAME, not the path: the folder lives inside a hidden
+          // AppData tree, so the useful thing is the Abrir button beside it
+          message: res.kind === "pdf" ? t("print.pdfSaved", { file: fileNameOf(res.path) }) : t("print.printed"),
+          savedPath: res.kind === "pdf" ? res.path : null,
         });
-        // success fades; a failure does not (see below)
-        timer.current = setTimeout(() => alive.current && setState(IDLE), 6000);
+        // a plain "printed" fades; a saved PDF stays until dismissed, because
+        // its buttons are the only convenient way to reach the file
+        if (res.kind !== "pdf") {
+          timer.current = setTimeout(() => alive.current && setState(IDLE), 6000);
+        }
       } catch (err) {
         if (!alive.current) return;
         // sticky on purpose: the actions are the recovery path, and the panel
         // that triggered this may be gone by the time anyone looks up
         setState({
-          busy: false,
+          ...IDLE,
           message: errorMessage(t, err),
           tone: "danger",
           failedDocId: docId,
@@ -87,5 +105,17 @@ export function useTicketPrint() {
     if (state.failedDocId) void run(state.failedDocId, state.failedCopy, "pdf");
   }, [run, state.failedDocId, state.failedCopy]);
 
-  return { state, print, savePdf, retry, savePdfForFailed, dismiss };
+  /** Hand the saved PDF to the OS — open it, or show it in the file manager. */
+  const reveal = useCallback(
+    (mode: "open" | "folder") => {
+      const path = state.savedPath;
+      if (!path) return;
+      void window.arkom.invoke("print:reveal", { path, mode }).catch((err) => {
+        if (alive.current) setState((prev) => ({ ...prev, message: errorMessage(t, err), tone: "danger" }));
+      });
+    },
+    [state.savedPath, t],
+  );
+
+  return { state, print, savePdf, retry, savePdfForFailed, reveal, dismiss };
 }

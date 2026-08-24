@@ -332,12 +332,16 @@ export const es = {
   "set.footerHint": "Se imprime encima de «Gracias por su visita».",
   "set.pendingHint": "Pendiente de los datos del cliente.",
   "set.saved": "Ajustes guardados",
-  "set.ticketsFolder": "Los PDF se guardan en la carpeta tickets del equipo.",
+  "set.ticketsFolder": "Carpeta de tickets",
+  "set.ticketsFolderHint": "Aquí se guardan los PDF de los tickets.",
+  "set.openTicketsFolder": "Abrir carpeta",
 
   /* printing feedback */
   "print.printing": "Imprimiendo…",
   "print.printed": "Ticket impreso",
-  "print.pdfSaved": "PDF guardado: {path}",
+  "print.pdfSaved": "PDF guardado: {file}",
+  "print.openPdf": "Abrir",
+  "print.showFolder": "Ver carpeta",
   "print.failed": "No se pudo imprimir",
   "print.retry": "Reintentar",
   "print.savePdf": "Guardar PDF",

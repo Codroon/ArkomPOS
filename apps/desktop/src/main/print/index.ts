@@ -10,7 +10,9 @@
  * Every attempt, successful or not, writes `document.print` to the oplog with
  * its target, so "did that ticket ever come out?" is answerable afterwards.
  */
-import { BrowserWindow } from "electron";
+import { BrowserWindow, shell } from "electron";
+import { extname, resolve, sep } from "node:path";
+import { mkdir } from "node:fs/promises";
 import {
   appError,
   mutate,
@@ -27,10 +29,43 @@ import { peek } from "../repos/sale";
 import { getSettings, shopProfile } from "../repos/settings";
 import { tillContext } from "../context";
 import { encodeEscPos } from "./escpos";
-import { renderTicketPdf } from "./pdf";
+import { renderTicketPdf, ticketsDir as ticketsDirPath } from "./pdf";
 import { sendRawToPrinter } from "./raw-windows";
 
 export { ticketsDir } from "./pdf";
+
+/**
+ * Open a saved ticket in the system viewer, or show it in the file manager.
+ *
+ * The renderer supplies the path, so it is resolved against the tickets folder
+ * and required to be a .pdf before the shell ever sees it — this is a door into
+ * the OS and it opens onto exactly one directory.
+ */
+export async function revealTicket(path: string, mode: "open" | "folder"): Promise<{ ok: boolean }> {
+  const target = resolve(path);
+  const dir = resolve(ticketsDirPath());
+
+  // the tickets folder itself is openable — that is the "Abrir carpeta" button
+  // in Ajustes, and the folder is created lazily on the first save
+  if (target === dir) {
+    await mkdir(dir, { recursive: true });
+    const problem = await shell.openPath(dir);
+    if (problem) throw appError("VALIDATION", problem);
+    return { ok: true };
+  }
+
+  if (!target.startsWith(dir + sep) || extname(target).toLowerCase() !== ".pdf") {
+    throw appError("VALIDATION", "Solo se pueden abrir tickets guardados.");
+  }
+  if (mode === "folder") {
+    shell.showItemInFolder(target);
+    return { ok: true };
+  }
+  // openPath returns "" on success, or the OS's reason for refusing
+  const problem = await shell.openPath(target);
+  if (problem) throw appError("VALIDATION", problem);
+  return { ok: true };
+}
 
 /** The OS printer list, for the Ajustes dropdown. */
 export async function listPrinters(): Promise<PrinterInfo[]> {

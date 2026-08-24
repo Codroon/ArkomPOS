@@ -65,6 +65,10 @@ import {
   PrintTicketResponseSchema,
   PrintTestRequestSchema,
   PrintTestResponseSchema,
+  PrintRevealRequestSchema,
+  PrintRevealResponseSchema,
+  PrintTicketsDirRequestSchema,
+  PrintTicketsDirResponseSchema,
 } from "@arkom/core";
 import type { ArkomDb } from "@arkom/db";
 import { tillContext } from "./context";
@@ -73,7 +77,7 @@ import { resolveScanCode } from "./repos/scan";
 import { addStock, listInventory, listMovements } from "./repos/inventory";
 import { createSupplier, listSuppliers } from "./repos/suppliers";
 import { getSettings, saveSettings } from "./repos/settings";
-import { listPrinters, printTest, printTicket } from "./print";
+import { listPrinters, printTest, printTicket, revealTicket, ticketsDir } from "./print";
 import {
   addLine,
   complete,
@@ -244,5 +248,13 @@ export function registerIpcHandlers(db: ArkomDb): void {
 
   registerAsync("print:test", PrintTestRequestSchema, PrintTestResponseSchema, ({ target }) => {
     return printTest(db, tillContext(db).ctx, target);
+  });
+
+  registerAsync("print:reveal", PrintRevealRequestSchema, PrintRevealResponseSchema, ({ path, mode }) => {
+    return revealTicket(path, mode);
+  });
+
+  register("print:ticketsDir", PrintTicketsDirRequestSchema, PrintTicketsDirResponseSchema, () => {
+    return { path: ticketsDir() };
   });
 }

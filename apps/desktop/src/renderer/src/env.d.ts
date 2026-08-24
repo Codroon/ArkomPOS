@@ -68,6 +68,11 @@ declare global {
       invoke(channel: "print:printers", payload?: undefined): Promise<PrinterInfo[]>;
       invoke(channel: "print:ticket", payload: PrintTicketInput): Promise<PrintTicketResponse>;
       invoke(channel: "print:test", payload?: { target?: "auto" | "pdf" }): Promise<PrintTicketResponse>;
+      invoke(
+        channel: "print:reveal",
+        payload: { path: string; mode: "open" | "folder" },
+      ): Promise<{ ok: boolean }>;
+      invoke(channel: "print:ticketsDir", payload?: undefined): Promise<{ path: string }>;
     };
   }
 }

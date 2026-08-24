@@ -15,6 +15,7 @@ import {
   SettingsSchema,
   PrintPrintersResponseSchema,
   PrintTicketResponseSchema,
+  PrintTicketsDirResponseSchema,
   type PrinterInfo,
   type Settings,
 } from "@arkom/core";
@@ -30,6 +31,7 @@ import {
   useT,
 } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
+import { fileNameOf } from "../../lib/use-ticket-print";
 
 /** Shown beneath any field the seed left as a placeholder. */
 const PENDING = "PENDIENTE";
@@ -39,6 +41,7 @@ export function SettingsScreen() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [printers, setPrinters] = useState<PrinterInfo[]>([]);
   const [testing, setTesting] = useState(false);
+  const [ticketsPath, setTicketsPath] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; tone: "neutral" | "danger" } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -57,6 +60,10 @@ export function SettingsScreen() {
       .invoke("print:printers")
       .then((raw) => setPrinters(PrintPrintersResponseSchema.parse(raw)))
       .catch((err) => console.error("print:printers failed", err));
+    window.arkom
+      .invoke("print:ticketsDir")
+      .then((raw) => setTicketsPath(PrintTicketsDirResponseSchema.parse(raw).path))
+      .catch((err) => console.error("print:ticketsDir failed", err));
     return () => {
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
@@ -81,7 +88,7 @@ export function SettingsScreen() {
       setTesting(true);
       try {
         const res = PrintTicketResponseSchema.parse(await window.arkom.invoke("print:test", { target }));
-        say(res.kind === "pdf" ? t("print.pdfSaved", { path: res.path }) : t("print.printed"));
+        say(res.kind === "pdf" ? t("print.pdfSaved", { file: fileNameOf(res.path) }) : t("print.printed"));
       } catch (err) {
         say(errorMessage(t, err), "danger");
       } finally {
@@ -90,6 +97,14 @@ export function SettingsScreen() {
     },
     [say, t],
   );
+
+  /** Hand the tickets folder to the OS file manager. */
+  const openTicketsFolder = useCallback(() => {
+    if (!ticketsPath) return;
+    void window.arkom
+      .invoke("print:reveal", { path: ticketsPath, mode: "folder" })
+      .catch((err) => say(errorMessage(t, err), "danger"));
+  }, [ticketsPath, say, t]);
 
   if (!settings) return <div className="p-4 text-[12px] text-muted">…</div>;
 
@@ -157,7 +172,22 @@ export function SettingsScreen() {
                 {t("set.testSavePdf")}
               </GhostButton>
             </div>
-            <div className="text-[11px] leading-snug text-subtle">{t("set.ticketsFolder")}</div>
+            {/* the folder sits inside a hidden AppData tree, so the path is shown
+                for reference and the button is how anyone actually gets there */}
+            <div className="flex flex-col gap-1.5 border-t border-line pt-3">
+              <div className="text-[10px] font-bold uppercase tracking-[.1em] text-muted">
+                {t("set.ticketsFolder")}
+              </div>
+              <div className="break-all font-mono text-[10px] leading-snug text-subtle">
+                {ticketsPath ?? t("common.dash")}
+              </div>
+              <div>
+                <GhostButton disabled={!ticketsPath} onClick={openTicketsFolder}>
+                  {t("set.openTicketsFolder")}
+                </GhostButton>
+              </div>
+              <div className="text-[11px] leading-snug text-subtle">{t("set.ticketsFolderHint")}</div>
+            </div>
           </section>
 
           {/* ---------------- shop ---------------- */}

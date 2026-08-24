@@ -8,8 +8,9 @@
  */
 import { useEffect, useState } from "react";
 import type { TicketPeek } from "@arkom/core";
-import { GhostButton, MoneyText, SectionLabel, Toast, useT, type TKey } from "@arkom/ui";
+import { GhostButton, MoneyText, SectionLabel, useT, type TKey } from "@arkom/ui";
 import { useTicketPrint } from "../lib/use-ticket-print";
+import { PrintToast } from "../lib/print-toast";
 
 const METHOD_KEYS: Record<string, TKey> = {
   cash: "pay.cash",
@@ -124,38 +125,7 @@ export function TicketPeekModal({ docId, onClose }: { docId: string; onClose: ()
         </div>
       </div>
 
-      <Toast
-        message={printer.state.message}
-        tone={printer.state.tone}
-        actions={
-          printer.state.failedDocId ? (
-            <>
-              <button
-                type="button"
-                onClick={printer.retry}
-                className="rounded-[2px] border border-danger-ink/40 px-1.5 py-0.5 text-[11px] font-bold hover:bg-danger-ink/10"
-              >
-                {t("print.retry")}
-              </button>
-              <button
-                type="button"
-                onClick={printer.savePdfForFailed}
-                className="rounded-[2px] border border-danger-ink/40 px-1.5 py-0.5 text-[11px] font-bold hover:bg-danger-ink/10"
-              >
-                {t("print.savePdf")}
-              </button>
-              <button
-                type="button"
-                onClick={printer.dismiss}
-                aria-label={t("peek.close")}
-                className="px-1 text-[12px] font-bold opacity-60 hover:opacity-100"
-              >
-                ✕
-              </button>
-            </>
-          ) : null
-        }
-      />
+      <PrintToast printer={printer} />
     </div>
   );
 }
