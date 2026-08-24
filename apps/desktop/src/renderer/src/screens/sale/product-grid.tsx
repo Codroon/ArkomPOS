@@ -7,13 +7,24 @@ import { type EntityRef, type ProductRow } from "@arkom/core";
 import { Chip, cn, GhostButton, MoneyText, SectionLabel, useDataLabel, useT } from "@arkom/ui";
 import { navigateTo } from "../../lib/screen-bus";
 
-function Card({ product, onAdd }: { product: ProductRow; onAdd: (p: ProductRow) => void }) {
+function Card({
+  product,
+  shake,
+  onAdd,
+}: {
+  product: ProductRow;
+  shake: boolean;
+  onAdd: (p: ProductRow) => void;
+}) {
   const t = useT();
   return (
     <button
       type="button"
       onClick={() => onAdd(product)}
-      className="flex flex-col gap-1 rounded-[3px] border border-border bg-card p-2 text-left hover:border-border-input-required"
+      className={cn(
+        "flex flex-col gap-1 rounded-[3px] border border-border bg-card p-2 text-left hover:border-border-input-required",
+        shake && "arkom-shake border-border-input-required",
+      )}
     >
       <div className="line-clamp-2 min-h-[28px] text-[11px] leading-snug text-ink">
         {product.name}
@@ -30,12 +41,15 @@ export function ProductGrid({
   groups,
   activeGroup,
   search,
+  shakeProductId,
   onAdd,
 }: {
   products: ProductRow[];
   groups: EntityRef[];
   activeGroup: string; // "" = all
   search: string;
+  /** the card that just refused to be added (out of stock) — shakes once */
+  shakeProductId: string | null;
   onAdd: (p: ProductRow) => void;
 }) {
   const t = useT();
@@ -79,7 +93,7 @@ export function ProductGrid({
           </SectionLabel>
           <div className="grid grid-cols-4 gap-2">
             {items.map((p) => (
-              <Card key={p.id} product={p} onAdd={onAdd} />
+              <Card key={p.id} product={p} shake={p.id === shakeProductId} onAdd={onAdd} />
             ))}
           </div>
         </div>
@@ -87,7 +101,7 @@ export function ProductGrid({
       {ungrouped.length > 0 ? (
         <div className={cn("grid grid-cols-4 gap-2", sections.length > 0 && "mt-2")}>
           {ungrouped.map((p) => (
-            <Card key={p.id} product={p} onAdd={onAdd} />
+            <Card key={p.id} product={p} shake={p.id === shakeProductId} onAdd={onAdd} />
           ))}
         </div>
       ) : null}

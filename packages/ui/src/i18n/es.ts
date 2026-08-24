@@ -218,6 +218,8 @@ export const es = {
   "sale.lineCountOne": "1 línea",
   "sale.lineCountMany": "{n} líneas",
   "sale.emptyTicket": "Escanea o toca un producto para empezar.",
+  "sale.outOfStock": "Agotado · {name}",
+  "sale.onlyNLeft": "Solo quedan {n} · {name}",
   "sale.pvpOriginal": "PVP original {price} · motivo: {reason}",
   "chip.modificado": "MODIFICADO",
   "sale.modifyPrice": "Modificar precio",

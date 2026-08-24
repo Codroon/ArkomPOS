@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { AppError } from "../errors";
+import { applyMovements, buildMovement, stockKey } from "../ledger";
 import {
   allocateNumber,
+  availableForSale,
   computeDocumentTotals,
   computeLine,
   roundHalfUpDiv,
@@ -70,6 +72,58 @@ describe("computeDocumentTotals — exact Σ of line totals", () => {
 
   it("is empty-safe", () => {
     expect(computeDocumentTotals([])).toEqual({ subtotalCents: 0, taxCents: 0, totalCents: 0 });
+  });
+});
+
+describe("availableForSale — fail-fast stock check for the cashier", () => {
+  const draft = (...lines: { productId: string | null; qty: number }[]) => ({ lines });
+
+  it("is the whole shelf when the ticket is empty", () => {
+    expect(availableForSale("p1", 7, null)).toBe(7);
+    expect(availableForSale("p1", 7, draft())).toBe(7);
+  });
+
+  it("is zero when there is no stock", () => {
+    expect(availableForSale("p1", 0, null)).toBe(0);
+    expect(availableForSale("p1", 0, draft({ productId: "p1", qty: 1 }))).toBe(0);
+  });
+
+  it("counts what the ticket already claims: 2 on hand + 2 on the ticket refuses a third", () => {
+    expect(availableForSale("p1", 2, draft({ productId: "p1", qty: 1 }))).toBe(1);
+    expect(availableForSale("p1", 2, draft({ productId: "p1", qty: 2 }))).toBe(0);
+  });
+
+  it("sums several lines of the same product", () => {
+    expect(availableForSale("p1", 10, draft({ productId: "p1", qty: 3 }, { productId: "p1", qty: 4 }))).toBe(3);
+  });
+
+  it("ignores other products and unit-less lines", () => {
+    expect(
+      availableForSale("p1", 5, draft({ productId: "p2", qty: 4 }, { productId: null, qty: 2 }, { productId: "p1", qty: 1 })),
+    ).toBe(4);
+  });
+
+  it("never goes negative even if the ticket somehow over-claims", () => {
+    expect(availableForSale("p1", 1, draft({ productId: "p1", qty: 5 }))).toBe(0);
+  });
+
+  it("does NOT count parked tickets — that race is caught at completion instead", () => {
+    // the cashier's own ticket is all availableForSale can see…
+    const mine = draft({ productId: "p1", qty: 2 });
+    expect(availableForSale("p1", 2, mine)).toBe(0);
+    // …a *parked* ticket holding 2 more is invisible here, so this still reads "2 free"
+    expect(availableForSale("p1", 2, null)).toBe(2);
+    // and the ledger guard is what actually refuses the oversell at completion
+    const key = stockKey("p1", "l1");
+    expect(() =>
+      applyMovements(
+        { [key]: 2 },
+        [
+          buildMovement({ productId: "p1", locationId: "l1", movementType: "sale_out", qty: -2 }),
+          buildMovement({ productId: "p1", locationId: "l1", movementType: "sale_out", qty: -2 }),
+        ],
+      ),
+    ).toThrowError(AppError);
   });
 });
 

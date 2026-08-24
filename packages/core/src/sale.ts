@@ -56,6 +56,37 @@ export function computeDocumentTotals(lines: ReadonlyArray<LineMoney>): {
   return { subtotalCents, taxCents, totalCents };
 }
 
+/* ---------------------------- availability ---------------------------- */
+
+/** The shape availableForSale needs from a draft — any SaleState satisfies it. */
+export interface DraftLikeLine {
+  productId: string | null;
+  qty: number;
+}
+
+/**
+ * How many MORE of a quantity-tracked product may go on THIS ticket:
+ * what the shelf holds minus what this ticket already claims.
+ *
+ * `onHand` is passed in because a draft carries no stock figures. Parked
+ * tickets are deliberately NOT counted — only serialized units reserve stock,
+ * so a parked quantity line is still on the shelf until it is charged. That
+ * race (two tills, or a parked ticket resumed later) is caught where it must
+ * be: the NEGATIVE_STOCK guard inside the completing transaction. This is a
+ * fail-fast layer for the cashier, never the authority.
+ */
+export function availableForSale(
+  productId: string,
+  onHand: number,
+  draft: { lines: ReadonlyArray<DraftLikeLine> } | null | undefined,
+): number {
+  const onTicket = (draft?.lines ?? []).reduce(
+    (claimed, line) => (line.productId === productId ? claimed + line.qty : claimed),
+    0,
+  );
+  return Math.max(0, onHand - onTicket);
+}
+
 /* ------------------------------- tenders ------------------------------- */
 
 export type TenderMethod = "cash" | "card" | "bizum" | "transfer";

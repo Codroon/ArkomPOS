@@ -7,6 +7,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  availableForSale,
   type CompletedSale,
   type EntityRef,
   type ProductRow,
@@ -38,6 +39,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
   const [searchText, setSearchText] = useState("");
   const [noMatch, setNoMatch] = useState<string | null>(null);
   const [shake, setShake] = useState(false);
+  const [shakeProductId, setShakeProductId] = useState<string | null>(null);
   const [flashLineId, setFlashLineId] = useState<string | null>(null);
   const [unitPick, setUnitPick] = useState<UnitPickState | null>(null);
   const [overrideLine, setOverrideLine] = useState<SaleLineRow | null>(null);
@@ -100,14 +102,38 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
     [applyState],
   );
 
+  const productsRef = useRef<ProductRow[]>([]);
+  productsRef.current = products;
+
+  /** Refuse an oversell before it is typed (req 2.x fail-fast); serialized
+   *  products are already gated by unit availability in the picker. */
+  const refuse = useCallback(
+    (product: ProductRow, message: string) => {
+      showToast(message);
+      setShakeProductId(product.id);
+      setTimeout(() => setShakeProductId(null), 400);
+      setShake(true);
+      setTimeout(() => setShake(false), 350);
+    },
+    [showToast],
+  );
+
   const addByProduct = useCallback(
     (productId: string) => {
+      const row = productsRef.current.find((p) => p.id === productId);
+      if (row && row.itemType !== "serialized") {
+        const available = availableForSale(productId, row.onHand, saleRef.current);
+        if (available <= 0) {
+          refuse(row, t(row.onHand <= 0 ? "sale.outOfStock" : "sale.onlyNLeft", { n: row.onHand, name: row.name }));
+          return;
+        }
+      }
       window.arkom
         .invoke("sale:addLine", { docId: saleRef.current?.docId ?? null, productId })
         .then(handleAddResponse) // a serialized product answers with its unit list
         .catch((err) => showToast(errorMessage(t, err)));
     },
-    [handleAddResponse, showToast, t],
+    [handleAddResponse, showToast, refuse, t],
   );
 
   const addByUnit = useCallback(
@@ -173,12 +199,27 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
   const onSetQty = useCallback(
     (line: SaleLineRow, qty: number) => {
       if (!sale || qty < 1) return;
+      // cap at what the shelf can still give this line (other lines of the same
+      // product already claim their share)
+      const row = line.productId ? products.find((p) => p.id === line.productId) : undefined;
+      let next = qty;
+      if (row && line.productId) {
+        const claimedElsewhere = sale.lines
+          .filter((l) => l.id !== line.id && l.productId === line.productId)
+          .reduce((n, l) => n + l.qty, 0);
+        const maxForLine = Math.max(0, row.onHand - claimedElsewhere);
+        if (qty > maxForLine) {
+          showToast(t("sale.onlyNLeft", { n: maxForLine, name: row.name }));
+          next = maxForLine;
+          if (next === line.qty || next < 1) return; // nothing left to give
+        }
+      }
       window.arkom
-        .invoke("sale:setQty", { docId: sale.docId, lineId: line.id, qty })
+        .invoke("sale:setQty", { docId: sale.docId, lineId: line.id, qty: next })
         .then((s) => applyState(s))
         .catch((err) => showToast(errorMessage(t, err)));
     },
-    [sale, applyState, showToast, t],
+    [sale, products, applyState, showToast, t],
   );
 
   const onRemove = useCallback(
@@ -372,7 +413,14 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
             ))}
           </div>
 
-          <ProductGrid products={products} groups={groups} activeGroup={activeGroup} search={searchText} onAdd={onAddProduct} />
+          <ProductGrid
+            products={products}
+            groups={groups}
+            activeGroup={activeGroup}
+            search={searchText}
+            shakeProductId={shakeProductId}
+            onAdd={onAddProduct}
+          />
         </div>
 
         {/* right: ticket + payment (400px fixed) */}

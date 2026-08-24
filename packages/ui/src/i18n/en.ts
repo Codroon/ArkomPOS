@@ -216,6 +216,8 @@ export const en: Record<TKey, string> = {
   "sale.lineCountOne": "1 line",
   "sale.lineCountMany": "{n} lines",
   "sale.emptyTicket": "Scan or tap a product to start.",
+  "sale.outOfStock": "Out of stock · {name}",
+  "sale.onlyNLeft": "Only {n} left · {name}",
   "sale.pvpOriginal": "Original price {price} · reason: {reason}",
   "chip.modificado": "MODIFIED",
   "sale.modifyPrice": "Modify price",
