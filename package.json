@@ -17,6 +17,7 @@
     "db:seed": "pnpm --filter @arkom/desktop db:seed",
     "db:stats": "pnpm --filter @arkom/desktop db:stats",
     "db:audit": "pnpm --filter @arkom/desktop db:audit",
+    "imei:gen": "pnpm --filter @arkom/desktop imei:gen",
     "build:win": "pnpm --filter @arkom/desktop build:win"
   }
 }

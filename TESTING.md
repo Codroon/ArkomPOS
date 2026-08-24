@@ -24,7 +24,18 @@ The app opens in Spanish; the **ES · EN** chip in the top bar switches the inte
 > Everything else is counted by model — and one barcode may point to several models,
 > which is exactly why the app sometimes asks you "which item is it?".
 
+> **Why an invented IMEI is rejected:** a real IMEI's last digit is a checksum of the
+> other 14, so a made-up number is wrong 9 times out of 10. Use a real phone's IMEI, one
+> from the box below, or run `pnpm imei:gen 10` for fresh valid ones.
+
 Anywhere you type a code, press **Enter** to submit it (that is what a scanner does).
+
+**Spare valid test IMEIs** (none of these are in the database yet):
+
+```
+353474021190657   353474051376481   353474027065457   353474097128706   353474031298037
+353474052979234   353474032184889   353474029141223   353474014039127   353474012595260
+```
 
 ---
 
@@ -45,20 +56,23 @@ Anywhere you type a code, press **Enter** to submit it (that is what a scanner d
 
 ## 2. Receive 10 units of it
 
-1. Go to **Inventario**. The **Entrada de stock** panel at the bottom is always
-   visible — notice Cantidad and Coste are greyed out until you pick an item.
-2. In the panel's search box type `8412345009990` and press **Enter**.
+1. Go to **Inventario** and click **+ Entrada de stock** in the top right (or just
+   press **F6**). A panel slides in from the right — that's where all receiving happens.
+   Notice Cantidad and Coste are greyed out until you pick an item.
+2. The cursor is already in the search box. Type `8412345009990` and press **Enter**.
 
-✅ The item resolves and its name appears with a "Cambiar artículo" link;
-   Cantidad and Coste become editable.
+✅ The item appears as a card showing its code and current stock, with a
+   "Cambiar artículo" link; Cantidad and Coste become editable.
 
 3. **Cantidad:** `10` · **Coste por unidad:** `8,00`
-4. Click **Añadir a la lista** → the line appears on the right.
+4. Click **Añadir a la lista** → the line drops into the list below and the cursor
+   jumps back to the search box, ready for the next box.
 5. Choose a **Proveedor** (e.g. *Distribuidora Madrid Móvil*).
-6. Click **Confirmar entrada · 80,00 €**.
+6. Check the **Total** at the bottom reads **80,00 €**, then click **Confirmar entrada**.
 
-✅ Toast "Entrada registrada · 1 línea", the row flashes, and *Cargador rápido 65W*
-   now shows **10** in the table.
+✅ Toast "Entrada registrada · 1 línea", the row flashes, *Cargador rápido 65W*
+   now shows **10** in the table, and the panel empties but stays open for the next
+   delivery. Press **Esc** to close it.
 
 7. Click that row to open **Movimientos** on the right.
 
@@ -71,7 +85,7 @@ Anywhere you type a code, press **Enter** to submit it (that is what a scanner d
 
 This is the case that used to fail: you scan the box, nothing matches, dead end.
 
-1. In the **Entrada de stock** search box type `8412345007774` and press **Enter**.
+1. Open the receiving panel again (**F6**) and type `8412345007774` → **Enter**.
 
 ✅ A window appears: *"Código no encontrado — Ningún artículo responde a 8412345007774"*,
    offering **Crear artículo nuevo** and **Asignar a un artículo existente**.
@@ -83,7 +97,7 @@ This is the case that used to fail: you scan the box, nothing matches, dead end.
    added to it as an additional code. You never left the panel.
 
 4. **Cantidad:** `4` · **Coste por unidad:** `8,00` → **Añadir a la lista** →
-   Proveedor → **Confirmar entrada**.
+   Proveedor → **Confirmar entrada** (Total 32,00 €).
 
 ✅ *Cargador rápido 65W* now shows **14**.
 
@@ -97,7 +111,7 @@ This is the case that used to fail: you scan the box, nothing matches, dead end.
 The seed already contains **Apple iPhone 17 Pro Max 256GB Negro** — barcode
 `0194253172567` — with **5 units** in stock. We'll receive 3 more.
 
-1. In the **Entrada de stock** box type the **barcode** `0194253172567` → Enter.
+1. In the receiving panel (**F6**) type the **barcode** `0194253172567` → Enter.
 
 ✅ It resolves with a **SERIE** badge — a phone model.
 
@@ -124,7 +138,8 @@ The seed already contains **Apple iPhone 17 Pro Max 256GB Negro** — barcode
    ✅ Each becomes a chip and the counter walks 1 → 2 → 3. **Añadir a la lista** only
       becomes clickable once all three are in.
 
-5. **Añadir a la lista** → Proveedor → **Confirmar entrada · 3.597,00 €**.
+5. **Añadir a la lista** → Proveedor → check the **Total** reads **3.597,00 €** →
+   **Confirmar entrada**.
 
 ✅ The iPhone 17 row goes from **5** to **8**. Open its Movimientos: three separate
    **ENTRADA +1** lines, one per phone, each showing its IMEI.
@@ -163,7 +178,7 @@ The seed has both, each with its own barcode:
 
 ### (b) Receive 5 of the 15 Pro Max using the shared code
 
-1. **Inventario** → in the entry box type `8412345008887` → Enter.
+1. **Inventario** → **F6** → type `8412345008887` → Enter.
 
    ✅ The picker opens: *"¿Qué artículo es?"* listing **both** protectors with their
       current stock (12 and 9).
@@ -246,7 +261,86 @@ pnpm db:audit --verify
 
 ---
 
-## 7. Final check
+## 7. The three things fixed after your first run-through
+
+### (a) Receiving is its own panel now
+
+1. From **Inventario**, press **F6** (or the **+ Entrada de stock** button).
+2. Type `8412345001635` (Protector iPhone 16 Pro Max) → Enter → **Cantidad** `4` →
+   **Coste por unidad** `5,50` → **Añadir a la lista**.
+
+   ✅ The cursor returns to the search box on its own.
+
+3. Type `8437123000174` (Auriculares TWS) → Enter → **Cantidad** `2` →
+   **Coste por unidad** `8,50` → **Añadir a la lista**.
+
+   ✅ Two lines in the list, **Total 39,00 €**.
+
+4. Pick a **Proveedor** → **Confirmar entrada**.
+
+   ✅ Toast, both rows update, and the panel stays open and empty — ready for the next
+      box without reopening anything. Press **Esc** to leave.
+
+### (b) A bad IMEI now tells you why
+
+1. **F6** → type `0194253172567` (iPhone 17 Pro Max) → Enter → **Cantidad** `3` →
+   **Coste por unidad** `1199,00`.
+2. Type this deliberately corrupted IMEI (its last digit is wrong) → Enter:
+
+   ```
+   353474021190650
+   ```
+
+   ✅ *"IMEI no válido — el dígito de control no coincide. Vuelve a escanear la etiqueta."*
+      The bad number stays selected, so the next scan simply replaces it.
+
+3. Now type these three good ones, Enter after each:
+
+   ```
+   353474021190657
+   353474051376481
+   353474027065457
+   ```
+
+   ✅ Counter walks to **3 de 3**; **Añadir a la lista** unlocks.
+
+4. **Añadir a la lista** → Proveedor → **Confirmar entrada**.
+
+   ✅ The iPhone 17 count goes up by 3.
+
+### (c) The till stops you selling what you haven't got
+
+We'll empty one item completely. *Base carga inalámbrica 15W* (barcode
+`8437123000167`) starts with **6**.
+
+1. Go to **Venta** and type `8437123000167` → Enter, **six times**.
+
+   ✅ The ticket line reads **6**.
+
+2. Type it a **seventh** time.
+
+   ✅ Nothing is added: *"Solo quedan 6 · Base carga inalámbrica 15W"* and the card shakes.
+
+3. Click the **+** on that ticket line.
+
+   ✅ Same message; the quantity stays at 6.
+
+4. Pay it: **Efectivo** → **Cobrar (F4)** → **Nueva venta**.
+5. Now scan `8437123000167` once more.
+
+   ✅ *"Agotado · Base carga inalámbrica 15W"* — the ticket stays empty.
+
+### (d) Check the books
+
+```bash
+pnpm db:audit --verify
+```
+
+✅ All checks OK.
+
+---
+
+## 8. Final check
 
 ```bash
 pnpm db:audit --verify

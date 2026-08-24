@@ -41,7 +41,9 @@ export function validateImeiBatch(args: { expectedQty: number; imeis: ReadonlyAr
   }
   const seen = new Set<string>();
   for (const imei of imeis) {
-    if (!isValidImei(imei)) throw appError("VALIDATION", "IMEI no válido (15 dígitos).", "imei");
+    if (!isValidImei(imei)) {
+      throw appError("VALIDATION", "IMEI no válido — el dígito de control no coincide.", "imei");
+    }
     if (seen.has(imei)) throw appError("DUPLICATE_IMEI", "Ese IMEI está repetido en la entrada.", "imei");
     seen.add(imei);
   }

@@ -13,6 +13,7 @@
     "db:seed": "node scripts/run-db-task.cjs seed",
     "db:stats": "node scripts/run-db-task.cjs stats",
     "db:audit": "node scripts/run-db-task.cjs audit",
+    "imei:gen": "node scripts/imei-gen.cjs",
     "typecheck": "tsc --noEmit",
     "postinstall": "electron-builder install-app-deps"
   },

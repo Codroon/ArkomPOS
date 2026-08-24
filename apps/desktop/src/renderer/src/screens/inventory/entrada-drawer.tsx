@@ -204,7 +204,7 @@ export function EntradaDrawer({
     const cost = parseMoneyInput(costInput);
     if (cost === null) errors.cost = costInput.trim() === "" ? "val.costRequired" : "val.invalidAmount";
     if (qty < 1) errors.qty = "val.qtyMin1";
-    if (serialized && imeis.length !== qty) errors.imei = "val.imeiInvalid";
+    if (serialized && imeis.length !== qty) errors.imei = "val.imeiCountMismatch";
     setLineErrors(errors);
     if (Object.keys(errors).length > 0 || cost === null) return;
 
