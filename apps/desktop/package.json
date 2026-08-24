@@ -33,6 +33,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.11",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.0.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",

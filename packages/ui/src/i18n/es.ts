@@ -384,6 +384,25 @@ export const es = {
   "demo.confirmBody": "Se borran {products} artículos de ejemplo con su stock y su historial. No se puede deshacer.",
   "demo.confirm": "Borrar",
   "demo.removed": "Datos de demostración borrados: {products} artículos.",
+
+  /* backups */
+  "bk.section": "Copia de seguridad",
+  "bk.intro": "La copia se hace sola cada noche y al cerrar el programa. Se guardan las {keep} últimas.",
+  "bk.last": "Última copia",
+  "bk.never": "Todavía ninguna.",
+  "bk.count": "{n} copias guardadas.",
+  "bk.now": "Copiar ahora",
+  "bk.running": "Copiando…",
+  "bk.openFolder": "Abrir carpeta de copias",
+  "bk.done": "Copia hecha y verificada ({size}).",
+  "bk.secondary": "Segunda copia (USB o carpeta sincronizada)",
+  "bk.secondaryNone": "Sin segunda copia. Si el disco de la tienda falla, solo quedan las copias de este mismo equipo.",
+  "bk.secondarySet": "Cada copia se duplica aquí.",
+  "bk.choose": "Elegir carpeta…",
+  "bk.clear": "Quitar",
+  "bk.restoreTitle": "¿Restaurar una copia?",
+  "bk.restoreBody": "No se hace desde aquí, a propósito: sobrescribir la base de datos con un clic es la forma de perder la caja del día. El procedimiento está en DEPLOYMENT.md — cerrar el programa, sustituir el archivo, abrirlo otra vez.",
+  "bk.dbPath": "Base de datos",
 } as const;
 
 export type TKey = keyof typeof es;

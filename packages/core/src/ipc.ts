@@ -43,6 +43,10 @@ export const IPC_CHANNELS = [
   "setup:complete",
   "demo:status",
   "demo:remove",
+  "backup:status",
+  "backup:now",
+  "backup:openFolder",
+  "backup:pickFolder",
 ] as const;
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
@@ -488,6 +492,11 @@ export const SettingsSchema = z.object({
   shopNif: z.string().max(40),
   shopAddress: z.string().max(300),
   ticketFooter: z.string().max(200),
+  /** a USB stick or synced folder; "" = local backups only */
+  backupSecondaryPath: z.string().max(500),
+  /** status, written by the backup runner rather than edited in Ajustes */
+  backupLastAtMs: z.number().int(),
+  backupLastStatus: z.string().max(300),
 });
 export type Settings = z.infer<typeof SettingsSchema>;
 
@@ -615,3 +624,36 @@ export const DemoRemoveResponseSchema = z.object({
   codes: z.number().int(),
 });
 export type DemoRemoveResponse = z.infer<typeof DemoRemoveResponseSchema>;
+
+/* ------------------------------------------------------------- backups --- */
+
+export const BackupStatusRequestSchema = z.object({}).optional();
+export const BackupStatusResponseSchema = z.object({
+  dir: z.string(),
+  databasePath: z.string(),
+  lastAtMs: z.number().int(),
+  lastStatus: z.string(),
+  count: z.number().int(),
+  secondaryPath: z.string(),
+  keep: z.number().int(),
+});
+export type BackupStatus = z.infer<typeof BackupStatusResponseSchema>;
+
+export const BackupRunRequestSchema = z.object({}).optional();
+export const BackupRunResponseSchema = z.object({
+  path: z.string(),
+  atMs: z.number().int(),
+  sizeBytes: z.number().int(),
+  oplogRows: z.number().int(),
+  pruned: z.number().int(),
+  secondaryPath: z.string().nullable(),
+  secondaryError: z.string().nullable(),
+});
+export type BackupRunResponse = z.infer<typeof BackupRunResponseSchema>;
+
+export const BackupOpenFolderRequestSchema = z.object({}).optional();
+export const BackupOpenFolderResponseSchema = z.object({ ok: z.boolean() });
+
+/** Native folder picker for the second destination — typing a path invites typos. */
+export const BackupPickFolderRequestSchema = z.object({}).optional();
+export const BackupPickFolderResponseSchema = z.object({ path: z.string().nullable() });

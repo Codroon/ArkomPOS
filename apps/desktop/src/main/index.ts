@@ -2,6 +2,14 @@ import { app, BrowserWindow } from "electron";
 import { join } from "node:path";
 import { initDb } from "./db";
 import { registerIpcHandlers } from "./ipc";
+import { runBackup, startNightlyBackups, stopNightlyBackups } from "./backup";
+import { tillContext } from "./context";
+
+/** How long the app will wait for the closing backup before letting go. */
+const CLOSE_BACKUP_TIMEOUT_MS = 10_000;
+
+/** before-quit fires again after app.quit(); this stops the second pass. */
+let quitting = false;
 
 // dev-only: ARKOM_DEBUG_PORT opens Chrome DevTools Protocol for scripted
 // driving/screenshots of the running app (never set in packaged builds)
@@ -65,6 +73,34 @@ if (!app.requestSingleInstanceLock()) {
     const db = initDb();
     registerIpcHandlers(db);
     createWindow();
+
+    // the till may not be configured yet, so the context is read per run rather
+    // than captured here — first run creates the tenant this depends on
+    startNightlyBackups(db, () => tillContext(db).ctx);
+
+    /**
+     * Back up on the way out. The nightly run covers a till left switched on;
+     * this covers the far more common shop that turns the machine off at close.
+     * Between them, both habits are protected.
+     *
+     * before-quit is synchronous, so the quit is held while the backup runs and
+     * released either way — a failed backup must never trap the app open. The
+     * timeout is the same promise: a stuck copy loses the backup, not the exit.
+     */
+    app.on("before-quit", (event) => {
+      if (quitting) return;
+      event.preventDefault();
+      quitting = true;
+      stopNightlyBackups();
+
+      const guard = new Promise((resolve) => setTimeout(resolve, CLOSE_BACKUP_TIMEOUT_MS));
+      Promise.race([
+        runBackup(db, tillContext(db).ctx, "close").catch((err) =>
+          console.error("[backup] on close failed:", err),
+        ),
+        guard,
+      ]).finally(() => app.quit());
+    });
 
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();

@@ -28,13 +28,18 @@ export const DEFAULT_SETTINGS: Settings = {
   shopNif: "PENDIENTE — NIF",
   shopAddress: "PENDIENTE — Dirección fiscal",
   ticketFooter: "Precios claros. Sin letra pequeña.",
+  backupSecondaryPath: "", // local backups only until someone points it at a stick
+  backupLastAtMs: 0,
+  backupLastStatus: "",
 };
 
 type SettingKey = keyof Settings;
 
 /** Values live as strings; these two put the non-string fields back together. */
 function decode(key: SettingKey, raw: string): Settings[SettingKey] {
-  return key === "paperWidthMm" ? (Number(raw) === 58 ? 58 : 80) : raw;
+  if (key === "paperWidthMm") return Number(raw) === 58 ? 58 : 80;
+  if (key === "backupLastAtMs") return Number(raw) || 0;
+  return raw;
 }
 function encode(value: Settings[SettingKey]): string {
   return String(value);

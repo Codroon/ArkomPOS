@@ -36,6 +36,7 @@ import {
 } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
 import { fileNameOf } from "../../lib/use-ticket-print";
+import { BackupPanel } from "./backup-panel";
 
 /** Shown beneath any field the seed left as a placeholder. */
 const PENDING = "PENDIENTE";
@@ -246,6 +247,8 @@ export function SettingsScreen() {
               hint={t("set.footerHint")}
             />
           </section>
+
+          <BackupPanel say={say} />
 
           {/* ---------------- demo data ---------------- */}
           {demo?.present ? (

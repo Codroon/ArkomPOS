@@ -382,6 +382,25 @@ export const en: Record<TKey, string> = {
   "demo.confirmBody": "This deletes {products} sample items with their stock and history. It cannot be undone.",
   "demo.confirm": "Remove",
   "demo.removed": "Demo data removed: {products} items.",
+
+  /* backups */
+  "bk.section": "Backup",
+  "bk.intro": "Backups run on their own every night and when the app closes. The last {keep} are kept.",
+  "bk.last": "Last backup",
+  "bk.never": "None yet.",
+  "bk.count": "{n} backups kept.",
+  "bk.now": "Back up now",
+  "bk.running": "Backing up…",
+  "bk.openFolder": "Open backup folder",
+  "bk.done": "Backed up and verified ({size}).",
+  "bk.secondary": "Second copy (USB or synced folder)",
+  "bk.secondaryNone": "No second copy. If this machine's disk fails, only backups on the same machine remain.",
+  "bk.secondarySet": "Every backup is duplicated here.",
+  "bk.choose": "Choose folder…",
+  "bk.clear": "Remove",
+  "bk.restoreTitle": "Restore a backup?",
+  "bk.restoreBody": "Deliberately not done from here: overwriting the database with one click is how a day's takings get lost. The procedure is in DEPLOYMENT.md — close the app, replace the file, start it again.",
+  "bk.dbPath": "Database",
 };
 
 /**

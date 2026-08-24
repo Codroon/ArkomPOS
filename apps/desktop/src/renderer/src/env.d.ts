@@ -30,6 +30,8 @@ import type {
   SetupCompleteRequest,
   DemoStatus,
   DemoRemoveResponse,
+  BackupStatus,
+  BackupRunResponse,
 } from "@arkom/core";
 
 declare global {
@@ -83,6 +85,10 @@ declare global {
       ): Promise<{ tenantId: string; demoProducts: number; demoUnits: number }>;
       invoke(channel: "demo:status", payload?: undefined): Promise<DemoStatus>;
       invoke(channel: "demo:remove", payload?: undefined): Promise<DemoRemoveResponse>;
+      invoke(channel: "backup:status", payload?: undefined): Promise<BackupStatus>;
+      invoke(channel: "backup:now", payload?: undefined): Promise<BackupRunResponse>;
+      invoke(channel: "backup:openFolder", payload?: undefined): Promise<{ ok: boolean }>;
+      invoke(channel: "backup:pickFolder", payload?: undefined): Promise<{ path: string | null }>;
     };
   }
 }

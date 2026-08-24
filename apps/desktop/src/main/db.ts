@@ -8,6 +8,7 @@ import { app } from "electron";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { openDb, runMigrations, type ArkomDb } from "@arkom/db";
+import type BetterSqlite3 from "better-sqlite3";
 
 // out/main → apps/desktop → apps → repo root
 const REPO_ROOT = join(__dirname, "../../../..");
@@ -22,10 +23,23 @@ function resolveMigrationsDir(): string {
   return join(REPO_ROOT, "packages/db/drizzle");
 }
 
+/**
+ * The raw better-sqlite3 handle, kept because SQLite's ONLINE BACKUP API lives
+ * on it. Backing up a live database by copying the file is a way to produce a
+ * corrupt copy — WAL means the bytes on disk are not the database.
+ */
+let sqliteHandle: BetterSqlite3.Database | null = null;
+
+export function rawSqlite(): BetterSqlite3.Database {
+  if (!sqliteHandle) throw new Error("initDb() has not run yet");
+  return sqliteHandle;
+}
+
 export function initDb(): ArkomDb {
   const dbPath = resolveDbPath();
   mkdirSync(dirname(dbPath), { recursive: true });
-  const { db } = openDb(dbPath);
+  const { sqlite, db } = openDb(dbPath);
+  sqliteHandle = sqlite;
   runMigrations(db, resolveMigrationsDir());
   return db;
 }

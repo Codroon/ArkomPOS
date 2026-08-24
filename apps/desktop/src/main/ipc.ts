@@ -4,7 +4,8 @@
  * cross the bridge as typed envelopes (the renderer maps codes, never strings).
  * Handlers do no business math — that lives in core; writes go through mutate().
  */
-import { ipcMain } from "electron";
+import { BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { mkdir } from "node:fs/promises";
 import { z, ZodError } from "zod";
 import {
   AppError,
@@ -77,10 +78,19 @@ import {
   DemoStatusResponseSchema,
   DemoRemoveRequestSchema,
   DemoRemoveResponseSchema,
+  BackupStatusRequestSchema,
+  BackupStatusResponseSchema,
+  BackupRunRequestSchema,
+  BackupRunResponseSchema,
+  BackupOpenFolderRequestSchema,
+  BackupOpenFolderResponseSchema,
+  BackupPickFolderRequestSchema,
+  BackupPickFolderResponseSchema,
 } from "@arkom/core";
 import type { ArkomDb } from "@arkom/db";
 import { resetTillContext, tillContext } from "./context";
 import { completeFirstRun, demoStatus, isSetupNeeded, removeDemoData } from "./setup";
+import { backupStatus, backupsDir, runBackup } from "./backup";
 import { addCode, getProduct, listCodes, listGroups, listProducts, removeCode, saveProduct } from "./repos/catalog";
 import { resolveScanCode } from "./repos/scan";
 import { addStock, listInventory, listMovements } from "./repos/inventory";
@@ -285,5 +295,31 @@ export function registerIpcHandlers(db: ArkomDb): void {
 
   register("demo:remove", DemoRemoveRequestSchema, DemoRemoveResponseSchema, () => {
     return removeDemoData(db, tillContext(db).ctx);
+  });
+
+  /* -------------------------------- backups -------------------------------- */
+
+  registerAsync("backup:status", BackupStatusRequestSchema, BackupStatusResponseSchema, () => {
+    return backupStatus(db, tillContext(db).ctx);
+  });
+
+  registerAsync("backup:now", BackupRunRequestSchema, BackupRunResponseSchema, () => {
+    return runBackup(db, tillContext(db).ctx, "manual");
+  });
+
+  registerAsync("backup:openFolder", BackupOpenFolderRequestSchema, BackupOpenFolderResponseSchema, async () => {
+    const dir = backupsDir();
+    await mkdir(dir, { recursive: true }); // created lazily by the first backup
+    const problem = await shell.openPath(dir);
+    if (problem) throw appError("VALIDATION", problem);
+    return { ok: true };
+  });
+
+  registerAsync("backup:pickFolder", BackupPickFolderRequestSchema, BackupPickFolderResponseSchema, async () => {
+    const win = BrowserWindow.getAllWindows()[0];
+    const result = win
+      ? await dialog.showOpenDialog(win, { properties: ["openDirectory", "createDirectory"] })
+      : await dialog.showOpenDialog({ properties: ["openDirectory", "createDirectory"] });
+    return { path: result.canceled ? null : (result.filePaths[0] ?? null) };
   });
 }

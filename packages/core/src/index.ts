@@ -165,6 +165,14 @@ export {
   DemoStatusResponseSchema,
   DemoRemoveRequestSchema,
   DemoRemoveResponseSchema,
+  BackupStatusRequestSchema,
+  BackupStatusResponseSchema,
+  BackupRunRequestSchema,
+  BackupRunResponseSchema,
+  BackupOpenFolderRequestSchema,
+  BackupOpenFolderResponseSchema,
+  BackupPickFolderRequestSchema,
+  BackupPickFolderResponseSchema,
 } from "./ipc";
 export type {
   IpcChannel,
@@ -204,6 +212,8 @@ export type {
   SetupCompleteRequest,
   DemoStatus,
   DemoRemoveResponse,
+  BackupStatus,
+  BackupRunResponse,
   PrintTicketInput,
   PrintTestRequest,
 } from "./ipc";
