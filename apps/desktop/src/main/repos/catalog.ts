@@ -77,7 +77,18 @@ export function listProducts(db: ArkomDb, ctx: MutationCtx, filters: CatalogList
   const f = filters ?? {};
   const search = f.search?.trim().replace(/[%_]/g, "");
   if (search && search.length >= 2) {
-    conds.push(or(like(products.name, `%${search}%`), like(products.barcode, `%${search}%`))!);
+    // name, primary barcode OR any additional code — otherwise a box code the
+    // shop attached would find nothing here while working everywhere else
+    conds.push(
+      or(
+        like(products.name, `%${search}%`),
+        like(products.barcode, `%${search}%`),
+        sql`exists (select 1 from product_codes pc
+              where pc.product_id = ${products}.id
+                and pc.tenant_id = ${ctx.tenantId}
+                and pc.code like ${`%${search}%`})`,
+      )!,
+    );
   }
   if (f.groupId) conds.push(eq(products.groupId, f.groupId));
   if (f.itemType) conds.push(eq(products.itemType, f.itemType));
@@ -169,7 +180,16 @@ export function saveProduct(db: ArkomDb, ctx: MutationCtx, input: CatalogSaveReq
   // req 4.4 (amended): a barcode already in use WARNS; the client confirms.
   // Checked outside the transaction — a warning must not open (or abort) one.
   const typedBarcode = normalizeScanCode(input.barcode ?? "");
-  if (typedBarcode !== "" && !input.confirmed) {
+  const priorBarcode = input.id
+    ? (db
+        .select({ barcode: products.barcode })
+        .from(products)
+        .where(and(eq(products.tenantId, ctx.tenantId), eq(products.id, input.id)))
+        .all()[0]?.barcode ?? null)
+    : null;
+  // only warn about a barcode the user actually typed/changed — once two
+  // products legitimately share a code, editing anything else must not re-nag
+  if (typedBarcode !== "" && typedBarcode !== priorBarcode && !input.confirmed) {
     const conflicts = productsHoldingCode(db, ctx, typedBarcode, input.id ?? undefined);
     if (conflicts.length > 0) return { kind: "barcodeWarning", code: typedBarcode, conflicts };
   }

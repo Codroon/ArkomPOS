@@ -61,13 +61,16 @@ export function PaymentPanel({
 
   return (
     <div className={cn("border-t border-border-strong bg-panel px-3 py-2.5", charging && "pointer-events-none opacity-70")}>
+      {/* tiles stay inert on an empty ticket: a 0,00 tender would be invalid and
+          would silently keep Cobrar disabled with nothing on screen to explain it */}
       <div className="grid grid-cols-4 gap-1.5">
         {METHODS.map((method) => (
           <button
             key={method}
             type="button"
+            disabled={total <= 0}
             onClick={() => onChange([...entries, newTenderEntry(method, remaining)])}
-            className="rounded-[3px] border border-border-input bg-card px-1 py-2 text-[11px] font-bold text-ink-2 hover:border-ink-3 hover:text-ink"
+            className="rounded-[3px] border border-border-input bg-card px-1 py-2 text-[11px] font-bold text-ink-2 hover:border-ink-3 hover:text-ink disabled:border-border disabled:text-faint disabled:hover:border-border"
           >
             {t(METHOD_KEYS[method])}
           </button>

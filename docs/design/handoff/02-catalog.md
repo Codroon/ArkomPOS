@@ -19,7 +19,8 @@ Columns: Código (mono, faint) · Nombre · Grupo · Tipo (Chip) · Coste (right
 ## Editor panel (create/edit — `catalog:save`)
 Fields, top→down (Field component; required inputs use `border-input`-strong #71717a):
 1. Nombre* (text, unique per tenant → DUPLICATE_NAME inline)
-2. Código de barras (mono; SCAN works here; "Generar" ghost button if empty ⇒ core auto-EAN; unique → DUPLICATE_BARCODE)
+2. Código de barras (el de la caja) (mono; SCAN works here; helper "Escanea aquí el código real del producto"; while empty, a small text button "Generar código interno (solo si no tiene código)" ⇒ core auto-EAN, and an empty save still auto-generates; **no longer unique** — a code already in use warns and names the holders, then proceeds on confirmation, PRD 4.4 amended)
+2b. Códigos adicionales (scan/type ⇒ chip; ✕ asks to confirm; same shared-code warning on attach; disabled until the item has been saved once, since codes attach immediately)
 3. Grupo* (select from productGroups)
 4. Coste* · PVP* · IVA* (three-up grid; IVA select: 21% only enabled in P1, others visible-disabled "próximamente")
 5. Margen calculado (live, muted: "36,60 € · 24,6%" from PVP−Coste; pure display)

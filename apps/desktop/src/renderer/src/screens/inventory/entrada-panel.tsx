@@ -139,14 +139,20 @@ export function EntradaPanel({
     active: row.active,
   });
 
+  /** Reject and SELECT the text: the next scan replaces it instead of appending. */
+  const rejectImei = (key: TKey) => {
+    setLineErrors({ imei: key });
+    setTimeout(() => imeiRef.current?.select(), 0);
+  };
+
   const captureImei = async () => {
     const imei = imeiInput.trim();
     if (!isValidImei(imei)) {
-      setLineErrors({ imei: "val.imeiInvalid" });
+      rejectImei("val.imeiInvalid");
       return;
     }
     if (imeis.includes(imei) || staged.some((l) => l.imeis.includes(imei))) {
-      setLineErrors({ imei: "val.imeiDupStaged" });
+      rejectImei("val.imeiDupStaged");
       return;
     }
     // already in the database? the resolver knows — catch it here rather than
@@ -154,7 +160,7 @@ export function EntradaPanel({
     try {
       const known = await window.arkom.invoke("scan:resolve", { code: imei });
       if (known.kind === "unit" || (known.kind === "none" && known.unavailableUnit)) {
-        setLineErrors({ imei: "val.imeiRegistered" });
+        rejectImei("val.imeiRegistered");
         return;
       }
     } catch (err) {
@@ -218,7 +224,9 @@ export function EntradaPanel({
   const totalCents = staged.reduce((a, l) => a + l.qty * l.unitCostCents, 0);
   const canStage =
     product !== null && qty >= 1 && parseMoneyInput(costInput) !== null && (!serialized || imeis.length === qty);
-  const canConfirm = staged.length > 0 && supplierId !== "" && !submitting;
+  // `product === null` means no line is half-built: confirming with one in
+  // progress would silently throw away what the user just typed
+  const canConfirm = staged.length > 0 && supplierId !== "" && !submitting && product === null;
 
   const confirm = () => {
     if (!canConfirm) return;

@@ -83,8 +83,10 @@ export function useScanFlow(handlers: ScanFlowHandlers): { resolve: (code: strin
           }}
           onAttached={(product, code) => {
             setUnknown(null);
+            // resume FIRST: selecting the product resets the screen's notice,
+            // so the confirmation has to be the last thing written
+            ref.current.onProduct(product, code);
             ref.current.onAttached?.(product, code);
-            ref.current.onProduct(product, code); // resume the interrupted flow
           }}
           onClose={() => setUnknown(null)}
         />

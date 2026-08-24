@@ -1,8 +1,9 @@
 /**
  * Scan resolution repository — gathers every row a code could mean (product
  * primary barcodes ∪ additional product codes ∪ in-stock unit IMEIs) and lets
- * core decide. Used by the sale screen, stock entry and catalog search so all
- * three answer a scan identically.
+ * core decide. Used by the sale screen and stock entry, so both answer a scan
+ * identically; catalog search reaches the same codes through `catalog:list`,
+ * which matches name ∪ barcode ∪ product_codes.
  */
 import { and, eq, sql } from "drizzle-orm";
 import {

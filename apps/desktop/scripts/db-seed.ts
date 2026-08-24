@@ -1,7 +1,7 @@
 /**
  * Seed data (dev + demo) — docs/design/system-design.md §8.
  * Tenant "Arkom Demo", location "Tienda", terminal "Till 1" + ticket series "T1-";
- * 5 groups, ~25 products (3 serialized phone models with example IMEI units),
+ * 5 groups, ~29 products (4 serialized phone models with example IMEI units),
  * 2 suppliers, opening purchase_in movements so inventory is non-empty.
  *
  * Lives in apps/desktop (not packages/db): it needs @arkom/core for UUIDv7 and
@@ -43,7 +43,7 @@ const GROUPS = ["Móviles", "Protectores", "Cargadores y Cables", "Auriculares",
 
 const SUPPLIERS = ["Distribuidora Madrid Móvil", "TecnoImport Levante"] as const;
 
-// ~25 products across the groups (3 serialized phone models incl. example units w/ IMEIs).
+// ~29 products across the groups (4 serialized phone models incl. example units w/ IMEIs).
 // Two rows are deliberately incomplete so the catalog's missing-data flags (req 3.3)
 // have something to show: one without barcode, one without cost/tax.
 const PRODUCTS: ProductSpec[] = [

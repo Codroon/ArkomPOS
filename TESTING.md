@@ -57,7 +57,7 @@ Anywhere you type a code, press **Enter** to submit it (that is what a scanner d
 5. Choose a **Proveedor** (e.g. *Distribuidora Madrid Móvil*).
 6. Click **Confirmar entrada · 80,00 €**.
 
-✅ Toast "Entrada registrada · 1 líneas", the row flashes, and *Cargador rápido 65W*
+✅ Toast "Entrada registrada · 1 línea", the row flashes, and *Cargador rápido 65W*
    now shows **10** in the table.
 
 7. Click that row to open **Movimientos** on the right.
@@ -183,8 +183,9 @@ The seed has both, each with its own barcode:
 ✅ In the Inventario table: **Protector iPhone 15 Pro Max = 17** (12 + 5) and
    **Protector iPhone 16 Pro Max = 12** (9 + 3).
 
-✅ Open each row's **Movimientos**: the 15 shows only its **+5**, the 16 only its **+3**.
-   Neither shows the other's entry.
+✅ Open each row's **Movimientos**: the newest line on the 15 is its **+5** and on the 16
+   its **+3** (below them you'll also see the opening stock each one started with — 12 and
+   9). Neither shows the other's entry.
 
 ### (e) Sell one, using the shared code
 
@@ -218,7 +219,8 @@ pnpm db:audit --verify
 
    ✅ A list of the individual phones in stock opens, each with its IMEI.
 
-2. Pick any one → it is added to the ticket at 1.499,00 €.
+2. Click `353474060000122` in that list (any one works, but leave `353474060000205`
+   alone — the next half needs it) → it is added to the ticket at 1.499,00 €.
 3. **Efectivo** → **Cobrar (F4)** → the sale completes with the next ticket number.
 
 **By IMEI** (the phone is in your hand):

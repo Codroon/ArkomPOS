@@ -251,7 +251,8 @@ export function CatalogEditor({
           </button>
         ) : null}
 
-        <ExtraCodesField productId={draft.id} productName={draft.name} />
+        {/* keyed: switching products must reset the field's own state */}
+        <ExtraCodesField key={draft.id ?? "new"} productId={draft.id} productName={draft.name} />
 
         <Field label={t("editor.group")} required error={err("groupId")}>
           <SelectInput requiredStyle value={draft.groupId} onChange={(e) => onPatch({ groupId: e.target.value })}>
