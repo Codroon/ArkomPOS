@@ -59,6 +59,12 @@ import {
   SettingsGetResponseSchema,
   SettingsSaveRequestSchema,
   SettingsSaveResponseSchema,
+  PrintPrintersRequestSchema,
+  PrintPrintersResponseSchema,
+  PrintTicketRequestSchema,
+  PrintTicketResponseSchema,
+  PrintTestRequestSchema,
+  PrintTestResponseSchema,
 } from "@arkom/core";
 import type { ArkomDb } from "@arkom/db";
 import { tillContext } from "./context";
@@ -67,6 +73,7 @@ import { resolveScanCode } from "./repos/scan";
 import { addStock, listInventory, listMovements } from "./repos/inventory";
 import { createSupplier, listSuppliers } from "./repos/suppliers";
 import { getSettings, saveSettings } from "./repos/settings";
+import { listPrinters, printTest, printTicket } from "./print";
 import {
   addLine,
   complete,
@@ -100,6 +107,22 @@ function register<Req, Res>(
   ipcMain.handle(channel, (_event, payload: unknown) => {
     try {
       return resSchema.parse(handler(reqSchema.parse(payload)));
+    } catch (err) {
+      throw asBridgeError(err);
+    }
+  });
+}
+
+/** Same contract as register(), for handlers that must await real I/O. */
+function registerAsync<Req, Res>(
+  channel: string,
+  reqSchema: z.ZodType<Req>,
+  resSchema: z.ZodType<Res>,
+  handler: (req: Req) => Promise<Res>,
+): void {
+  ipcMain.handle(channel, async (_event, payload: unknown) => {
+    try {
+      return resSchema.parse(await handler(reqSchema.parse(payload)));
     } catch (err) {
       throw asBridgeError(err);
     }
@@ -209,5 +232,17 @@ export function registerIpcHandlers(db: ArkomDb): void {
 
   register("settings:save", SettingsSaveRequestSchema, SettingsSaveResponseSchema, (patch) => {
     return saveSettings(db, tillContext(db).ctx, patch);
+  });
+
+  registerAsync("print:printers", PrintPrintersRequestSchema, PrintPrintersResponseSchema, () => {
+    return listPrinters();
+  });
+
+  registerAsync("print:ticket", PrintTicketRequestSchema, PrintTicketResponseSchema, (req) => {
+    return printTicket(db, tillContext(db).ctx, req);
+  });
+
+  registerAsync("print:test", PrintTestRequestSchema, PrintTestResponseSchema, ({ target }) => {
+    return printTest(db, tillContext(db).ctx, target);
   });
 }

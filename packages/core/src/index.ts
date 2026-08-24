@@ -151,6 +151,8 @@ export {
   PrintPrintersResponseSchema,
   PrintTicketRequestSchema,
   PrintTicketResponseSchema,
+  PrintTestRequestSchema,
+  PrintTestResponseSchema,
 } from "./ipc";
 export type {
   IpcChannel,
@@ -187,4 +189,5 @@ export type {
   PrinterInfo,
   PrintTicketRequest,
   PrintTicketResponse,
+  PrintTestRequest,
 } from "./ipc";

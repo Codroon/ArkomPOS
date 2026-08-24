@@ -14,6 +14,11 @@ extraResources:
   # the window asks for this by path at runtime
   - from: build/icon.ico
     to: icon.ico
+  # the PDF ticket inlines these as data: URIs (no CDN — the till is offline)
+  - from: ../../packages/ui/src/fonts
+    to: fonts
+    filter:
+      - "*.woff2"
 win:
   target: nsis
   icon: build/icon.ico

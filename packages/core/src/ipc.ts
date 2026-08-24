@@ -36,6 +36,7 @@ export const IPC_CHANNELS = [
   "settings:save",
   "print:printers",
   "print:ticket",
+  "print:test",
 ] as const;
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
@@ -491,10 +492,14 @@ export const SettingsSaveRequestSchema = SettingsSchema.partial();
 export const SettingsSaveResponseSchema = SettingsSchema;
 
 export const PrintPrintersRequestSchema = z.object({}).optional();
+/**
+ * What the OS knows about a printer. No "is default" flag: Electron 37 dropped
+ * it from PrinterInfo and the replacement is platform-specific, so the dropdown
+ * lists what exists and the owner picks rather than us guessing wrong.
+ */
 export const PrinterInfoSchema = z.object({
   name: z.string(),
   displayName: z.string(),
-  isDefault: z.boolean(),
 });
 export const PrintPrintersResponseSchema = z.array(PrinterInfoSchema);
 export type PrinterInfo = z.infer<typeof PrinterInfoSchema>;
@@ -518,3 +523,14 @@ export const PrintTicketResponseSchema = z.discriminatedUnion("kind", [
 ]);
 export type PrintTicketRequest = z.infer<typeof PrintTicketRequestSchema>;
 export type PrintTicketResponse = z.infer<typeof PrintTicketResponseSchema>;
+
+/**
+ * "Imprimir prueba" in Ajustes. Renders a fixed sample ticket so the owner can
+ * check paper, cut and the shop's legal block without ringing up a real sale —
+ * and so nothing lands in the document table just to test a printer.
+ */
+export const PrintTestRequestSchema = z
+  .object({ target: z.enum(["auto", "pdf"]).default("auto") })
+  .default({ target: "auto" });
+export const PrintTestResponseSchema = PrintTicketResponseSchema;
+export type PrintTestRequest = z.infer<typeof PrintTestRequestSchema>;
