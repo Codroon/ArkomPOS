@@ -41,6 +41,29 @@ export {
   allocateNumber,
 } from "./sale";
 export type { LineMoney, TenderMethod, TenderDraft, TenderSummary, SeriesState, DraftLikeLine } from "./sale";
+export {
+  renderTicket,
+  ticketToText,
+  wrapText,
+  COLUMNS_BY_PAPER,
+  TICKET_ES,
+  TICKET_ES_METHODS,
+} from "./ticket";
+export type {
+  TicketOp,
+  TicketTextOp,
+  TicketRuleOp,
+  TicketFeedOp,
+  TicketCutOp,
+  TicketDrawerOp,
+  TicketAlign,
+  TicketSize,
+  TicketDoc,
+  TicketLine,
+  TicketTender,
+  ShopProfile,
+  PaperWidthMm,
+} from "./ticket";
 export { AppError, appError, toBridgeError, parseIpcError } from "./errors";
 export {
   TAX_RATE_BP,

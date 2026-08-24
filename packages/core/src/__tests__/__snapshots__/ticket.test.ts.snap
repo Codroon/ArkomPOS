@@ -1,0 +1,78 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`renderTicket > lays out a mixed sale on 80mm paper 1`] = `
+"                A R K O M
+   E L E C T R O N I C S · P H O N E S
+
+          Arkom Electrónica S.L.
+              NIF B00000000
+      Calle Ejemplo 1, 28001 Madrid
+------------------------------------------
+T1-000042                 24/08/2026 09:31
+Terminal: Till 1
+------------------------------------------
+Samsung Galaxy A16 128GB Negro
+IMEI 356938104420030
+1 x 189,00 €                      189,00 €
+Cargador 20W USB-C
+2 x 14,90 €                        29,80 €
+Funda libro Galaxy A16
+1 x 10,00 €                        10,00 €
+                                MODIFICADO
+------------------------------------------
+Base imponible                    180,82 €
+IVA 21%                            37,98 €
+T O T A L                 2 1 8 , 8 0   €
+                              IVA INCLUIDO
+------------------------------------------
+Efectivo                          200,00 €
+Tarjeta                            50,00 €
+  AUT-9931
+Cambio                             31,20 €
+------------------------------------------
+    Precios claros. Sin letra pequeña.
+          Gracias por su visita
+
+
+------------------------------------------ ✂
+[cajón]"
+`;
+
+exports[`renderTicket > lays out the same sale on 58mm paper 1`] = `
+"          A R K O M
+      ELECTRONICS · PHONES
+
+     Arkom Electrónica S.L.
+         NIF B00000000
+ Calle Ejemplo 1, 28001 Madrid
+--------------------------------
+T1-000042       24/08/2026 09:31
+Terminal: Till 1
+--------------------------------
+Samsung Galaxy A16 128GB Negro
+IMEI 356938104420030
+1 x 189,00 €            189,00 €
+Cargador 20W USB-C
+2 x 14,90 €              29,80 €
+Funda libro Galaxy A16
+1 x 10,00 €              10,00 €
+                      MODIFICADO
+--------------------------------
+Base imponible          180,82 €
+IVA 21%                  37,98 €
+T O T A L       2 1 8 , 8 0   €
+                    IVA INCLUIDO
+--------------------------------
+Efectivo                200,00 €
+Tarjeta                  50,00 €
+  AUT-9931
+Cambio                   31,20 €
+--------------------------------
+   Precios claros. Sin letra
+            pequeña.
+     Gracias por su visita
+
+
+-------------------------------- ✂
+[cajón]"
+`;
