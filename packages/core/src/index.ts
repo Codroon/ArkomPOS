@@ -12,7 +12,17 @@ export {
   marginPct,
 } from "./money";
 export { ean13CheckDigit, isValidEan13, ean13WithCheckDigit, generateInternalEan13 } from "./barcode";
-export { imeiCheckDigit, imeiWithCheckDigit, isValidImei } from "./imei";
+export { imeiCheckDigit, imeiWithCheckDigit, isValidImei, validateImeiBatch } from "./imei";
+export { resolveScan, normalizeScanCode } from "./scan";
+export type {
+  ScanProduct,
+  ScanUnit,
+  ScanProductVia,
+  ScanProductCandidate,
+  ScanUnitCandidate,
+  ScanMatch,
+  ScanResolution,
+} from "./scan";
 export {
   P1_MOVEMENT_TYPES,
   buildMovement,

@@ -78,9 +78,28 @@ export const products = sqliteTable("products", {
   createdAt: ts("created_at").notNull(),
   updatedAt: ts("updated_at").notNull(),
 }, (t) => [
-  uniqueIndex("ux_product_tenant_name").on(t.tenantId, t.name),   // req 4.4
-  uniqueIndex("ux_product_tenant_barcode").on(t.tenantId, t.barcode), // req 4.4 (NULLs allowed, distinct)
+  uniqueIndex("ux_product_tenant_name").on(t.tenantId, t.name),   // req 4.4 (name stays unique)
+  // NOT unique: a real box EAN can legitimately sit on several variants, and the
+  // shop resolves the ambiguity at scan time (PRD 4.4 amended — warn & confirm).
+  index("ix_product_tenant_barcode").on(t.tenantId, t.barcode),
   index("ix_product_group").on(t.groupId),
+]);
+
+/**
+ * Additional scannable codes per product. `products.barcode` remains the primary
+ * code (the one printed on the label we generate); these are extra codes the same
+ * item answers to — the manufacturer EAN, a wholesaler's code, an old SKU.
+ */
+export const productCodes = sqliteTable("product_codes", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  productId: text("product_id").notNull().references(() => products.id),
+  code: text("code").notNull(),
+  createdAt: ts("created_at").notNull(),
+}, (t) => [
+  // the same product may not hold one code twice; different products may share it
+  uniqueIndex("ux_product_code_product_code").on(t.tenantId, t.productId, t.code),
+  index("ix_product_code_tenant_code").on(t.tenantId, t.code),
 ]);
 
 /* serialized stock: one row per physical phone (ADR-0004) */
