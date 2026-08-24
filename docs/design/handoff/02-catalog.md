@@ -12,6 +12,8 @@ Columns: Código (mono, faint) · Nombre · Grupo · Tipo (Chip) · Coste (right
 - Missing-data rows: `bg #f6f6f7` + per-cell "—" with warning chip `FALTA` on the missing field(s); row always clickable to fix (req 3.3).
 - Stock cell is read-only display from `product_stock` (editing lives in Inventario).
 - Row click → load into editor; selected row `bg #eceef0`.
+**Product identity (added 2026-08-24).** The barcode field is labelled *"Código de barras (el de la caja)"* with the helper *"Escanea aquí el código real del producto"* — capturing the manufacturer's code is the point, because that is what gets scanned later. Generating an internal code is the fallback: a small text button, shown only while the field is empty (auto-generation on an empty save is unchanged). Below it, **"Códigos adicionales"** holds every other code the item answers to, as removable chips (removal asks first). Attaching a code that other products already use — or saving a primary barcode that is already in use — shows *"Ese código ya está en otro artículo: X"* and proceeds only on confirmation (PRD 4.4 amended). Duplicate names are still blocked outright.
+
 - Sort by Nombre default; header click sorts (Nombre, PVP, Stock). **P1 deviation:** no virtualization — plain scroll. A one-shop catalog is ≤ a few hundred rows; windowing (a dep or hand-rolled scroller) buys nothing at that scale. Same call applies to Venta's product grid. Revisit if a real catalog import lands thousands of rows.
 
 ## Editor panel (create/edit — `catalog:save`)

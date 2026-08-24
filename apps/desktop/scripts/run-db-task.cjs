@@ -12,17 +12,18 @@ const path = require("node:path");
 const fs = require("node:fs");
 
 const task = process.argv[2];
-if (!["migrate", "seed", "stats"].includes(task)) {
-  console.error("Usage: node scripts/run-db-task.cjs <migrate|seed|stats>");
+const passThrough = process.argv.slice(3); // e.g. --verify
+if (!["migrate", "seed", "stats", "audit"].includes(task)) {
+  console.error("Usage: node scripts/run-db-task.cjs <migrate|seed|stats|audit> [flags]");
   process.exit(2);
 }
 
 const desktopDir = path.resolve(__dirname, "..");
 const repoRoot = path.resolve(desktopDir, "../..");
-const entry = path.join(desktopDir, "scripts/db-cli.ts");
+const entry = path.join(desktopDir, task === "audit" ? "scripts/db-audit.ts" : "scripts/db-cli.ts");
 // bundle lands under apps/desktop, whose deps include better-sqlite3, so the
 // runtime require resolves under either pnpm layout (isolated or hoisted)
-const outFile = path.join(desktopDir, "out/db-cli.cjs");
+const outFile = path.join(desktopDir, task === "audit" ? "out/db-audit.cjs" : "out/db-cli.cjs");
 
 // 1. bundle the TS entry (workspace TS + drizzle bundled; native module external)
 const esbuild = require("esbuild");
@@ -42,7 +43,7 @@ const electron = require("electron"); // resolves to the binary path under plain
 const dbPath = process.env.ARKOM_DB_PATH || path.join(repoRoot, ".data/arkom-pos.db");
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
-const result = spawnSync(electron, [outFile, task], {
+const result = spawnSync(electron, [outFile, task, ...passThrough], {
   stdio: "inherit",
   cwd: repoRoot,
   env: {

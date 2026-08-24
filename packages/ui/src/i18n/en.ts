@@ -192,6 +192,7 @@ export const en: Record<TKey, string> = {
   "val.qtyMin1": "Integer ≥ 1.",
   "val.imeiInvalid": "Invalid IMEI (15 digits).",
   "val.imeiDupStaged": "That IMEI is already in this entry.",
+  "val.imeiRegistered": "That IMEI is already registered in the system.",
   "val.supplierRequired": "Supplier is required.",
 
   /* mapped server errors (sale) */

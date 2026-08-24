@@ -51,6 +51,8 @@ const PRODUCTS: ProductSpec[] = [
   { name: "Samsung Galaxy A16 128GB Negro", group: "Móviles", itemType: "serialized", costCents: 13500, priceCents: 18900, reorderPoint: 2, lowStockThreshold: 1 },
   { name: "Xiaomi Redmi Note 13 256GB Azul", group: "Móviles", itemType: "serialized", costCents: 16500, priceCents: 22900, reorderPoint: 2, lowStockThreshold: 1 },
   { name: "Apple iPhone 13 128GB Medianoche", group: "Móviles", itemType: "serialized", costCents: 28900, priceCents: 38900, reorderPoint: 1, lowStockThreshold: 1 },
+  // the phone the manual walkthrough receives and sells: real-looking box EAN, 5 units in stock
+  { name: "Apple iPhone 17 Pro Max 256GB Negro", group: "Móviles", itemType: "serialized", costCents: 119900, priceCents: 149900, barcode: "0194253172567", reorderPoint: 2, lowStockThreshold: 1 },
   // Protectores
   { name: "Protector cristal templado iPhone 13", group: "Protectores", costCents: 180, priceCents: 990, openingQty: 24, reorderPoint: 6, lowStockThreshold: 3 },
   { name: "Protector cristal templado iPhone 15", group: "Protectores", costCents: 200, priceCents: 1090, openingQty: 18, reorderPoint: 6, lowStockThreshold: 3 },
@@ -59,6 +61,10 @@ const PRODUCTS: ProductSpec[] = [
   { name: "Funda transparente iPhone 13", group: "Protectores", costCents: 250, priceCents: 1290, openingQty: 12, reorderPoint: 4, lowStockThreshold: 2 },
   { name: "Funda silicona Galaxy A16", group: "Protectores", costCents: 280, priceCents: 1290, openingQty: 10, reorderPoint: 4, lowStockThreshold: 2 },
   { name: "Funda libro Galaxy A16", group: "Protectores", costCents: 320, priceCents: 1490, openingQty: 5, reorderPoint: 3, lowStockThreshold: 2, barcode: null },
+  // sibling accessories: each has its OWN box code, and the walkthrough gives them
+  // a shared one on purpose — this is the everyday case the picker exists for
+  { name: "Protector iPhone 15 Pro Max", group: "Protectores", costCents: 500, priceCents: 1490, barcode: "8412345001567", openingQty: 12, reorderPoint: 4, lowStockThreshold: 2 },
+  { name: "Protector iPhone 16 Pro Max", group: "Protectores", costCents: 550, priceCents: 1590, barcode: "8412345001635", openingQty: 9, reorderPoint: 4, lowStockThreshold: 2 },
   // Cargadores y Cables
   { name: "Cargador 20W USB-C", group: "Cargadores y Cables", costCents: 480, priceCents: 1490, openingQty: 16, reorderPoint: 5, lowStockThreshold: 3 },
   { name: "Cargador 30W USB-C GaN", group: "Cargadores y Cables", costCents: 750, priceCents: 1990, openingQty: 8, reorderPoint: 4, lowStockThreshold: 2 },
@@ -80,11 +86,19 @@ const PRODUCTS: ProductSpec[] = [
   { name: "Hub USB-C 4 puertos", group: "Memoria y Ordenador", costCents: null, priceCents: 2190, taxed: false, reorderPoint: 2, lowStockThreshold: 1 },
 ];
 
-// 2 example units per serialized model (name → 14-digit IMEI bases; Luhn digit appended)
-const UNIT_IMEI_BASES: Record<string, [string, string]> = {
+// example units per serialized model (name → 14-digit IMEI bases; Luhn digit appended)
+const UNIT_IMEI_BASES: Record<string, string[]> = {
   "Samsung Galaxy A16 128GB Negro": ["35693810442003", "35693810442011"],
   "Xiaomi Redmi Note 13 256GB Azul": ["86209104778120", "86209104778138"],
   "Apple iPhone 13 128GB Medianoche": ["35328711990245", "35328711990252"],
+  // 5 identical phones — same model, colour and storage, told apart only by IMEI
+  "Apple iPhone 17 Pro Max 256GB Negro": [
+    "35347406000012",
+    "35347406000020",
+    "35347406000038",
+    "35347406000046",
+    "35347406000053",
+  ],
 };
 
 /* ------------------------------- seeding ------------------------------- */
@@ -151,10 +165,12 @@ export function seed(db: ArkomDb): { seeded: boolean; message: string } {
     PRODUCTS.forEach((spec, idx) => {
       const productId = uuidv7();
       const taxed = spec.taxed !== false;
+      // explicit barcode = a real box code · null = deliberately missing (req 3.3)
+      // · undefined = internal code from our own series
       const barcode =
         spec.barcode === null
           ? null
-          : ean13WithCheckDigit(`8437123${String(++barcodeSerial).padStart(5, "0")}`);
+          : (spec.barcode ?? ean13WithCheckDigit(`8437123${String(++barcodeSerial).padStart(5, "0")}`));
       const product = {
         id: productId,
         tenantId,

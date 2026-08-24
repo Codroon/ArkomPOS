@@ -56,7 +56,7 @@ Each exists in schema/enums where cheap (ADR-0007/0009) but gets zero UI.
 - [ ] **4.1** Save blocked unless cost, PVP, IVA and group are set (Zod, field-level messages).
 - [ ] **4.2** Barcode field accepts scanner input; "Generar" creates a valid internal EAN-13 when empty.
 - [ ] **4.3** (P1 subset) Type selectable: Stock / Serializado; remaining types visible-disabled. Serializado→Stock and Stock→Serializado blocked once stock/units exist (typed error).
-- [ ] **4.4** Duplicate name or barcode within tenant rejected server-side with field-level error.
+- [ ] **4.4** (amended 2026-08-24, client-driven) Duplicate **name** within tenant rejected server-side with a field-level error. Duplicate **barcode** is no longer rejected: it warns, names the products that already answer to the code, and proceeds on confirmation. *Reason:* the original rule assumed one code per product, so products were created with generated internal barcodes and scanning the real box EAN found nothing — the feature looked missing. Real EANs legitimately sit on sibling variants (two protector models, one wholesaler code), so uniqueness was the wrong constraint. Items now also carry **additional codes** (`product_codes`), and any code that matches several items opens a picker.
 - [ ] **4.5** Reorder point and low-stock threshold editable, integers ≥0, drive Inventario flags.
 - [ ] Products with movements can't be deleted — only deactivated; inactive products can't be sold or receive stock but keep history.
 

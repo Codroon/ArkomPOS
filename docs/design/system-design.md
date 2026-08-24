@@ -92,8 +92,16 @@ batch; duplicates are no-ops. Down-sync deliberately out of v1 (ADR-0001).
 
 Tenant "Arkom Demo", location "Tienda", terminal "Till 1" + ticket series `T1-`;
 groups: Moviles, Protector, Cargador y Cable, Auriculares, Memoria y Ordenador;
-~25 products across groups (incl. 3 serialized phone models + example units w/ IMEIs),
+~29 products across groups (incl. 4 serialized phone models + example units w/ IMEIs),
 2 suppliers; opening `purchase_in` movements so inventory is non-empty on first run.
+
+Fixtures the manual walkthrough (`TESTING.md`) depends on — keep them in step with it:
+- **Apple iPhone 17 Pro Max 256GB Negro** — serialized, realistic box EAN `0194253172567`,
+  **5 in-stock units** of the identical model/colour/storage, told apart only by IMEI.
+- **Protector iPhone 15 Pro Max** / **Protector iPhone 16 Pro Max** — sibling accessories,
+  each with its own distinct box EAN and opening stock. They start with NO shared code:
+  the walkthrough attaches one deliberately to exercise the warning and the picker.
+Products may carry an explicit real barcode; the rest fall back to our internal series.
 
 ## 9. Revisit as it grows
 

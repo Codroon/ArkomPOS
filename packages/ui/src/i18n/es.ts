@@ -194,6 +194,7 @@ export const es = {
   "val.qtyMin1": "Entero ≥ 1.",
   "val.imeiInvalid": "IMEI no válido (15 dígitos).",
   "val.imeiDupStaged": "Ese IMEI ya está en la entrada.",
+  "val.imeiRegistered": "Ese IMEI ya está registrado en el sistema.",
   "val.supplierRequired": "El proveedor es obligatorio.",
 
   /* mapped server errors (sale) */

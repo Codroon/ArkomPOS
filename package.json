@@ -16,6 +16,7 @@
     "db:migrate": "pnpm --filter @arkom/desktop db:migrate",
     "db:seed": "pnpm --filter @arkom/desktop db:seed",
     "db:stats": "pnpm --filter @arkom/desktop db:stats",
+    "db:audit": "pnpm --filter @arkom/desktop db:audit",
     "build:win": "pnpm --filter @arkom/desktop build:win"
   }
 }

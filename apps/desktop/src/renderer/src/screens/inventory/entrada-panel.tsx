@@ -139,7 +139,7 @@ export function EntradaPanel({
     active: row.active,
   });
 
-  const captureImei = () => {
+  const captureImei = async () => {
     const imei = imeiInput.trim();
     if (!isValidImei(imei)) {
       setLineErrors({ imei: "val.imeiInvalid" });
@@ -148,6 +148,17 @@ export function EntradaPanel({
     if (imeis.includes(imei) || staged.some((l) => l.imeis.includes(imei))) {
       setLineErrors({ imei: "val.imeiDupStaged" });
       return;
+    }
+    // already in the database? the resolver knows — catch it here rather than
+    // letting the whole entry fail at Confirmar
+    try {
+      const known = await window.arkom.invoke("scan:resolve", { code: imei });
+      if (known.kind === "unit" || (known.kind === "none" && known.unavailableUnit)) {
+        setLineErrors({ imei: "val.imeiRegistered" });
+        return;
+      }
+    } catch (err) {
+      console.error("scan:resolve failed", err);
     }
     setLineErrors({});
     setImeis((prev) => [...prev, imei]);
@@ -352,7 +363,7 @@ export function EntradaPanel({
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    captureImei();
+                    void captureImei();
                   }
                 }}
                 placeholder={t("entry.imeiPlaceholder")}
