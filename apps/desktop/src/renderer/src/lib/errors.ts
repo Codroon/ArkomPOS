@@ -11,6 +11,8 @@ export function errorMessage(t: TFn, err: unknown): string {
   const ipc = parseIpcError(err);
   if (!ipc) return String((err as Error | undefined)?.message ?? err);
   switch (ipc.code) {
+    case "PRINT_FAILED":
+      return t("print.failed");
     case "NEGATIVE_STOCK":
       return t("err.negativeStock");
     case "UNIT_NOT_AVAILABLE":

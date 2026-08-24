@@ -152,7 +152,18 @@ export function PaymentPanel({
   );
 }
 
-export function CompletedPanel({ completed, onNew }: { completed: CompletedSale; onNew: () => void }) {
+export function CompletedPanel({
+  completed,
+  onNew,
+  onPrint,
+  printing,
+}: {
+  completed: CompletedSale;
+  onNew: () => void;
+  /** reprint — the automatic one already went out on completion, so this is a COPIA */
+  onPrint: () => void;
+  printing: boolean;
+}) {
   const t = useT();
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4">
@@ -166,9 +177,12 @@ export function CompletedPanel({ completed, onNew }: { completed: CompletedSale;
         </div>
       ) : null}
       <div className="mt-2 flex items-center gap-2">
-        <LockedButton>{t("done.print")}</LockedButton>
+        <GhostButton disabled={printing} onClick={onPrint}>
+          {printing ? t("print.printing") : t("print.reprint")}
+        </GhostButton>
         <PrimaryButton onClick={onNew}>{t("done.new")}</PrimaryButton>
       </div>
+      <div className="text-[10px] text-subtle">{t("print.copyNote")}</div>
       <div className="text-[10px] text-subtle">{t("done.autoHint")}</div>
     </div>
   );

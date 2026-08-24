@@ -189,5 +189,6 @@ export type {
   PrinterInfo,
   PrintTicketRequest,
   PrintTicketResponse,
+  PrintTicketInput,
   PrintTestRequest,
 } from "./ipc";

@@ -1,10 +1,15 @@
 /**
  * Read-only ticket peek (sale:peek) — opened from the movimientos drawer's
  * Documento links and reusable anywhere a docNumber is shown. Esc closes.
+ *
+ * Reprint lives here because this is where you land when looking for a sale
+ * that already happened: the customer is back at the counter without their
+ * ticket. Every reprint is stamped COPIA and does not open the drawer.
  */
 import { useEffect, useState } from "react";
 import type { TicketPeek } from "@arkom/core";
-import { GhostButton, MoneyText, SectionLabel, useT, type TKey } from "@arkom/ui";
+import { GhostButton, MoneyText, SectionLabel, Toast, useT, type TKey } from "@arkom/ui";
+import { useTicketPrint } from "../lib/use-ticket-print";
 
 const METHOD_KEYS: Record<string, TKey> = {
   cash: "pay.cash",
@@ -22,6 +27,7 @@ function formatDate(ms: number): string {
 export function TicketPeekModal({ docId, onClose }: { docId: string; onClose: () => void }) {
   const t = useT();
   const [peek, setPeek] = useState<TicketPeek | null>(null);
+  const printer = useTicketPrint();
 
   useEffect(() => {
     window.arkom
@@ -107,10 +113,49 @@ export function TicketPeekModal({ docId, onClose }: { docId: string; onClose: ()
           ) : null}
         </div>
 
-        <div className="flex justify-end border-t border-line bg-surface-2 px-4 py-2">
+        <div className="flex items-center justify-end gap-2 border-t border-line bg-surface-2 px-4 py-2">
+          {/* only a completed sale has a ticket to reprint */}
+          {peek?.status === "completed" ? (
+            <GhostButton disabled={printer.state.busy} onClick={() => printer.print(peek.docId, true)}>
+              {printer.state.busy ? t("print.printing") : t("print.reprint")}
+            </GhostButton>
+          ) : null}
           <GhostButton onClick={onClose}>{t("peek.close")}</GhostButton>
         </div>
       </div>
+
+      <Toast
+        message={printer.state.message}
+        tone={printer.state.tone}
+        actions={
+          printer.state.failedDocId ? (
+            <>
+              <button
+                type="button"
+                onClick={printer.retry}
+                className="rounded-[2px] border border-danger-ink/40 px-1.5 py-0.5 text-[11px] font-bold hover:bg-danger-ink/10"
+              >
+                {t("print.retry")}
+              </button>
+              <button
+                type="button"
+                onClick={printer.savePdfForFailed}
+                className="rounded-[2px] border border-danger-ink/40 px-1.5 py-0.5 text-[11px] font-bold hover:bg-danger-ink/10"
+              >
+                {t("print.savePdf")}
+              </button>
+              <button
+                type="button"
+                onClick={printer.dismiss}
+                aria-label={t("peek.close")}
+                className="px-1 text-[12px] font-bold opacity-60 hover:opacity-100"
+              >
+                ✕
+              </button>
+            </>
+          ) : null
+        }
+      />
     </div>
   );
 }

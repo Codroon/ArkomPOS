@@ -21,6 +21,7 @@ import { openCatalogWithBarcode } from "../../lib/screen-bus";
 import { useScanFlow } from "../../lib/use-scan-flow";
 import { ProductGrid } from "./product-grid";
 import { TicketPanel } from "./ticket-panel";
+import { useTicketPrint } from "../../lib/use-ticket-print";
 import { CompletedPanel, PaymentPanel, parseTenders, type TenderEntry } from "./payment-panel";
 import { OverrideModal, ParkModal, ParkedPopover, UnitPickModal, type UnitPickState } from "./sale-modals";
 
@@ -50,6 +51,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
   const [charging, setCharging] = useState(false);
   const [toast, setToast] = useState<{ text: string; tone: "neutral" | "danger" } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const printer = useTicketPrint();
 
   const showToast = useCallback((message: string, tone: "neutral" | "danger" = "danger") => {
     setToast({ text: message, tone });
@@ -335,6 +337,18 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
     return () => clearTimeout(timer);
   }, [completed, resetForNewSale]);
 
+  /* Auto-print, exactly once per completed sale (PRD 2.9). Guarded by docId
+     rather than a boolean: the completed panel re-renders, and a customer must
+     not collect two tickets because React ran an effect twice. A failure here
+     lands in the sticky toast below — never in the sale, which is already
+     closed and paid. */
+  const autoPrinted = useRef<string | null>(null);
+  useEffect(() => {
+    if (!completed || autoPrinted.current === completed.docId) return;
+    autoPrinted.current = completed.docId;
+    printer.print(completed.docId);
+  }, [completed, printer]);
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       {/* header strip */}
@@ -426,7 +440,12 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
         {/* right: ticket + payment (400px fixed) */}
         <aside className="flex w-[400px] flex-none flex-col border-l border-line-strong bg-surface">
           {completed ? (
-            <CompletedPanel completed={completed} onNew={resetForNewSale} />
+            <CompletedPanel
+              completed={completed}
+              onNew={resetForNewSale}
+              printing={printer.state.busy}
+              onPrint={() => printer.print(completed.docId, true)}
+            />
           ) : (
             <>
               <TicketPanel
@@ -459,6 +478,39 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
       {parkOpen ? <ParkModal onPark={onPark} onClose={() => setParkOpen(false)} /> : null}
       {scanModals}
       <Toast message={toast?.text ?? null} tone={toast?.tone ?? "neutral"} />
+      <Toast
+        message={printer.state.message}
+        tone={printer.state.tone}
+        className={toast ? "bottom-16" : undefined}
+        actions={
+          printer.state.failedDocId ? (
+            <>
+              <button
+                type="button"
+                onClick={printer.retry}
+                className="rounded-[2px] border border-danger-ink/40 px-1.5 py-0.5 text-[11px] font-bold hover:bg-danger-ink/10"
+              >
+                {t("print.retry")}
+              </button>
+              <button
+                type="button"
+                onClick={printer.savePdfForFailed}
+                className="rounded-[2px] border border-danger-ink/40 px-1.5 py-0.5 text-[11px] font-bold hover:bg-danger-ink/10"
+              >
+                {t("print.savePdf")}
+              </button>
+              <button
+                type="button"
+                onClick={printer.dismiss}
+                aria-label={t("peek.close")}
+                className="px-1 text-[12px] font-bold opacity-60 hover:opacity-100"
+              >
+                ✕
+              </button>
+            </>
+          ) : null
+        }
+      />
     </div>
   );
 }

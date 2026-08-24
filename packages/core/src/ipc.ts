@@ -522,6 +522,8 @@ export const PrintTicketResponseSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("pdf"), path: z.string() }),
 ]);
 export type PrintTicketRequest = z.infer<typeof PrintTicketRequestSchema>;
+/** What the renderer sends: `copy` and `target` get their defaults main-side. */
+export type PrintTicketInput = z.input<typeof PrintTicketRequestSchema>;
 export type PrintTicketResponse = z.infer<typeof PrintTicketResponseSchema>;
 
 /**
