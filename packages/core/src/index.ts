@@ -157,6 +157,14 @@ export {
   PrintRevealResponseSchema,
   PrintTicketsDirRequestSchema,
   PrintTicketsDirResponseSchema,
+  SetupStatusRequestSchema,
+  SetupStatusResponseSchema,
+  SetupCompleteRequestSchema,
+  SetupCompleteResponseSchema,
+  DemoStatusRequestSchema,
+  DemoStatusResponseSchema,
+  DemoRemoveRequestSchema,
+  DemoRemoveResponseSchema,
 } from "./ipc";
 export type {
   IpcChannel,
@@ -193,6 +201,9 @@ export type {
   PrinterInfo,
   PrintTicketRequest,
   PrintTicketResponse,
+  SetupCompleteRequest,
+  DemoStatus,
+  DemoRemoveResponse,
   PrintTicketInput,
   PrintTestRequest,
 } from "./ipc";

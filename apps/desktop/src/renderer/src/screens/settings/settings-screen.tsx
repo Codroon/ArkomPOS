@@ -16,11 +16,15 @@ import {
   PrintPrintersResponseSchema,
   PrintTicketResponseSchema,
   PrintTicketsDirResponseSchema,
+  DemoStatusResponseSchema,
+  DemoRemoveResponseSchema,
+  type DemoStatus,
   type PrinterInfo,
   type Settings,
 } from "@arkom/core";
 import {
   AccentButton,
+  ConfirmDialog,
   Field,
   GhostButton,
   SectionLabel,
@@ -42,6 +46,9 @@ export function SettingsScreen() {
   const [printers, setPrinters] = useState<PrinterInfo[]>([]);
   const [testing, setTesting] = useState(false);
   const [ticketsPath, setTicketsPath] = useState<string | null>(null);
+  const [demo, setDemo] = useState<DemoStatus | null>(null);
+  const [demoConfirm, setDemoConfirm] = useState(false);
+  const [removingDemo, setRemovingDemo] = useState(false);
   const [toast, setToast] = useState<{ message: string; tone: "neutral" | "danger" } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -64,6 +71,10 @@ export function SettingsScreen() {
       .invoke("print:ticketsDir")
       .then((raw) => setTicketsPath(PrintTicketsDirResponseSchema.parse(raw).path))
       .catch((err) => console.error("print:ticketsDir failed", err));
+    window.arkom
+      .invoke("demo:status")
+      .then((raw) => setDemo(DemoStatusResponseSchema.parse(raw)))
+      .catch((err) => console.error("demo:status failed", err));
     return () => {
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
@@ -105,6 +116,21 @@ export function SettingsScreen() {
       .invoke("print:reveal", { path: ticketsPath, mode: "folder" })
       .catch((err) => say(errorMessage(t, err), "danger"));
   }, [ticketsPath, say, t]);
+
+  /** Remove the sample catalogue. Refused by core once any ticket exists. */
+  const removeDemo = useCallback(async () => {
+    setDemoConfirm(false);
+    setRemovingDemo(true);
+    try {
+      const removed = DemoRemoveResponseSchema.parse(await window.arkom.invoke("demo:remove"));
+      setDemo(DemoStatusResponseSchema.parse(await window.arkom.invoke("demo:status")));
+      say(t("demo.removed", { products: String(removed.products) }));
+    } catch (err) {
+      say(errorMessage(t, err), "danger");
+    } finally {
+      setRemovingDemo(false);
+    }
+  }, [say, t]);
 
   if (!settings) return <div className="p-4 text-[12px] text-muted">…</div>;
 
@@ -220,8 +246,45 @@ export function SettingsScreen() {
               hint={t("set.footerHint")}
             />
           </section>
+
+          {/* ---------------- demo data ---------------- */}
+          {demo?.present ? (
+            <section className="col-span-2 flex flex-col gap-2 border-t border-line pt-4">
+              <SectionLabel>{t("demo.section")}</SectionLabel>
+              <div className="text-[12px] text-ink-2">
+                {t("demo.present", {
+                  products: String(demo.products),
+                  groups: String(demo.groups),
+                  suppliers: String(demo.suppliers),
+                })}
+              </div>
+              {demo.blockedBySales ? (
+                // not a disabled button with no explanation: the reason IS the
+                // useful part, and it is permanent rather than a temporary state
+                <div className="max-w-[560px] rounded-[3px] border border-warning-ink/25 bg-warning-bg px-3 py-2 text-[11px] leading-snug text-warning-ink">
+                  {t("demo.blocked")}
+                </div>
+              ) : (
+                <div>
+                  <GhostButton disabled={removingDemo} onClick={() => setDemoConfirm(true)}>
+                    {removingDemo ? t("demo.removing") : t("demo.remove")}
+                  </GhostButton>
+                </div>
+              )}
+            </section>
+          ) : null}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={demoConfirm}
+        title={t("demo.confirmTitle")}
+        body={t("demo.confirmBody", { products: String(demo?.products ?? 0) })}
+        confirmLabel={t("demo.confirm")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={() => void removeDemo()}
+        onCancel={() => setDemoConfirm(false)}
+      />
 
       <Toast message={toast?.message ?? null} tone={toast?.tone} />
     </>

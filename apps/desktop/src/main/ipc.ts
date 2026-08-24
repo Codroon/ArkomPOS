@@ -69,9 +69,18 @@ import {
   PrintRevealResponseSchema,
   PrintTicketsDirRequestSchema,
   PrintTicketsDirResponseSchema,
+  SetupStatusRequestSchema,
+  SetupStatusResponseSchema,
+  SetupCompleteRequestSchema,
+  SetupCompleteResponseSchema,
+  DemoStatusRequestSchema,
+  DemoStatusResponseSchema,
+  DemoRemoveRequestSchema,
+  DemoRemoveResponseSchema,
 } from "@arkom/core";
 import type { ArkomDb } from "@arkom/db";
-import { tillContext } from "./context";
+import { resetTillContext, tillContext } from "./context";
+import { completeFirstRun, demoStatus, isSetupNeeded, removeDemoData } from "./setup";
 import { addCode, getProduct, listCodes, listGroups, listProducts, removeCode, saveProduct } from "./repos/catalog";
 import { resolveScanCode } from "./repos/scan";
 import { addStock, listInventory, listMovements } from "./repos/inventory";
@@ -256,5 +265,25 @@ export function registerIpcHandlers(db: ArkomDb): void {
 
   register("print:ticketsDir", PrintTicketsDirRequestSchema, PrintTicketsDirResponseSchema, () => {
     return { path: ticketsDir() };
+  });
+
+  /* ---- first run: the only handlers that may run before a shop exists ---- */
+
+  register("setup:status", SetupStatusRequestSchema, SetupStatusResponseSchema, () => {
+    return { needed: isSetupNeeded(db) };
+  });
+
+  register("setup:complete", SetupCompleteRequestSchema, SetupCompleteResponseSchema, (input) => {
+    const result = completeFirstRun(db, input);
+    resetTillContext(); // the till now has an identity; drop the empty answer
+    return result;
+  });
+
+  register("demo:status", DemoStatusRequestSchema, DemoStatusResponseSchema, () => {
+    return demoStatus(db, tillContext(db).ctx);
+  });
+
+  register("demo:remove", DemoRemoveRequestSchema, DemoRemoveResponseSchema, () => {
+    return removeDemoData(db, tillContext(db).ctx);
   });
 }

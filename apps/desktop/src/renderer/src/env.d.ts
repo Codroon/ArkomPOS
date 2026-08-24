@@ -27,6 +27,9 @@ import type {
   PrinterInfo,
   PrintTicketInput,
   PrintTicketResponse,
+  SetupCompleteRequest,
+  DemoStatus,
+  DemoRemoveResponse,
 } from "@arkom/core";
 
 declare global {
@@ -73,6 +76,13 @@ declare global {
         payload: { path: string; mode: "open" | "folder" },
       ): Promise<{ ok: boolean }>;
       invoke(channel: "print:ticketsDir", payload?: undefined): Promise<{ path: string }>;
+      invoke(channel: "setup:status", payload?: undefined): Promise<{ needed: boolean }>;
+      invoke(
+        channel: "setup:complete",
+        payload: SetupCompleteRequest,
+      ): Promise<{ tenantId: string; demoProducts: number; demoUnits: number }>;
+      invoke(channel: "demo:status", payload?: undefined): Promise<DemoStatus>;
+      invoke(channel: "demo:remove", payload?: undefined): Promise<DemoRemoveResponse>;
     };
   }
 }

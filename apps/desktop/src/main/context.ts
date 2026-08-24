@@ -12,13 +12,19 @@ export interface TillContext {
 
 let cached: TillContext | null = null;
 
+/** First run creates the tenant, so the cached "no shop yet" answer must go. */
+export function resetTillContext(): void {
+  cached = null;
+}
+
 export function tillContext(db: ArkomDb): TillContext {
   if (cached) return cached;
   const tenant = db.select().from(schema.tenants).limit(1).all()[0];
   const location = db.select().from(schema.locations).limit(1).all()[0];
   const terminal = db.select().from(schema.terminals).limit(1).all()[0];
   if (!tenant || !location || !terminal) {
-    throw appError("VALIDATION", "Base de datos vacía — ejecuta `pnpm db:seed`.");
+    // a packaged install reaches this only before first-run setup completes
+    throw appError("VALIDATION", "Esta caja aún no está configurada.");
   }
   cached = {
     meta: {

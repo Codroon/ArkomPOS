@@ -51,6 +51,10 @@ export const productGroups = sqliteTable("product_groups", {
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name").notNull(), // Moviles, Protector, Cargador y Cable, Auriculares, Memoria y Ordenador
   sortOrder: integer("sort_order").notNull().default(0),
+  /* sample data from first-run "Load demo data", removable until real selling
+     starts. Only the three tables that OWN demo rows carry the flag — units,
+     movements and codes are reachable from their product. */
+  isDemo: integer("is_demo", { mode: "boolean" }).notNull().default(false),
   createdAt: ts("created_at").notNull(),
 }, (t) => [uniqueIndex("ux_group_tenant_name").on(t.tenantId, t.name)]);
 
@@ -58,6 +62,7 @@ export const suppliers = sqliteTable("suppliers", {
   id: text("id").primaryKey(),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name").notNull(),
+  isDemo: integer("is_demo", { mode: "boolean" }).notNull().default(false),
   createdAt: ts("created_at").notNull(),
 }, (t) => [uniqueIndex("ux_supplier_tenant_name").on(t.tenantId, t.name)]);
 
@@ -75,6 +80,7 @@ export const products = sqliteTable("products", {
   reorderPoint: integer("reorder_point").notNull().default(0),
   lowStockThreshold: integer("low_stock_threshold").notNull().default(0),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
+  isDemo: integer("is_demo", { mode: "boolean" }).notNull().default(false),
   createdAt: ts("created_at").notNull(),
   updatedAt: ts("updated_at").notNull(),
 }, (t) => [

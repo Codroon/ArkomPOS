@@ -39,6 +39,10 @@ export const IPC_CHANNELS = [
   "print:test",
   "print:reveal",
   "print:ticketsDir",
+  "setup:status",
+  "setup:complete",
+  "demo:status",
+  "demo:remove",
 ] as const;
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
@@ -557,3 +561,57 @@ export const PrintRevealResponseSchema = z.object({ ok: z.boolean() });
 /** Where tickets are saved — shown in Ajustes with a button to open it. */
 export const PrintTicketsDirRequestSchema = z.object({}).optional();
 export const PrintTicketsDirResponseSchema = z.object({ path: z.string() });
+
+/* --------------------------------------------- first run + demo data --- */
+
+/**
+ * First run. A client install has no seed step, so the app asks the shop who it
+ * is once, and everything the answer produces lands in one transaction.
+ */
+export const SetupStatusRequestSchema = z.object({}).optional();
+export const SetupStatusResponseSchema = z.object({ needed: z.boolean() });
+
+export const SetupCompleteRequestSchema = z.object({
+  shopLegalName: z.string().trim().min(1).max(200),
+  shopNif: z.string().trim().min(1).max(40),
+  shopAddress: z.string().trim().min(1).max(300),
+  ticketFooter: z.string().trim().max(200),
+  terminalName: z.string().trim().min(1).max(60),
+  // ADR-0008: the series prefix is frozen once tickets start being issued
+  seriesPrefix: z
+    .string()
+    .trim()
+    .min(1)
+    .max(10)
+    .regex(/^[A-Za-z0-9-]+$/, "Solo letras, números y guiones."),
+  loadDemo: z.boolean(),
+});
+export const SetupCompleteResponseSchema = z.object({
+  tenantId: z.string(),
+  demoProducts: z.number().int(),
+  demoUnits: z.number().int(),
+});
+export type SetupCompleteRequest = z.infer<typeof SetupCompleteRequestSchema>;
+
+export const DemoStatusRequestSchema = z.object({}).optional();
+export const DemoStatusResponseSchema = z.object({
+  present: z.boolean(),
+  products: z.number().int(),
+  groups: z.number().int(),
+  suppliers: z.number().int(),
+  removable: z.boolean(),
+  /** true once any ticket exists — demo rows are then load-bearing */
+  blockedBySales: z.boolean(),
+});
+export type DemoStatus = z.infer<typeof DemoStatusResponseSchema>;
+
+export const DemoRemoveRequestSchema = z.object({}).optional();
+export const DemoRemoveResponseSchema = z.object({
+  products: z.number().int(),
+  groups: z.number().int(),
+  suppliers: z.number().int(),
+  units: z.number().int(),
+  movements: z.number().int(),
+  codes: z.number().int(),
+});
+export type DemoRemoveResponse = z.infer<typeof DemoRemoveResponseSchema>;
