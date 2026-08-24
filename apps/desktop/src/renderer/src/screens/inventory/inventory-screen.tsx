@@ -1,15 +1,16 @@
 /**
- * Inventario — handoff 03. Header: live total valuation (at cost) + below-min
- * chip (click applies the filter); stock table (display-only quantities, req
- * 5.1); movimientos drawer on row click (5.4); entrada de stock band (req 6).
+ * Inventario — handoff 03. Header: live total valuation (at cost), below-min
+ * chip (click applies the filter) and the "+ Entrada de stock" button (F6);
+ * stock table (display-only quantities, req 5.1); movimientos drawer on row
+ * click (5.4); receiving happens in its own drawer (req 6).
  * One unfiltered fetch feeds header AND table; filters apply client-side via
  * core helpers at P1 catalog scale (the §4 server filters remain for Venta).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isLowStock, type EntityRef, type InventoryRow } from "@arkom/core";
-import { cn, GhostButton, MoneyText, SearchInput, Toast, useDataLabel, useT } from "@arkom/ui";
+import { cn, GhostButton, MoneyText, PrimaryButton, SearchInput, Toast, useDataLabel, useT } from "@arkom/ui";
 import { openCatalogWithBarcode } from "../../lib/screen-bus";
-import { EntradaPanel } from "./entrada-panel";
+import { EntradaDrawer } from "./entrada-drawer";
 import { InventoryTable } from "./inventory-table";
 import { MovementsDrawer } from "./movements-drawer";
 
@@ -27,6 +28,7 @@ export function InventoryScreen() {
   const [searchText, setSearchText] = useState("");
   const [filters, setFilters] = useState<Filters>({ groupId: "", itemType: "", lowStockOnly: false });
   const [drawerProduct, setDrawerProduct] = useState<InventoryRow | null>(null);
+  const [entryOpen, setEntryOpen] = useState(false);
   const [flashIds, setFlashIds] = useState<ReadonlySet<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -43,6 +45,18 @@ export function InventoryScreen() {
       .then(setGroups)
       .catch((err) => console.error("catalog:groups failed", err));
   }, [refresh]);
+
+  // F6 opens receiving from anywhere on the screen
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "F6") {
+        e.preventDefault();
+        setEntryOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const rows = useMemo(() => {
     if (!allRows) return [];
@@ -107,6 +121,9 @@ export function InventoryScreen() {
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
         />
+        <PrimaryButton title={t("entry.openHint")} onClick={() => setEntryOpen(true)}>
+          {t("entry.open")}
+        </PrimaryButton>
       </div>
 
       {/* filters row */}
@@ -172,8 +189,17 @@ export function InventoryScreen() {
         )}
       </div>
 
-      {/* entrada de stock band */}
-      <EntradaPanel rows={allRows ?? []} onConfirmed={onConfirmed} onCreateArticle={openCatalogWithBarcode} />
+      {entryOpen ? (
+        <EntradaDrawer
+          rows={allRows ?? []}
+          onConfirmed={onConfirmed}
+          onCreateArticle={(code) => {
+            setEntryOpen(false);
+            openCatalogWithBarcode(code);
+          }}
+          onClose={() => setEntryOpen(false)}
+        />
+      ) : null}
 
       {drawerProduct ? <MovementsDrawer product={drawerProduct} onClose={() => setDrawerProduct(null)} /> : null}
       <Toast message={toast} />

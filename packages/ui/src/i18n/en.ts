@@ -172,6 +172,11 @@ export const en: Record<TKey, string> = {
 
   /* entrada de stock */
   "entry.section": "Stock entry",
+  "entry.open": "+ Stock entry",
+  "entry.openHint": "Record goods received (F6)",
+  "entry.close": "Close",
+  "entry.currentStock": "{n} in stock",
+  "entry.lastCostHint": "Last known cost.",
   "entry.scanLabel": "Item",
   "entry.scanPlaceholder": "Scan a code or enter an IMEI…",
   "entry.unknownCode": "Not found",

@@ -23,7 +23,12 @@ export interface ScanFlowHandlers {
   onUnknown?: (code: string) => void;
 }
 
-export function useScanFlow(handlers: ScanFlowHandlers): { resolve: (code: string) => void; modals: ReactNode } {
+export function useScanFlow(handlers: ScanFlowHandlers): {
+  resolve: (code: string) => void;
+  modals: ReactNode;
+  /** true while the picker or the rescue is up — hosts must not treat Esc as their own */
+  isModalOpen: boolean;
+} {
   const t = useT();
   const ref = useRef(handlers);
   ref.current = handlers; // keep resolve() stable while always calling the latest handlers
@@ -94,5 +99,5 @@ export function useScanFlow(handlers: ScanFlowHandlers): { resolve: (code: strin
     </>
   );
 
-  return { resolve, modals };
+  return { resolve, modals, isModalOpen: ambiguous !== null || unknown !== null };
 }

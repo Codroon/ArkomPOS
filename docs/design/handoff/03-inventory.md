@@ -1,8 +1,8 @@
 # Handoff 03 — Inventario (list + movimientos + entrada de stock)
 
 ## Overview
-Header: "Inventario" + "Valoración total <b>18.492,60 €</b> (a coste)" (live sum onHand×cost) + right chip "<n> artículos bajo mínimo" (click = applies Bajo-mínimo filter).
-Body: stock table; bottom band = **Entrada de stock** panel (mockup's stock-count twin panel is NOT built in P1 — band is single, full-width).
+Header: "Inventario" + "Valoración total <b>18.492,60 €</b> (a coste)" (live sum onHand×cost) + chip "<n> artículos bajo mínimo" (click = applies Bajo-mínimo filter) + search + primary **"+ Entrada de stock"** button (F6).
+Body: stock table, full height (the mockup's stock-count twin panel is NOT built in P1; receiving moved into its own drawer — see below).
 Quantities are display-only everywhere on this screen (req 5.1).
 
 ## Stock table (sticky header)
@@ -13,14 +13,18 @@ Row click → **Movimientos drawer** (this is an addition the mockup omits; req 
 ## Movimientos drawer (right, 420px)
 Header: product name + current onHand. Table: Fecha (dd/mm hh:mm) · Tipo (Chip: ENTRADA / VENTA / AJUSTE) · Cantidad (signed, +bold / −ink-2) · Coste · Documento (docNumber link → read-only ticket peek) · Usuario ("—" until auth). Newest first, infinite scroll (`inventory:movements` cursor). Footer note: "El stock solo cambia mediante movimientos." Empty: "Sin movimientos."
 
-## Entrada de stock panel (`stock:add`) — rebuilt 2026-08-24 for discoverability
-`bg-panel`, SectionLabel "ENTRADA DE STOCK". **The whole shape is always visible** — find · Cantidad · Coste por unidad · Proveedor · staged lines · Confirmar — with the per-line fields *disabled* until an item resolves. Nothing about the feature is hidden behind a successful scan (the failure that prompted this: a real box code returned "no results" and the panel looked empty/missing).
-1. ScanInput "Escanea un código o busca por nombre…" — every code goes through `scan:resolve` (primary barcode ∪ additional codes ∪ in-stock IMEIs); typing a name shows an inline match list instead. Several matches ⇒ **ambiguity picker**; no match ⇒ **rescue modal** (create the item with the code prefilled, or attach the code to an existing item and carry straight on). A resolved item shows as a chip with "Cambiar artículo".
-2. **Quantity first:** focus lands on Cantidad. Coste por unidad* prefills from the item's last cost.
-3. Serialized items: the quantity IS the IMEI target. An **"IMEI n de N"** capture loop appears — scan/type → Enter → chip; invalid Luhn, an IMEI already staged, and one already registered in the system are each rejected inline. "Faltan n IMEIs" counts down; the line cannot be added until captured == quantity, and it posts as ONE entry (`expectedQty` + `imeis[]`).
-4. Proveedor* (select + "Nuevo proveedor" inline create).
-5. Staged-lines mini table (name · units | qty × cost | ✕ remove), running total.
-6. `Confirmar entrada · <total> €` primary ⇒ one tx: purchase_in movements (+units for IMEIs) → table & valuation update in place, panel clears, focus returns to scan. Success toast "Entrada registrada · <n> líneas".
+## Entrada de stock — right drawer (`stock:add`), reworked 2026-08-25
+Receiving is a task the owner sits down to do, so it owns the screen instead of a strip squeezed under the table (the strip felt cramped and easy to miss in live testing). **The Inventario header carries a primary "+ Entrada de stock" button (shortcut F6)**; there is no bottom band.
+
+The drawer is ~**480px**, right side, same pattern as Movimientos: **Esc closes** (but never while the scan picker/rescue is up), focus is **trapped** inside, clicking the backdrop closes. One column, top to bottom:
+1. **ScanInput** (autofocus) "Escanea un código o busca por nombre…" — every code goes through `scan:resolve` (primary barcode ∪ additional codes ∪ in-stock IMEIs); typing a name shows an inline match list instead. Several matches ⇒ **ambiguity picker**; no match ⇒ **rescue modal** (create the item with the code prefilled, or attach the code to an existing item and carry straight on) — both work unchanged inside the drawer.
+2. **Resolved item card**: name (+ `SERIE`), its code, current stock, and "Cambiar artículo". Before anything resolves, a dashed placeholder explains what to do and the fields below stay disabled — the shape of the task is always visible.
+3. **Cantidad first** (focus lands there and selects), then **Coste por unidad***, prefilled with the item's last known cost.
+4. Serialized items: the quantity IS the IMEI target. An **"IMEI n de N"** capture loop appears — scan/type → Enter → chip (each removable); invalid Luhn, an IMEI already staged, and one already registered are each rejected inline and the field re-selects so the next scan replaces it. "Faltan n IMEIs" counts down; the line cannot be added until captured == quantity, and it posts as ONE entry (`expectedQty` + `imeis[]`).
+5. **Proveedor*** (select + "Nuevo proveedor" inline create).
+6. **"Añadir a la lista"** (full width) ⇒ the line joins the staged list and **focus returns to the scan field** for the next box.
+7. **Staged lines** occupy real vertical space (name · code/units | qty × cost | ✕ remove); empty state explains itself.
+8. Footer: running **Total** + one full-width **Confirmar entrada** ⇒ one tx: purchase_in movements (+units for IMEIs) → table & valuation update in place, success toast "Entrada registrada · <n> línea(s)", and **the drawer clears but stays open** for the next delivery (Esc to leave). Confirmar is disabled while a line is still half-built, so nothing typed is silently discarded.
 
 ## States
 | Element | State | Behavior |

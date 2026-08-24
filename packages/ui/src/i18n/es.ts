@@ -174,6 +174,11 @@ export const es = {
 
   /* entrada de stock */
   "entry.section": "Entrada de stock",
+  "entry.open": "+ Entrada de stock",
+  "entry.openHint": "Registrar mercancía recibida (F6)",
+  "entry.close": "Cerrar",
+  "entry.currentStock": "{n} en stock",
+  "entry.lastCostHint": "Último coste conocido.",
   "entry.scanLabel": "Artículo",
   "entry.scanPlaceholder": "Escanea código o introduce IMEI…",
   "entry.unknownCode": "No existe",
