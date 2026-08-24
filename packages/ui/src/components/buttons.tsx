@@ -7,18 +7,43 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement>;
 const base =
   "inline-flex h-7 items-center justify-center gap-1.5 rounded-[3px] px-3 text-[12px] leading-none disabled:cursor-default";
 
-/** 00-foundations: ink-2 bg, white text. */
-export function PrimaryButton({ className, ...props }: ButtonProps) {
+/**
+ * THE blue button — a screen may have exactly one (manual: "blue appears on one
+ * piece per surface"). It is the screen's primary action: Cobrar on Venta,
+ * Confirmar entrada in the receiving drawer, Guardar in Catálogo.
+ * Its label is Graphite 900 and bold: white on Signal Blue is banned.
+ */
+export function AccentButton({ className, ...props }: ButtonProps) {
   return (
     <button
       type="button"
-      className={cn(base, "bg-ink-2 font-bold text-white hover:bg-ink disabled:bg-subtle", className)}
+      className={cn(
+        base,
+        "bg-accent font-bold text-accent-ink hover:brightness-95",
+        "disabled:bg-surface-2 disabled:text-subtle",
+        className,
+      )}
       {...props}
     />
   );
 }
 
-/** 00-foundations: white bg, border-input. */
+/** Everything else that leads: graphite, Bone label. Never blue. */
+export function PrimaryButton({ className, ...props }: ButtonProps) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        base,
+        "bg-ink font-semibold text-inverse-ink hover:bg-ink-2 disabled:bg-surface-2 disabled:text-subtle",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+/** Quiet action on paper. */
 export function GhostButton({ className, ...props }: ButtonProps) {
   return (
     <button

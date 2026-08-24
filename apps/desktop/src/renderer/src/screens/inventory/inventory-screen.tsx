@@ -107,9 +107,10 @@ export function InventoryScreen() {
             onClick={() => setFilters((f) => ({ ...f, lowStockOnly: !f.lowStockOnly }))}
             className={cn(
               "h-6 rounded-[3px] border px-2 text-[11px] font-bold",
+              // the low-stock count wears the warning pair so it reads across the shop
               filters.lowStockOnly
-                ? "border-ink-2 bg-ink-2 text-white"
-                : "border-line-strong bg-surface-2 text-ink-2 hover:border-muted",
+                ? "border-warning-ink bg-warning-ink text-warning-bg"
+                : "border-warning-ink/30 bg-warning-bg text-warning-ink hover:border-warning-ink/60",
             )}
           >
             {belowMinCount === 1 ? t("inv.belowMinOne") : t("inv.belowMinMany", { n: belowMinCount })}
@@ -155,7 +156,7 @@ export function InventoryScreen() {
           className={cn(
             "h-6 rounded-[3px] border px-2 text-[11px] font-bold",
             filters.lowStockOnly
-              ? "border-ink-2 bg-ink-2 text-white"
+              ? "border-ink bg-ink text-inverse-ink"
               : "border-line-strong bg-card text-ink-2 hover:border-muted",
           )}
         >

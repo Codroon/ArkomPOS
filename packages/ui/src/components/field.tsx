@@ -26,7 +26,7 @@ export function Field({
         {required ? <span className="text-muted">*</span> : null}
       </SectionLabel>
       {children}
-      {error ? <div className="text-[11px] leading-snug text-ink-2">{error}</div> : null}
+      {error ? <div className="text-[11px] leading-snug text-danger-ink">{error}</div> : null}
       {!error && hint ? <div className="text-[11px] leading-snug text-subtle">{hint}</div> : null}
     </div>
   );
@@ -46,7 +46,7 @@ export const TextInput = forwardRef<
         controlBase,
         requiredStyle ? "border-line-strong" : "border-line-strong",
         invalid && "border-ink",
-        mono && "font-mono tabular-nums",
+        mono && "font-mono font-medium tabular-nums",
         className,
       )}
       {...props}

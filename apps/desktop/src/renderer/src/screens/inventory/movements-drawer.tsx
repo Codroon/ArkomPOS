@@ -6,13 +6,20 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { InventoryRow, MovementRow } from "@arkom/core";
-import { Chip, cn, MoneyText, useT, type TKey } from "@arkom/ui";
+import { Chip, cn, MoneyText, useT, type ChipVariant, type TKey } from "@arkom/ui";
 import { TicketPeekModal } from "../../components/ticket-peek-modal";
 
 const TYPE_KEYS: Record<string, TKey> = {
   purchase_in: "mov.entrada",
   sale_out: "mov.venta",
   adjustment: "mov.ajuste",
+};
+
+/** stock arriving reads as success, leaving as neutral, corrections as warning */
+const TYPE_VARIANTS: Record<string, ChipVariant> = {
+  purchase_in: "success",
+  sale_out: "neutral",
+  adjustment: "warning",
 };
 
 function formatShort(ms: number): string {
@@ -75,7 +82,7 @@ export function MovementsDrawer({ product, onClose }: { product: InventoryRow; o
       >
         <div className="flex items-baseline gap-2 border-b border-line-strong bg-surface-2 px-4 py-2.5">
           <div className="text-[13px] font-bold">{product.name}</div>
-          <div className="font-mono text-[11px] tabular-nums text-muted">
+          <div className="font-mono font-medium text-[11px] tabular-nums text-muted">
             {t("drawer.onHand", { n: product.onHand })}
           </div>
           <div className="flex-1" />
@@ -119,18 +126,20 @@ export function MovementsDrawer({ product, onClose }: { product: InventoryRow; o
                   const typeKey = TYPE_KEYS[m.movementType];
                   return (
                     <tr key={m.id} className="border-b border-line bg-card align-top">
-                      <td className="whitespace-nowrap px-1.5 py-1.5 font-mono text-[10px] tabular-nums text-muted">
+                      <td className="whitespace-nowrap px-1.5 py-1.5 font-mono font-medium text-[10px] tabular-nums text-muted">
                         {formatShort(m.createdAtMs)}
                       </td>
                       <td className="px-1.5 py-1.5">
-                        <Chip>{typeKey ? t(typeKey) : m.movementType.toUpperCase()}</Chip>
+                        <Chip variant={TYPE_VARIANTS[m.movementType] ?? "neutral"}>
+                          {typeKey ? t(typeKey) : m.movementType.toUpperCase()}
+                        </Chip>
                         {m.imei ? (
-                          <div className="mt-0.5 truncate font-mono text-[9px] tabular-nums text-subtle">{m.imei}</div>
+                          <div className="mt-0.5 truncate font-mono font-medium text-[9px] tabular-nums text-subtle">{m.imei}</div>
                         ) : null}
                       </td>
                       <td
                         className={cn(
-                          "px-1.5 py-1.5 text-right font-mono tabular-nums",
+                          "px-1.5 py-1.5 text-right font-mono font-medium tabular-nums",
                           m.qty > 0 ? "font-bold text-ink" : "text-ink-2",
                         )}
                       >
@@ -139,7 +148,7 @@ export function MovementsDrawer({ product, onClose }: { product: InventoryRow; o
                       <td className="whitespace-nowrap px-1.5 py-1.5 text-right text-[10px] text-muted">
                         {m.unitCostCents == null ? t("common.dash") : <MoneyText cents={m.unitCostCents} />}
                       </td>
-                      <td className="truncate px-1.5 py-1.5 font-mono text-[10px] tabular-nums">
+                      <td className="truncate px-1.5 py-1.5 font-mono font-medium text-[10px] tabular-nums">
                         {m.documentId && m.documentNumber ? (
                           <button
                             type="button"

@@ -15,9 +15,9 @@ import {
 } from "@arkom/core";
 import {
   Field,
+  AccentButton,
   GhostButton,
   LockedButton,
-  PrimaryButton,
   SectionLabel,
   Segmented,
   SelectInput,
@@ -113,7 +113,7 @@ function ExtraCodesField({ productId, productName }: { productId: string | null;
           codes.map((code) => (
             <span
               key={code.id}
-              className="inline-flex items-center gap-1 rounded-[2px] border border-line-strong bg-card px-1 py-px font-mono text-[10px] tabular-nums"
+              className="inline-flex items-center gap-1 rounded-[2px] border border-line-strong bg-card px-1 py-px font-mono font-medium text-[10px] tabular-nums"
             >
               {code.code}
               <button type="button" className="text-muted hover:text-ink" onClick={() => setRemoving(code)}>
@@ -305,7 +305,7 @@ export function CatalogEditor({
         <div className="text-[11px] text-muted">
           {t("editor.margin")}{" "}
           {margin !== null ? (
-            <span className="font-mono tabular-nums">
+            <span className="font-mono font-medium tabular-nums">
               {formatCents(margin)}
               {marginRatio !== null ? ` · ${String(marginRatio).replace(".", ",")}%` : ""}
             </span>
@@ -363,11 +363,12 @@ export function CatalogEditor({
       </div>
 
       <div className="border-t border-line-strong bg-surface-2 px-4 py-2.5">
-        {generalError ? <div className="mb-2 text-[11px] text-ink-2">{generalError}</div> : null}
+        {generalError ? <div className="mb-2 text-[11px] text-danger-ink">{generalError}</div> : null}
         <div className="flex items-center gap-2">
-          <PrimaryButton onClick={onSave} disabled={!canSave || saving}>
+          {/* the single blue element on Catálogo */}
+          <AccentButton onClick={onSave} disabled={!canSave || saving}>
             {saving ? t("common.saving") : t("common.save")}
-          </PrimaryButton>
+          </AccentButton>
           <GhostButton onClick={onCancel}>{t("common.cancel")}</GhostButton>
           <div className="flex-1" />
           <LockedButton title={t("editor.deleteLockedHint")}>{t("editor.delete")}</LockedButton>

@@ -32,7 +32,7 @@ export function Segmented<T extends string>({
           className={cn(
             "flex items-center gap-1 border-r border-line px-2 py-1 text-[11px] last:border-r-0",
             value === opt.value
-              ? "bg-ink-2 font-bold text-white"
+              ? "bg-ink font-semibold text-inverse-ink"
               : opt.disabled
                 ? "cursor-default bg-surface-2 text-subtle"
                 : "text-ink-2 hover:bg-hover",

@@ -50,7 +50,7 @@ export function TicketPeekModal({ docId, onClose }: { docId: string; onClose: ()
         <div className="flex items-baseline gap-2 border-b border-line-strong bg-surface-2 px-4 py-2.5">
           <div className="font-mono text-[14px] font-bold tabular-nums">{peek?.docNumber ?? "…"}</div>
           {peek?.completedAtMs ? (
-            <div className="font-mono text-[10px] tabular-nums text-muted">{formatDate(peek.completedAtMs)}</div>
+            <div className="font-mono font-medium text-[10px] tabular-nums text-muted">{formatDate(peek.completedAtMs)}</div>
           ) : null}
         </div>
 
@@ -61,7 +61,7 @@ export function TicketPeekModal({ docId, onClose }: { docId: string; onClose: ()
                 <div key={i} className="flex items-baseline gap-2 border-b border-line py-1.5 text-[12px]">
                   <div className="min-w-0 flex-1">
                     <div className="truncate">{line.description}</div>
-                    <div className="font-mono text-[10px] tabular-nums text-subtle">
+                    <div className="font-mono font-medium text-[10px] tabular-nums text-subtle">
                       {line.imei ? `IMEI ${line.imei} · ` : ""}
                       {line.qty} × <MoneyText cents={line.unitPriceCents} />
                     </div>
@@ -90,7 +90,7 @@ export function TicketPeekModal({ docId, onClose }: { docId: string; onClose: ()
                     <span>
                       {t(METHOD_KEYS[tender.method] ?? "pay.cash")}
                       {tender.cardReference ? (
-                        <span className="ml-1 font-mono text-[10px] text-subtle">{tender.cardReference}</span>
+                        <span className="ml-1 font-mono font-medium text-[10px] text-subtle">{tender.cardReference}</span>
                       ) : null}
                     </span>
                     <MoneyText cents={tender.amountCents} />

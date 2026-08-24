@@ -67,19 +67,19 @@ export function InventoryTable({
                   <td className="px-3 py-1.5">
                     <span className={row.active ? "text-ink" : "text-subtle"}>{row.name}</span>
                     {row.itemType === "serialized" ? <Chip className="ml-1.5">{t("chip.serie")}</Chip> : null}
-                    <div className="font-mono text-[10px] tabular-nums text-subtle">
+                    <div className="font-mono font-medium text-[10px] tabular-nums text-subtle">
                       {row.barcode ?? t("common.dash")}
                     </div>
                   </td>
                   <td className="px-3 py-1.5 text-right font-mono text-[13px] font-bold tabular-nums">
                     {row.onHand}
                   </td>
-                  <td className="px-3 py-1.5 text-right font-mono tabular-nums text-muted">
+                  <td className="px-3 py-1.5 text-right font-mono font-medium tabular-nums text-muted">
                     {row.reorderPoint}
                   </td>
                   <td className="px-3 py-1.5">
                     {low ? (
-                      <Chip variant="warn">{t("chip.bajoMinimo")}</Chip>
+                      <Chip variant="warning">{t("chip.bajoMinimo")}</Chip>
                     ) : (
                       <span className="text-[11px] text-subtle">{t("inv.ok")}</span>
                     )}

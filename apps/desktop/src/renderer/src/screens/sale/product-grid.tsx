@@ -30,7 +30,7 @@ function Card({
         {product.name}
         {product.itemType === "serialized" ? <Chip className="ml-1">{t("chip.serie")}</Chip> : null}
       </div>
-      <div className="truncate font-mono text-[9px] tabular-nums text-subtle">{product.barcode ?? ""}</div>
+      <div className="truncate font-mono font-medium text-[9px] tabular-nums text-subtle">{product.barcode ?? ""}</div>
       <MoneyText cents={product.priceCents ?? 0} className="text-[12px] font-bold" />
     </button>
   );

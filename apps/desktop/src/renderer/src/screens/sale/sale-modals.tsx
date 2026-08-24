@@ -80,9 +80,9 @@ export function UnitPickModal({
               onClick={() => onPick(unit.unitId)}
               className="flex w-full items-baseline justify-between border-b border-line px-2 py-2 text-left hover:bg-hover"
             >
-              <span className="font-mono text-[12px] tabular-nums">{unit.imei}</span>
+              <span className="font-mono font-medium text-[12px] tabular-nums">{unit.imei}</span>
               <span className="text-[10px] text-subtle">
-                {t("pick.inSince")} <span className="font-mono tabular-nums">{formatDay(unit.createdAtMs)}</span>
+                {t("pick.inSince")} <span className="font-mono font-medium tabular-nums">{formatDay(unit.createdAtMs)}</span>
               </span>
             </button>
           ))

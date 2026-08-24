@@ -21,7 +21,7 @@ function MissingCell({ t }: { t: TFn }) {
   return (
     <span className="inline-flex items-center gap-1">
       <span className="text-subtle">{t("common.dash")}</span>
-      <Chip variant="warn">{t("chip.falta")}</Chip>
+      <Chip variant="warning">{t("chip.falta")}</Chip>
     </span>
   );
 }
@@ -109,7 +109,7 @@ export function CatalogTable({
                 !isSelected && "hover:bg-hover",
               )}
             >
-              <td className="px-3 py-1.5 font-mono text-[11px] tabular-nums text-subtle">
+              <td className="px-3 py-1.5 font-mono font-medium text-[11px] tabular-nums text-subtle">
                 {missing.has("barcode") ? <MissingCell t={t} /> : row.barcode}
               </td>
               <td className={cn("px-3 py-1.5", row.active ? "text-ink" : "text-subtle")}>
@@ -131,7 +131,7 @@ export function CatalogTable({
               <td className="px-3 py-1.5 text-right tabular-nums text-muted">
                 {missing.has("tax") ? <MissingCell t={t} /> : `${(row.taxRateBp ?? 0) / 100}%`}
               </td>
-              <td className="px-3 py-1.5 text-right font-mono tabular-nums">{row.onHand}</td>
+              <td className="px-3 py-1.5 text-right font-mono font-medium tabular-nums">{row.onHand}</td>
             </tr>
           );
         })}

@@ -5,7 +5,7 @@
  * with single-submit; completed state with the allocated number.
  */
 import { centsToInput, parseMoneyInput, tenderSummary, uuidv7, type CompletedSale, type SaleState, type TenderDraft, type TenderMethod } from "@arkom/core";
-import { cn, Field, GhostButton, LockedButton, MoneyText, PrimaryButton, TextInput, useT, type TKey } from "@arkom/ui";
+import { AccentButton, cn, Field, GhostButton, LockedButton, MoneyText, PrimaryButton, TextInput, useT, type TKey } from "@arkom/ui";
 
 export interface TenderEntry {
   key: string;
@@ -129,7 +129,7 @@ export function PaymentPanel({
         </div>
       ) : null}
 
-      <div className="mt-2 flex justify-between font-mono text-[12px] tabular-nums">
+      <div className="mt-2 flex justify-between font-mono font-medium text-[12px] tabular-nums">
         {summary && summary.changeCents > 0 ? (
           <>
             <span className="font-sans font-bold text-ink">{t("pay.change")}</span>
@@ -144,9 +144,10 @@ export function PaymentPanel({
       </div>
       {summary?.nonCashExcess ? <div className="mt-1 text-[11px] text-ink-2">{t("err.tenderMismatch")}</div> : null}
 
-      <PrimaryButton className="mt-2 h-9 w-full text-[13px]" disabled={!canCharge} onClick={onCharge}>
+      {/* the single blue element on Venta — the manual's one-blue rule */}
+      <AccentButton className="mt-2 h-9 w-full text-[13px]" disabled={!canCharge} onClick={onCharge}>
         {charging ? t("pay.charging") : t("pay.charge")}
-      </PrimaryButton>
+      </AccentButton>
     </div>
   );
 }
@@ -156,10 +157,10 @@ export function CompletedPanel({ completed, onNew }: { completed: CompletedSale;
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4">
       <div className="text-[12px] font-bold uppercase tracking-[.1em] text-muted">{t("done.title")}</div>
-      <div className="font-mono text-[28px] font-bold tabular-nums">{completed.docNumber}</div>
-      <MoneyText cents={completed.totalCents} className="text-[16px] font-bold" />
+      <div className="font-display text-[28px] tracking-[.02em]">{completed.docNumber}</div>
+      <MoneyText cents={completed.totalCents} className="font-display text-[20px]" />
       {completed.changeCents > 0 ? (
-        <div className="flex items-baseline gap-2 font-mono text-[14px] tabular-nums">
+        <div className="flex items-baseline gap-2 font-mono font-medium text-[14px] tabular-nums">
           <span className="font-sans text-[11px] text-muted">{t("pay.change")}</span>
           <MoneyText cents={completed.changeCents} className="font-bold" />
         </div>

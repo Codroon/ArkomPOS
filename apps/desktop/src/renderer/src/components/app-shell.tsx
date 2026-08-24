@@ -40,11 +40,11 @@ function LocaleToggle() {
       type="button"
       title={t("shell.localeToggle")}
       onClick={() => setLocale(locale === "es" ? "en" : "es")}
-      className="flex items-center gap-1 self-center rounded-[3px] border border-line-strong bg-card px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-[.06em]"
+      className="flex items-center gap-1 self-center rounded-[3px] border border-inverse-muted/50 px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-[.06em] hover:border-inverse-ink"
     >
-      <span className={locale === "es" ? "text-ink" : "text-subtle"}>ES</span>
-      <span className="text-subtle">·</span>
-      <span className={locale === "en" ? "text-ink" : "text-subtle"}>EN</span>
+      <span className={locale === "es" ? "text-inverse-ink" : "text-inverse-muted"}>ES</span>
+      <span className="text-inverse-muted">·</span>
+      <span className={locale === "en" ? "text-inverse-ink" : "text-inverse-muted"}>EN</span>
     </button>
   );
 }
@@ -63,22 +63,30 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
 
   return (
     <div className="flex h-full min-h-[860px] flex-col bg-canvas text-ink">
-      {/* topbar */}
-      <header className="flex h-11 flex-none items-stretch border-b border-line-strong bg-surface text-[12px]">
-        <div className="flex items-center gap-2 border-r border-line px-3.5 font-bold tracking-[.14em]">
-          {t("shell.brand")}
-          <span className="text-[10px] font-normal tracking-[.08em] text-subtle">{t("shell.brandSuffix")}</span>
+      {/* topbar — the brand plate: Graphite 900 with the Bone wordmark sitting on
+          a 3px Signal Blue rule, exactly as the manual draws the lockup. The blue
+          here is a rule, not an action, so the one-blue-per-surface budget of each
+          screen below is untouched. */}
+      <header className="relative flex h-11 flex-none items-stretch bg-inverse text-[12px] text-inverse-ink">
+        <div className="flex items-center gap-2 border-r border-inverse-2 px-3.5">
+          <span className="font-display text-[15px] leading-none tracking-[.06em] text-inverse-ink">
+            {t("shell.brand")}
+          </span>
+          <span className="font-mono text-[9px] font-medium tracking-[.16em] text-inverse-muted">
+            {t("shell.brandSuffix")}
+          </span>
         </div>
         <div className="flex-1" />
-        <div className="flex items-center border-l border-line px-3.5">
+        <div className="flex items-center border-l border-inverse-2 px-3.5">
           <LocaleToggle />
         </div>
-        <div className="flex items-center border-l border-line px-3.5 text-muted">
+        <div className="flex items-center border-l border-inverse-2 px-3.5 font-mono text-[11px] font-medium tabular-nums text-inverse-ink">
           {context?.terminal.name ?? t("common.dash")}
         </div>
-        <div className="flex items-center border-l border-line px-3.5 font-mono text-[11px] tabular-nums text-ink-2">
+        <div className="flex items-center border-l border-inverse-2 px-3.5 font-mono text-[11px] font-medium tabular-nums text-inverse-muted">
           {formatNow(now)}
         </div>
+        <span aria-hidden className="absolute inset-x-0 bottom-0 h-[3px] bg-accent" />
       </header>
 
       <div className="flex min-h-0 flex-1">
@@ -94,14 +102,14 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
                 className={cn(
                   "flex items-center gap-[9px] border-l-[3px] px-3 py-2 text-left",
                   screen === item.id
-                    ? "border-ink-2 bg-active font-bold text-ink"
+                    ? "border-inverse bg-inverse font-semibold text-inverse-ink"
                     : "border-transparent text-ink-2 hover:border-line hover:bg-hover hover:text-ink",
                 )}
               >
                 <span
                   className={cn(
                     "w-4 text-center text-[11px] tabular-nums",
-                    screen === item.id ? "text-muted" : "text-subtle",
+                    screen === item.id ? "text-inverse-muted" : "text-subtle",
                   )}
                 >
                   {item.n}

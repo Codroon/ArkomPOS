@@ -25,8 +25,8 @@ import {
   Chip,
   cn,
   Field,
+  AccentButton,
   GhostButton,
-  PrimaryButton,
   ScanInput,
   SectionLabel,
   SelectInput,
@@ -325,7 +325,7 @@ export function EntradaDrawer({
                   >
                     <span className="min-w-0 flex-1 truncate text-[12px]">{row.name}</span>
                     {row.itemType === "serialized" ? <Chip>{t("chip.serie")}</Chip> : null}
-                    <span className="font-mono text-[10px] tabular-nums text-subtle">{row.onHand}</span>
+                    <span className="font-mono font-medium text-[10px] tabular-nums text-subtle">{row.onHand}</span>
                   </button>
                 ))}
               </div>
@@ -341,7 +341,7 @@ export function EntradaDrawer({
                     {product.name}
                     {serialized ? <Chip className="ml-1.5">{t("chip.serie")}</Chip> : null}
                   </div>
-                  <div className="font-mono text-[10px] tabular-nums text-subtle">
+                  <div className="font-mono font-medium text-[10px] tabular-nums text-subtle">
                     {knownRow?.barcode ?? t("common.dash")} · {t("entry.currentStock", { n: product.onHand })}
                   </div>
                 </div>
@@ -430,7 +430,7 @@ export function EntradaDrawer({
                 {imeis.map((imei) => (
                   <span
                     key={imei}
-                    className="inline-flex items-center gap-1 rounded-[2px] border border-line bg-surface-2 px-1 py-px font-mono text-[10px] tabular-nums"
+                    className="inline-flex items-center gap-1 rounded-[2px] border border-line bg-surface-2 px-1 py-px font-mono font-medium text-[10px] tabular-nums"
                   >
                     {imei}
                     <button
@@ -508,11 +508,11 @@ export function EntradaDrawer({
                 <div key={l.key} className="flex items-start gap-2 border-b border-line px-2 py-1.5 last:border-b-0">
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[12px]">{l.name}</div>
-                    <div className="font-mono text-[10px] tabular-nums text-subtle">
+                    <div className="font-mono font-medium text-[10px] tabular-nums text-subtle">
                       {l.imeis.length > 0 ? t("entry.stagedUnits", { n: l.imeis.length }) : l.code ?? ""}
                     </div>
                   </div>
-                  <div className="whitespace-nowrap font-mono text-[11px] tabular-nums">
+                  <div className="whitespace-nowrap font-mono font-medium text-[11px] tabular-nums">
                     {l.qty} × {formatCents(l.unitCostCents)}
                   </div>
                   <button
@@ -531,14 +531,15 @@ export function EntradaDrawer({
 
         {/* footer */}
         <div className="flex-none border-t border-line-strong bg-surface-2 px-4 py-3">
-          {confirmError ? <div className="mb-2 text-[11px] text-ink-2">{confirmError}</div> : null}
+          {confirmError ? <div className="mb-2 text-[11px] text-danger-ink">{confirmError}</div> : null}
           <div className="mb-2 flex items-baseline justify-between">
             <SectionLabel>{t("entry.stagedTotal")}</SectionLabel>
             <span className="font-mono text-[14px] font-bold tabular-nums">{formatCents(totalCents)}</span>
           </div>
-          <PrimaryButton className="h-9 w-full text-[13px]" onClick={confirm} disabled={!canConfirm}>
+          {/* the single blue element on Inventario */}
+          <AccentButton className="h-9 w-full text-[13px]" onClick={confirm} disabled={!canConfirm}>
             {submitting ? t("common.saving") : t("entry.confirm")}
-          </PrimaryButton>
+          </AccentButton>
         </div>
       </div>
 

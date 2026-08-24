@@ -48,11 +48,11 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
   const [parkedOpen, setParkedOpen] = useState(false);
   const [tenders, setTenders] = useState<TenderEntry[]>([]);
   const [charging, setCharging] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; tone: "neutral" | "danger" } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showToast = useCallback((message: string) => {
-    setToast(message);
+  const showToast = useCallback((message: string, tone: "neutral" | "danger" = "danger") => {
+    setToast({ text: message, tone });
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 3000);
   }, []);
@@ -161,7 +161,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
     },
     onCreateProduct: (code) => openCatalogWithBarcode(code),
     onError: (message) => showToast(message),
-    onAttached: (product, code) => showToast(t("unknown.attached", { code, name: product.name })),
+    onAttached: (product, code) => showToast(t("unknown.attached", { code, name: product.name }), "neutral"),
     onUnknown: (code) => {
       setNoMatch(code);
       setShake(true);
@@ -359,7 +359,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
             {t("park.chip", { n: parkedList.length })}
           </button>
         ) : null}
-        <div className="font-mono text-[10px] text-subtle">{t("sale.kbdHints")}</div>
+        <div className="font-mono font-medium text-[10px] text-subtle">{t("sale.kbdHints")}</div>
       </div>
       {parkedOpen ? <ParkedPopover parked={parkedList} onResume={onResume} onClose={() => setParkedOpen(false)} /> : null}
 
@@ -390,7 +390,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
               className={cn(
                 "h-6 rounded-[3px] border px-2 text-[11px] font-bold",
                 activeGroup === ""
-                  ? "border-ink-2 bg-ink-2 text-white"
+                  ? "border-ink bg-ink text-inverse-ink"
                   : "border-line-strong bg-card text-ink-2 hover:border-muted",
               )}
             >
@@ -404,7 +404,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
                 className={cn(
                   "h-6 rounded-[3px] border px-2 text-[11px] font-bold",
                   activeGroup === group.id
-                    ? "border-ink-2 bg-ink-2 text-white"
+                    ? "border-ink bg-ink text-inverse-ink"
                     : "border-line-strong bg-card text-ink-2 hover:border-muted",
                 )}
               >
@@ -458,7 +458,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
       ) : null}
       {parkOpen ? <ParkModal onPark={onPark} onClose={() => setParkOpen(false)} /> : null}
       {scanModals}
-      <Toast message={toast} />
+      <Toast message={toast?.text ?? null} tone={toast?.tone ?? "neutral"} />
     </div>
   );
 }

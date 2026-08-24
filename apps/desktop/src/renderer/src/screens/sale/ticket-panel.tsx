@@ -38,12 +38,12 @@ function LineRow({
             {line.description}
             {serialized ? <Chip className="ml-1.5">{t("chip.serie")}</Chip> : null}
             {line.priceOverridden ? (
-              <Chip variant="warn" className="ml-1.5">
+              <Chip variant="info" className="ml-1.5">
                 {t("chip.modificado")}
               </Chip>
             ) : null}
           </div>
-          <div className="font-mono text-[10px] tabular-nums text-subtle">
+          <div className="font-mono font-medium text-[10px] tabular-nums text-subtle">
             {serialized ? `IMEI ${line.imei ?? "—"}` : line.barcode ?? "—"} · {line.qty} ×{" "}
             {formatCents(line.unitPriceCents)}
           </div>
@@ -168,7 +168,7 @@ export function TicketPanel({
       </div>
 
       {/* totals strip — always server state (handoff 01) */}
-      <div className="border-t border-line-strong bg-surface-2 px-3 py-2 font-mono tabular-nums">
+      <div className="border-t border-line-strong bg-surface-2 px-3 py-2 font-mono font-medium tabular-nums">
         <div className="flex justify-between text-[11px] text-muted">
           <span className="font-sans">{t("sale.subtotal")}</span>
           <MoneyText cents={sale?.subtotalCents ?? 0} />
@@ -179,7 +179,7 @@ export function TicketPanel({
         </div>
         <div className="mt-1 flex items-baseline justify-between">
           <span className="font-sans text-[12px] font-bold">{t("sale.total")}</span>
-          <MoneyText cents={sale?.totalCents ?? 0} className="text-[20px] font-bold" />
+          <MoneyText cents={sale?.totalCents ?? 0} className="font-display text-[20px]" />
         </div>
       </div>
     </div>

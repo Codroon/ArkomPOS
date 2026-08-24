@@ -46,7 +46,7 @@ function FilterChip({
       className={cn(
         "h-6 rounded-[3px] border px-2 text-[11px] font-bold",
         active
-          ? "border-ink-2 bg-ink-2 text-white"
+          ? "border-ink bg-ink text-inverse-ink"
           : "border-line-strong bg-card text-ink-2 hover:border-muted",
       )}
     >

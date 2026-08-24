@@ -151,7 +151,7 @@ export function UnknownCodeModal({
                         {row.name}
                         {row.itemType === "serialized" ? <Chip className="ml-1.5">{t("chip.serie")}</Chip> : null}
                       </div>
-                      <div className="font-mono text-[10px] tabular-nums text-subtle">{row.barcode ?? ""}</div>
+                      <div className="font-mono font-medium text-[10px] tabular-nums text-subtle">{row.barcode ?? ""}</div>
                     </div>
                     {row.priceCents != null ? <MoneyText cents={row.priceCents} className="text-[11px]" /> : null}
                   </button>

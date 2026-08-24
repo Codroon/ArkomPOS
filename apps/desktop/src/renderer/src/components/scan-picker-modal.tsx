@@ -60,7 +60,7 @@ export function ScanPickerModal({
                     ) : null}
                     {!product.active ? <Chip className="ml-1.5">{t("chip.inactive")}</Chip> : null}
                   </div>
-                  <div className="font-mono text-[10px] tabular-nums text-subtle">
+                  <div className="font-mono font-medium text-[10px] tabular-nums text-subtle">
                     {isUnit ? `IMEI ${match.unit.imei}` : t("pick.stock", { n: product.onHand })}
                   </div>
                 </div>
