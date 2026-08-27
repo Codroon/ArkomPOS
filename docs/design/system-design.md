@@ -1,8 +1,9 @@
 # Arkom POS — System Design v1
 
 Authority order: `docs/adr/` → this document → `packages/db/src/schema.ts`. Phase 1 scope:
-sale screen, catalog, inventory (+ minimal add-stock), no auth, no sync build (sync is
-*designed* here, built in Phase 2).
+sale screen, catalog, inventory (+ minimal add-stock), ticket printing, Ajustes-lite. Auth
+arrived in v0.10.0 (ADR-0012) — §3, §4 and §4.1 below describe the guarded write path.
+Shifts and sync remain *designed* here, built later.
 
 ## 1. Component map
 
@@ -30,13 +31,22 @@ Dependency rule: `apps/* → packages/*`; `core` imports nothing from apps; `db`
 
 ## 3. The write path (the one pattern everything uses)
 
-Renderer → `ipc.invoke(channel, payload)` → main handler → **Zod parse** →
-`core` builds the mutation plan → **one SQLite transaction**:
+Renderer → `ipc.invoke(channel, payload)` → **guard: session + permission** →
+main handler → **Zod parse** → `core` builds the mutation plan → **one SQLite transaction**:
 business rows + `product_stock` cache + `oplog` entry → typed result back.
 
 - No renderer ever touches the DB. No handler computes money or stock math — that lives in core.
 - Every mutation goes through `mutate()` so the oplog before/after envelope is impossible to skip (ADR-0005).
 - Gap-free numbers allocated inside the same transaction at completion (ADR-0008).
+- **Every handler is registered through `handle(channel, permission, fn)`** and receives the
+  session as its first argument (ADR-0012). No session ⇒ `AUTH_REQUIRED`; session without the
+  permission ⇒ `PERMISSION_DENIED`. Both are decided in main — a hidden button is convenience,
+  never the control.
+- **`mutate()` stamps `user_id` from the session, never from the payload.** A renderer that
+  sends a `userId` cannot influence what the oplog records.
+- An `approvable` permission the caller lacks raises `APPROVAL_REQUIRED`; the renderer retries
+  the same call with an owner's PIN alongside the payload, and the action runs in that one call
+  with **both** `user_id` and `authorized_by_user_id` stamped.
 
 ## 4. IPC contract v1 (all payloads/results are Zod schemas in `core/ipc.ts`)
 
@@ -68,15 +78,46 @@ business rows + `product_stock` cache + `oplog` entry → typed result back.
 | `print:printers` | {} → {name, displayName}[] | OS printer list for the Ajustes dropdown. No "is default" flag — Electron 37 dropped it from PrinterInfo and the replacement is platform-specific |
 | `print:ticket` | {docId, copy?, target?:'auto'\|'pdf'} → {kind:'printed', printer} \| {kind:'pdf', path} | `auto` = the configured printer, else **PRINT_FAILED**; `pdf` = always a file under `userData/tickets`. `copy` stamps COPIA and withholds the drawer pulse. Every attempt writes `document.print` to the oplog with its target and outcome. A print failure NEVER rolls back the sale |
 | `print:test` | {target?:'auto'\|'pdf'} → same union as `print:ticket` | "Imprimir prueba": a sample ticket, not a document — consumes no ticket number, logged as `printer.test` |
-| `meta:context` | {} → {tenant, location, terminal} | injected config |
+| `meta:context` | {} → {tenant, location, terminal} | injected config · **unguarded** (the Login screen needs the shop name) |
+| `auth:login` | {userId, pin} → SessionInfo | **unguarded.** Wrong PIN ⇒ `INVALID_PIN` with attempts remaining; locked ⇒ `USER_LOCKED` with the unlock time. Never echoes the PIN |
+| `auth:session` | {} → SessionInfo | null | **unguarded.** What the renderer boots against; also pushed on every session change |
+| `auth:logout` | {} → {ok} | auto-parks an open cart with a note naming the outgoing user |
+| `auth:lock` / `auth:unlock` | lock {} → {ok} · unlock {pin} → SessionInfo | unlock accepts only the **current** user's PIN; the session and cart survive |
+| `auth:activity` | {} → void | throttled idle-timer ping from the renderer |
+| `auth:recover` | {userId, code, newPin} → {recoveryCode} | **unguarded.** Owners only; returns a fresh code, invalidates the old |
+| `users:list` | {} → UserRow[] | `users.manage`. Includes inactive; never returns a hash |
+| `users:create` | {name, role, pin, overrides} → UserRow | `users.manage`. Weak PIN ⇒ `WEAK_PIN` |
+| `users:update` | {id, name?, role?, overrides?, active?} → UserRow | `users.manage`. Last active owner ⇒ `LAST_OWNER` |
+| `users:resetPin` | {id, newPin, currentPin?} → {ok} | `users.manage`. `currentPin` required when changing your own |
 
-Typed errors: `{code: 'PRINT_FAILED' | 'DUPLICATE_NAME' | 'DUPLICATE_BARCODE' | 'DUPLICATE_IMEI' | 'NEGATIVE_STOCK' | 'UNIT_NOT_AVAILABLE' | 'TENDER_MISMATCH' | 'VALIDATION' , message, field?}` — renderer maps codes to UI, never parses strings. (DUPLICATE_NAME added with the catalog slice: req 4.4 wants name and barcode duplicates distinguished per field. DUPLICATE_IMEI added with the inventory slice: req 6.1 rejects duplicate IMEIs at entry. PRINT_FAILED added with the ticket slice: the sale is already complete when it is raised, so the UI offers Reintentar/Guardar PDF rather than treating it as a write failure.)
+Typed errors: `{code: 'AUTH_REQUIRED' | 'PERMISSION_DENIED' | 'APPROVAL_REQUIRED' | 'INVALID_PIN' | 'USER_LOCKED' | 'WEAK_PIN' | 'LAST_OWNER' | 'PRINT_FAILED' | 'DUPLICATE_NAME' | 'DUPLICATE_BARCODE' | 'DUPLICATE_IMEI' | 'NEGATIVE_STOCK' | 'UNIT_NOT_AVAILABLE' | 'TENDER_MISMATCH' | 'VALIDATION' , message, field?}` — renderer maps codes to UI, never parses strings. (DUPLICATE_NAME added with the catalog slice: req 4.4 wants name and barcode duplicates distinguished per field. DUPLICATE_IMEI added with the inventory slice: req 6.1 rejects duplicate IMEIs at entry. PRINT_FAILED added with the ticket slice: the sale is already complete when it is raised, so the UI offers Reintentar/Guardar PDF rather than treating it as a write failure. The seven auth codes arrived with ADR-0012; APPROVAL_REQUIRED is the unusual one — it names the permission and is an invitation to retry with an approver's PIN, not a refusal.)
+
+### 4.1 Users and permissions (ADR-0012)
+
+`users`: UUIDv7 `id` · tenant/location/terminal keys · `name` · `role` (text, Zod-validated in
+code, **no CHECK constraint** so a new role is not a migration) · `pin_hash` · `pin_salt` ·
+`permission_overrides` (JSON key→boolean) · `active` · `failed_attempts` · `locked_until` ·
+`recovery_code_hash` (owners, nullable) · `created_at` · `updated_at`.
+
+`oplog` gains nullable `authorized_by_user_id` beside `user_id`. Auth events (login, logout,
+lock, unlock, failed attempt, lockout, PIN reset, approval granted/denied) are oplog entries —
+no second logging system (ADR-0005).
+
+Permissions are a typed registry in `packages/core`: `{ key, module, labelEs, approvable }`
+plus role defaults, in one file. Effective = role defaults merged with the user's overrides;
+the owner role cannot be reduced. `can(user, key, ctx?)` carries `ctx` from day one, unused
+now, for future resource-level rules ("a technician may only edit repairs assigned to them")
+that must not require editing call sites.
+
+Users are **deactivated, never deleted** — history references them.
 
 ## 5. Screen ↔ data (Phase 1)
 
 - **Catalog** = `catalog:list` + save form (`catalog:save`). Missing-data chips from NULL columns.
 - **Inventory** = `inventory:list` + drawer with `inventory:movements` + Add-stock modal (`stock:add`).
 - **Sale** = local Zustand cart mirrored to draft document via `sale:*`; scan box always focused; groups grid from `productGroups`; completion runs the big transaction; ticket prints.
+- **Login / Lock / Approval** = `auth:*` only; no business data crosses until a session exists.
+- **Usuarios** = `users:*`, gated on `users.manage`; override toggles render from the core registry, so a new permission key appears with no UI change.
 
 ## 6. Sync (designed now, built Phase 2)
 
