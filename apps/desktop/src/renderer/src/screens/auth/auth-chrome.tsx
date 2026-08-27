@@ -3,9 +3,15 @@
  * countdown, and the hook behind it.
  */
 import { useEffect, useState } from "react";
-import { useT } from "@arkom/ui";
+import { LocaleToggle, useT } from "@arkom/ui";
 
-/** The same Graphite bar the shell wears, so Login looks like the app. */
+/**
+ * The same Graphite bar the shell wears, so Login looks like the app.
+ *
+ * It carries the ES · EN toggle because these screens come BEFORE the shell,
+ * and whoever configures a till has to be able to read them — that person is
+ * not always the Spanish-speaking shopkeeper.
+ */
 export function BrandPlate() {
   const t = useT();
   return (
@@ -14,6 +20,8 @@ export function BrandPlate() {
       <span className="ml-2 font-mono text-[9px] font-medium tracking-[.16em] text-inverse-muted">
         {t("shell.brandSuffix")}
       </span>
+      <div className="flex-1" />
+      <LocaleToggle />
       <span aria-hidden className="absolute inset-x-0 bottom-0 h-[3px] bg-accent" />
     </header>
   );

@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from "react";
 import { ROLE_LABELS_ES as ROLE_LABELS, type MetaContextResponse, type PermissionKey } from "@arkom/core";
-import { cn, LockBadge, useLocale, useT, type TKey } from "@arkom/ui";
+import { cn, LocaleToggle, LockBadge, useT, type TKey } from "@arkom/ui";
 import { useCan, useSession } from "../lib/use-session";
 import { registerNavigator, type ScreenId } from "../lib/screen-bus";
 import { CatalogScreen } from "../screens/catalog/catalog-screen";
@@ -104,23 +104,6 @@ function UserChip({ name, role }: { name: string; role: string }) {
         </>
       ) : null}
     </div>
-  );
-}
-
-function LocaleToggle() {
-  const t = useT();
-  const [locale, setLocale] = useLocale();
-  return (
-    <button
-      type="button"
-      title={t("shell.localeToggle")}
-      onClick={() => setLocale(locale === "es" ? "en" : "es")}
-      className="flex items-center gap-1 self-center rounded-[3px] border border-inverse-muted/50 px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-[.06em] hover:border-inverse-ink"
-    >
-      <span className={locale === "es" ? "text-inverse-ink" : "text-inverse-muted"}>ES</span>
-      <span className="text-inverse-muted">·</span>
-      <span className={locale === "en" ? "text-inverse-ink" : "text-inverse-muted"}>EN</span>
-    </button>
   );
 }
 

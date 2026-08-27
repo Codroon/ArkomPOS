@@ -2,9 +2,17 @@
 
 Follows [`00-foundations.md`](00-foundations.md): brand tokens only, no raw hex, **one blue
 element per surface** (the primary action), **white-on-blue banned**, blue body text on
-Bone banned. Spanish only on all four surfaces — these are staff-facing, but the shop is
-Spanish and the login screen is the shop's front door, so the ES/EN toggle does not appear
-until the shell loads.
+Bone banned.
+
+**The ES/EN toggle appears on every pre-shell screen** — first-run setup, owner creation,
+the recovery code, and Login. It was Spanish-only at first, on the reasoning that the shop
+is Spanish and the front door should be too. That was wrong in one specific way: the person
+*configuring* a till is often not the shopkeeper, and a setup wizard nobody in the room can
+read is not a setup wizard. The toggle sits in the brand plate, exactly where the shell puts
+it, so it is one control in one place across the whole app.
+
+Printed tickets are unaffected and always Spanish (ADR-0011). The toggle is staff UI; the
+customer's document is not.
 
 Money and time formats unchanged. All strings via `useT()` from the typed dictionary
 (ADR-0011).
@@ -44,7 +52,8 @@ Full-window, replaces the shell. No nav, no topbar chips.
 - **Right — the keypad**, disabled and dimmed until a tile is selected.
 
 **Corner:** bottom-left, 10px `subtle`, Mono — the shop's legal name and `v0.10.0`. This
-is how a support call starts ("which version are you on?").
+is how a support call starts ("which version are you on?"). The ES/EN toggle is top-right
+in the brand plate.
 
 **States**
 

@@ -18,7 +18,7 @@
  */
 import { useCallback, useMemo, useState } from "react";
 import { SetupCompleteResponseSchema } from "@arkom/core";
-import { AccentButton, Field, TextInput, useT } from "@arkom/ui";
+import { AccentButton, Field, LocaleToggle, TextInput, useT } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
 
 const PREFIX_OK = /^[A-Za-z0-9-]+$/;
@@ -130,6 +130,10 @@ export function FirstRunDialog({ onDone }: { onDone: () => void }) {
       <header className="relative flex h-11 flex-none items-center bg-inverse px-3.5 text-inverse-ink">
         <span className="font-display text-[15px] leading-none tracking-[.06em]">ARKOM</span>
         <span className="ml-2 font-mono text-[9px] font-medium tracking-[.16em] text-inverse-muted">POS</span>
+        <div className="flex-1" />
+        {/* setup is the first thing anyone sees, and the person doing it may not
+            read Spanish — the toggle has to be reachable before the shell exists */}
+        <LocaleToggle />
         <span aria-hidden className="absolute inset-x-0 bottom-0 h-[3px] bg-accent" />
       </header>
 
