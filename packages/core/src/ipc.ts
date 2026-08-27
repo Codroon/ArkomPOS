@@ -47,11 +47,34 @@ export const IPC_CHANNELS = [
   "backup:now",
   "backup:openFolder",
   "backup:pickFolder",
+  "auth:users",
+  "auth:login",
+  "auth:session",
+  "auth:logout",
+  "auth:lock",
+  "auth:unlock",
+  "auth:activity",
+  "auth:recover",
+  "auth:printRecovery",
+  "setup:owner",
+  "users:list",
+  "users:create",
+  "users:update",
+  "users:resetPin",
 ] as const;
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
 /** Typed error codes (§4) — the renderer maps codes to UI, never parses messages. */
 export const ErrorCodeSchema = z.enum([
+  /* auth (ADR-0012). APPROVAL_REQUIRED is the unusual one: it is an invitation
+     to retry with an approver's PIN, not a refusal. */
+  "AUTH_REQUIRED",
+  "PERMISSION_DENIED",
+  "APPROVAL_REQUIRED",
+  "INVALID_PIN",
+  "USER_LOCKED",
+  "WEAK_PIN",
+  "LAST_OWNER",
   "PRINT_FAILED",
   "DUPLICATE_NAME",
   "DUPLICATE_BARCODE",
@@ -578,7 +601,11 @@ export const PrintTicketsDirResponseSchema = z.object({ path: z.string() });
  * is once, and everything the answer produces lands in one transaction.
  */
 export const SetupStatusRequestSchema = z.object({}).optional();
-export const SetupStatusResponseSchema = z.object({ needed: z.boolean() });
+export const SetupStatusResponseSchema = z.object({
+  needed: z.boolean(),
+  /** shop exists but has no users — a v0.9.0 till that just upgraded (spec I2) */
+  ownerNeeded: z.boolean(),
+});
 
 export const SetupCompleteRequestSchema = z.object({
   shopLegalName: z.string().trim().min(1).max(200),
@@ -657,3 +684,122 @@ export const BackupOpenFolderResponseSchema = z.object({ ok: z.boolean() });
 /** Native folder picker for the second destination — typing a path invites typos. */
 export const BackupPickFolderRequestSchema = z.object({}).optional();
 export const BackupPickFolderResponseSchema = z.object({ path: z.string().nullable() });
+
+/* ------------------------------------------------------ auth (ADR-0012) --- */
+
+export const RoleSchema = z.enum(["owner", "cashier"]);
+
+/** A PIN in flight. Never stored in a state object, never echoed back. */
+export const PinSchema = z.string().regex(/^\d{4,6}$/, "El PIN debe tener entre 4 y 6 dígitos.");
+
+/**
+ * All the renderer ever learns about the session. No hash, no overrides map,
+ * no recovery code — just who is here and what they may do (ADR-0012 §4).
+ */
+export const SessionInfoSchema = z.object({
+  userId: z.string(),
+  name: z.string(),
+  role: z.string(),
+  permissions: z.array(z.string()),
+  /** true while the idle/manual lock overlay should cover everything */
+  locked: z.boolean(),
+});
+export type SessionInfo = z.infer<typeof SessionInfoSchema>;
+
+/** A tile on the Login screen. Deliberately not a user row. */
+export const LoginUserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  role: z.string(),
+  lockedUntilMs: z.number().int().nullable(),
+});
+export type LoginUser = z.infer<typeof LoginUserSchema>;
+
+export const AuthUsersRequestSchema = z.object({}).optional();
+export const AuthUsersResponseSchema = z.array(LoginUserSchema);
+
+export const AuthLoginRequestSchema = z.object({ userId: z.string(), pin: PinSchema });
+export const AuthLoginResponseSchema = SessionInfoSchema;
+
+export const AuthSessionRequestSchema = z.object({}).optional();
+export const AuthSessionResponseSchema = SessionInfoSchema.nullable();
+
+export const AuthLogoutRequestSchema = z.object({}).optional();
+export const AuthLogoutResponseSchema = z.object({ ok: z.boolean(), parkedDocId: z.string().nullable() });
+
+export const AuthLockRequestSchema = z.object({}).optional();
+export const AuthLockResponseSchema = z.object({ ok: z.boolean() });
+
+export const AuthUnlockRequestSchema = z.object({ pin: PinSchema });
+export const AuthUnlockResponseSchema = SessionInfoSchema;
+
+/** Throttled idle-timer ping. Carries nothing — its arrival is the message. */
+export const AuthActivityRequestSchema = z.object({}).optional();
+export const AuthActivityResponseSchema = z.object({ ok: z.boolean() });
+
+export const AuthRecoverRequestSchema = z.object({
+  userId: z.string(),
+  code: z.string().min(8).max(20),
+  newPin: PinSchema,
+});
+export const AuthRecoverResponseSchema = z.object({ recoveryCode: z.string() });
+
+/* ---- users administration (users.manage) ---- */
+
+export const UserRowSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  role: z.string(),
+  active: z.boolean(),
+  overrides: z.record(z.string(), z.boolean()),
+  lastLoginAtMs: z.number().int().nullable(),
+  lockedUntilMs: z.number().int().nullable(),
+});
+export type UserRow = z.infer<typeof UserRowSchema>;
+
+export const UsersListRequestSchema = z.object({}).optional();
+export const UsersListResponseSchema = z.array(UserRowSchema);
+
+export const UsersCreateRequestSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  role: RoleSchema,
+  pin: PinSchema,
+  overrides: z.record(z.string(), z.boolean()).default({}),
+});
+/** A new owner gets a recovery code, shown exactly once (ADR-0012 §8). */
+export const UsersCreateResponseSchema = z.object({
+  user: UserRowSchema,
+  recoveryCode: z.string().nullable(),
+});
+
+export const UsersUpdateRequestSchema = z.object({
+  id: z.string(),
+  name: z.string().trim().min(1).max(80).optional(),
+  role: RoleSchema.optional(),
+  overrides: z.record(z.string(), z.boolean()).optional(),
+  active: z.boolean().optional(),
+});
+export const UsersUpdateResponseSchema = UserRowSchema;
+
+export const UsersResetPinRequestSchema = z.object({
+  id: z.string(),
+  newPin: PinSchema,
+  /** required when changing your OWN pin (ADR-0012 / spec G5) */
+  currentPin: PinSchema.optional(),
+});
+export const UsersResetPinResponseSchema = z.object({ ok: z.boolean() });
+
+/* ---- first-run owner creation ---- */
+
+export const SetupOwnerRequestSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  pin: PinSchema,
+});
+export const SetupOwnerResponseSchema = z.object({
+  user: UserRowSchema,
+  recoveryCode: z.string(),
+});
+
+/** Prints the recovery code on the thermal printer, or falls back to PDF. */
+export const AuthPrintRecoveryRequestSchema = z.object({ code: z.string(), name: z.string() });
+export const AuthPrintRecoveryResponseSchema = PrintTicketResponseSchema;

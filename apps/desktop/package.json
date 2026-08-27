@@ -16,7 +16,8 @@
     "imei:gen": "node scripts/imei-gen.cjs",
     "typecheck": "tsc --noEmit",
     "postinstall": "electron-builder install-app-deps",
-    "icons:build": "node scripts/run-icons.cjs"
+    "icons:build": "node scripts/run-icons.cjs",
+    "test": "vitest run --config vitest.config.ts --root ."
   },
   "dependencies": {
     "@arkom/core": "workspace:*",
@@ -44,6 +45,7 @@
     "esbuild": "^0.25.0",
     "tailwindcss": "^4.1.11",
     "typescript": "^5.9.2",
-    "vite": "^7.0.0"
+    "vite": "^7.0.0",
+    "vitest": "^3.2.7"
   }
 }

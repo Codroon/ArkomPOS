@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "pnpm --filter arkom-pos dev",
     "dev:web": "pnpm --filter @arkom/web dev",
-    "test": "pnpm --filter @arkom/core test",
+    "test": "pnpm --filter @arkom/core test && pnpm --filter arkom-pos test",
     "typecheck": "pnpm -r typecheck",
     "db:generate": "pnpm --filter @arkom/db db:generate",
     "db:migrate": "pnpm --filter arkom-pos db:migrate",
@@ -19,5 +19,8 @@
     "db:audit": "pnpm --filter arkom-pos db:audit",
     "imei:gen": "pnpm --filter arkom-pos imei:gen",
     "build:win": "pnpm --filter arkom-pos build:win"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.7"
   }
 }

@@ -17,11 +17,13 @@ import {
   appError,
   mutate,
   renderTicket,
+  wrapText,
   type MutationCtx,
   type PrinterInfo,
   type PrintTicketRequest,
   type PrintTicketResponse,
   type TicketDoc,
+  type TicketOp,
 } from "@arkom/core";
 import type { ArkomDb } from "@arkom/db";
 import { makeMutateRunner } from "../mutate-runner";
@@ -218,5 +220,72 @@ export async function printTest(
       error: err instanceof Error ? err.message : String(err),
     });
     throw appError("PRINT_FAILED", `No se pudo imprimir en ${settings.printerName}.`);
+  }
+}
+
+/**
+ * Print the owner's recovery code on the thermal printer.
+ *
+ * Deliberately its own tiny document rather than a ticket: it carries no shop
+ * totals, no number, and must not look like a receipt someone can throw away.
+ * If there is no printer it falls back to a PDF like everything else, so the
+ * code can still be saved on a till that has not been wired up yet.
+ */
+export async function printRecoveryCode(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  ownerName: string,
+  code: string,
+): Promise<PrintTicketResponse> {
+  const settings = getSettings(db, ctx);
+  const shop = shopProfile(db, ctx);
+  const cols = settings.paperWidthMm === 58 ? 32 : 42;
+  const centre = (text: string) => ({
+    op: "text" as const,
+    text,
+    align: "center" as const,
+    bold: false,
+    size: "normal" as const,
+  });
+
+  const ops: TicketOp[] = [
+    { op: "text", text: "ARKOM", align: "center", bold: true, size: "big" },
+    centre("CODIGO DE RECUPERACION"),
+    { op: "rule", char: "-" },
+    centre(shop.legalName),
+    centre(`Responsable: ${ownerName}`),
+    centre(new Date().toLocaleDateString("es-ES")),
+    { op: "feed", lines: 1 },
+    { op: "text", text: code, align: "center", bold: true, size: "wide" },
+    { op: "feed", lines: 1 },
+    { op: "rule", char: "-" },
+    ...wrapText(
+      "Guarda este papel fuera de la caja. Permite recuperar el acceso si olvidas tu PIN. No se volvera a mostrar.",
+      cols,
+    ).map(centre),
+    { op: "feed", lines: 2 },
+    { op: "cut" },
+  ];
+
+  const logPrint = (after: Record<string, unknown>) =>
+    mutate(makeMutateRunner(db), ctx, (_tx, log) => {
+      // the CODE never enters the payload — only that one was printed
+      log({ entity: "user", entityId: ctx.userId ?? "owner", action: "recovery_printed", before: null, after });
+    });
+
+  if (!settings.printerName) {
+    const path = await renderTicketPdf(ops, settings.paperWidthMm, "CODIGO-RECUPERACION");
+    logPrint({ ok: true, target: "pdf" });
+    return { kind: "pdf", path };
+  }
+  try {
+    await sendRawToPrinter(settings.printerName, encodeEscPos(ops, settings.commandSet, settings.paperWidthMm));
+    logPrint({ ok: true, target: "printer", printer: settings.printerName });
+    return { kind: "printed", printer: settings.printerName };
+  } catch {
+    // a failed print must not lose the code — fall through to a file
+    const path = await renderTicketPdf(ops, settings.paperWidthMm, "CODIGO-RECUPERACION");
+    logPrint({ ok: false, target: "printer", fellBackToPdf: true });
+    return { kind: "pdf", path };
   }
 }
