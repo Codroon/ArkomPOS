@@ -17,7 +17,7 @@
     "typecheck": "tsc --noEmit",
     "postinstall": "electron-builder install-app-deps",
     "icons:build": "node scripts/run-icons.cjs",
-    "test": "vitest run --config vitest.config.ts --root ."
+    "test": "node scripts/run-tests.cjs"
   },
   "dependencies": {
     "@arkom/core": "workspace:*",

@@ -14,6 +14,7 @@ import {
   type SaleAddLineResponse,
   type SaleLineRow,
   type SaleState,
+  formatCents,
 } from "@arkom/core";
 import { cn, GhostButton, ScanInput, Toast, useDataLabel, useT, type ScanInputHandle } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
@@ -23,6 +24,7 @@ import { ProductGrid } from "./product-grid";
 import { TicketPanel } from "./ticket-panel";
 import { useTicketPrint } from "../../lib/use-ticket-print";
 import { PrintToast } from "../../lib/print-toast";
+import { useApprovalFlow } from "../../lib/use-approval";
 import { CompletedPanel, PaymentPanel, parseTenders, type TenderEntry } from "./payment-panel";
 import { OverrideModal, ParkModal, ParkedPopover, UnitPickModal, type UnitPickState } from "./sale-modals";
 
@@ -53,6 +55,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
   const [toast, setToast] = useState<{ text: string; tone: "neutral" | "danger" } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const printer = useTicketPrint();
+  const approval = useApprovalFlow();
 
   const showToast = useCallback((message: string, tone: "neutral" | "danger" = "danger") => {
     setToast({ text: message, tone });
@@ -236,18 +239,44 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
     [sale, applyState, showToast, t],
   );
 
+  /**
+   * A cashier lacks sale.price_override, so this raises APPROVAL_REQUIRED and
+   * the flow collects an owner's PIN and retries the SAME call — the override
+   * then lands with both ids on its audit entry. An owner never sees a keypad.
+   */
   const onOverrideApply = useCallback(
     (newPriceCents: number, reason: string) => {
       if (!sale || !overrideLine) return;
-      window.arkom
-        .invoke("sale:overridePrice", { docId: sale.docId, lineId: overrideLine.id, newPriceCents, reason })
+      const line = overrideLine;
+      void approval
+        .run(
+          (auth) =>
+            window.arkom.invoke(
+              "sale:overridePrice",
+              { docId: sale.docId, lineId: line.id, newPriceCents, reason },
+              auth,
+            ),
+          "sale.price_override",
+          {
+            title: t("apr.priceOverride"),
+            details: [
+              { label: t("sale.ticket"), value: line.description },
+              {
+                label: t("ovr.newPrice"),
+                value: `${formatCents(line.unitPriceCents)} → ${formatCents(newPriceCents)}`,
+                mono: true,
+              },
+              { label: t("apr.reason"), value: reason },
+            ],
+          },
+        )
         .then((s) => {
           setOverrideLine(null);
           applyState(s);
         })
         .catch((err) => showToast(errorMessage(t, err)));
     },
-    [sale, overrideLine, applyState, showToast, t],
+    [sale, overrideLine, applyState, showToast, t, approval],
   );
 
   const resetForNewSale = useCallback(() => {
@@ -480,6 +509,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
       {scanModals}
       <Toast message={toast?.text ?? null} tone={toast?.tone ?? "neutral"} />
       <PrintToast printer={printer} className={toast ? "bottom-16" : undefined} />
+      {approval.modal}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseIpcError, type CatalogListRequest, type EntityRef, type ProductRow } from "@arkom/core";
 import { cn, ConfirmDialog, GhostButton, PrimaryButton, SearchInput, useDataLabel, useT } from "@arkom/ui";
 import { consumeCatalogPrefill } from "../../lib/screen-bus";
+import { useApprovalFlow } from "../../lib/use-approval";
 import { CatalogEditor } from "./catalog-editor";
 import { CatalogTable, type Sort, type SortKey } from "./catalog-table";
 import {
@@ -57,6 +58,7 @@ function FilterChip({
 
 export function CatalogScreen() {
   const t = useT();
+  const approval = useApprovalFlow();
   const dataLabel = useDataLabel();
   const [rows, setRows] = useState<ProductRow[]>([]);
   const [groups, setGroups] = useState<EntityRef[]>([]);
@@ -160,8 +162,18 @@ export function CatalogScreen() {
       setSaving(true);
       setServerErrors({});
       setGeneralError(null);
-      window.arkom
-        .invoke("catalog:save", { ...request, confirmed })
+      // creating and editing are different permissions and both are approvable:
+      // a cashier fixing a price on the shop floor gets the owner's keypad
+      // rather than a dead end (handoff/auth.md, "Shell changes")
+      void approval
+        .run(
+          (auth) => window.arkom.invoke("catalog:save", { ...request, confirmed }, auth),
+          request.id ? "catalog.edit" : "catalog.create",
+          {
+            title: request.id ? t("apr.catalogEdit") : t("apr.catalogCreate"),
+            details: [{ label: t("editor.name"), value: request.name }],
+          },
+        )
       .then((result) => {
         // req 4.4 amended: a barcode already in use warns instead of blocking
         if (result.kind === "barcodeWarning") {
@@ -184,7 +196,7 @@ export function CatalogScreen() {
       })
         .finally(() => setSaving(false));
     },
-    [draft, openDraft, refresh],
+    [draft, openDraft, refresh, approval, t],
   );
 
   const onSave = useCallback(() => submit(false), [submit]);
@@ -349,6 +361,7 @@ export function CatalogScreen() {
         }}
         onCancel={() => setBarcodeWarning(null)}
       />
+      {approval.modal}
     </div>
   );
 }
