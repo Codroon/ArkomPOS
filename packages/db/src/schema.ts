@@ -238,7 +238,9 @@ export const oplog = sqliteTable("oplog", {
   action: text("action").notNull(),        // "create" | "update" | "complete" | "park" | ...
   before: text("before", { mode: "json" }),
   after: text("after", { mode: "json" }),
-  userId: text("user_id"),                 // nullable until auth (ADR-0010)
+  userId: text("user_id"),                 // NULL = pre-auth (ADR-0010/0012)
+  /** set only when an action needed a second person's PIN (ADR-0012 §5) */
+  authorizedByUserId: text("authorized_by_user_id"),
   createdAt: ts("created_at").notNull(),
 }, (t) => [
   uniqueIndex("ux_oplog_opid").on(t.opId),
@@ -264,3 +266,37 @@ export const settings = sqliteTable("settings", {
   value: text("value").notNull(),
   updatedAt: ts("updated_at").notNull(),
 }, (t) => [primaryKey({ columns: [t.tenantId, t.key] })]);
+
+/* ---------------- users: local PIN credentials (ADR-0012) ----------------
+ * The till's ONLY authority. Phase 2 Supabase identities stay separate and are
+ * joined later by a nullable cloud_user_id — a link, never a merge: the till
+ * must authenticate with the router unplugged.
+ *
+ * `role` is text with NO check constraint on purpose. Adding a role (Technician,
+ * when repairs land) must be one edit to the permission registry in core, not a
+ * migration. Zod validates it in code, where it can be tested.
+ *
+ * Users are DEACTIVATED, never deleted — documents and oplog rows point here. */
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  locationId: text("location_id").notNull().references(() => locations.id),
+  terminalId: text("terminal_id").notNull().references(() => terminals.id),
+  name: text("name").notNull(),
+  role: text("role").notNull(),                    // "owner" | "cashier" | … (Zod, not CHECK)
+  pinHash: text("pin_hash").notNull(),             // self-describing: scrypt$… or $argon2id$…
+  /** JSON map of permission key → boolean, layered over the role's defaults. */
+  permissionOverrides: text("permission_overrides", { mode: "json" }),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  /* persisted so a lockout survives killing the app — the obvious bypass, closed */
+  failedAttempts: integer("failed_attempts").notNull().default(0),
+  lockedUntil: ts("locked_until"),
+  /** owners only; SHA-256 of the printed code (ADR-0012 §8) */
+  recoveryCodeHash: text("recovery_code_hash"),
+  lastLoginAt: ts("last_login_at"),
+  createdAt: ts("created_at").notNull(),
+  updatedAt: ts("updated_at").notNull(),
+}, (t) => [
+  uniqueIndex("ux_user_tenant_name").on(t.tenantId, t.name),
+  index("ix_user_active").on(t.tenantId, t.active),
+]);

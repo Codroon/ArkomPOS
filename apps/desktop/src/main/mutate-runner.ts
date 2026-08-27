@@ -26,6 +26,7 @@ export function makeMutateRunner(db: ArkomDb): MutateRunner<DbTx> {
             before: e.before ?? null,
             after: e.after ?? null,
             userId: e.userId,
+            authorizedByUserId: e.authorizedByUserId ?? null,
             createdAt: e.createdAt,
           })
           .run();

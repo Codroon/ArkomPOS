@@ -14,7 +14,19 @@ export interface MutationCtx {
   tenantId: string;
   locationId: string;
   terminalId: string;
-  userId: string | null; // nullable until auth (ADR-0010)
+  /**
+   * Who did it. NULL means "pre-auth" — a row written before v0.10.0 (ADR-0010).
+   * Stamped from the SESSION in main, never from anything the renderer sends
+   * (ADR-0012 §5): a payload carrying a userId must not be able to change what
+   * the audit trail records.
+   */
+  userId: string | null;
+  /**
+   * Who allowed it, when the actor lacked the permission and a second person
+   * typed their PIN. "Ana discounted this phone" and "Ana discounted this phone
+   * and Ahmer approved it" are different facts; the second settles arguments.
+   */
+  authorizedByUserId?: string | null;
 }
 
 /** What a mutation declares about itself. */

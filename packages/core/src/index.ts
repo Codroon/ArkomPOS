@@ -64,6 +64,28 @@ export type {
   ShopProfile,
   PaperWidthMm,
 } from "./ticket";
+export {
+  PIN_MIN_LENGTH,
+  PIN_MAX_LENGTH,
+  checkPin,
+  isPinAcceptable,
+  setArgon2,
+  activeScheme,
+  hashPin,
+  verifyPin,
+  generateRecoveryCode,
+  normalizeRecoveryCode,
+  hashRecoveryCode,
+  verifyRecoveryCode,
+  LOCKOUT_THRESHOLD,
+  LOCKOUT_LADDER_MS,
+  isLockedOut,
+  lockoutRemainingMs,
+  attemptsRemaining,
+  registerFailure,
+  registerSuccess,
+} from "./pin";
+export type { PinProblem, PinScheme, LockoutState } from "./pin";
 export { AppError, appError, toBridgeError, parseIpcError } from "./errors";
 export {
   TAX_RATE_BP,
