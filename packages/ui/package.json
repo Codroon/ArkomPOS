@@ -8,7 +8,10 @@
     ".": "./src/index.ts",
     "./cn": "./src/cn.ts",
     "./styles/tokens.css": "./src/styles/tokens.css",
-    "./styles/fonts.css": "./src/styles/fonts.css"
+    "./styles/fonts.css": "./src/styles/fonts.css",
+    "./i18n/es": "./src/i18n/es.ts",
+    "./i18n/en": "./src/i18n/en.ts",
+    "./package.json": "./package.json"
   },
   "main": "./src/index.ts",
   "types": "./src/index.ts",

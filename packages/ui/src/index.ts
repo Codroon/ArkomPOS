@@ -1,5 +1,16 @@
 export { cn } from "./cn";
-export { useT, useLocale, getLocale, setLocale, translate, translateData, useDataLabel } from "./i18n";
+export {
+  useT,
+  useLocale,
+  getLocale,
+  setLocale,
+  translate,
+  translateData,
+  useDataLabel,
+  usePermissionLabel,
+  useModuleLabel,
+  useRoleLabel,
+} from "./i18n";
 export type { TKey, TFn, Locale, DataLabelFn } from "./i18n";
 export { LockBadge } from "./components/lock-badge";
 export { SectionLabel } from "./components/section-label";

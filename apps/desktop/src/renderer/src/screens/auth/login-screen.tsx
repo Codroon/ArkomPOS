@@ -11,17 +11,17 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   AuthUsersResponseSchema,
-  ROLE_LABELS_ES,
   SessionInfoSchema,
   type LoginUser,
 } from "@arkom/core";
-import { cn, Keypad, useT } from "@arkom/ui";
+import { cn, Keypad, useRoleLabel, useT } from "@arkom/ui";
 import { ipcOf } from "../../lib/errors";
 import { BrandPlate, CountdownChip, useCountdown } from "./auth-chrome";
 import { ForgotPinFlow } from "./forgot-pin";
 
 export function LoginScreen({ onSignedIn }: { onSignedIn: () => void }) {
   const t = useT();
+  const roleLabel = useRoleLabel();
   const [users, setUsers] = useState<LoginUser[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pin, setPin] = useState("");
@@ -120,7 +120,7 @@ export function LoginScreen({ onSignedIn }: { onSignedIn: () => void }) {
                     u.id === selectedId ? "text-inverse-muted" : "text-muted",
                   )}
                 >
-                  {ROLE_LABELS_ES[u.role as keyof typeof ROLE_LABELS_ES] ?? u.role}
+                  {roleLabel(u.role)}
                 </div>
                 {u.lockedUntilMs && u.lockedUntilMs > Date.now() ? (
                   <div className="mt-1">

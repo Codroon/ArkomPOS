@@ -476,6 +476,30 @@ export const es = {
   "err.weakPin": "Ese PIN es demasiado fácil de adivinar.",
   "err.lastOwner": "Debe quedar al menos un responsable activo.",
 
+  /* roles and permissions — the registry holds keys, the dictionary holds words */
+  "role.owner": "Responsable",
+  "role.cashier": "Cajero",
+
+  "permMod.sale": "Venta",
+  "permMod.catalog": "Catálogo",
+  "permMod.inventory": "Inventario",
+  "permMod.admin": "Administración",
+
+  "perm.sale.create": "Vender",
+  "perm.sale.park": "Aparcar tickets",
+  "perm.sale.resume": "Recuperar tickets aparcados",
+  "perm.sale.price_override": "Modificar el precio de una línea",
+  "perm.catalog.view": "Ver el catálogo",
+  "perm.catalog.attach_code": "Asignar un código a un artículo",
+  "perm.catalog.create": "Crear artículos",
+  "perm.catalog.edit": "Editar artículos",
+  "perm.inventory.view": "Ver el inventario",
+  "perm.inventory.receive": "Registrar entradas de stock",
+  "perm.inventory.adjust": "Ajustar stock",
+  "perm.users.manage": "Gestionar usuarios",
+  "perm.settings.edit": "Cambiar ajustes",
+  "perm.backup.manage": "Gestionar copias de seguridad",
+
   /* backups */
   "bk.section": "Copia de seguridad",
   "bk.intro": "La copia se hace sola cada noche y al cerrar el programa. Se guardan las {keep} últimas.",

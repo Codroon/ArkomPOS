@@ -6,8 +6,8 @@
  * (ADR-0011); the date format stays dd/mm/yyyy hh:mm regardless of locale.
  */
 import { useEffect, useState } from "react";
-import { ROLE_LABELS_ES as ROLE_LABELS, type MetaContextResponse, type PermissionKey } from "@arkom/core";
-import { cn, LocaleToggle, LockBadge, useT, type TKey } from "@arkom/ui";
+import type { MetaContextResponse, PermissionKey } from "@arkom/core";
+import { cn, LocaleToggle, LockBadge, useRoleLabel, useT, type TKey } from "@arkom/ui";
 import { useCan, useSession } from "../lib/use-session";
 import { registerNavigator, type ScreenId } from "../lib/screen-bus";
 import { CatalogScreen } from "../screens/catalog/catalog-screen";
@@ -49,6 +49,7 @@ function formatNow(d: Date): string {
  */
 function UserChip({ name, role }: { name: string; role: string }) {
   const t = useT();
+  const roleLabel = useRoleLabel();
   const [open, setOpen] = useState(false);
 
   // called separately rather than through a union: window.arkom.invoke is
@@ -79,7 +80,7 @@ function UserChip({ name, role }: { name: string; role: string }) {
       >
         <span className="text-[11px] font-semibold text-inverse-ink">{name}</span>
         <span className="font-mono text-[9px] tracking-[.08em] text-inverse-muted">
-          {(ROLE_LABELS as Record<string, string>)[role] ?? role}
+          {roleLabel(role)}
         </span>
       </button>
       {open ? (

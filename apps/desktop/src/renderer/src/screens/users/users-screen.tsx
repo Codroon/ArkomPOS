@@ -13,11 +13,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   PERMISSIONS,
   PERMISSION_MODULES,
-  ROLE_LABELS_ES,
   UserRowSchema,
   UsersListResponseSchema,
   isRoleDefault,
-  type PermissionModule,
   type UserRow,
 } from "@arkom/core";
 import {
@@ -32,18 +30,14 @@ import {
   Switch,
   TextInput,
   Toast,
+  useModuleLabel,
+  usePermissionLabel,
+  useRoleLabel,
   useT,
 } from "@arkom/ui";
 import { errorMessage, ipcOf } from "../../lib/errors";
 import { useSession } from "../../lib/use-session";
 import { RecoveryCodeStep } from "../auth/recovery-code-step";
-
-const MODULE_LABELS: Record<PermissionModule, string> = {
-  sale: "Venta",
-  catalog: "Catálogo",
-  inventory: "Inventario",
-  admin: "Administración",
-};
 
 interface Draft {
   id: string | null;
@@ -84,6 +78,9 @@ function formatWhen(ms: number | null, never: string): string {
 
 export function UsersScreen() {
   const t = useT();
+  const permLabel = usePermissionLabel();
+  const modLabel = useModuleLabel();
+  const roleLabel = useRoleLabel();
   const { session } = useSession();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -214,7 +211,7 @@ export function UsersScreen() {
                   )}
                 >
                   <td className="px-4 py-2 font-semibold">{u.name}</td>
-                  <td className="px-4 py-2">{ROLE_LABELS_ES[u.role as keyof typeof ROLE_LABELS_ES] ?? u.role}</td>
+                  <td className="px-4 py-2">{roleLabel(u.role)}</td>
                   <td className="px-4 py-2">
                     {u.active ? (
                       <span className="text-muted">{t("usr.active")}</span>
@@ -248,8 +245,8 @@ export function UsersScreen() {
               <Field label={t("usr.role")}>
                 <Segmented
                   options={[
-                    { value: "owner", label: ROLE_LABELS_ES.owner },
-                    { value: "cashier", label: ROLE_LABELS_ES.cashier },
+                    { value: "owner", label: roleLabel("owner") },
+                    { value: "cashier", label: roleLabel("cashier") },
                   ]}
                   value={draft.role}
                   onChange={(v) => setDraft({ ...draft, role: v })}
@@ -303,7 +300,7 @@ export function UsersScreen() {
                   return (
                     <div key={mod}>
                       <div className="text-[10px] font-bold uppercase tracking-[.1em] text-subtle">
-                        {MODULE_LABELS[mod]}
+                        {modLabel(mod)}
                       </div>
                       <div className="mt-1 flex flex-col gap-1">
                         {keys.map((p) => {
@@ -330,7 +327,7 @@ export function UsersScreen() {
                                 label=""
                                 className={isOwnerDraft ? "pointer-events-none opacity-40" : ""}
                               />
-                              <span className="flex-1 text-[12px]">{p.labelEs}</span>
+                              <span className="flex-1 text-[12px]">{permLabel(p.key, p.labelEs)}</span>
                               <span className="text-[10px] text-subtle">{state}</span>
                             </div>
                           );

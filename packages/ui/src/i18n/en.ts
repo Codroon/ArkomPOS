@@ -474,6 +474,30 @@ export const en: Record<TKey, string> = {
   "err.weakPin": "That PIN is too easy to guess.",
   "err.lastOwner": "At least one active owner must remain.",
 
+  /* roles and permissions */
+  "role.owner": "Owner",
+  "role.cashier": "Cashier",
+
+  "permMod.sale": "Sale",
+  "permMod.catalog": "Catalog",
+  "permMod.inventory": "Inventory",
+  "permMod.admin": "Administration",
+
+  "perm.sale.create": "Sell",
+  "perm.sale.park": "Park tickets",
+  "perm.sale.resume": "Resume parked tickets",
+  "perm.sale.price_override": "Change a line price",
+  "perm.catalog.view": "View the catalog",
+  "perm.catalog.attach_code": "Attach a code to an item",
+  "perm.catalog.create": "Create items",
+  "perm.catalog.edit": "Edit items",
+  "perm.inventory.view": "View inventory",
+  "perm.inventory.receive": "Receive stock",
+  "perm.inventory.adjust": "Adjust stock",
+  "perm.users.manage": "Manage users",
+  "perm.settings.edit": "Change settings",
+  "perm.backup.manage": "Manage backups",
+
   /* backups */
   "bk.section": "Backup",
   "bk.intro": "Backups run on their own every night and when the app closes. The last {keep} are kept.",

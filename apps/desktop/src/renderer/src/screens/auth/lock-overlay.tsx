@@ -10,14 +10,15 @@
  * different person is "Cambiar de usuario", which logs out and parks the cart.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ROLE_LABELS_ES, SessionInfoSchema, type SessionInfo } from "@arkom/core";
-import { Keypad, useT } from "@arkom/ui";
+import { SessionInfoSchema, type SessionInfo } from "@arkom/core";
+import { Keypad, useRoleLabel, useT } from "@arkom/ui";
 import { ipcOf } from "../../lib/errors";
 import { formatCountdown } from "./login-screen";
 import { useCountdown } from "./auth-chrome";
 
 export function LockOverlay({ session, onSwitchUser }: { session: SessionInfo; onSwitchUser: () => void }) {
   const t = useT();
+  const roleLabel = useRoleLabel();
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +79,7 @@ export function LockOverlay({ session, onSwitchUser }: { session: SessionInfo; o
       <div className="mt-2 text-center">
         <div className="text-[16px] font-semibold">{session.name}</div>
         <div className="text-[11px] text-inverse-muted">
-          {ROLE_LABELS_ES[session.role as keyof typeof ROLE_LABELS_ES] ?? session.role}
+          {roleLabel(session.role)}
         </div>
       </div>
 

@@ -87,3 +87,39 @@ export function useDataLabel(): DataLabelFn {
   const [locale] = useLocale();
   return useCallback<DataLabelFn>((name) => translateData(locale, name), [locale]);
 }
+
+/* ------------------------------------------------- registry-driven labels --
+ * Permission keys, module names and roles live in `packages/core` as DATA —
+ * core owns the vocabulary, the dictionary owns the words (ADR-0011). These
+ * three resolve `perm.<key>`, `permMod.<module>` and `role.<role>` and fall
+ * back to the raw value, so a key added to the registry before its translation
+ * renders as itself rather than blowing up.
+ *
+ * `ui-labels.test.ts` fails if any registry key is missing from either
+ * dictionary, which is what keeps the fallback a safety net rather than a
+ * silent way to ship English-only labels into a Spanish shop. */
+
+function dynamic(locale: Locale, key: string, fallback: string): string {
+  const dict = DICTS[locale] as Record<string, string | undefined>;
+  return dict[key] ?? (es as Record<string, string | undefined>)[key] ?? fallback;
+}
+
+export type LabelFn = (value: string, fallback?: string) => string;
+
+/** "sale.price_override" → "Modificar el precio de una línea" */
+export function usePermissionLabel(): LabelFn {
+  const [locale] = useLocale();
+  return useCallback<LabelFn>((key, fallback) => dynamic(locale, `perm.${key}`, fallback ?? key), [locale]);
+}
+
+/** "catalog" → "Catálogo" */
+export function useModuleLabel(): LabelFn {
+  const [locale] = useLocale();
+  return useCallback<LabelFn>((mod, fallback) => dynamic(locale, `permMod.${mod}`, fallback ?? mod), [locale]);
+}
+
+/** "owner" → "Responsable" / "Owner" */
+export function useRoleLabel(): LabelFn {
+  const [locale] = useLocale();
+  return useCallback<LabelFn>((role, fallback) => dynamic(locale, `role.${role}`, fallback ?? role), [locale]);
+}

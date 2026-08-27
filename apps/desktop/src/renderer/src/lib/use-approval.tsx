@@ -13,6 +13,7 @@
  */
 import { useCallback, useState } from "react";
 import { permissionLabelEs, type PermissionKey } from "@arkom/core";
+import { usePermissionLabel } from "@arkom/ui";
 import { ApprovalModal, type ApprovalDetail } from "../components/approval-modal";
 import { ipcOf } from "./errors";
 
@@ -32,6 +33,7 @@ interface Pending {
 }
 
 export function useApprovalFlow() {
+  const permLabel = usePermissionLabel();
   const [pending, setPending] = useState<Pending | null>(null);
 
   /**
@@ -69,7 +71,7 @@ export function useApprovalFlow() {
   const modal = pending ? (
     <ApprovalModal
       title={pending.request.title}
-      permissionLabel={permissionLabelEs(pending.permission)}
+      permissionLabel={permLabel(pending.permission, permissionLabelEs(pending.permission))}
       details={pending.request.details}
       onCancel={() => pending.resolve(null)}
       onApprove={(approval) => pending.resolve(approval)}
