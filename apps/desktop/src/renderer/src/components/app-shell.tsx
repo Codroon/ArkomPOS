@@ -14,6 +14,7 @@ import { CatalogScreen } from "../screens/catalog/catalog-screen";
 import { InventoryScreen } from "../screens/inventory/inventory-screen";
 import { SaleScreen } from "../screens/sale/sale-screen";
 import { SettingsScreen } from "../screens/settings/settings-screen";
+import { UsersScreen } from "../screens/users/users-screen";
 
 /**
  * `needs` hides the row entirely when the session lacks it (handoff/auth.md,
@@ -32,6 +33,7 @@ const NAV_ITEMS: ReadonlyArray<{ n: string; labelKey: TKey; id?: ScreenId; needs
   { n: "09", labelKey: "nav.caja" },
   { n: "10", labelKey: "nav.informes" },
   { n: "11", labelKey: "nav.ajustes", id: "ajustes", needs: "settings.edit" },
+  { n: "12", labelKey: "usr.title", id: "usuarios", needs: "users.manage" },
 ];
 
 function formatNow(d: Date): string {
@@ -219,6 +221,8 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
             <CatalogScreen />
           ) : screen === "ajustes" ? (
             <SettingsScreen />
+          ) : screen === "usuarios" ? (
+            <UsersScreen />
           ) : (
             <InventoryScreen />
           )}
