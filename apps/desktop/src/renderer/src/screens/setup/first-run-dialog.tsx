@@ -10,6 +10,11 @@
  * Everything here is changeable later in Ajustes except the series prefix,
  * which ADR-0008 freezes once numbering starts — so the hint says so, next to
  * the field, rather than in a manual nobody reads.
+ *
+ * Since v0.10.0 the owner is created immediately AFTER this, in its own step:
+ * setup:status reports `ownerNeeded` and App routes there, which is the same
+ * path a v0.9.0 till takes when it updates. One flow, two entry points — rather
+ * than a fourth section here that the upgrade case could never reach.
  */
 import { useCallback, useMemo, useState } from "react";
 import { SetupCompleteResponseSchema } from "@arkom/core";

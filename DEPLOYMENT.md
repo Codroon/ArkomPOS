@@ -3,7 +3,7 @@
 Everything needed to put this on the counter PC and hand it over. Written to be
 followed at the shop, not read beforehand.
 
-Version covered: **0.9.0**.
+Version covered: **0.10.0**.
 
 ---
 
@@ -27,7 +27,7 @@ the backup destination in §7 is set up.**
 
 ## 2. What the installer contains, and what it doesn't
 
-`Arkom POS Setup 0.9.0.exe` — about 94 MB.
+`Arkom POS Setup 0.10.0.exe` — about 94 MB.
 
 **Inside it:**
 - the application,
@@ -89,7 +89,37 @@ The app opens on a welcome screen instead of the till. It asks for:
    - *Start empty* is the right choice if the owner's real stock is going in
      that same day.
 
+4. **The shop's responsable.** A name and a 4–6 digit PIN, typed twice. This is
+   the person who can manage users, change settings and authorise a discount.
+   Weak PINs are refused — no `1234`, no `1111`, no runs of digits.
+
 Everything except the prefix can be changed later in **Ajustes**.
+
+### The recovery code — do not skip this
+
+Immediately after the owner is created the till shows a **12-character recovery
+code, once**, with an **Imprimir** button. Print it and put it in the shop's
+folder or safe.
+
+It is the **only** way back in if the owner forgets their PIN. There is no
+master PIN and no vendor override — deliberately, because a till the developer
+can unlock is a till whose audit trail proves nothing. If both the PIN and the
+code are lost, recovery means restoring a backup on site.
+
+A cashier who forgets their PIN needs none of this: the owner resets it from
+**Ajustes → Usuarios** in ten seconds.
+
+### Adding staff
+
+**12 Usuarios**, owner only. Add each person with their own PIN and the
+**Cajero** role. A cashier can sell, look at the catalogue and stock, and
+receive deliveries. Changing a price, creating or editing an item, or adjusting
+stock raises **"Autorización del responsable"** — the cashier presses the
+button, the owner types their PIN on the same screen, and the sale carries on
+with both names on the record.
+
+Individual permissions can be granted or withheld per person from the same
+screen, without inventing new roles.
 
 ---
 
@@ -244,6 +274,27 @@ uninstall first.
 
 **Take a manual backup before updating** (§7). It costs ten seconds.
 
+### Updating a v0.9.0 till to v0.10.0 — what the client sees
+
+v0.10.0 adds users and permissions to a till that has been selling without
+them. The upgrade is one installer over the top and **no data is touched**:
+every existing sale, product and setting stays exactly as it was, and past
+sales keep showing no cashier name because there was none to record.
+
+On the **first launch after the update** the owner sees one new screen before
+the till:
+
+> **Un paso más**
+> Esta versión añade usuarios y permisos. Crea el responsable de la tienda para
+> continuar. Tus ventas, artículos y ajustes siguen intactos.
+
+They enter their name and choose a PIN, the recovery code is printed, and from
+then on the till opens on the Login screen. It cannot be skipped — without a
+user there is nobody to attribute a sale to.
+
+**Walk the owner through this in person, or on the phone, the first time.** It
+is the only update so far that changes what they see when the app opens.
+
 ### Uninstalling
 
 *Settings → Apps → Arkom POS → Uninstall.*
@@ -265,6 +316,10 @@ In order. Do not skip ahead — each step assumes the one above worked.
 - [ ] **2. First run with the REAL data.** Registered name, NIF, address, footer.
       Agree the ticket prefix with the owner — it is permanent. Choose demo data
       or empty (§3).
+- [ ] **2b. Create the responsable.** The owner picks their own PIN — you should
+      not know it. **Print the recovery code and watch them put it somewhere
+      safe** before continuing (§3).
+- [ ] **2c. Add the staff** in 12 Usuarios, each with their own PIN, as Cajero.
 - [ ] **3. Printer.** Driver, USB, paper, then Ajustes → pick it → 80 mm → Epson
       → **Imprimir prueba**. Check the accents, the € sign, and the cut (§4).
 - [ ] **4. Scanner.** Notepad test first, then a scan into the app's search box
@@ -293,11 +348,16 @@ In order. Do not skip ahead — each step assumes the one above worked.
       `pnpm db:audit --verify`. It must report **Todo correcto**.
 - [ ] **11. Back up.** Ajustes → **Copiar ahora**. Confirm a file appears both
       locally and on the stick.
-- [ ] **12. Show the owner three things:** how to reprint a ticket, where the
-      backups are, and that closing the app backs it up automatically.
+- [ ] **12. Show the owner four things:** how to reprint a ticket, where the
+      backups are, that closing the app backs it up automatically, and how to
+      authorise a cashier's price change with their PIN.
+- [ ] **13. Have a cashier sign in and sell one thing**, so they have done it
+      once with you standing there. Then have them try a price change and let
+      the owner authorise it.
 
 ### Leave behind
 
 - The USB backup stick, plugged in.
 - The installer file, somewhere findable, in case Windows needs reinstalling.
+- **The printed recovery code**, in the shop's folder — not in the till drawer.
 - This document.

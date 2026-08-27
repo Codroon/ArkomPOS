@@ -10,7 +10,7 @@ shop's data lives in one SQLite file on the counter PC.
 
 ---
 
-## Current state — v0.9.0
+## Current state — v0.10.0
 
 Phase 1 is complete and packaged. Verified on a clean Windows machine end to
 end, with one exception noted below.
@@ -27,15 +27,17 @@ end, with one exception noted below.
 | **Backups** | Nightly + on close via SQLite's online backup API, each one verified, last 14 kept, optional second destination |
 | **First run** | Fresh install asks the shop who it is, then migrates and starts — no seed step on a client machine |
 | **Audit** | `db:audit --verify` checks every invariant the design rests on |
+| **Auth** | PIN login with roles, per-action owner approval with dual attribution, idle lock, per-user permission overrides, owner recovery code |
 
 ### Not built yet
 
-Auth / login / shifts · refunds and voids · full invoices (tickets only) ·
+Shifts / float / Z report · refunds and voids · full invoices (tickets only) ·
 card-terminal SDK integration (references are typed in) · sync and the web
 dashboard · repairs, used devices, agency and SIM sales.
 
-The schema already anticipates all of these — nullable actor columns, tenancy
-keys, document types — so they extend rather than replace what is here.
+The schema already anticipates all of these — nullable `shift_id`, tenancy keys,
+document types — so they extend rather than replace what is here. A new role or
+module is an edit to the permission registry, not a migration (ADR-0012).
 
 ### Known gaps
 
@@ -99,7 +101,7 @@ pnpm dev              # launch the till with HMR
 | Command | What it does |
 |---|---|
 | `pnpm dev` | Run the desktop app with hot reload |
-| `pnpm test` | Vitest over `packages/core` (145 tests) |
+| `pnpm test` | Vitest: `packages/core` + the main-process guard and approval tests (224) |
 | `pnpm -r typecheck` | Typecheck every package |
 | `pnpm db:generate` | Generate a migration after editing `schema.ts` |
 | `pnpm db:migrate` | Apply pending migrations |
@@ -125,10 +127,11 @@ Read in roughly this order.
 | Document | Read it for |
 |---|---|
 | [`CLAUDE.md`](CLAUDE.md) | The house rules and the authority order. **Start here.** |
-| [`docs/adr/`](docs/adr/) | The eleven frozen decisions and why. Changing one needs a superseding ADR |
+| [`docs/adr/`](docs/adr/) | The twelve frozen decisions and why. Changing one needs a superseding ADR |
 | [`docs/design/system-design.md`](docs/design/system-design.md) | Boundaries, the write path, and the full IPC contract (§4) |
 | [`docs/specs/phase1-prd.md`](docs/specs/phase1-prd.md) | What Phase 1 promised, requirement by requirement, with what is still owed by the client |
-| [`docs/design/handoff/`](docs/design/handoff/) | Per-screen specs: foundations (brand tokens, the one-blue rule), sale, catalog, inventory |
+| [`docs/specs/auth-slice.md`](docs/specs/auth-slice.md) | The v0.10.0 auth slice, acceptance criteria A1–K3 |
+| [`docs/design/handoff/`](docs/design/handoff/) | Per-screen specs: foundations (brand tokens, the one-blue rule), sale, catalog, inventory, auth |
 | [`TESTING.md`](TESTING.md) | Manual walkthroughs in plain Spanish/English, for the owner to drive |
 | [`DEPLOYMENT.md`](DEPLOYMENT.md) | Installing on the shop PC, printer and scanner setup, backups, restore, the shop-visit checklist |
 
@@ -148,6 +151,8 @@ Break one of these and something is quietly wrong rather than loudly broken.
 | **Ticket numbers are per-till and gap-free** | Allocated inside the completion transaction. The prefix is permanent once selling starts |
 | **Errors are typed codes** | The renderer maps codes to its own strings and never parses messages |
 | **Brand tokens only** — no raw hex in components | Signal Blue lands on exactly one element per screen. **White-on-blue is banned**, and so is blue body text on Bone |
+| **Every IPC handler declares a permission** | Checks live in main; a hidden button is a courtesy, never the control. `mutate()` stamps the actor from the session, never the payload |
+| **No PIN in logs, payloads or errors** | Not even in "wrong PIN" messages, which carry attempts remaining and nothing else |
 | **Spanish first**, via the typed dictionary | `es.ts` is the source of truth; `en.ts` must satisfy the same key map or typecheck fails. Printed tickets are always Spanish regardless of the UI toggle |
 
 ---

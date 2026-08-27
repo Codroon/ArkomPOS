@@ -9,10 +9,11 @@ Operating instructions for Claude Code in this repo. Read before writing anythin
 4. This file.
 
 ## What we are building right now (Phase 1 only)
-Desktop till (Electron): **Sale**, **Catalog**, **Inventory (+ minimal add-stock)**, and **Ajustes-lite**
-(printer + paper + command set + the shop's legal block; nav 11 unlocks this and nothing else).
+Desktop till (Electron): **Sale**, **Catalog**, **Inventory (+ minimal add-stock)**, **Ajustes-lite**
+(printer + paper + command set + the shop's legal block) and **Usuarios** (nav 11 and 12).
+Since v0.10.0 the till has PIN login, roles and per-action approval (ADR-0012).
 Ticket printing is in: ESC/POS through the Windows RAW spooler, PDF fallback, reprints stamped COPIA.
-NOT in Phase 1: auth/login/shifts, refunds/voids, full invoices, card-terminal SDK, sync, web app,
+NOT yet: shifts/float/Z report, refunds/voids, full invoices, card-terminal SDK, sync, web app,
 repairs/used/agency/SIM screens. Schema already anticipates them — build nothing for them.
 
 ## Hard rules
@@ -25,6 +26,13 @@ repairs/used/agency/SIM screens. Schema already anticipates them — build nothi
 - **Renderer never touches DB/Node.** Everything crosses typed IPC validated with Zod on both sides.
 - **Tax is snapshotted on lines** (regime + rate_bp + amounts). Phase 1 = IVA21 only.
 - **Errors are typed codes** per the IPC contract — the UI never string-matches messages.
+- **Every IPC handler declares a permission.** Register through `guarded()`, `authed()` or
+  `open()` — never `ipcMain.handle` directly. The open allow-list is short and a test pins it.
+- **Permission checks live in main, never only in the renderer.** `useCan()` and `<Guarded>`
+  hide buttons as a courtesy; the guard is the control. `mutate()` stamps the actor from the
+  SESSION, never from anything the payload carries (ADR-0012).
+- **No PIN in a log line, an oplog payload, or an error message** — including "wrong PIN"
+  errors, which carry attempts remaining and nothing else. Hashes never leave the main process.
 - **Brand tokens only.** Colours and faces come from `packages/ui/src/styles/tokens.css` by
   meaning (`canvas`, `ink`, `accent`, `warning-bg`…). No raw hex in components. Signal Blue lands
   on exactly **one** element per screen — the primary action. **White-on-blue is banned** (text on

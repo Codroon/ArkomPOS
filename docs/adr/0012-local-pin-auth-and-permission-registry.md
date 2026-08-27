@@ -52,11 +52,20 @@ and a short blocklist of dates and keypad patterns. The PIN crosses IPC once as 
 is compared, and is dropped. It never enters a log line, an oplog payload, or an error
 message — including "wrong PIN" errors, which say only that.
 
-Hashed with **argon2id** via `@node-rs/argon2` (N-API, prebuilt, ABI-stable across Electron
-versions), per-user salt, constant-time verification. Node's built-in `crypto.scrypt` is a
-documented, drop-in fallback behind a two-function interface (`hashPin`, `verifyPin`) if
-the packaged build objects — the packaging risk is verified in the **first** build slice,
-not discovered at `build:win`.
+Hashed behind a two-function interface (`hashPin`, `verifyPin`) with a per-user salt and
+constant-time verification. Hashes are **self-describing** — `scrypt$…` or `$argon2id$…` —
+and verification dispatches on the prefix, so the KDF is a runtime choice rather than a
+migration.
+
+**Shipped: `crypto.scrypt`.** argon2id via `@node-rs/argon2` was the intended default and
+was built and tested working. It is not shipped, because adding it to the app's dependencies
+made electron-builder produce an installer containing that one package and nothing else — no
+better-sqlite3, no drizzle-orm — which installed, launched, and died on `Cannot find module
+'drizzle-orm/sqlite-core'`. pnpm 10+ does not install transitive platform binaries, so
+argon2's twelve optional per-platform packages are absent and electron-builder's collector
+truncates the tree when it meets them. Removing the dependency restored all 3971 entries.
+The fallback this ADR already allowed for is therefore the shipped choice, and
+`apps/desktop/src/main/auth/kdf.ts` documents the path back.
 
 **The honest reason the KDF choice is not critical:** a six-digit PIN has a million
 possible values. Anyone holding the database file can exhaust that space regardless of

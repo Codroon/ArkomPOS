@@ -504,7 +504,102 @@ beside it. Ajustes has a button for each of the first three.
 
 ---
 
-## 11. Final check
+## 11. Usuarios and PINs (v0.10.0)
+
+From this version the till asks who you are. Nothing sells until someone signs
+in, and every sale now records the person who made it.
+
+> **Dev PINs** — a seeded development database creates two users:
+> **Ahmer / 8317** (responsable) and **Ana / 5162** (cajero).
+> These exist **only** on a developer's machine. A real install has no seed
+> step: it asks the owner to set their own PIN on first launch, and nobody else
+> ever knows it.
+
+### (a) Signing in
+
+Start the app. You get tiles, not a password box. Tap **Ahmer**, type `8317`,
+press **Entrar**.
+
+Type it wrong on purpose. It should say **"PIN incorrecto · te quedan 4
+intentos"**, and count down each time. Get it wrong five times and that user
+locks for a minute with a countdown you can watch — and **the other user can
+still sign in**, because it locks the person, not the till.
+
+### (b) What a cashier cannot do
+
+Sign out (top-right, your name → **Cambiar de usuario**) and sign in as **Ana**.
+
+Look at the menu. It ends at **10 Informes** — no **11 Ajustes**, no
+**12 Usuarios**. Those are the owner's, and they are not merely greyed out:
+even if the button were there, the till would refuse the request.
+
+### (c) What a cashier can do with permission — the important one
+
+Still as Ana, put something on a ticket, click the **…** on the line and choose
+**Modificar precio**. Set a lower price, give a reason, apply.
+
+Instead of refusing, a box appears: **"Autorización del responsable"** showing
+what is being authorised — the item, `14,90 € → 10,00 €`, and your reason.
+Type **Ahmer's** PIN (`8317`) and press **Autorizar**.
+
+The price changes and the sale carries on. **This is the point of the version:**
+
+```bash
+pnpm db:audit --action price_override --diff
+```
+
+The entry records Ana as the person who did it — and Ahmer as the person who
+allowed it. Two different facts, and the second is the one that settles an
+argument three weeks later.
+
+Now try it again on another line. It asks again. There is deliberately no
+"stay authorised for five minutes".
+
+### (d) The lock
+
+Leave the till alone for five minutes, or click your name → **Bloquear**.
+
+The screen goes black with your name on it. Esc does nothing. Only **your** PIN
+opens it — there are no other user tiles — and when it opens, the ticket you
+were building is exactly where you left it.
+
+To hand over to someone else, use **Cambiar de usuario**. If a ticket is open it
+is parked automatically with a note, so the next person's lines never end up
+mixed into yours.
+
+### (e) Managing people
+
+As Ahmer, go to **12 Usuarios**.
+
+- Add a user: name, role, PIN twice. Try `1234` — it is refused as too easy.
+- Open Ana and look at **Permisos**: every permission grouped by area, each
+  saying "Por defecto", "Permitido" or "Bloqueado". Switch one on and it becomes
+  hers without inventing a new role.
+- Open Ahmer. His toggles are disabled: the responsable always has everything.
+- Try to deactivate Ahmer while he is the only responsable. **It refuses**, and
+  says why.
+
+### (f) If a PIN is forgotten
+
+A **cashier** forgetting theirs: the owner resets it from Usuarios in ten
+seconds. On the Login screen, "He olvidado mi PIN" tells them exactly that.
+
+An **owner** forgetting theirs: that is what the recovery code printed at setup
+is for. Keep it in the shop's folder — it is the only way back in, by design.
+Entering it lets you set a new PIN and prints a fresh code.
+
+### (g) The books
+
+```bash
+pnpm db:audit --entity user --diff
+```
+
+Sign-ins, sign-outs, locks, failed attempts, lockouts, approvals granted and
+denied — all there. **No PIN appears anywhere in it**, and none ever will.
+
+---
+
+## 12. Final check
 
 ```bash
 pnpm db:audit --verify

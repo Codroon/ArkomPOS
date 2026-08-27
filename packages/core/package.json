@@ -6,7 +6,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./pin-hash": "./src/pin-hash.ts"
+    "./pin-hash": "./src/pin-hash.ts",
+    "./package.json": "./package.json"
   },
   "main": "./src/index.ts",
   "types": "./src/index.ts",

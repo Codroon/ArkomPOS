@@ -84,9 +84,11 @@ screen · password or biometric login · per-terminal user restrictions.
 - [ ] **B1** PIN is 4–6 digits. Rejected with a specific message: non-digits, wrong length,
       all-same-digit (`1111`), ascending or descending runs of 3 or more (`1234`, `4321`,
       `987654`), and a short blocklist.
-- [ ] **B2** Hash/verify round-trips through one interface (`hashPin` / `verifyPin`);
-      comparison is constant-time. argon2id via `@node-rs/argon2`, with `crypto.scrypt` as
-      the documented fallback if the **packaged** build objects.
+- [x] **B2** Hash/verify round-trips through one interface (`hashPin` / `verifyPin`);
+      comparison is constant-time. Hashes are self-describing so the KDF is a runtime choice.
+      **Shipped scrypt**: argon2id broke electron-builder's node_modules collection under
+      pnpm 11 and shipped an installer that could not open its own database (ADR-0012 §2).
+      Both schemes stay covered by the tests.
 - [ ] **B3** The PIN never appears in a log file, an oplog `before`/`after` payload, an
       error message, or a renderer state object. Verified by a test that hashes a known PIN
       and greps the resulting oplog row and log line for the digits.

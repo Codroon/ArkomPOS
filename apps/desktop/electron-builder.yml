@@ -4,7 +4,12 @@ directories:
   output: release
 files:
   - out/**
-  # node_modules is included by default; better-sqlite3 is the only native one
+  # Explicit, not implicit. The main bundle require()s better-sqlite3,
+  # drizzle-orm, node-thermal-printer, zod and @node-rs/argon2 at runtime
+  # (electron-vite externalises dependencies), so they have to be in the
+  # package. Naming only "out/**" quietly shipped a build that could not open
+  # its own database — found by installing it.
+  - node_modules/**
 copyright: © Codroon
 # native module (better-sqlite3) must stay outside the asar archive
 asarUnpack:

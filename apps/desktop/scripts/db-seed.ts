@@ -15,6 +15,7 @@ import { mutate, uuidv7, type MutationCtx } from "@arkom/core";
 import { schema as s, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner } from "../src/main/mutate-runner";
 import { createShop, insertDemoData, SETUP_DONE_KEY } from "../src/main/setup";
+import { createUser } from "../src/main/auth/users";
 
 /** Ajustes defaults for a dev database: printer off, shop data still owed. */
 const DEV_SETTINGS: Record<string, string> = {
@@ -56,11 +57,19 @@ export function seed(db: ArkomDb): { seeded: boolean; message: string } {
     return insertDemoData(tx, log, ids, now);
   });
 
+  /* DEV USERS — never in a client build.
+     A client install has no seed step at all; it creates its owner through the
+     first-run step and sets a PIN nobody else knows. These two exist so
+     `pnpm dev` lands on Login with something to type, and their PINs are in
+     TESTING.md precisely because they are worthless outside a dev machine. */
+  createUser(db, ctx, { name: "Ahmer", role: "owner", pin: "8317" });
+  createUser(db, ctx, { name: "Ana", role: "cashier", pin: "5162" });
+
   return {
     seeded: true,
     message:
       `Seeded: Arkom Demo / Tienda / Till 1 (T1-), ${counts.productCount} products, ` +
       `${counts.unitCount} IMEI units, opening stock, Ajustes placeholders + oplog. ` +
-      `All catalogue rows tagged is_demo.`,
+      `All catalogue rows tagged is_demo. Dev users: Ahmer/8317 (responsable), Ana/5162 (cajero).`,
   };
 }
