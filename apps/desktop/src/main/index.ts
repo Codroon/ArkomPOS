@@ -5,6 +5,8 @@ import { registerIpcHandlers } from "./ipc";
 import { runBackup, startNightlyBackups, stopNightlyBackups } from "./backup";
 import { tillContext } from "./context";
 import { isSetupNeeded } from "./setup";
+import { installKdf } from "./auth/kdf";
+import { startIdleWatcher, stopIdleWatcher } from "./auth/session";
 import {
   hardenApp,
   installErrorLogging,
@@ -109,6 +111,7 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(async () => {
     installErrorLogging();
     hardenApp();
+    installKdf();
 
     const db = initDb();
     registerIpcHandlers(db);
@@ -117,6 +120,7 @@ if (!app.requestSingleInstanceLock()) {
     // the till may not be configured yet, so the context is read per run rather
     // than captured here — first run creates the tenant this depends on
     startNightlyBackups(db, () => tillContext(db).ctx);
+    startIdleWatcher();
 
     /**
      * Back up on the way out. The nightly run covers a till left switched on;
@@ -132,6 +136,7 @@ if (!app.requestSingleInstanceLock()) {
       event.preventDefault();
       quitting = true;
       stopNightlyBackups();
+      stopIdleWatcher();
 
       const guard = new Promise((resolve) => setTimeout(resolve, CLOSE_BACKUP_TIMEOUT_MS));
 

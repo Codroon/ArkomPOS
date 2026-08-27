@@ -32,16 +32,26 @@ import type {
   DemoRemoveResponse,
   BackupStatus,
   BackupRunResponse,
+  SessionInfo,
+  LoginUser,
+  UserRow,
 } from "@arkom/core";
 
 declare global {
+  /** Injected at build time from apps/desktop/package.json. */
+  const __APP_VERSION__: string;
+
   interface Window {
     /** Typed IPC bridge exposed by the preload script (the renderer's only I/O). */
     arkom: {
       invoke(channel: "meta:context", payload?: undefined): Promise<MetaContextResponse>;
       invoke(channel: "catalog:list", payload?: CatalogListRequest): Promise<ProductRow[]>;
       invoke(channel: "catalog:get", payload: { id: string }): Promise<ProductRow>;
-      invoke(channel: "catalog:save", payload: CatalogSaveRequest): Promise<CatalogSaveResponse>;
+      invoke(
+        channel: "catalog:save",
+        payload: CatalogSaveRequest,
+        approval?: { userId: string; pin: string },
+      ): Promise<CatalogSaveResponse>;
       invoke(channel: "catalog:groups", payload?: undefined): Promise<EntityRef[]>;
       invoke(channel: "catalog:codes", payload: { productId: string }): Promise<ProductCode[]>;
       invoke(channel: "catalog:addCode", payload: CatalogAddCodeRequest): Promise<CatalogAddCodeResponse>;
@@ -59,6 +69,7 @@ declare global {
       invoke(
         channel: "sale:overridePrice",
         payload: { docId: string; lineId: string; newPriceCents: number; reason: string },
+        approval?: { userId: string; pin: string },
       ): Promise<SaleState>;
       invoke(
         channel: "sale:park",
@@ -78,13 +89,47 @@ declare global {
         payload: { path: string; mode: "open" | "folder" },
       ): Promise<{ ok: boolean }>;
       invoke(channel: "print:ticketsDir", payload?: undefined): Promise<{ path: string }>;
-      invoke(channel: "setup:status", payload?: undefined): Promise<{ needed: boolean }>;
+      invoke(channel: "setup:status", payload?: undefined): Promise<{ needed: boolean; ownerNeeded: boolean }>;
       invoke(
         channel: "setup:complete",
         payload: SetupCompleteRequest,
       ): Promise<{ tenantId: string; demoProducts: number; demoUnits: number }>;
       invoke(channel: "demo:status", payload?: undefined): Promise<DemoStatus>;
       invoke(channel: "demo:remove", payload?: undefined): Promise<DemoRemoveResponse>;
+      invoke(channel: "auth:users", payload?: undefined): Promise<LoginUser[]>;
+      invoke(channel: "auth:login", payload: { userId: string; pin: string }): Promise<SessionInfo>;
+      invoke(channel: "auth:session", payload?: undefined): Promise<SessionInfo | null>;
+      invoke(channel: "auth:logout", payload?: undefined): Promise<{ ok: boolean; parkedDocId: string | null }>;
+      invoke(channel: "auth:lock", payload?: undefined): Promise<{ ok: boolean }>;
+      invoke(channel: "auth:unlock", payload: { pin: string }): Promise<SessionInfo>;
+      invoke(channel: "auth:activity", payload?: undefined): Promise<{ ok: boolean }>;
+      invoke(
+        channel: "auth:recover",
+        payload: { userId: string; code: string; newPin: string },
+      ): Promise<{ recoveryCode: string }>;
+      invoke(
+        channel: "auth:printRecovery",
+        payload: { code: string; name: string },
+      ): Promise<PrintTicketResponse>;
+      invoke(
+        channel: "setup:owner",
+        payload: { name: string; pin: string },
+      ): Promise<{ user: UserRow; recoveryCode: string }>;
+      invoke(channel: "users:list", payload?: undefined): Promise<UserRow[]>;
+      invoke(
+        channel: "users:create",
+        payload: { name: string; role: string; pin: string; overrides?: Record<string, boolean> },
+      ): Promise<{ user: UserRow; recoveryCode: string | null }>;
+      invoke(
+        channel: "users:update",
+        payload: { id: string; name?: string; role?: string; overrides?: Record<string, boolean>; active?: boolean },
+      ): Promise<UserRow>;
+      invoke(
+        channel: "users:resetPin",
+        payload: { id: string; newPin: string; currentPin?: string },
+      ): Promise<{ ok: boolean }>;
+      /** Session changes are pushed from main; returns an unsubscribe. */
+      onSessionChanged(fn: (session: unknown) => void): () => void;
       invoke(channel: "backup:status", payload?: undefined): Promise<BackupStatus>;
       invoke(channel: "backup:now", payload?: undefined): Promise<BackupRunResponse>;
       invoke(channel: "backup:openFolder", payload?: undefined): Promise<{ ok: boolean }>;

@@ -23,6 +23,7 @@
     "@arkom/core": "workspace:*",
     "@arkom/db": "workspace:*",
     "@arkom/ui": "workspace:*",
+    "@node-rs/argon2": "^2.1.0",
     "better-sqlite3": "^12.2.0",
     "drizzle-orm": "^0.44.4",
     "electron-updater": "^6.6.2",

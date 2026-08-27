@@ -11,9 +11,6 @@ import {
   attemptsRemaining,
   can,
   effectiveOverrides,
-  generateRecoveryCode,
-  hashPin,
-  hashRecoveryCode,
   isLockedOut,
   isPinAcceptable,
   isRole,
@@ -24,13 +21,18 @@ import {
   resolvePermissions,
   toOplogJson,
   uuidv7,
-  verifyPin,
-  verifyRecoveryCode,
   type LogFn,
   type MutationCtx,
   type PermissionKey,
   type UserRow,
 } from "@arkom/core";
+import {
+  generateRecoveryCode,
+  hashPin,
+  hashRecoveryCode,
+  verifyPin,
+  verifyRecoveryCode,
+} from "@arkom/core/pin-hash";
 import { schema as s, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner } from "../mutate-runner";
 

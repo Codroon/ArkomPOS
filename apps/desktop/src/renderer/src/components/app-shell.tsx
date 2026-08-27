@@ -6,15 +6,21 @@
  * (ADR-0011); the date format stays dd/mm/yyyy hh:mm regardless of locale.
  */
 import { useEffect, useState } from "react";
-import type { MetaContextResponse } from "@arkom/core";
+import { ROLE_LABELS_ES as ROLE_LABELS, type MetaContextResponse, type PermissionKey } from "@arkom/core";
 import { cn, LockBadge, useLocale, useT, type TKey } from "@arkom/ui";
+import { useCan, useSession } from "../lib/use-session";
 import { registerNavigator, type ScreenId } from "../lib/screen-bus";
 import { CatalogScreen } from "../screens/catalog/catalog-screen";
 import { InventoryScreen } from "../screens/inventory/inventory-screen";
 import { SaleScreen } from "../screens/sale/sale-screen";
 import { SettingsScreen } from "../screens/settings/settings-screen";
 
-const NAV_ITEMS: ReadonlyArray<{ n: string; labelKey: TKey; id?: ScreenId }> = [
+/**
+ * `needs` hides the row entirely when the session lacks it (handoff/auth.md,
+ * "Shell changes"). Hiding is a convenience — the handlers refuse the call
+ * regardless — but a cashier should not see doors they cannot open.
+ */
+const NAV_ITEMS: ReadonlyArray<{ n: string; labelKey: TKey; id?: ScreenId; needs?: PermissionKey }> = [
   { n: "01", labelKey: "nav.venta", id: "venta" },
   { n: "02", labelKey: "nav.catalogo", id: "catalogo" },
   { n: "03", labelKey: "nav.inventario", id: "inventario" },
@@ -25,12 +31,78 @@ const NAV_ITEMS: ReadonlyArray<{ n: string; labelKey: TKey; id?: ScreenId }> = [
   { n: "08", labelKey: "nav.transferencias" },
   { n: "09", labelKey: "nav.caja" },
   { n: "10", labelKey: "nav.informes" },
-  { n: "11", labelKey: "nav.ajustes", id: "ajustes" },
+  { n: "11", labelKey: "nav.ajustes", id: "ajustes", needs: "settings.edit" },
 ];
 
 function formatNow(d: Date): string {
   const p = (n: number) => String(n).padStart(2, "0");
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/**
+ * Who is at the till, with the two ways out of it.
+ *
+ * "Cambiar de usuario" logs out and auto-parks an open cart, so the next
+ * cashier's lines never join the last one's under a single attribution.
+ */
+function UserChip({ name, role }: { name: string; role: string }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+
+  // called separately rather than through a union: window.arkom.invoke is
+  // overloaded per channel, so a union of names matches none of the overloads
+  const lock = async () => {
+    setOpen(false);
+    try {
+      await window.arkom.invoke("auth:lock");
+    } catch (err) {
+      console.error("auth:lock failed", err);
+    }
+  };
+  const logout = async () => {
+    setOpen(false);
+    try {
+      await window.arkom.invoke("auth:logout");
+    } catch (err) {
+      console.error("auth:logout failed", err);
+    }
+  };
+
+  return (
+    <div className="relative flex items-center border-l border-inverse-2 px-3.5">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex flex-col items-start leading-tight hover:opacity-80"
+      >
+        <span className="text-[11px] font-semibold text-inverse-ink">{name}</span>
+        <span className="font-mono text-[9px] tracking-[.08em] text-inverse-muted">
+          {(ROLE_LABELS as Record<string, string>)[role] ?? role}
+        </span>
+      </button>
+      {open ? (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-2 top-11 z-50 w-[188px] rounded-[3px] border border-line-strong bg-card py-1 shadow-lg">
+            <button
+              type="button"
+              onClick={() => void lock()}
+              className="block w-full px-3 py-1.5 text-left text-[12px] text-ink hover:bg-hover"
+            >
+              {t("lock.button")}
+            </button>
+            <button
+              type="button"
+              onClick={() => void logout()}
+              className="block w-full px-3 py-1.5 text-left text-[12px] text-ink hover:bg-hover"
+            >
+              {t("lock.switchUser")}
+            </button>
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
 }
 
 function LocaleToggle() {
@@ -52,6 +124,8 @@ function LocaleToggle() {
 
 export function AppShell({ context }: { context: MetaContextResponse | null }) {
   const t = useT();
+  const can = useCan();
+  const { session } = useSession();
   const [screen, setScreen] = useState<ScreenId>("venta");
   const [now, setNow] = useState(() => new Date());
 
@@ -78,6 +152,7 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
           </span>
         </div>
         <div className="flex-1" />
+        {session ? <UserChip name={session.name} role={session.role} /> : null}
         <div className="flex items-center border-l border-inverse-2 px-3.5">
           <LocaleToggle />
         </div>
@@ -94,7 +169,7 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
         {/* left nav */}
         <aside className="flex w-[186px] flex-none flex-col border-r border-line-strong bg-surface">
           <div className="px-3 pb-1 pt-2.5 text-[9px] font-bold tracking-[.12em] text-subtle">{t("shell.menu")}</div>
-          {NAV_ITEMS.map((item) =>
+          {NAV_ITEMS.filter((item) => !item.needs || can(item.needs)).map((item) =>
             item.id ? (
               <button
                 key={item.n}

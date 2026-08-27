@@ -64,19 +64,15 @@ export type {
   ShopProfile,
   PaperWidthMm,
 } from "./ticket";
+/* PIN policy and lockout only. Hashing lives in "@arkom/core/pin-hash", which
+   main imports directly — this entry is bundled into the renderer and the
+   sandboxed preload, and node:crypto is not available in either. */
 export {
   PIN_MIN_LENGTH,
   PIN_MAX_LENGTH,
   checkPin,
   isPinAcceptable,
-  setArgon2,
-  activeScheme,
-  hashPin,
-  verifyPin,
-  generateRecoveryCode,
-  normalizeRecoveryCode,
-  hashRecoveryCode,
-  verifyRecoveryCode,
+  normalizeRecoveryCodeInput,
   LOCKOUT_THRESHOLD,
   LOCKOUT_LADDER_MS,
   isLockedOut,
@@ -85,7 +81,7 @@ export {
   registerFailure,
   registerSuccess,
 } from "./pin";
-export type { PinProblem, PinScheme, LockoutState } from "./pin";
+export type { PinProblem, LockoutState } from "./pin";
 export {
   PERMISSIONS,
   PERMISSION_MODULES,

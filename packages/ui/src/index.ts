@@ -16,3 +16,4 @@ export { ScanInput } from "./components/scan-input";
 export type { ScanInputHandle } from "./components/scan-input";
 export { Toast } from "./components/toast";
 export { ConfirmDialog } from "./components/confirm-dialog";
+export { Keypad, PIN_MIN, PIN_MAX } from "./components/keypad";

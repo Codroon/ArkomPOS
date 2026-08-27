@@ -2,45 +2,88 @@ import { useCallback, useEffect, useState } from "react";
 import { MetaContextResponseSchema, SetupStatusResponseSchema, type MetaContextResponse } from "@arkom/core";
 import { AppShell } from "./components/app-shell";
 import { FirstRunDialog } from "./screens/setup/first-run-dialog";
+import { LoginScreen } from "./screens/auth/login-screen";
+import { LockOverlay } from "./screens/auth/lock-overlay";
+import { OwnerStep } from "./screens/auth/owner-step";
+import { SessionProvider, useActivityReporter, useSession } from "./lib/use-session";
 
 /**
- * Boot order matters: ask whether the till has been set up BEFORE asking who it
- * is. On a fresh client install there is no tenant yet, so meta:context would
- * fail — and a failed context is not an error there, it is the normal state of
- * a machine the installer finished five seconds ago.
+ * Boot order, and it matters:
+ *
+ *   1. Is there a shop?      no  → first-run setup
+ *   2. Is there an owner?    no  → owner creation (a v0.9.0 till that updated)
+ *   3. Is someone signed in? no  → Login
+ *   4. Is the session locked?    → Lock overlay over the shell
+ *
+ * Each question is asked of MAIN, never inferred in the renderer. A restart
+ * always lands at step 3 because the session is memory-only (ADR-0012 §4).
  */
-export function App() {
-  const [setupNeeded, setSetupNeeded] = useState<boolean | null>(null);
+type Stage = "loading" | "setup" | "owner" | "login" | "app";
+
+function Boot() {
+  const { session, ready } = useSession();
+  const [stage, setStage] = useState<Stage>("loading");
   const [context, setContext] = useState<MetaContextResponse | null>(null);
 
   const loadContext = useCallback(() => {
     window.arkom
       .invoke("meta:context")
-      // Zod on both sides of the bridge (CLAUDE.md hard rule)
       .then((raw) => setContext(MetaContextResponseSchema.parse(raw)))
       .catch((err) => console.error("meta:context failed", err));
   }, []);
 
+  const evaluate = useCallback(async () => {
+    try {
+      const status = SetupStatusResponseSchema.parse(await window.arkom.invoke("setup:status"));
+      if (status.needed) return setStage("setup");
+      if (status.ownerNeeded) return setStage("owner");
+      loadContext();
+      setStage("login");
+    } catch (err) {
+      console.error("setup:status failed", err);
+    }
+  }, [loadContext]);
+
   useEffect(() => {
-    window.arkom
-      .invoke("setup:status")
-      .then((raw) => {
-        const { needed } = SetupStatusResponseSchema.parse(raw);
-        setSetupNeeded(needed);
-        if (!needed) loadContext();
-      })
-      .catch((err) => console.error("setup:status failed", err));
-  }, [loadContext]);
+    void evaluate();
+  }, [evaluate]);
 
-  const onSetupDone = useCallback(() => {
-    setSetupNeeded(false);
-    loadContext();
-  }, [loadContext]);
+  // a live session takes precedence over whatever the boot check concluded
+  useEffect(() => {
+    if (ready && session) setStage("app");
+    else if (ready && !session && stage === "app") setStage("login");
+  }, [ready, session, stage]);
 
-  // hold the frame back for one round-trip rather than flashing the shell and
-  // then replacing it with the setup dialog
-  if (setupNeeded === null) return <div className="h-full bg-canvas" />;
-  if (setupNeeded) return <FirstRunDialog onDone={onSetupDone} />;
+  // only report activity while someone is actually working
+  useActivityReporter(stage === "app" && !!session && !session.locked);
 
-  return <AppShell context={context} />;
+  const switchUser = useCallback(async () => {
+    try {
+      await window.arkom.invoke("auth:logout");
+    } catch (err) {
+      console.error("auth:logout failed", err);
+    }
+  }, []);
+
+  if (stage === "loading") return <div className="h-full bg-canvas" />;
+  if (stage === "setup") return <FirstRunDialog onDone={() => void evaluate()} />;
+  if (stage === "owner") return <OwnerStep upgrade onDone={() => void evaluate()} />;
+  if (stage === "login" || !session) {
+    return <LoginScreen onSignedIn={() => { loadContext(); setStage("app"); }} />;
+  }
+
+  return (
+    <>
+      <AppShell context={context} />
+      {session.locked ? <LockOverlay session={session} onSwitchUser={() => void switchUser()} /> : null}
+    </>
+  );
+}
+
+export function App() {
+  return (
+    <SessionProvider>
+      <Boot />
+    </SessionProvider>
+  );
 }

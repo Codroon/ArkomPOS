@@ -1,24 +1,28 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  activeScheme,
   attemptsRemaining,
   checkPin,
-  generateRecoveryCode,
-  hashPin,
-  hashRecoveryCode,
   isLockedOut,
   isPinAcceptable,
   LOCKOUT_LADDER_MS,
   LOCKOUT_THRESHOLD,
   lockoutRemainingMs,
-  normalizeRecoveryCode,
+  normalizeRecoveryCodeInput as normalizeRecoveryCode,
   registerFailure,
   registerSuccess,
+  type LockoutState,
+} from "../pin";
+// hashing lives apart because core's main entry is bundled into the renderer
+// and the sandboxed preload, neither of which has node:crypto
+import {
+  activeScheme,
+  generateRecoveryCode,
+  hashPin,
+  hashRecoveryCode,
   setArgon2,
   verifyPin,
   verifyRecoveryCode,
-  type LockoutState,
-} from "../pin";
+} from "../pin-hash";
 
 afterEach(() => setArgon2(null));
 
