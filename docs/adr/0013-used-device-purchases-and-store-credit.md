@@ -143,9 +143,24 @@ charging VAT on the wrong base and filing it.
 
 `usedDevices.viewSeller` is its own permission, owner-only by default and grantable to a
 cashier. The list and the device detail render without the seller block for anyone lacking
-it; the handler withholds the fields rather than the UI hiding them (ADR-0012 §5). The
-purchase document print includes the seller — printing is the act that requires the
-permission, and the printed slip is the legally required record.
+it; the handler withholds the fields rather than the UI hiding them (ADR-0012 §5).
+
+**Amended at the Stage A review (2026-08-28), before any of this shipped.** The draft made
+*every* print of the purchase document require `viewSeller`. That is wrong at the counter:
+the cashier types the seller's name and ID number into the form, and then could not print
+the slip the seller has to sign — gating data they had just entered, and blocking the one
+action that makes the purchase a legal record. The gate is therefore split by *when*:
+
+| | Permission |
+|---|---|
+| Print the document for the purchase being logged | `usedDevices.create` |
+| Seller block on the device detail | `usedDevices.viewSeller` |
+| Seller-ID photo in the gallery | `usedDevices.viewSeller` |
+| Reprint the document afterwards | `usedDevices.viewSeller` |
+
+The distinction is data the cashier already has in front of them versus reading it back off
+the till later. A reprint is the loophole that would otherwise make the on-screen gate
+decorative, so it is gated with what it reveals.
 
 ### 7. Schema summary
 
@@ -178,7 +193,14 @@ required register needs.
 **Auto-creating a catalogue product per physical device.** Rejected: it would put a
 one-off row in the catalogue for every phone ever bought. Instead one `used_device` product
 per brand+model+storage+colour is found-or-created, and the individual price, grade and
-battery live on the unit. See the open decision on catalogue noise.
+battery live on the unit.
+
+The catalogue-noise question this left open was settled at the same review: those products
+are hidden from the **Catálogo management list only**. They stay ordinary sellable products
+on the Sale screen — findable by scan and by model search — carrying a used marker and the
+unit's grade. Hiding them from selling as well would make a bought phone unsellable, which
+is the opposite of the point; hiding them from the maintenance list keeps the owner's
+catalogue the set of things they actually maintain.
 
 ## Consequences
 

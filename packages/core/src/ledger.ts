@@ -6,7 +6,11 @@
  */
 import { appError } from "./errors";
 
-export const P1_MOVEMENT_TYPES = ["purchase_in", "sale_out", "adjustment"] as const;
+/* `tradein_in` is a used device entering stock (ADR-0013). It is a separate
+   type from `purchase_in` so the books can tell supplier stock from what was
+   bought over the counter — REBU margin scheme applies to the second and not
+   the first — but it obeys exactly the same ledger rules. */
+export const P1_MOVEMENT_TYPES = ["purchase_in", "sale_out", "adjustment", "tradein_in"] as const;
 export type P1MovementType = (typeof P1_MOVEMENT_TYPES)[number];
 
 export interface MovementInput {
@@ -35,7 +39,7 @@ export function buildMovement(input: MovementInput): MovementDraft {
   if (!Number.isInteger(qty) || qty === 0) {
     throw appError("VALIDATION", "La cantidad debe ser un entero distinto de cero.", "qty");
   }
-  if (movementType === "purchase_in") {
+  if (movementType === "purchase_in" || movementType === "tradein_in") {
     if (qty <= 0) throw appError("VALIDATION", "Una entrada de compra debe tener cantidad positiva.", "qty");
     const cost = input.unitCostCents;
     if (cost == null || !Number.isInteger(cost) || cost < 0) {

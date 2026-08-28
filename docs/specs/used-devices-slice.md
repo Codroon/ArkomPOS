@@ -1,6 +1,6 @@
 # Arkom POS — Used devices slice (Comprar usados · Dispositivos usados · Saldo a favor)
 
-Status: **Stage A — design, awaiting go** · Target: **v0.11.0** · Owner: Zothix (Codroon)
+Status: **Stage B — building** · Target: **v0.11.0** · Owner: Zothix (Codroon)
 Companions: [`ADR-0013`](../adr/0013-used-device-purchases-and-store-credit.md) (decisions) ·
 [`system-design.md`](../design/system-design.md) (schema + IPC) ·
 [`handoff/used-devices.md`](../design/handoff/used-devices.md) (screens).
@@ -81,6 +81,14 @@ warranty tracking on used sales.
 - [ ] **U4** `units` gains nullable `purchase_id`, `sale_price_cents`, `grade`,
       `battery_pct`. Existing rows are untouched and keep working (NULL price = inherit
       the product's).
+- [ ] **U4b** A used device is filed under a **found-or-create product per brand + model +
+      storage + colour**, named `… (usado)` — not one product per physical phone. Grade,
+      battery and selling price live on the unit, which is why they are nullable columns
+      there and not on the product.
+- [ ] **U4c** Those products are hidden from the **Catálogo management list only**. They
+      remain fully findable on the **Sale screen** — by barcode/IMEI scan and by model
+      search — and every result carries a used marker with the grade, so a cashier can
+      tell the new iPhone 11 from the second-hand one at a glance.
 - [ ] **U5** Enums gain `units.status += 'held'` and `documents.doc_type += 'purchase'` as
       TypeScript-only changes — no CHECK constraint exists, so no data migration.
 - [ ] **U6** A `purchase` number series is created per till with prefix `C-`, allocated
@@ -137,6 +145,10 @@ warranty tracking on used sales.
 - [ ] **X3** Both actions print the purchase document (thermal, PDF fallback): shop header,
       purchase number, date, device + IMEI, accessories, buy price, payout method, seller
       name + ID number + phone, and a signature line.
+- [ ] **X3b** That print needs **`usedDevices.create` only, not `viewSeller`**. The cashier
+      typed the seller's details thirty seconds earlier; withholding the printout they must
+      hand over to be signed would gate data they just entered. `viewSeller` governs
+      reading those details **back** later — see Y3b.
 - [ ] **X4** Both actions print a shelf label: barcode, model, grade.
 - [ ] **X5** Everything lands in one transaction with one oplog envelope; the actor is the
       session (ADR-0012).
@@ -151,6 +163,10 @@ warranty tracking on used sales.
 - [ ] **Y3** Detail: photo gallery, device data, seller block **gated on
       `usedDevices.viewSeller`**, buy price + payout, refurb cost, and a timeline built
       from the oplog.
+- [ ] **Y3b** `usedDevices.viewSeller` gates three things and only these three: the seller
+      block, the ID photo in the gallery, and **reprinting the purchase document from the
+      detail view**. A reprint after the fact is a way to read the seller's data off a
+      till that will not show it on screen, so it is gated with the data it reveals.
 - [ ] **Y4** Actions on a held device: toggle *Requiere revisión*, edit refurb cost, and
       *Enviar a inventario* (selling price set at that moment).
 - [ ] **Y5** Refurb cost is editable only while held; once in stock it is frozen, because
@@ -218,6 +234,9 @@ warranty tracking on used sales.
 | Gate | price/payout/log refused in main until confirmed; pass and fail both oplogged |
 | Logging | purchase + unit + oplog written with the session actor, in one transaction |
 | Hold | held unit has no movement, on-hand 0, absent from `resolveScan` in-stock results |
+| Invariant | **a held unit has zero stock movements, an in-stock unit has exactly one stock-in** — status and ledger produced by one function so they cannot disagree |
+| Catalogue | a used product is absent from the Catálogo list and present in Sale search and scan, with its grade |
+| Seller gate | logging prints the document without `viewSeller`; reprinting from the detail view requires it |
 | Send to inventory | posts one `tradein_in` at buy + refurb cost; sets sale price; status flips |
 | Refurb | cost folds into unit cost; frozen once in stock |
 | Voucher | issue → redeem → second redeem refused; void from issued only; void of redeemed refused |
@@ -226,12 +245,25 @@ warranty tracking on used sales.
 | Photos | relative paths stored; backup includes the folder |
 | Migration | populated v0.10.0 DB: counts unchanged, existing units still sell, `--verify` green |
 
-## Open questions for the client
+## Decisions taken at the Stage A review
+
+1. **Oversized voucher: refused, not part-consumed.** Shop rule — credit applies to a
+   purchase of equal or greater value, otherwise the seller is paid cash. Partial
+   redemption stays modelled (`remaining_cents`) and disabled.
+2. **Found-or-create used product**, hidden from Catálogo management, visible in Sale
+   search and scan with a used/grade marker (U4b, U4c).
+3. **`units.sale_price_cents` nullable**, NULL = inherit the product's price.
+4. **The seller gate is split** (X3b, Y3b): logging a purchase includes printing its
+   document; `viewSeller` covers the seller block, the ID photo and later reprints.
+5. **Nav renames applied** and both items unlocked.
+6. **Margin setting ships at 25%.**
+7. **Refurb cost freezes** when the device is sent to inventory.
+
+## Still open for the client
 
 1. **The rate table** — buy price by model and grade. Manual entry until it arrives; the
    seam is marked in code.
-2. **Margin %** default for the selling-price prefill. Shipping 25% as a setting.
-3. **The 15-day hold** — captured as a date with a settings flag, default off. Whether it
+2. **The 15-day hold** — captured as a date with a settings flag, default off. Whether it
    should warn or block is the client's call.
-4. **Acquisition channel** wording on the printed document, if their gestor wants specific
+3. **Acquisition channel** wording on the printed document, if their gestor wants specific
    REBU phrasing.

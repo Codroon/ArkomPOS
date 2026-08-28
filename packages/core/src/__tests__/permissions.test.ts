@@ -36,10 +36,18 @@ describe("registry shape", () => {
     }
   });
 
-  it("marks exactly the four approvable actions", () => {
+  it("marks exactly the approvable actions", () => {
+    // a pin, not a tautology: making a new key approvable means a cashier can
+    // perform it with someone else's PIN, which is a decision, not a detail
     const approvable = PERMISSIONS.filter((p) => p.approvable).map((p) => p.key);
     expect(approvable.sort()).toEqual(
-      ["catalog.create", "catalog.edit", "inventory.adjust", "sale.price_override"].sort(),
+      [
+        "catalog.create",
+        "catalog.edit",
+        "inventory.adjust",
+        "sale.price_override",
+        "usedDevices.priceOverride",
+      ].sort(),
     );
   });
 

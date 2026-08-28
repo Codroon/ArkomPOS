@@ -18,7 +18,7 @@
  */
 
 /** Groups the Usuarios screen renders as sections, in this order. */
-export const PERMISSION_MODULES = ["sale", "catalog", "inventory", "admin"] as const;
+export const PERMISSION_MODULES = ["sale", "catalog", "inventory", "usedDevices", "admin"] as const;
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
 
 export interface PermissionDef {
@@ -51,6 +51,19 @@ export const PERMISSIONS = [
   { key: "inventory.receive", module: "inventory", labelEs: "Registrar entradas de stock", approvable: false },
   // registered before its screen exists: the key is the contract, the UI arrives later
   { key: "inventory.adjust", module: "inventory", labelEs: "Ajustar stock", approvable: true },
+
+  /* ---- used devices (ADR-0013) ----
+     Buying is counter work, so the cashier holds most of these by default. The
+     two they do not hold are the two that cost the shop money or expose a
+     third party: overriding an agreed price, and reading the seller's ID. */
+  { key: "usedDevices.create", module: "usedDevices", labelEs: "Comprar dispositivos usados", approvable: false },
+  { key: "usedDevices.priceOverride", module: "usedDevices", labelEs: "Modificar el precio de compra sugerido", approvable: true },
+  { key: "usedDevices.sendToInventory", module: "usedDevices", labelEs: "Enviar un dispositivo a inventario", approvable: false },
+  { key: "usedDevices.editRefurbCost", module: "usedDevices", labelEs: "Editar el coste de reacondicionamiento", approvable: false },
+  // personal data of someone who is not a customer: off by default, grantable
+  { key: "usedDevices.viewSeller", module: "usedDevices", labelEs: "Ver los datos del vendedor", approvable: false },
+  { key: "usedDevices.redeemCredit", module: "usedDevices", labelEs: "Canjear saldo a favor", approvable: false },
+  { key: "usedDevices.voidCredit", module: "usedDevices", labelEs: "Anular un vale de saldo", approvable: false },
 
   /* ---- admin: owner-only, and not approvable ---- */
   // a cashier does not manage users with the owner leaning over their shoulder;
@@ -107,6 +120,12 @@ export const CASHIER_DEFAULTS: readonly PermissionKey[] = [
   "catalog.attach_code",
   "inventory.view",
   "inventory.receive",
+  /* the client asked for the whole buy-and-shelve flow at the counter, so
+     sending to inventory is a cashier default and not an approval */
+  "usedDevices.create",
+  "usedDevices.sendToInventory",
+  "usedDevices.editRefurbCost",
+  "usedDevices.redeemCredit",
 ];
 
 const ROLE_DEFAULTS: Record<Role, readonly PermissionKey[] | "all"> = {

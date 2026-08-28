@@ -15,11 +15,22 @@ import { sqliteTable, text, integer, uniqueIndex, index, primaryKey } from "driz
 export const ITEM_TYPES = ["stocked", "serialized", "used_device", "service", "repair", "agency", "sim", "topup"] as const;
 export const TAX_REGIMES = ["IVA21", "IVA10", "IVA4", "REBU", "EXEMPT"] as const; // P1 uses IVA21 (ADR-0007)
 export const MOVEMENT_TYPES = ["purchase_in", "sale_out", "adjustment", "count_post", "repair_part_out", "tradein_in", "return_in", "transfer"] as const; // P1: first three
-export const DOC_TYPES = ["ticket", "invoice", "credit_note"] as const; // P1: ticket only (ADR-0008)
+export const DOC_TYPES = ["ticket", "invoice", "credit_note", "purchase"] as const; // "purchase" = used-device intake, own series (ADR-0013)
 export const DOC_STATUSES = ["draft", "parked", "completed"] as const;
 export const LINE_TYPES = ["product", "serialized_unit", "repair", "tradein_credit", "agency", "sim", "topup"] as const; // P1: product, serialized_unit
 export const TENDER_METHODS = ["cash", "card", "bizum", "transfer", "store_credit"] as const; // P1: all but store_credit
-export const UNIT_STATUSES = ["in_stock", "reserved", "sold"] as const;
+/* "held" = bought but NOT in stock: a unit row with no stock movement, so on-hand
+   is 0 and the Sale screen never offers it (ADR-0013 §1). */
+export const UNIT_STATUSES = ["in_stock", "reserved", "sold", "held"] as const;
+
+/* ---------------- used devices (ADR-0013) ---------------- */
+export const DEVICE_GRADES = ["A", "B", "C"] as const;
+export const ID_DOC_TYPES = ["DNI", "NIE", "PASAPORTE"] as const;
+/** Decides the resale tax regime months later: private ⇒ REBU (ADR-0007). */
+export const ACQUISITION_CHANNELS = ["private_individual", "business"] as const;
+export const PAYOUT_METHODS = ["cash", "transfer", "store_credit"] as const;
+export const PHOTO_KINDS = ["front", "back", "extra", "seller_id"] as const;
+export const VOUCHER_STATUSES = ["issued", "redeemed", "void"] as const;
 
 const ts = (name: string) => integer(name, { mode: "timestamp_ms" });
 
@@ -117,6 +128,14 @@ export const units = sqliteTable("units", {
   imei: text("imei").notNull(),
   status: text("status", { enum: UNIT_STATUSES }).notNull().default("in_stock"),
   costCents: integer("cost_cents").notNull(),
+  /* ---- used devices (ADR-0013); all nullable, so every pre-v0.11 row is valid ---- */
+  /** the intake this unit came from; NULL for new stock bought from a supplier */
+  purchaseId: text("purchase_id"),
+  /** per-unit selling price. NULL = inherit the product's price, which is every
+      existing row — used phones are priced individually. */
+  salePriceCents: integer("sale_price_cents"),
+  grade: text("grade", { enum: DEVICE_GRADES }),
+  batteryPct: integer("battery_pct"),
   soldDocumentId: text("sold_document_id"), // set on sale; FK soft by convention (documents defined below)
   createdAt: ts("created_at").notNull(),
   updatedAt: ts("updated_at").notNull(),
@@ -299,4 +318,100 @@ export const users = sqliteTable("users", {
 }, (t) => [
   uniqueIndex("ux_user_tenant_name").on(t.tenantId, t.name),
   index("ix_user_active").on(t.tenantId, t.active),
+]);
+
+/* ---------------- used-device purchases (ADR-0013) ----------------
+ * One row per purchase, 1:1 with a `documents` row of doc_type "purchase" —
+ * the document owns the gap-free number (ADR-0008), this owns the detail.
+ *
+ * The seller block is the second-hand register's required field set, captured
+ * at intake so a future weekly export is a report rather than a request to
+ * re-interview sixty customers. It is personal data: `usedDevices.viewSeller`
+ * gates it, and the HANDLER withholds it — the UI does not merely hide it. */
+export const usedPurchases = sqliteTable("used_purchases", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  locationId: text("location_id").notNull().references(() => locations.id),
+  terminalId: text("terminal_id").notNull().references(() => terminals.id),
+  /** the numbered purchase document */
+  documentId: text("document_id").notNull().references(() => documents.id),
+  /** the unit this intake created; set in the same transaction */
+  unitId: text("unit_id"),
+  productId: text("product_id").references(() => products.id),
+
+  /* ---- device ---- */
+  brand: text("brand").notNull(),
+  model: text("model").notNull(),
+  storage: text("storage"),
+  color: text("color"),
+  grade: text("grade", { enum: DEVICE_GRADES }).notNull(),
+  batteryPct: integer("battery_pct"),
+  imei: text("imei").notNull(),
+  accessories: text("accessories", { mode: "json" }), // {charger,box,cable,case}
+  barcode: text("barcode"),
+
+  /* ---- seller: personal data, permission-gated ---- */
+  sellerName: text("seller_name").notNull(),
+  sellerPhone: text("seller_phone"),
+  sellerIdType: text("seller_id_type", { enum: ID_DOC_TYPES }).notNull(),
+  sellerIdNumber: text("seller_id_number").notNull(),
+  /** the register may want it; unused by the UI today, present so adding it is not a migration */
+  sellerAddress: text("seller_address"),
+
+  acquisitionChannel: text("acquisition_channel", { enum: ACQUISITION_CHANNELS })
+    .notNull()
+    .default("private_individual"),
+
+  /* ---- money ---- */
+  buyPriceCents: integer("buy_price_cents").notNull(),
+  /** folded into the unit's cost at send-to-inventory, then frozen */
+  refurbCostCents: integer("refurb_cost_cents").notNull().default(0),
+  payoutMethod: text("payout_method", { enum: PAYOUT_METHODS }).notNull(),
+  payoutReference: text("payout_reference"),
+
+  needsReview: integer("needs_review", { mode: "boolean" }).notNull().default(false),
+  /** captured now; the 15-day resale hold is a setting, default off */
+  purchasedAt: ts("purchased_at").notNull(),
+  createdAt: ts("created_at").notNull(),
+  updatedAt: ts("updated_at").notNull(),
+}, (t) => [
+  uniqueIndex("ux_purchase_document").on(t.documentId),
+  index("ix_purchase_imei").on(t.tenantId, t.imei),
+  index("ix_purchase_unit").on(t.unitId),
+]);
+
+/* Photos are FILES. The database stores a path relative to the photos root, so
+ * the folder can be restored under a different user profile without rewriting
+ * rows. Never blobs — see ADR-0013 §3 for what that would do to the backups. */
+export const purchasePhotos = sqliteTable("purchase_photos", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  purchaseId: text("purchase_id").notNull().references(() => usedPurchases.id),
+  kind: text("kind", { enum: PHOTO_KINDS }).notNull(),
+  /** relative to userData/photos — e.g. "purchases/<id>/front.jpg" */
+  path: text("path").notNull(),
+  createdAt: ts("created_at").notNull(),
+}, (t) => [index("ix_photo_purchase").on(t.purchaseId)]);
+
+/* Store credit: money the shop already owes, redeemed as a TENDER on a sale —
+ * never a negative line, which would corrupt the taxable base (ADR-0013 §4).
+ * remainingCents is modelled so enabling partial redemption later is a
+ * behaviour change rather than a migration; today it always equals amount. */
+export const storeCreditVouchers = sqliteTable("store_credit_vouchers", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  locationId: text("location_id").notNull().references(() => locations.id),
+  purchaseId: text("purchase_id").references(() => usedPurchases.id),
+  amountCents: integer("amount_cents").notNull(),
+  remainingCents: integer("remaining_cents").notNull(),
+  status: text("status", { enum: VOUCHER_STATUSES }).notNull().default("issued"),
+  /** the sale that consumed it */
+  redeemedDocumentId: text("redeemed_document_id"),
+  redeemedAt: ts("redeemed_at"),
+  voidReason: text("void_reason"),
+  createdAt: ts("created_at").notNull(),
+  updatedAt: ts("updated_at").notNull(),
+}, (t) => [
+  index("ix_voucher_status").on(t.tenantId, t.status),
+  index("ix_voucher_purchase").on(t.purchaseId),
 ]);

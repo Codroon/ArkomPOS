@@ -142,6 +142,13 @@ Two panes: gallery and data left, actions right.
 **Gallery** — thumbnails, click to enlarge. The seller-ID photo appears **only** with
 `usedDevices.viewSeller`.
 
+**Reimprimir documento de compra** — a ghost button in the actions pane, also behind
+`usedDevices.viewSeller`. Printing the document *while logging the purchase* needs no such
+permission: the cashier entered those details a moment earlier and has to hand the seller
+something to sign. A reprint days later is a way to read the seller's data off a till that
+will not show it on screen, so it is gated with the data it reveals. Without the
+permission the button is absent and the handler refuses.
+
 **Datos del dispositivo** — marca, modelo, almacenamiento, color, grado, batería, IMEI,
 accesorios, código de barras.
 
@@ -170,7 +177,23 @@ price, with a link to the catalogue product.
 
 ## 4. Sale-screen changes
 
-Two additions, no restructuring.
+Three additions, no restructuring.
+
+**Used devices appear in the ordinary search.** A purchase files its device under a
+found-or-create product named `Apple iPhone SE 2020 64GB Blanco (usado)`; that product is
+hidden from the **Catálogo** management list — it is bookkeeping, not something the owner
+maintains — but it is a normal sellable product on this screen. Scanning the shelf label or
+the IMEI finds it, and so does typing the model.
+
+Every used result carries a marker so the two are never confused when the shop stocks a
+model both new and second-hand:
+
+> `Apple iPhone SE 2020 64GB` · `Usado` chip (neutral) + `Grado B` chip · `189,00 €`
+
+The grade chip reads from the **unit**, not the product, because two phones of the same
+model are rarely in the same condition. A held device is not offered at all — scanning one
+reports the near-miss (*"Dispositivo en espera — todavía no está a la venta"*) rather than
+"unknown code", so a cashier is told why rather than left doubting the scanner.
 
 **A new tender: `Saldo a favor`.** It joins Efectivo · Tarjeta · Bizum · Transferencia in
 the payment panel. Pressing it opens the **voucher finder** rather than an amount field,
