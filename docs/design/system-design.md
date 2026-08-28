@@ -3,7 +3,8 @@
 Authority order: `docs/adr/` → this document → `packages/db/src/schema.ts`. Phase 1 scope:
 sale screen, catalog, inventory (+ minimal add-stock), ticket printing, Ajustes-lite. Auth
 arrived in v0.10.0 (ADR-0012) — §3, §4 and §4.1 below describe the guarded write path.
-Shifts and sync remain *designed* here, built later.
+Used-device purchases and store credit arrived in v0.11.0 (ADR-0013) — §4.2. Shifts and
+sync remain *designed* here, built later.
 
 ## 1. Component map
 
@@ -89,6 +90,17 @@ business rows + `product_stock` cache + `oplog` entry → typed result back.
 | `users:create` | {name, role, pin, overrides} → UserRow | `users.manage`. Weak PIN ⇒ `WEAK_PIN` |
 | `users:update` | {id, name?, role?, overrides?, active?} → UserRow | `users.manage`. Last active owner ⇒ `LAST_OWNER` |
 | `users:resetPin` | {id, newPin, currentPin?} → {ok} | `users.manage`. `currentPin` required when changing your own |
+| `used:checkImei` | {imei} → {valid, duplicate:{kind:'unit'|'purchase', id, ref}?} | `usedDevices.create`. Luhn + duplicate across units AND open purchases. **No network call** (ADR-0013) |
+| `used:log` | PurchaseInput{device, seller, photos[], buyPriceCents, payout, barcode, gateConfirmed, action:'hold'|'inventory', sellPriceCents?, reason?} → {purchaseId, docNumber, unitId, voucherId?} | `usedDevices.create`; a changed suggested price additionally needs `usedDevices.priceOverride` (approvable). Refuses unless `gateConfirmed`. ONE transaction: document + number (ADR-0008) + used_purchases + unit + photos + optional `tradein_in` movement + optional voucher + oplog |
+| `used:list` | filters{status?, search?} → UsedDeviceRow[] | `usedDevices.create`. Seller fields omitted without `usedDevices.viewSeller` |
+| `used:get` | {purchaseId} → UsedDeviceDetail | as above; the seller block is withheld by the HANDLER, not hidden by the UI |
+| `used:setReview` | {purchaseId, needsReview} → UsedDeviceDetail | `usedDevices.create` |
+| `used:setRefurbCost` | {purchaseId, refurbCostCents} → UsedDeviceDetail | `usedDevices.editRefurbCost`. Refused once the unit is in stock — the cost is already folded in |
+| `used:sendToInventory` | {purchaseId, sellPriceCents} → {unitId} | `usedDevices.sendToInventory`. Posts the `tradein_in` movement at buy + refurb cost, sets the unit's sale price, status held→in_stock |
+| `used:photo` | {purchaseId, kind, dataUrl|filePath} → {path} | `usedDevices.create`. Writes JPEG ≤1600px under `photos/purchases/<id>/`; returns the RELATIVE path |
+| `used:printDocument` / `used:printLabel` | {purchaseId, copy?} → same union as `print:ticket` | `usedDevices.create`; the document additionally needs `usedDevices.viewSeller` — it prints the seller's identity |
+| `credit:find` | {search?} → VoucherRow[] | `usedDevices.redeemCredit`. Only `issued` vouchers |
+| `credit:void` | {voucherId, reason} → VoucherRow | `usedDevices.voidCredit`. Only from `issued`; reason required and oplogged |
 
 Typed errors: `{code: 'AUTH_REQUIRED' | 'PERMISSION_DENIED' | 'APPROVAL_REQUIRED' | 'INVALID_PIN' | 'USER_LOCKED' | 'WEAK_PIN' | 'LAST_OWNER' | 'PRINT_FAILED' | 'DUPLICATE_NAME' | 'DUPLICATE_BARCODE' | 'DUPLICATE_IMEI' | 'NEGATIVE_STOCK' | 'UNIT_NOT_AVAILABLE' | 'TENDER_MISMATCH' | 'VALIDATION' , message, field?}` — renderer maps codes to UI, never parses strings. (DUPLICATE_NAME added with the catalog slice: req 4.4 wants name and barcode duplicates distinguished per field. DUPLICATE_IMEI added with the inventory slice: req 6.1 rejects duplicate IMEIs at entry. PRINT_FAILED added with the ticket slice: the sale is already complete when it is raised, so the UI offers Reintentar/Guardar PDF rather than treating it as a write failure. The seven auth codes arrived with ADR-0012; APPROVAL_REQUIRED is the unusual one — it names the permission and is an invitation to retry with an approver's PIN, not a refusal.)
 
@@ -111,6 +123,38 @@ that must not require editing call sites.
 
 Users are **deactivated, never deleted** — history references them.
 
+### 4.2 Used devices (ADR-0013)
+
+**`used_purchases`** (1:1 with a `documents` row of `doc_type = 'purchase'`): device
+attributes (brand, model, storage, colour, grade, battery %, IMEI, accessory flags),
+the seller block (name, phone, ID type + number, nullable address), `acquisition_channel`,
+`buy_price_cents`, `payout_method` + `payout_reference`, `refurb_cost_cents`,
+`needs_review`, `purchased_at`, `barcode`.
+**`purchase_photos`**: purchase id · **relative** path · kind
+(`front`/`back`/`extra`/`seller_id`). Files live under
+`userData/photos/purchases/<purchase-id>/` — never blobs, and the backup copies the folder
+alongside the database.
+**`store_credit_vouchers`**: amount, `remaining_cents` (modelled, partial redemption
+disabled), status `issued`/`redeemed`/`void`, purchase id, redeeming document id, void
+reason.
+
+**`units` gains** nullable `purchase_id`, `sale_price_cents` (NULL = inherit the product
+price, which is every pre-v0.11 row), `grade`, `battery_pct`.
+
+**Enums gain**, TypeScript-only because drizzle's SQLite text enums emit no CHECK:
+`units.status += 'held'` and `documents.doc_type += 'purchase'`.
+
+**"On hold" is the absence of a stock movement.** A held device has a `units` row and NO
+`tradein_in` row, so on-hand is 0 and `resolveScan` — which only offers in-stock units —
+never surfaces it for sale. There is no second inventory to reconcile (ADR-0004/0013 §1).
+Sending it to inventory posts the movement and flips the status in one transaction.
+
+**Store credit is a tender, never a line.** `TENDER_METHODS.store_credit` activates;
+`LINE_TYPES.tradein_credit` stays deliberately unused, because a negative line would change
+the document's taxable base and the printed IVA breakdown. Redemption flips the voucher
+inside the sale's completion transaction under a conditional update, so a double redemption
+is impossible rather than unlikely.
+
 ## 5. Screen ↔ data (Phase 1)
 
 - **Catalog** = `catalog:list` + save form (`catalog:save`). Missing-data chips from NULL columns.
@@ -118,6 +162,7 @@ Users are **deactivated, never deleted** — history references them.
 - **Sale** = local Zustand cart mirrored to draft document via `sale:*`; scan box always focused; groups grid from `productGroups`; completion runs the big transaction; ticket prints.
 - **Login / Lock / Approval** = `auth:*` only; no business data crosses until a session exists.
 - **Usuarios** = `users:*`, gated on `users.manage`; override toggles render from the core registry, so a new permission key appears with no UI change.
+- **Comprar usados / Dispositivos usados** = `used:*` + `credit:*`. Selling a used phone reuses the ordinary serialized-unit path — no new sale code (ADR-0013).
 
 ## 6. Sync (designed now, built Phase 2)
 

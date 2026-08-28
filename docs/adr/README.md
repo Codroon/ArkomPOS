@@ -17,6 +17,7 @@ If a decision must change, the ADR is superseded by a new one — never silently
 | [0010](0010-auth-deferred-nullable-actor-columns.md) | Auth & shifts deferred; nullable actor columns now | Accepted |
 | [0011](0011-ui-i18n-typed-dictionary.md) | UI i18n via typed in-repo dictionary; print path stays Spanish | Accepted |
 | [0012](0012-local-pin-auth-and-permission-registry.md) | Local PIN auth, session in main, permissions as a typed registry | Accepted |
+| [0013](0013-used-device-purchases-and-store-credit.md) | Used devices as serialized units; purchase document; store credit as a tender | Accepted |
 
 Constraints common to all: team = one developer + Claude Code · Phase 1 = 2 weeks (sale screen, catalog, inventory) ·
 client = retail mobile shop in Spain (unreliable connectivity, Spanish fiscal rules ahead) · product intent = resell to
