@@ -35,6 +35,7 @@ import type {
   SessionInfo,
   LoginUser,
   UserRow,
+  UsedCheckImeiResponse,
 } from "@arkom/core";
 
 declare global {
@@ -115,6 +116,10 @@ declare global {
         channel: "setup:owner",
         payload: { name: string; pin: string },
       ): Promise<{ user: UserRow; recoveryCode: string }>;
+      invoke(
+        channel: "used:checkImei",
+        payload: { imei: string },
+      ): Promise<UsedCheckImeiResponse>;
       invoke(channel: "users:list", payload?: undefined): Promise<UserRow[]>;
       invoke(
         channel: "users:create",

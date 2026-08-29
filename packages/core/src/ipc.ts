@@ -61,6 +61,7 @@ export const IPC_CHANNELS = [
   "users:create",
   "users:update",
   "users:resetPin",
+  "used:checkImei",
 ] as const;
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
@@ -803,3 +804,36 @@ export const SetupOwnerResponseSchema = z.object({
 /** Prints the recovery code on the thermal printer, or falls back to PDF. */
 export const AuthPrintRecoveryRequestSchema = z.object({ code: z.string(), name: z.string() });
 export const AuthPrintRecoveryResponseSchema = PrintTicketResponseSchema;
+
+/* ---- used devices (ADR-0013) ---- */
+
+/**
+ * The gate's database half.
+ *
+ * Format is checked in the renderer with the same `isValidImei` the rest of
+ * the app uses — no round trip to be told a typo is a typo. This channel
+ * answers the question the renderer cannot: has this device been through the
+ * shop before, as a unit or as a purchase still on hold?
+ *
+ * `existing` names what was found so the screen can link to it. It carries no
+ * seller data: a cashier without `usedDevices.viewSeller` must not learn who
+ * sold us a phone by typing its IMEI.
+ */
+export const UsedImeiConflictSchema = z.object({
+  kind: z.enum(["unit", "purchase"]),
+  id: z.string(),
+  /** what to show on the link — a product name or a purchase number */
+  label: z.string(),
+});
+export type UsedImeiConflict = z.infer<typeof UsedImeiConflictSchema>;
+
+export const UsedCheckImeiRequestSchema = z.object({
+  imei: z.string().trim().min(1).max(20),
+});
+export const UsedCheckImeiResponseSchema = z.object({
+  /** false for a bad check digit OR a device already known */
+  ok: z.boolean(),
+  rejection: z.enum(["format", "duplicate_unit", "duplicate_purchase"]).nullable(),
+  existing: UsedImeiConflictSchema.nullable(),
+});
+export type UsedCheckImeiResponse = z.infer<typeof UsedCheckImeiResponseSchema>;

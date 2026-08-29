@@ -13,6 +13,7 @@ import { registerNavigator, type ScreenId } from "../lib/screen-bus";
 import { CatalogScreen } from "../screens/catalog/catalog-screen";
 import { InventoryScreen } from "../screens/inventory/inventory-screen";
 import { SaleScreen } from "../screens/sale/sale-screen";
+import { BuyUsedScreen } from "../screens/used/buy-used-screen";
 import { SettingsScreen } from "../screens/settings/settings-screen";
 import { UsersScreen } from "../screens/users/users-screen";
 
@@ -25,7 +26,7 @@ const NAV_ITEMS: ReadonlyArray<{ n: string; labelKey: TKey; id?: ScreenId; needs
   { n: "01", labelKey: "nav.venta", id: "venta" },
   { n: "02", labelKey: "nav.catalogo", id: "catalogo" },
   { n: "03", labelKey: "nav.inventario", id: "inventario" },
-  { n: "04", labelKey: "nav.compraUsados" },
+  { n: "04", labelKey: "nav.compraUsados", id: "comprarUsados", needs: "usedDevices.create" },
   { n: "05", labelKey: "nav.unidadUsada" },
   { n: "06", labelKey: "nav.reparacion" },
   { n: "07", labelKey: "nav.taller" },
@@ -203,6 +204,8 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
             <SaleScreen terminalName={context?.terminal.name ?? t("common.dash")} />
           ) : screen === "catalogo" ? (
             <CatalogScreen />
+          ) : screen === "comprarUsados" ? (
+            <BuyUsedScreen />
           ) : screen === "ajustes" ? (
             <SettingsScreen />
           ) : screen === "usuarios" ? (

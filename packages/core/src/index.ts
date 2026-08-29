@@ -286,6 +286,9 @@ export {
   UsersResetPinResponseSchema,
   SetupOwnerRequestSchema,
   SetupOwnerResponseSchema,
+  UsedImeiConflictSchema,
+  UsedCheckImeiRequestSchema,
+  UsedCheckImeiResponseSchema,
 } from "./ipc";
 export type {
   IpcChannel,
@@ -332,4 +335,6 @@ export type {
   UserRow,
   PrintTicketInput,
   PrintTestRequest,
+  UsedImeiConflict,
+  UsedCheckImeiResponse,
 } from "./ipc";

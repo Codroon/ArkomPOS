@@ -6,7 +6,7 @@
  * behaves like an appliance rather than a Chromium window someone can wander
  * out of.
  */
-import { app, BrowserWindow, Menu, shell, type WebContents } from "electron";
+import { app, BrowserWindow, Menu, session, shell, type WebContents } from "electron";
 import { appendFile, mkdir, rename, stat } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -107,6 +107,35 @@ export function hardenApp(): void {
       if (url !== current) event.preventDefault();
     });
   });
+
+  installPermissionPolicy();
+}
+
+/**
+ * What the renderer may ask the operating system for.
+ *
+ * Electron grants most permission requests by default. That was harmless while
+ * nothing asked for anything; the used-device capture modal changes that, so
+ * the policy becomes explicit rather than inherited.
+ *
+ * `media` is allowed because photographing a phone on the counter is the point
+ * of that modal — and it is only ever a camera the shop's own staff pointed at
+ * their own counter. Everything else is denied: a till has no business asking
+ * for the location of the shop, sending notifications, or reading the
+ * clipboard, and if one of those requests ever appears it is a bug worth
+ * seeing in the log rather than a dialog worth granting.
+ */
+function installPermissionPolicy(): void {
+  const allowed = new Set(["media"]);
+
+  session.defaultSession.setPermissionRequestHandler((_contents, permission, callback) => {
+    const ok = allowed.has(permission);
+    if (!ok) logEvent("permission-denied", permission);
+    callback(ok);
+  });
+
+  // the synchronous sibling: getUserMedia consults this one on some paths
+  session.defaultSession.setPermissionCheckHandler((_contents, permission) => allowed.has(permission));
 }
 
 /* ---------------------------- window geometry ---------------------------- */

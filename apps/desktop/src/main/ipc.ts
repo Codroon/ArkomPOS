@@ -133,6 +133,8 @@ import {
   UsersUpdateResponseSchema,
   UsersResetPinRequestSchema,
   UsersResetPinResponseSchema,
+  UsedCheckImeiRequestSchema,
+  UsedCheckImeiResponseSchema,
   type MutationCtx,
   type PermissionKey,
 } from "@arkom/core";
@@ -143,6 +145,7 @@ import { resolveScanCode } from "./repos/scan";
 import { addStock, listInventory, listMovements } from "./repos/inventory";
 import { createSupplier, listSuppliers } from "./repos/suppliers";
 import { getSettings, saveSettings } from "./repos/settings";
+import { checkImei, logGateRejection } from "./repos/used";
 import { listPrinters, printTest, printTicket, revealTicket, ticketsDir, printRecoveryCode } from "./print";
 import { completeFirstRun, demoStatus, isSetupNeeded, removeDemoData } from "./setup";
 import { backupStatus, backupsDir, runBackup } from "./backup";
@@ -588,6 +591,26 @@ export function registerIpcHandlers(db: ArkomDb): void {
     resetPin(db, s.ctx, s.userId, input);
     return { ok: true };
   });
+
+  /* ---- used devices (ADR-0013) ---- */
+
+  guarded(
+    "used:checkImei",
+    "usedDevices.create",
+    UsedCheckImeiRequestSchema,
+    UsedCheckImeiResponseSchema,
+    (s, { imei }) => {
+      const result = checkImei(db, s.ctx, imei);
+      /* A duplicate is worth a line in the audit trail — someone was offered a
+         phone the shop has already seen, and that is the event a shopkeeper
+         wants to find later. A mistyped IMEI is not: it is a typo, and logging
+         every keystroke-triggered check would bury the interesting one. */
+      if (result.rejection === "duplicate_unit" || result.rejection === "duplicate_purchase") {
+        logGateRejection(db, s.ctx, imei, result.rejection, result.existing?.id ?? null);
+      }
+      return result;
+    },
+  );
 }
 
 /**
