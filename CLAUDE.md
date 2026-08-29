@@ -10,12 +10,14 @@ Operating instructions for Claude Code in this repo. Read before writing anythin
 
 ## What we are building right now (Phase 1 only)
 Desktop till (Electron): **Sale**, **Catalog**, **Inventory (+ minimal add-stock)**, **Ajustes-lite**
-(printer + paper + command set + the shop's legal block) and **Usuarios** (nav 11 and 12).
+(printer + paper + command set + the shop's legal block), **Usuarios**, and since v0.11.0
+**Comprar usados** + **Dispositivos usados** (nav 04, 05, 11 and 12).
 Since v0.10.0 the till has PIN login, roles and per-action approval (ADR-0012).
 Ticket printing is in: ESC/POS through the Windows RAW spooler, PDF fallback, reprints stamped COPIA.
 Since v0.11.0 the till buys used devices: gate, purchase document, shelf label, store credit (ADR-0013).
 NOT yet: shifts/float/Z report, refunds/voids, full invoices, card-terminal SDK, sync, web app,
-repairs/used/agency/SIM screens. Schema already anticipates them — build nothing for them.
+repairs/agency/SIM screens, the refurbishment pipeline, the police-register export.
+Schema already anticipates them — build nothing for them.
 
 ## Hard rules
 - **Money is integer cents. Never floats. Never strings in logic.** Formatting only at UI/print edge.

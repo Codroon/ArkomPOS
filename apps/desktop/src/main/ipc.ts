@@ -207,6 +207,7 @@ import {
   getSession,
   lockSession,
   noteActivity,
+  setIdleLimitMinutes,
   startSession,
   toSessionInfo,
   unlockSession,
@@ -557,9 +558,14 @@ export function registerIpcHandlers(db: ArkomDb): void {
   guarded("settings:get", "settings.edit", SettingsGetRequestSchema, SettingsGetResponseSchema, (s) =>
     getSettings(db, s.ctx),
   );
-  guarded("settings:save", "settings.edit", SettingsSaveRequestSchema, SettingsSaveResponseSchema, (s, patch) =>
-    saveSettings(db, s.ctx, patch),
-  );
+  guarded("settings:save", "settings.edit", SettingsSaveRequestSchema, SettingsSaveResponseSchema, (s, patch) => {
+    const saved = saveSettings(db, s.ctx, patch);
+    /* The idle watcher holds the limit in memory, so a change has to be pushed
+       into it — otherwise the owner sets "never lock", sees it saved, and the
+       till keeps locking until the next restart. */
+    setIdleLimitMinutes(saved.idleLockMinutes);
+    return saved;
+  });
   guarded("demo:status", "settings.edit", DemoStatusRequestSchema, DemoStatusResponseSchema, (s) =>
     demoStatus(db, s.ctx),
   );

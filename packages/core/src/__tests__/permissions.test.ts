@@ -60,6 +60,48 @@ describe("registry shape", () => {
   });
 });
 
+describe("the used-devices module", () => {
+  /* Pinned because these seven decide who may hand shop money to a stranger
+     and who may read a seller's ID. A change here is a policy change, and it
+     should have to be made deliberately in two places. */
+  it("registers exactly the seven keys the slice defined", () => {
+    const keys = PERMISSIONS.filter((p) => p.module === "usedDevices").map((p) => p.key);
+    expect(keys.sort()).toEqual(
+      [
+        "usedDevices.create",
+        "usedDevices.priceOverride",
+        "usedDevices.sendToInventory",
+        "usedDevices.editRefurbCost",
+        "usedDevices.viewSeller",
+        "usedDevices.redeemCredit",
+        "usedDevices.voidCredit",
+      ].sort(),
+    );
+  });
+
+  it("gives a cashier the counter work and nothing else", () => {
+    // buying and shelving are counter work the client asked to keep at the till;
+    // reading the seller and voiding money the shop owes are not
+    for (const key of [
+      "usedDevices.create",
+      "usedDevices.sendToInventory",
+      "usedDevices.editRefurbCost",
+      "usedDevices.redeemCredit",
+    ] as PermissionKey[]) {
+      expect(can(cashier, key), key).toBe(true);
+    }
+    for (const key of ["usedDevices.viewSeller", "usedDevices.voidCredit"] as PermissionKey[]) {
+      expect(can(cashier, key), key).toBe(false);
+    }
+  });
+
+  it("lets an owner grant viewSeller to one cashier without inventing a role", () => {
+    const trusted = { role: "cashier", overrides: { "usedDevices.viewSeller": true } };
+    expect(can(trusted, "usedDevices.viewSeller")).toBe(true);
+    expect(can(trusted, "usedDevices.voidCredit")).toBe(false);
+  });
+});
+
 describe("role defaults", () => {
   it("gives the owner everything", () => {
     for (const p of PERMISSIONS) expect(can(owner, p.key), p.key).toBe(true);

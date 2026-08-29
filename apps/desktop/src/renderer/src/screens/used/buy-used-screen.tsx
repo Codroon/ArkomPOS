@@ -72,11 +72,18 @@ export function BuyUsedScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [logged, setLogged] = useState<UsedLogResponse | null>(null);
   const [logError, setLogError] = useState<string | null>(null);
+  /* the shop's own margin, not the built-in one: the default is a starting
+     point, and Ajustes is where the owner moves it */
+  const [marginPct, setMarginPct] = useState(DEFAULT_MARGIN_PCT);
 
   const patch = useCallback((next: Partial<BuyDraft>) => setDraft((d) => ({ ...d, ...next })), []);
 
   useEffect(() => {
     setTimeout(() => imeiRef.current?.focus(), 0);
+    window.arkom
+      .invoke("settings:get")
+      .then((settings) => setMarginPct(settings.usedMarginPct))
+      .catch((err) => console.error("settings:get failed", err));
   }, []);
 
 
@@ -564,7 +571,7 @@ export function BuyUsedScreen() {
         <SellPriceModal
           buyPriceCents={buyPriceCents(draft) ?? 0}
           refurbCostCents={0}
-          marginPct={DEFAULT_MARGIN_PCT}
+          marginPct={marginPct}
           busy={submitting}
           onCancel={() => setPriceModalOpen(false)}
           onConfirm={(sellPriceCents) => void submit("inventory", sellPriceCents)}

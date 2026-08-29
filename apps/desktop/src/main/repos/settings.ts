@@ -31,6 +31,8 @@ export const DEFAULT_SETTINGS: Settings = {
   backupSecondaryPath: "", // local backups only until someone points it at a stick
   backupLastAtMs: 0,
   backupLastStatus: "",
+  idleLockMinutes: 5,
+  usedMarginPct: 25,
 };
 
 type SettingKey = keyof Settings;
@@ -39,6 +41,9 @@ type SettingKey = keyof Settings;
 function decode(key: SettingKey, raw: string): Settings[SettingKey] {
   if (key === "paperWidthMm") return Number(raw) === 58 ? 58 : 80;
   if (key === "backupLastAtMs") return Number(raw) || 0;
+  // 0 is a real answer here ("never lock"), so it must survive the ?? fallback
+  if (key === "idleLockMinutes") return Number.isFinite(Number(raw)) ? Number(raw) : 5;
+  if (key === "usedMarginPct") return Number.isFinite(Number(raw)) ? Number(raw) : 25;
   return raw;
 }
 function encode(value: Settings[SettingKey]): string {

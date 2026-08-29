@@ -248,6 +248,41 @@ export function SettingsScreen() {
             />
           </section>
 
+          {/* ---------------- the till itself ---------------- */}
+          <section className="flex flex-col gap-2">
+            <SectionLabel>{t("set.tillSection")}</SectionLabel>
+
+            <Field label={t("set.idleLock")} hint={t("set.idleLockHint")}>
+              <SelectInput
+                value={String(settings.idleLockMinutes)}
+                onChange={(e) => void save({ idleLockMinutes: Number(e.target.value) })}
+              >
+                <option value="0">{t("set.idleLockNever")}</option>
+                {[1, 2, 5, 10, 15, 30].map((n) => (
+                  <option key={n} value={n}>
+                    {t("set.idleLockMinutes", { n })}
+                  </option>
+                ))}
+              </SelectInput>
+            </Field>
+
+            <Field label={t("set.usedMargin")} hint={t("set.usedMarginHint")}>
+              <div className="flex items-center gap-1.5">
+                <SelectInput
+                  value={String(settings.usedMarginPct)}
+                  onChange={(e) => void save({ usedMarginPct: Number(e.target.value) })}
+                >
+                  {[0, 10, 15, 20, 25, 30, 35, 40, 50].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </SelectInput>
+                <span className="font-mono text-[12px] text-muted">%</span>
+              </div>
+            </Field>
+          </section>
+
           <BackupPanel say={say} />
 
           {/* ---------------- demo data ---------------- */}

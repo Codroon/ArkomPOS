@@ -21,16 +21,50 @@
  *   3. **Restore is not a button.** Overwriting a live database from the UI is
  *      a way to lose a day's takings to a misclick. The procedure is three
  *      manual steps and lives in DEPLOYMENT.md.
+ *
+ * Since v0.11.0 there are TWO artefacts, not one. Device and ID photographs
+ * live as files beside the database (ADR-0013 §3), so each backup copies the
+ * photos folder alongside the .db and the pair travels together. A restore that
+ * takes only the database is a silent partial restore: every purchase still
+ * lists its photos and none of them open.
  */
 import { app } from "electron";
 import Database from "better-sqlite3";
-import { mkdir, readdir, stat, copyFile, unlink } from "node:fs/promises";
+import { cp, mkdir, readdir, rm, stat, copyFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { mutate, type MutationCtx } from "@arkom/core";
 import type { ArkomDb } from "@arkom/db";
 import { makeMutateRunner } from "../mutate-runner";
 import { rawSqlite, resolveDbPath } from "../db";
+import { photosRoot } from "../photos";
 import { getSettings, saveSettings } from "../repos/settings";
+
+/**
+ * Copy the photos folder, returning how many files travelled.
+ *
+ * A missing folder means the shop has bought nothing yet — zero files, no
+ * error. Anything else propagates: a backup that quietly dropped the
+ * photographs would be the kind that looks fine until the day it is needed.
+ */
+async function copyPhotos(dest: string): Promise<number> {
+  const source = photosRoot();
+  try {
+    await stat(source);
+  } catch {
+    return 0;
+  }
+  await rm(dest, { recursive: true, force: true });
+  await cp(source, dest, { recursive: true });
+  return countFiles(dest);
+}
+
+async function countFiles(dir: string): Promise<number> {
+  let total = 0;
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    total += entry.isDirectory() ? await countFiles(join(dir, entry.name)) : 1;
+  }
+  return total;
+}
 
 /** Roughly a fortnight of daily backups — enough to notice and step back. */
 export const KEEP_BACKUPS = 14;
@@ -101,6 +135,8 @@ async function pruneOld(dir: string): Promise<number> {
     const victim = join(dir, name);
     await unlink(victim);
     await dropSidecars(victim); // or they outlive the backup they belonged to
+    // the photos went with it, so they go with it now (v0.11.0)
+    await rm(`${victim}-photos`, { recursive: true, force: true }).catch(() => {});
   }
   return excess.length;
 }
@@ -136,6 +172,23 @@ export async function runBackup(
     throw new Error(`La copia de seguridad no superó la verificación: ${message}`);
   }
 
+  /* The photos, beside the database they belong to. Named after the .db so the
+     pair is obvious in a folder listing and prunes together. Best effort in one
+     direction only: a shop with no photos yet has no folder, which is not a
+     failure — but a folder that exists and will not copy is, because the backup
+     would otherwise look complete while missing half the record. */
+  let photoCount = 0;
+  const photoDest = `${path}-photos`;
+  try {
+    photoCount = await copyPhotos(photoDest);
+  } catch (err) {
+    await unlink(path).catch(() => {});
+    await rm(photoDest, { recursive: true, force: true }).catch(() => {});
+    const message = err instanceof Error ? err.message : String(err);
+    recordBackupRun(db, ctx, { ok: false, reason, error: message, atMs: at.getTime() });
+    throw new Error(`No se pudieron copiar las fotos: ${message}`);
+  }
+
   const { size } = await stat(path);
   const pruned = await pruneOld(dir);
 
@@ -162,6 +215,7 @@ export async function runBackup(
     path,
     sizeBytes: size,
     oplogRows,
+    photoCount,
     pruned,
     secondaryPath,
     secondaryError,

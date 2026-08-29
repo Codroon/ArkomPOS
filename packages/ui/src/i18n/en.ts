@@ -724,6 +724,15 @@ export const en: Record<TKey, string> = {
 
   "pick.grade": "Grade {grade}",
 
+/* till behaviour */
+  "set.tillSection": "The till",
+  "set.idleLock": "Lock the screen after",
+  "set.idleLockHint": "Minutes of inactivity. 0 = never lock.",
+  "set.idleLockNever": "Never lock",
+  "set.idleLockMinutes": "{n} minutes",
+  "set.usedMargin": "Margin for used devices",
+  "set.usedMarginHint": "What the selling price is prefilled with when sending to inventory.",
+
   /* backups */
   "bk.section": "Backup",
   "bk.intro": "Backups run on their own every night and when the app closes. The last {keep} are kept.",

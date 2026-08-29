@@ -202,6 +202,7 @@ turn on *View → Show → Hidden items*.
 |---|---|
 | **The database** (everything: products, stock, tickets, takings) | `…\Arkom POS\arkom-pos.db` |
 | Ticket PDFs | `…\Arkom POS\tickets\` |
+| **Photos of used devices** | `…\Arkom POS\photos\` |
 | Backups | `…\Arkom POS\backups\` |
 | Error log | `…\Arkom POS\logs\arkom.log` |
 | The program itself | `C:\Users\<user>\AppData\Local\Programs\arkom-pos\` |
@@ -222,6 +223,19 @@ The app backs itself up **every night at 03:30** and **every time it closes**,
 into `…\Arkom POS\backups\`. It keeps the last **14** and deletes older ones.
 Each backup is reopened and checked immediately after it is made; anything that
 fails the check is deleted rather than kept.
+
+Since v0.11.0 each backup is **two things**, not one:
+
+| | |
+|---|---|
+| `arkom-20260829-0330.db` | the database |
+| `arkom-20260829-0330.db-photos\` | the photographs of used devices taken up to that moment |
+
+They are made together, pruned together, and **must be restored together**.
+Restoring only the database leaves every used-device purchase listing photos that
+no longer exist — the record is there and the evidence is gone, which is the worst
+of both. If the photo folder cannot be copied, the whole backup is discarded and
+recorded as failed rather than left looking complete.
 
 ### Set up the second copy — do this at the shop visit
 

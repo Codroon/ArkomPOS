@@ -1,6 +1,6 @@
 {
   "name": "arkom-pos",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "private": true,
   "description": "Arkom POS till (Electron). Main = IPC handlers + repositories; renderer never touches DB/Node.",
   "main": "./out/main/index.js",

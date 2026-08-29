@@ -599,7 +599,159 @@ denied — all there. **No PIN appears anywhere in it**, and none ever will.
 
 ---
 
-## 12. Final check
+## 12. Used devices and store credit (v0.11.0)
+
+Sign in as **Ahmer / 8317**. This whole section needs no hardware: every print
+falls back to a PDF you can open from the toast.
+
+### (a) Buying a phone
+
+**04 · Comprar usados.**
+
+Fill the device: `Apple` / `iPhone SE 2020` / `64GB` / `Blanco`, grade **B**,
+battery `86`. Fill the seller: `Imran Khan`, DNI `Y2841170F`.
+
+Now the IMEI. Type one you know is already in stock — `353474060000122` —
+
+✅ The right-hand rail says **Ya existe en el sistema** and names the device it
+   belongs to. The confirmation checkbox stays greyed, and *Precio* and *Forma de
+   pago* stay inert. **There is no way to price a device you cannot buy.**
+
+Clear it and type `352094118803185` —
+
+✅ **IMEI válido.** The checkbox wakes up. The price and payment cards are still
+   inert until you tick it, because the check is the physical one you are
+   promising you did.
+
+Tick the box —
+
+✅ Price and payment become editable. Enter **80,00** and leave the payout on
+   *Efectivo*. Press **Generar** next to the barcode.
+
+Press **Dejar en espera** —
+
+✅ A green card: *Compra C-000001 registrada. El dispositivo queda en espera.*
+✅ Two prints go out (or two PDFs): the **purchase document** and a **shelf
+   label**. Open the document.
+
+The document is the reason the screen exists. Check it has, in this order: the
+shop's legal block, `C-000001` and the date, the device and its IMEI, the
+accessories, **VENDEDOR** with the name and DNI, the amount paid, the ownership
+declaration, and then **three blank lines above a signature rule**. A seller has
+to be able to sign it with a real pen.
+
+### (b) The gate is not just the screen
+
+Still on 04, start another purchase for the SAME IMEI `352094118803185` —
+
+✅ Refused before you can price it: the device is now a unit in the system.
+
+### (c) The register
+
+**05 · Dispositivos usados.**
+
+✅ Your purchase is there, newest first, with an **En espera** chip and no
+   selling price.
+✅ The counts strip reads `En espera 1`. Click it — the list filters and the
+   counts do **not** change. (A filter that also changes its own counts is one
+   you cannot navigate back out of.)
+✅ Search `352094` — one row. Search the purchase number `C-000001` — one row.
+
+Open it.
+
+✅ **Quién vende** shows the name and DNI, because you are the owner.
+✅ **Historial** lists the purchase, the device and the document as three
+   separate entries, each *by Ahmer*.
+✅ **Reacondicionamiento** has an *Editar* link. Set it to **15,00** —
+   *Coste total* becomes **75,00 €**.
+
+Press **Enviar a inventario** —
+
+✅ The modal shows the cost breakdown and prefills **93,75 €** — 75,00 plus the
+   25% margin from Ajustes, rounded up to 5 cents. Confirm it.
+✅ The chip becomes **En stock**, the actions collapse to one line, and
+   *Reacondicionamiento* now says **Ya incluido en el inventario. No se puede
+   cambiar.** That is not a UI whim: the figure is inside a posted stock
+   movement, and this ledger does not rewrite those.
+
+### (d) What a cashier sees
+
+Sign out, sign in as **Ana / 5162**.
+
+Open the same device from **05** —
+
+✅ Where the seller block was: *Datos del vendedor ocultos — requiere permiso.*
+✅ The ID photo, if you took one, is not in the gallery either.
+✅ There is no **Reimprimir documento de compra** button — a reprint is a way to
+   read the seller's details off a till that will not show them.
+
+> To prove it is not just hidden: as Ahmer, **12 · Usuarios → Ana**, switch
+> **Ver los datos del vendedor** on. Sign back in as Ana and the block appears.
+> Switch it off again before continuing.
+
+### (e) Selling the phone you bought
+
+Still as Ana, **01 · Venta**. Scan or type the barcode you generated, or search
+`iPhone SE` —
+
+✅ It is there, and its name ends in **(usado)**.
+✅ The unit picker shows the phone with its **grade** and **its own price** —
+   93,75 €, not the product's.
+
+Add it and press **Cobrar**, cash —
+
+✅ The ticket shows **no IVA** for that line and prints **Régimen especial de
+   bienes usados** instead. Under the margin scheme the customer pays no VAT
+   they could deduct, and the document must not pretend otherwise.
+
+Now check **02 · Catálogo** —
+
+✅ The used product is **not** in the list. It is bookkeeping the buy screen
+   creates, not stock the owner maintains.
+
+### (f) Store credit
+
+As Ahmer, buy a second phone on **04** — any valid IMEI, `50,00 €` — and set the
+payout to **Saldo a favor**.
+
+✅ The card says a voucher will be issued for 50,00 €.
+✅ After logging, the green card offers **Continuar a la venta**.
+
+Press it —
+
+✅ Venta opens with the credit already applied as a tender chip reading the
+   purchase number and 50,00 €. The amount is not editable: a voucher is spent
+   whole.
+
+Add items until the total is **more** than 50 €, pay the rest in cash, and press
+**Cobrar** —
+
+✅ The sale completes. **The total is the value of the goods** — the credit is a
+   payment, not a discount, so nothing about the taxable base changed.
+
+Try to use the same voucher again: **Venta → Saldo → search the same number** —
+
+✅ It is listed, greyed, marked **Ya usado**. Not hidden — a cashier who cannot
+   see why is a cashier arguing with a customer about a slip.
+
+One more: start a ticket for a few euros and search a voucher worth more —
+
+✅ Listed, greyed, **Mayor que el total**, with the rule underneath. The shop's
+   answer is to add items or pay another way, not to quietly keep the change.
+
+### (g) The books
+
+```bash
+pnpm db:audit --verify
+```
+
+✅ Still all OK. Purchases have their own `C-` series, gap-free and independent
+   of ticket numbers; the used phone's stock-in and the sale that took it back
+   out both balance.
+
+---
+
+## 13. Final check
 
 ```bash
 pnpm db:audit --verify

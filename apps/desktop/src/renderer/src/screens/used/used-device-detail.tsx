@@ -78,6 +78,7 @@ export function UsedDeviceDetailPane({
   const [zoom, setZoom] = useState<string | null>(null);
   const [voidOpen, setVoidOpen] = useState(false);
   const [voidReason, setVoidReason] = useState("");
+  const [marginPct, setMarginPct] = useState(DEFAULT_MARGIN_PCT);
 
   const load = useCallback(async () => {
     try {
@@ -90,6 +91,10 @@ export function UsedDeviceDetailPane({
 
   useEffect(() => {
     void load();
+    window.arkom
+      .invoke("settings:get")
+      .then((settings) => setMarginPct(settings.usedMarginPct))
+      .catch((err) => console.error("settings:get failed", err));
   }, [load]);
 
   useEffect(() => {
@@ -402,7 +407,7 @@ export function UsedDeviceDetailPane({
         <SellPriceModal
           buyPriceCents={device.buyPriceCents}
           refurbCostCents={device.refurbCostCents}
-          marginPct={DEFAULT_MARGIN_PCT}
+          marginPct={marginPct}
           busy={busy}
           onCancel={() => setPriceModal(false)}
           onConfirm={(cents) => void shelve(cents)}

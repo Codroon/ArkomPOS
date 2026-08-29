@@ -726,6 +726,15 @@ export const es = {
 
   "pick.grade": "Grado {grade}",
 
+/* till behaviour */
+  "set.tillSection": "La caja",
+  "set.idleLock": "Bloquear la pantalla tras",
+  "set.idleLockHint": "Minutos sin actividad. 0 = no bloquear nunca.",
+  "set.idleLockNever": "No bloquear",
+  "set.idleLockMinutes": "{n} minutos",
+  "set.usedMargin": "Margen para dispositivos usados",
+  "set.usedMarginHint": "Con lo que se rellena el precio de venta al enviar a inventario.",
+
   /* backups */
   "bk.section": "Copia de seguridad",
   "bk.intro": "La copia se hace sola cada noche y al cerrar el programa. Se guardan las {keep} últimas.",

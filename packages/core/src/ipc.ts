@@ -562,6 +562,17 @@ export const SettingsSchema = z.object({
   /** status, written by the backup runner rather than edited in Ajustes */
   backupLastAtMs: z.number().int(),
   backupLastStatus: z.string().max(300),
+  /**
+   * Minutes of inactivity before the till locks itself. 0 = never.
+   *
+   * A counter is not a desk: the screen is left facing the shop while someone
+   * fetches a phone from the back, and the lock is what stops the next person
+   * selling under the last one's name. Configurable because five minutes is
+   * right for a busy Saturday and maddening on a quiet Tuesday (ADR-0012).
+   */
+  idleLockMinutes: z.number().int().min(0).max(240),
+  /** margin the selling-price modal prefills with, in whole percent (ADR-0013) */
+  usedMarginPct: z.number().int().min(0).max(500),
 });
 export type Settings = z.infer<typeof SettingsSchema>;
 

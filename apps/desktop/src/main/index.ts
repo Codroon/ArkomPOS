@@ -6,7 +6,8 @@ import { runBackup, startNightlyBackups, stopNightlyBackups } from "./backup";
 import { tillContext } from "./context";
 import { isSetupNeeded } from "./setup";
 import { installKdf } from "./auth/kdf";
-import { startIdleWatcher, stopIdleWatcher } from "./auth/session";
+import { setIdleLimitMinutes, startIdleWatcher, stopIdleWatcher } from "./auth/session";
+import { getSettings } from "./repos/settings";
 import {
   hardenApp,
   installErrorLogging,
@@ -120,6 +121,15 @@ if (!app.requestSingleInstanceLock()) {
     // the till may not be configured yet, so the context is read per run rather
     // than captured here — first run creates the tenant this depends on
     startNightlyBackups(db, () => tillContext(db).ctx);
+
+    /* The shop's own idle limit, if it has one. Read defensively: a till that
+       has never been configured has no tenant to read settings for, and failing
+       to boot over a preference would be the wrong trade. */
+    try {
+      setIdleLimitMinutes(getSettings(db, tillContext(db).ctx).idleLockMinutes);
+    } catch {
+      // unconfigured till: the built-in default stands until first run completes
+    }
     startIdleWatcher();
 
     /**

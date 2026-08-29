@@ -1,6 +1,6 @@
 # Arkom POS — Used devices slice (Comprar usados · Dispositivos usados · Saldo a favor)
 
-Status: **Stage B — building** · Target: **v0.11.0** · Owner: Zothix (Codroon)
+Status: **Shipped — v0.11.0** · Target: **v0.11.0** · Owner: Zothix (Codroon)
 Companions: [`ADR-0013`](../adr/0013-used-device-purchases-and-store-credit.md) (decisions) ·
 [`system-design.md`](../design/system-design.md) (schema + IPC) ·
 [`handoff/used-devices.md`](../design/handoff/used-devices.md) (screens).
@@ -93,7 +93,7 @@ warranty tracking on used sales.
       TypeScript-only changes — no CHECK constraint exists, so no data migration.
 - [x] **U6** A `purchase` number series is created per till with prefix `C-`, allocated
       gap-free inside the finalising transaction (ADR-0008).
-- [ ] **U7** Migration runs on a **populated v0.10.0 database**: row counts unchanged,
+- [x] **U7** Migration runs on a **populated v0.10.0 database**: row counts unchanged,
       every existing unit still sells, `db:audit --verify` green.
 
 ### V. IMEI gate
@@ -131,6 +131,10 @@ warranty tracking on used sales.
       obvious in the code, awaiting the client's rate table.
 - [ ] **W9** Overriding a suggested/agreed price requires a reason **and** the approval
       modal, through `usedDevices.priceOverride`.
+      **Not built, deliberately.** There is nothing to override until the client's
+      rate table exists (open question 1): every buy price today is the agreed one,
+      typed once. The permission is registered and approvable, and the screen has
+      the seam — wiring a modal that can never open would be theatre.
 - [x] **W10** Payout: **cash** (posts a drawer movement), **transfer** (reference
       recorded), **store credit** (creates a voucher).
 
@@ -198,7 +202,7 @@ warranty tracking on used sales.
 
 ### P. Permissions
 
-- [ ] **P1** New registry keys with these defaults:
+- [x] **P1** New registry keys with these defaults:
 
 | Key | Module | Cashier | Approvable |
 |---|---|---|---|
@@ -210,18 +214,18 @@ warranty tracking on used sales.
 | `usedDevices.redeemCredit` | usedDevices | ✅ | — |
 | `usedDevices.voidCredit` | usedDevices | ❌ | — |
 
-- [ ] **P2** Every new channel is registered through `guarded()`; the registry test that
+- [x] **P2** Every new channel is registered through `guarded()`; the registry test that
       walks `IPC_CHANNELS` still passes.
-- [ ] **P3** The Users screen picks up all seven keys with **zero changes to that file** —
+- [x] **P3** The Users screen picks up all seven keys with **zero changes to that file** —
       the claim ADR-0012 Rule 2 made, now actually exercised by a second module.
-- [ ] **P4** Each key has `perm.<key>` in both dictionaries; the label-coherence test
+- [x] **P4** Each key has `perm.<key>` in both dictionaries; the label-coherence test
       covers them.
 
 ### B. Backup
 
-- [ ] **B1** The nightly and on-close backup includes `photos/` alongside the database.
-- [ ] **B2** Backup verification notices a photo folder that failed to copy.
-- [ ] **B3** DEPLOYMENT.md's restore procedure restores **both**, and says why taking only
+- [x] **B1** The nightly and on-close backup includes `photos/` alongside the database.
+- [x] **B2** Backup verification notices a photo folder that failed to copy.
+- [x] **B3** DEPLOYMENT.md's restore procedure restores **both**, and says why taking only
       the database is a silent partial restore.
 
 ---
