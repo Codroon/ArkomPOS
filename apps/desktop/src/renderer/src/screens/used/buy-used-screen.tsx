@@ -13,17 +13,22 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  DEFAULT_MARGIN_PCT,
+  formatCents,
   generateInternalEan13,
   isValidImei,
   parseIpcError,
   type AcquisitionChannel,
   type DeviceGrade,
   type IdDocType,
+  type UsedLogRequest,
+  type UsedLogResponse,
 } from "@arkom/core";
 import {
   AccentButton,
   Chip,
   Field,
+  GhostButton,
   PrimaryButton,
   ScanInput,
   SectionLabel,
@@ -34,13 +39,18 @@ import {
   useT,
   type ScanInputHandle,
 } from "@arkom/ui";
+import { errorMessage } from "../../lib/errors";
 import { GateRail, type GateState } from "./gate-rail";
+import { SellPriceModal } from "./sell-price-modal";
 import { PhotoSlotTile, useHasCamera } from "./photo-slots";
 import {
   PHOTO_SLOTS,
   batteryInvalid,
+  batteryValue,
+  buyPriceCents,
   completeness,
   emptyDraft,
+  slotKind,
   type BuyDraft,
   type PhotoSlot,
 } from "./model";
@@ -57,6 +67,10 @@ export function BuyUsedScreen() {
   const [confirmed, setConfirmed] = useState(false);
   const [barcodeError, setBarcodeError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [priceModalOpen, setPriceModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [logged, setLogged] = useState<UsedLogResponse | null>(null);
+  const [logError, setLogError] = useState<string | null>(null);
 
   const patch = useCallback((next: Partial<BuyDraft>) => setDraft((d) => ({ ...d, ...next })), []);
 
@@ -136,6 +150,83 @@ export function BuyUsedScreen() {
     }
     setBarcodeError(t("used.barcode.taken"));
   }, [patch, t]);
+
+  /**
+   * Everything the purchase is, as main wants it.
+   *
+   * Built here rather than in the handler so the two log actions differ by one
+   * field: whether the device goes on the shelf now or waits in the drawer.
+   */
+  const toRequest = (action: "hold" | "inventory", sellPriceCents?: number): UsedLogRequest => ({
+    device: {
+      brand: draft.brand.trim(),
+      model: draft.model.trim(),
+      storage: draft.storage.trim() || null,
+      color: draft.color.trim() || null,
+      grade: draft.grade,
+      batteryPct: batteryValue(draft.batteryPct),
+      imei: draft.imei.trim(),
+      accessories: draft.accessories,
+    },
+    seller: {
+      name: draft.sellerName.trim(),
+      phone: draft.sellerPhone.trim() || null,
+      idType: draft.sellerIdType,
+      idNumber: draft.sellerIdNumber.trim(),
+      channel: draft.channel,
+    },
+    photos: PHOTO_SLOTS.flatMap((slot) => {
+      const photo = draft.photos[slot];
+      return photo ? [{ kind: slotKind(slot), dataUrl: photo.dataUrl }] : [];
+    }),
+    buyPriceCents: buyPriceCents(draft) ?? 0,
+    payout: draft.payout,
+    payoutReference: draft.payoutReference.trim() || null,
+    barcode: draft.barcode.trim() || null,
+    gateConfirmed: confirmed,
+    action,
+    ...(sellPriceCents === undefined ? {} : { sellPriceCents }),
+  });
+
+  const submit = async (action: "hold" | "inventory", sellPriceCents?: number) => {
+    setSubmitting(true);
+    setLogError(null);
+    try {
+      /* No approval wrapper: usedDevices.create is not approvable, and the
+         override that IS (usedDevices.priceOverride) has nothing to override
+         until the client's rate table exists. Wiring a modal that can never
+         open would be theatre. */
+      const result = await window.arkom.invoke("used:log", toRequest(action, sellPriceCents));
+      setPriceModalOpen(false);
+      setLogged(result);
+    } catch (err) {
+      setLogError(errorMessage(t, err));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /** Clear the counter for the next customer. */
+  const startOver = () => {
+    setDraft(emptyDraft());
+    setGate({ phase: "idle" });
+    setConfirmed(false);
+    setLogged(null);
+    setLogError(null);
+    setBarcodeError(null);
+    setNotice(null);
+    setTimeout(() => imeiRef.current?.focus(), 0);
+  };
+
+  const reprint = async (what: "document" | "label") => {
+    if (!logged) return;
+    try {
+      const result = await window.arkom.invoke("used:print", { purchaseId: logged.purchaseId, what, copy: true });
+      setNotice(result.kind === "pdf" ? t("used.logged.pdfSaved") : t("used.logged.printed"));
+    } catch (err) {
+      setNotice(errorMessage(t, err));
+    }
+  };
 
   const done = completeness(draft);
   const gatePassed = gate.phase === "result" && gate.result.ok && confirmed;
@@ -389,23 +480,69 @@ export function BuyUsedScreen() {
             onPatch={patch}
             onGenerateBarcode={() => void generateBarcode()}
             barcodeError={barcodeError}
+            frozen={logged !== null}
           />
 
-          <div className="w-[340px] rounded-[3px] border border-line-strong bg-surface-2 px-3 py-2.5">
-            <div className="mb-2 text-[11px] text-muted">{canLog ? t("used.ready") : missing}</div>
-            <div className="flex gap-2">
-              <PrimaryButton className="h-9 flex-1" disabled={!canLog} onClick={() => setNotice(t("used.action.pending"))}>
-                {t("used.action.hold")}
-              </PrimaryButton>
-              {/* the screen's one blue element */}
-              <AccentButton className="h-9 flex-1" disabled={!canLog} onClick={() => setNotice(t("used.action.pending"))}>
-                {t("used.action.toInventory")}
-              </AccentButton>
+          {logged ? (
+            <div className="w-[340px] rounded-[3px] border border-success-ink/30 bg-success-bg px-3 py-2.5">
+              <div className="text-[12px] font-bold text-success-ink">
+                {t(logged.status === "in_stock" ? "used.logged.stock" : "used.logged.hold", {
+                  doc: logged.docNumber,
+                })}
+              </div>
+              {logged.voucherId ? (
+                <div className="mt-1 text-[11px] text-success-ink">
+                  {t("used.logged.voucher", { amount: formatCents(buyPriceCents(draft) ?? 0) })}
+                </div>
+              ) : null}
+              <div className="mt-2.5 flex gap-2">
+                <GhostButton className="flex-1" onClick={() => void reprint("document")}>
+                  {t("used.logged.printAgain")}
+                </GhostButton>
+                {/* the surface's one blue element once the purchase exists */}
+                <AccentButton className="flex-1" onClick={startOver}>
+                  {t("used.logged.newPurchase")}
+                </AccentButton>
+              </div>
+              {notice ? <div className="mt-2 text-[11px] text-ink-2">{notice}</div> : null}
             </div>
-            {notice ? <div className="mt-2 text-[11px] text-ink-2">{notice}</div> : null}
-          </div>
+          ) : (
+            <div className="w-[340px] rounded-[3px] border border-line-strong bg-surface-2 px-3 py-2.5">
+              <div className="mb-2 text-[11px] text-muted">{canLog ? t("used.ready") : missing}</div>
+              <div className="flex gap-2">
+                <PrimaryButton
+                  className="h-9 flex-1"
+                  disabled={!canLog || submitting}
+                  onClick={() => void submit("hold")}
+                >
+                  {submitting ? t("common.saving") : t("used.action.hold")}
+                </PrimaryButton>
+                {/* the screen's one blue element */}
+                <AccentButton
+                  className="h-9 flex-1"
+                  disabled={!canLog || submitting}
+                  onClick={() => setPriceModalOpen(true)}
+                >
+                  {t("used.action.toInventory")}
+                </AccentButton>
+              </div>
+              {logError ? <div className="mt-2 text-[11px] text-danger-ink">{logError}</div> : null}
+              {notice ? <div className="mt-2 text-[11px] text-ink-2">{notice}</div> : null}
+            </div>
+          )}
         </div>
       </div>
+
+      {priceModalOpen ? (
+        <SellPriceModal
+          buyPriceCents={buyPriceCents(draft) ?? 0}
+          refurbCostCents={0}
+          marginPct={DEFAULT_MARGIN_PCT}
+          busy={submitting}
+          onCancel={() => setPriceModalOpen(false)}
+          onConfirm={(sellPriceCents) => void submit("inventory", sellPriceCents)}
+        />
+      ) : null}
     </div>
   );
 }

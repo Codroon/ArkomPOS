@@ -36,6 +36,8 @@ import type {
   LoginUser,
   UserRow,
   UsedCheckImeiResponse,
+  UsedLogRequest,
+  UsedLogResponse,
 } from "@arkom/core";
 
 declare global {
@@ -120,6 +122,15 @@ declare global {
         channel: "used:checkImei",
         payload: { imei: string },
       ): Promise<UsedCheckImeiResponse>;
+      invoke(
+        channel: "used:log",
+        payload: UsedLogRequest,
+        approval?: { userId: string; pin: string },
+      ): Promise<UsedLogResponse>;
+      invoke(
+        channel: "used:print",
+        payload: { purchaseId: string; what: "document" | "label"; target?: "auto" | "pdf"; copy?: boolean },
+      ): Promise<PrintTicketResponse>;
       invoke(channel: "users:list", payload?: undefined): Promise<UserRow[]>;
       invoke(
         channel: "users:create",

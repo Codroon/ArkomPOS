@@ -609,6 +609,23 @@ export const es = {
   "used.missing.price": "Falta el precio de compra.",
   "used.ready": "Listo para registrar.",
 
+/* logging a purchase */
+  "used.sell.title": "Precio de venta",
+  "used.sell.buyPrice": "Precio de compra",
+  "used.sell.refurb": "Reacondicionamiento",
+  "used.sell.cost": "Coste total",
+  "used.sell.price": "Precio de venta",
+  "used.sell.marginHint": "Sugerido con un margen del {pct}%.",
+  "used.sell.confirm": "Enviar a inventario",
+  "used.logged.hold": "Compra {doc} registrada. El dispositivo queda en espera.",
+  "used.logged.stock": "Compra {doc} registrada. El dispositivo ya está a la venta.",
+  "used.logged.voucher": "Vale de saldo emitido por {amount}.",
+  "used.logged.newPurchase": "Registrar otra compra",
+  "used.logged.printAgain": "Volver a imprimir",
+  "used.logged.printed": "Documento y etiqueta enviados a la impresora.",
+  "used.logged.printFailed": "La compra está registrada, pero no se pudo imprimir. Vuelve a intentarlo o guarda el PDF.",
+  "used.logged.pdfSaved": "Guardado como PDF.",
+
   /* backups */
   "bk.section": "Copia de seguridad",
   "bk.intro": "La copia se hace sola cada noche y al cerrar el programa. Se guardan las {keep} últimas.",

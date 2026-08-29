@@ -144,6 +144,16 @@ export type {
   IntakeInput,
   IntakeResult,
 } from "./used";
+export {
+  renderPurchaseDoc,
+  renderShelfLabel,
+  deviceHeadline,
+  PURCHASE_ES,
+  PURCHASE_ES_PAYOUT,
+  PURCHASE_ES_ACCESSORIES,
+} from "./purchase-doc";
+export type { PurchaseDoc, PurchaseDocDevice, PurchaseDocSeller, ShelfLabel } from "./purchase-doc";
+export { opsToText, opBuilder } from "./print-ops";
 export { AppError, appError, toBridgeError, parseIpcError } from "./errors";
 export {
   TAX_RATE_BP,
@@ -289,6 +299,18 @@ export {
   UsedImeiConflictSchema,
   UsedCheckImeiRequestSchema,
   UsedCheckImeiResponseSchema,
+  DeviceGradeSchema,
+  IdDocTypeSchema,
+  PayoutMethodSchema,
+  AcquisitionChannelSchema,
+  PhotoKindSchema,
+  UsedPhotoInputSchema,
+  UsedDeviceInputSchema,
+  UsedSellerInputSchema,
+  UsedLogRequestSchema,
+  UsedLogResponseSchema,
+  UsedPrintRequestSchema,
+  UsedPrintResponseSchema,
 } from "./ipc";
 export type {
   IpcChannel,
@@ -337,4 +359,7 @@ export type {
   PrintTestRequest,
   UsedImeiConflict,
   UsedCheckImeiResponse,
+  UsedLogRequest,
+  UsedLogResponse,
+  UsedPrintRequest,
 } from "./ipc";

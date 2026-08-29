@@ -1,0 +1,87 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the purchase document > prints on 80mm paper 1`] = `
+"                A R K O M
+   E L E C T R O N I C S · P H O N E S
+
+          Arkom Electronics S.L.
+              NIF B12345678
+        C/ Mayor 14, 28013 Madrid
+------------------------------------------
+COMPRA DE DISPOSITIVO USADO
+C-000123                  27/08/2026 15:04
+Caja 1 · Atendido por Ana
+------------------------------------------
+Apple iPhone SE 2020 · 64GB · Blanco
+Grado B · Batería 86%
+IMEI 352094118803185
+Accesorios: cargador, cable
+------------------------------------------
+VENDEDOR
+Imran Khan
+DNI Y2841170F
+Tel. +34 632 118 044
+------------------------------------------
+IMPORTE PAGADO                     80,00 €
+Forma de pago: efectivo
+------------------------------------------
+El vendedor declara ser el legítimo
+propietario del dispositivo y que no
+procede de actividad ilícita.
+
+
+Firma del vendedor
+
+
+
+X ________________________________________
+------------------------------------------
+          Gracias por su visita
+
+
+------------------------------------------ ✂"
+`;
+
+exports[`the purchase document > prints on the 58mm fallback roll 1`] = `
+"          A R K O M
+      ELECTRONICS · PHONES
+
+     Arkom Electronics S.L.
+         NIF B12345678
+   C/ Mayor 14, 28013 Madrid
+--------------------------------
+COMPRA DE DISPOSITIVO USADO
+C-000123        27/08/2026 15:04
+Caja 1 · Atendido por Ana
+--------------------------------
+Apple iPhone SE 2020 · 64GB ·
+Blanco
+Grado B · Batería 86%
+IMEI 352094118803185
+Accesorios: cargador, cable
+--------------------------------
+VENDEDOR
+Imran Khan
+DNI Y2841170F
+Tel. +34 632 118 044
+--------------------------------
+IMPORTE PAGADO           80,00 €
+Forma de pago: efectivo
+--------------------------------
+El vendedor declara ser el
+legítimo propietario del
+dispositivo y que no procede de
+actividad ilícita.
+
+
+Firma del vendedor
+
+
+
+X ______________________________
+--------------------------------
+     Gracias por su visita
+
+
+-------------------------------- ✂"
+`;

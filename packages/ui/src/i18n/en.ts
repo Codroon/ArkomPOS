@@ -607,6 +607,23 @@ export const en: Record<TKey, string> = {
   "used.missing.price": "The buy price is missing.",
   "used.ready": "Ready to log.",
 
+/* logging a purchase */
+  "used.sell.title": "Selling price",
+  "used.sell.buyPrice": "Buy price",
+  "used.sell.refurb": "Refurbishment",
+  "used.sell.cost": "Total cost",
+  "used.sell.price": "Selling price",
+  "used.sell.marginHint": "Suggested with a {pct}% margin.",
+  "used.sell.confirm": "Send to inventory",
+  "used.logged.hold": "Purchase {doc} logged. The device is on hold.",
+  "used.logged.stock": "Purchase {doc} logged. The device is on sale.",
+  "used.logged.voucher": "Store-credit voucher issued for {amount}.",
+  "used.logged.newPurchase": "Log another purchase",
+  "used.logged.printAgain": "Print again",
+  "used.logged.printed": "Document and label sent to the printer.",
+  "used.logged.printFailed": "The purchase is logged, but it could not be printed. Try again or save the PDF.",
+  "used.logged.pdfSaved": "Saved as a PDF.",
+
   /* backups */
   "bk.section": "Backup",
   "bk.intro": "Backups run on their own every night and when the app closes. The last {keep} are kept.",

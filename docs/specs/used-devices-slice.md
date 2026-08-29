@@ -70,18 +70,18 @@ warranty tracking on used sales.
 
 ### U. Data and migration
 
-- [ ] **U1** `used_purchases` (1:1 with a `purchase` document): device brand, model,
+- [x] **U1** `used_purchases` (1:1 with a `purchase` document): device brand, model,
       storage, colour, grade, battery %, IMEI, accessories flags; seller name, phone, ID
       type, ID number, nullable address; `acquisition_channel`; buy price; payout method;
       `refurb_cost_cents`; `needs_review`; `purchased_at`; barcode.
-- [ ] **U2** `purchase_photos`: purchase id, **relative** path, kind
+- [x] **U2** `purchase_photos`: purchase id, **relative** path, kind
       (`front`/`back`/`extra`/`seller_id`). No blobs anywhere.
-- [ ] **U3** `store_credit_vouchers`: amount, `remaining_cents`, status
+- [x] **U3** `store_credit_vouchers`: amount, `remaining_cents`, status
       (`issued`/`redeemed`/`void`), purchase id, redeeming document id, void reason.
-- [ ] **U4** `units` gains nullable `purchase_id`, `sale_price_cents`, `grade`,
+- [x] **U4** `units` gains nullable `purchase_id`, `sale_price_cents`, `grade`,
       `battery_pct`. Existing rows are untouched and keep working (NULL price = inherit
       the product's).
-- [ ] **U4b** A used device is filed under a **found-or-create product per brand + model +
+- [x] **U4b** A used device is filed under a **found-or-create product per brand + model +
       storage + colour**, named `… (usado)` — not one product per physical phone. Grade,
       battery and selling price live on the unit, which is why they are nullable columns
       there and not on the product.
@@ -89,68 +89,68 @@ warranty tracking on used sales.
       remain fully findable on the **Sale screen** — by barcode/IMEI scan and by model
       search — and every result carries a used marker with the grade, so a cashier can
       tell the new iPhone 11 from the second-hand one at a glance.
-- [ ] **U5** Enums gain `units.status += 'held'` and `documents.doc_type += 'purchase'` as
+- [x] **U5** Enums gain `units.status += 'held'` and `documents.doc_type += 'purchase'` as
       TypeScript-only changes — no CHECK constraint exists, so no data migration.
-- [ ] **U6** A `purchase` number series is created per till with prefix `C-`, allocated
+- [x] **U6** A `purchase` number series is created per till with prefix `C-`, allocated
       gap-free inside the finalising transaction (ADR-0008).
 - [ ] **U7** Migration runs on a **populated v0.10.0 database**: row counts unchanged,
       every existing unit still sells, `db:audit --verify` green.
 
 ### V. IMEI gate
 
-- [ ] **V1** 15 digits, Luhn-checked by the **same** `isValidImei` serialized entry uses.
-- [ ] **V2** Duplicate check spans **all** existing units *and* all open purchases —
+- [x] **V1** 15 digits, Luhn-checked by the **same** `isValidImei` serialized entry uses.
+- [x] **V2** Duplicate check spans **all** existing units *and* all open purchases —
       a device cannot be bought twice, nor bought while an earlier purchase of it is on
       hold.
-- [ ] **V3** A cashier confirmation checkbox: activation lock removed and device factory
+- [x] **V3** A cashier confirmation checkbox: activation lock removed and device factory
       reset, physically verified. **Only this unblocks price and payout.**
-- [ ] **V4** Price, payout and both log actions are refused **in main**, not merely
+- [x] **V4** Price, payout and both log actions are refused **in main**, not merely
       disabled in the UI, until the gate has passed.
 - [ ] **V5** Gate outcomes — pass and fail, with the reason — are oplogged with the actor.
-- [ ] **V6** No network call exists anywhere in this path. Verified by the absence of any
+- [x] **V6** No network call exists anywhere in this path. Verified by the absence of any
       fetch in the used-device code and stated on screen: the check is physical.
 
 ### W. Buy used screen
 
-- [ ] **W1** Device section: brand, model, storage, colour, grade (A/B/C), battery %,
+- [x] **W1** Device section: brand, model, storage, colour, grade (A/B/C), battery %,
       IMEI, accessory toggles (charger / box / cable / case), photos.
-- [ ] **W2** Seller section: name, phone, ID type + number, ID photo. **No signature pad**
+- [x] **W2** Seller section: name, phone, ID type + number, ID photo. **No signature pad**
       — the signature line is on the printed document.
-- [ ] **W3** Right rail: IMEI check, then price + payout, blocked until V3 passes.
-- [ ] **W4** Photo slots — front, back, two free, plus seller ID — each offering **Upload**
+- [x] **W3** Right rail: IMEI check, then price + payout, blocked until V3 passes.
+- [x] **W4** Photo slots — front, back, two free, plus seller ID — each offering **Upload**
       and **Capture** side by side.
-- [ ] **W5** Capture uses `getUserMedia` with media permission granted in the Electron
+- [x] **W5** Capture uses `getUserMedia` with media permission granted in the Electron
       session permission handler; a device picker appears when more than one camera exists;
       "no camera detected" is a calm state that leaves Upload fully usable.
-- [ ] **W6** Photos are written as JPEG, longest edge ≤1600px, under
+- [x] **W6** Photos are written as JPEG, longest edge ≤1600px, under
       `photos/purchases/<purchase-id>/`.
-- [ ] **W7** Barcode: scan an existing code or **Generate** via the catalogue's
+- [x] **W7** Barcode: scan an existing code or **Generate** via the catalogue's
       `generateInternalEan13`, duplicate-checked against products, product codes and
       purchases.
-- [ ] **W8** Buy price is entered manually. The suggested-price seam exists and is
+- [x] **W8** Buy price is entered manually. The suggested-price seam exists and is
       obvious in the code, awaiting the client's rate table.
 - [ ] **W9** Overriding a suggested/agreed price requires a reason **and** the approval
       modal, through `usedDevices.priceOverride`.
-- [ ] **W10** Payout: **cash** (posts a drawer movement), **transfer** (reference
+- [x] **W10** Payout: **cash** (posts a drawer movement), **transfer** (reference
       recorded), **store credit** (creates a voucher).
 
 ### X. Logging a purchase
 
-- [ ] **X1** **Enviar a inventario**: creates the used unit, posts one `tradein_in`
+- [x] **X1** **Enviar a inventario**: creates the used unit, posts one `tradein_in`
       movement at buy cost **+ refurb cost if present**, prompts for a selling price
       prefilled from buy price + the margin % setting, and leaves the unit sellable with
       `REBU` as its default regime.
-- [ ] **X2** **Dejar en espera**: purchase and unit recorded, **no** stock movement, unit
+- [x] **X2** **Dejar en espera**: purchase and unit recorded, **no** stock movement, unit
       `status = 'held'`, not sellable, absent from Sale search.
-- [ ] **X3** Both actions print the purchase document (thermal, PDF fallback): shop header,
+- [x] **X3** Both actions print the purchase document (thermal, PDF fallback): shop header,
       purchase number, date, device + IMEI, accessories, buy price, payout method, seller
       name + ID number + phone, and a signature line.
-- [ ] **X3b** That print needs **`usedDevices.create` only, not `viewSeller`**. The cashier
+- [x] **X3b** That print needs **`usedDevices.create` only, not `viewSeller`**. The cashier
       typed the seller's details thirty seconds earlier; withholding the printout they must
       hand over to be signed would gate data they just entered. `viewSeller` governs
       reading those details **back** later — see Y3b.
-- [ ] **X4** Both actions print a shelf label: barcode, model, grade.
-- [ ] **X5** Everything lands in one transaction with one oplog envelope; the actor is the
+- [x] **X4** Both actions print a shelf label: barcode, model, grade.
+- [x] **X5** Everything lands in one transaction with one oplog envelope; the actor is the
       session (ADR-0012).
 - [ ] **X6** A held device scanned on the Sale screen reports the near-miss
       (`unavailableUnit`) rather than "unknown code".
@@ -177,7 +177,7 @@ warranty tracking on used sales.
 
 ### Z. Store credit
 
-- [ ] **Z1** Payout = store credit creates an `issued` voucher for the buy price, linked to
+- [x] **Z1** Payout = store credit creates an `issued` voucher for the buy price, linked to
       the purchase.
 - [ ] **Z2** *Flow A* — after logging, **Continuar a la venta** opens Sale with the credit
       already applied as a tender chip showing the purchase number and amount.

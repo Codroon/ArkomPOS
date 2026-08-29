@@ -28,6 +28,7 @@ export function GateRail({
   onPatch,
   onGenerateBarcode,
   barcodeError,
+  frozen = false,
 }: {
   draft: BuyDraft;
   gate: GateState;
@@ -36,6 +37,8 @@ export function GateRail({
   onPatch: (patch: Partial<BuyDraft>) => void;
   onGenerateBarcode: () => void;
   barcodeError: string | null;
+  /** the purchase is logged: these numbers are a record now, not a draft */
+  frozen?: boolean;
 }) {
   const t = useT();
 
@@ -85,7 +88,7 @@ export function GateRail({
           <input
             type="checkbox"
             className="mt-[2px] h-3.5 w-3.5 flex-none accent-ink"
-            disabled={!imeiOk}
+            disabled={!imeiOk || frozen}
             checked={confirmed}
             onChange={(e) => onConfirmedChange(e.target.checked)}
           />
@@ -115,6 +118,7 @@ export function GateRail({
               <TextInput
                 mono
                 requiredStyle
+                disabled={frozen}
                 className="h-9 text-[18px] font-bold"
                 inputMode="decimal"
                 value={draft.buyPriceInput}
@@ -149,6 +153,7 @@ export function GateRail({
                 <button
                   key={value}
                   type="button"
+                  disabled={frozen}
                   onClick={() => onPatch({ payout: value })}
                   className={cn(
                     "flex-1 border-r border-line px-1 py-1 text-[11px] last:border-r-0",
@@ -167,6 +172,7 @@ export function GateRail({
                 <TextInput
                   mono
                   requiredStyle
+                  disabled={frozen}
                   value={draft.payoutReference}
                   onChange={(e) => onPatch({ payoutReference: e.target.value })}
                 />
@@ -199,12 +205,12 @@ export function GateRail({
         <div className="mt-1.5 flex gap-1.5">
           <TextInput
             mono
-            disabled={!passed}
+            disabled={!passed || frozen}
             value={draft.barcode}
             onChange={(e) => onPatch({ barcode: e.target.value })}
             placeholder={t("used.barcode.placeholder")}
           />
-          <GhostButton className="flex-none" disabled={!passed} onClick={onGenerateBarcode}>
+          <GhostButton className="flex-none" disabled={!passed || frozen} onClick={onGenerateBarcode}>
             {t("used.barcode.generate")}
           </GhostButton>
         </div>

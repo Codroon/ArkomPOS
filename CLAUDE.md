@@ -13,6 +13,7 @@ Desktop till (Electron): **Sale**, **Catalog**, **Inventory (+ minimal add-stock
 (printer + paper + command set + the shop's legal block) and **Usuarios** (nav 11 and 12).
 Since v0.10.0 the till has PIN login, roles and per-action approval (ADR-0012).
 Ticket printing is in: ESC/POS through the Windows RAW spooler, PDF fallback, reprints stamped COPIA.
+Since v0.11.0 the till buys used devices: gate, purchase document, shelf label, store credit (ADR-0013).
 NOT yet: shifts/float/Z report, refunds/voids, full invoices, card-terminal SDK, sync, web app,
 repairs/used/agency/SIM screens. Schema already anticipates them — build nothing for them.
 
@@ -33,6 +34,12 @@ repairs/used/agency/SIM screens. Schema already anticipates them — build nothi
   SESSION, never from anything the payload carries (ADR-0012).
 - **No PIN in a log line, an oplog payload, or an error message** — including "wrong PIN"
   errors, which carry attempts remaining and nothing else. Hashes never leave the main process.
+- **Photographs are files, paths are rows.** Device and ID photos live under
+  `userData/photos/purchases/<id>/` as resized JPEGs; the database stores a path
+  relative to that root. Never a blob — it defeats the backup design (ADR-0013).
+- **Store credit is a tender, never a line.** A voucher pays for a sale the way
+  cash does; putting it on the document as a negative line corrupts the taxable
+  base and the printed IVA breakdown.
 - **Brand tokens only.** Colours and faces come from `packages/ui/src/styles/tokens.css` by
   meaning (`canvas`, `ink`, `accent`, `warning-bg`…). No raw hex in components. Signal Blue lands
   on exactly **one** element per screen — the primary action. **White-on-blue is banned** (text on

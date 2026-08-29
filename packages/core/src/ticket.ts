@@ -11,47 +11,44 @@
  * customer is handed.
  *
  * Money arrives in integer cents and is formatted once, here, at the edge.
+ *
+ * The op model and the typography that lays text onto it live in print-ops.ts,
+ * shared with the used-device purchase document. This file is the sale ticket
+ * and nothing else.
  */
 import { formatCents } from "./money";
+import {
+  COLUMNS_BY_PAPER,
+  columnsFor,
+  labelledRows,
+  letterSpaced,
+  formatPrintDate,
+  opsToText,
+  wrapText,
+  type PaperWidthMm,
+  type TicketAlign,
+  type TicketCutOp,
+  type TicketDrawerOp,
+  type TicketFeedOp,
+  type TicketOp,
+  type TicketRuleOp,
+  type TicketSize,
+  type TicketTextOp,
+} from "./print-ops";
 
-/* ------------------------------------------------------------------ model */
-
-export type TicketAlign = "left" | "center" | "right";
-
-/** Character-cell multipliers, the two axes ESC/POS actually offers. */
-export type TicketSize = "normal" | "wide" | "tall" | "big";
-
-export interface TicketTextOp {
-  op: "text";
-  text: string;
-  align: TicketAlign;
-  bold: boolean;
-  size: TicketSize;
-}
-/** A full-width dashed separator. */
-export interface TicketRuleOp {
-  op: "rule";
-  char: string;
-}
-export interface TicketFeedOp {
-  op: "feed";
-  lines: number;
-}
-export interface TicketCutOp {
-  op: "cut";
-}
-/** Kick the cash drawer. Only ever emitted for an original cash sale. */
-export interface TicketDrawerOp {
-  op: "drawer";
-}
-
-export type TicketOp = TicketTextOp | TicketRuleOp | TicketFeedOp | TicketCutOp | TicketDrawerOp;
-
-/** Paper the shop can load. 80mm is the counter printer; 58mm is the fallback roll. */
-export type PaperWidthMm = 80 | 58;
-
-/** Printable character columns at Font A for each roll. */
-export const COLUMNS_BY_PAPER: Record<PaperWidthMm, number> = { 80: 42, 58: 32 };
+/* Re-exported so every existing import of these from "./ticket" still works. */
+export { COLUMNS_BY_PAPER, wrapText };
+export type {
+  PaperWidthMm,
+  TicketAlign,
+  TicketCutOp,
+  TicketDrawerOp,
+  TicketFeedOp,
+  TicketOp,
+  TicketRuleOp,
+  TicketSize,
+  TicketTextOp,
+};
 
 export interface TicketLine {
   description: string;
@@ -118,69 +115,6 @@ export const TICKET_ES_METHODS: Record<string, string> = {
   transfer: "Transferencia",
 };
 
-/* ----------------------------------------------------------------- helpers */
-
-/** Columns a line actually gets: the double-width sizes halve the row. */
-function columnsFor(size: TicketSize, cols: number): number {
-  return size === "wide" || size === "big" ? Math.floor(cols / 2) : cols;
-}
-
-/**
- * Word-wrap to `cols`. Never truncates: a word longer than the line (a 15-digit
- * IMEI on 58mm paper, a German-length product name) is hard-split rather than
- * silently cut, because a half-printed product name on a receipt is worse than
- * an ugly one.
- */
-export function wrapText(text: string, cols: number): string[] {
-  if (cols <= 0) return [text];
-  const out: string[] = [];
-  for (const paragraph of text.split("\n")) {
-    let line = "";
-    for (const word of paragraph.trim().split(/\s+/).filter(Boolean)) {
-      let w = word;
-      // a word that cannot fit on its own line gets broken across lines
-      while (w.length > cols) {
-        if (line) {
-          out.push(line);
-          line = "";
-        }
-        out.push(w.slice(0, cols));
-        w = w.slice(cols);
-      }
-      if (!line) line = w;
-      else if (line.length + 1 + w.length <= cols) line += ` ${w}`;
-      else {
-        out.push(line);
-        line = w;
-      }
-    }
-    out.push(line);
-  }
-  return out.length > 0 ? out : [""];
-}
-
-/**
- * "Label................value" as one row. When the pair cannot fit, the value
- * drops to its own right-aligned line instead of colliding with the label.
- */
-function labelledRows(label: string, value: string, cols: number): string[] {
-  const gap = cols - label.length - value.length;
-  if (gap >= 1) return [label + " ".repeat(gap) + value];
-  return [label, value.padStart(cols)];
-}
-
-/** "E L E C T R O N I C S" — only when the roll is wide enough to hold it. */
-function letterSpaced(text: string, cols: number): string {
-  const spaced = text.split("").join(" ");
-  return spaced.length <= cols ? spaced : text;
-}
-
-function formatTicketDate(ms: number): string {
-  const d = new Date(ms);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-
 /* ------------------------------------------------------------------ render */
 
 /**
@@ -222,7 +156,7 @@ export function renderTicket(doc: TicketDoc, shop: ShopProfile, width: PaperWidt
   rule();
 
   /* ---- which sale this is ---- */
-  for (const row of labelledRows(doc.docNumber, formatTicketDate(doc.completedAtMs), cols)) {
+  for (const row of labelledRows(doc.docNumber, formatPrintDate(doc.completedAtMs), cols)) {
     ops.push({ op: "text", text: row, align: "left", bold: false, size: "normal" });
   }
   text(`${TICKET_ES.terminal}: ${doc.terminalName}`);
@@ -294,29 +228,10 @@ export function renderTicket(doc: TicketDoc, shop: ShopProfile, width: PaperWidt
 }
 
 /**
- * The ops as plain text, exactly as the thermal printer lays them out — the
- * double-size rows are stretched so the snapshot shows what the paper shows.
- * Used by the tests and by anything that wants to eyeball a ticket.
+ * The ops as plain text, exactly as the thermal printer lays them out. Kept
+ * under its original name because half the test suite calls it; the
+ * implementation is shared with every other printed document.
  */
 export function ticketToText(ops: TicketOp[], width: PaperWidthMm = 80): string {
-  const cols = COLUMNS_BY_PAPER[width];
-  const out: string[] = [];
-  for (const op of ops) {
-    if (op.op === "rule") out.push(op.char.repeat(cols));
-    else if (op.op === "feed") for (let i = 0; i < op.lines; i++) out.push("");
-    else if (op.op === "cut") out.push("-".repeat(cols) + " ✂");
-    else if (op.op === "drawer") out.push("[cajón]");
-    else {
-      const inner = columnsFor(op.size, cols);
-      const padded =
-        op.align === "center"
-          ? op.text.padStart(Math.floor((inner + op.text.length) / 2)).padEnd(inner)
-          : op.align === "right"
-            ? op.text.padStart(inner)
-            : op.text.padEnd(inner);
-      // widen the cells so a double-width row occupies the full roll on screen
-      out.push(op.size === "wide" || op.size === "big" ? padded.split("").join(" ").slice(0, cols) : padded);
-    }
-  }
-  return out.map((l) => l.trimEnd()).join("\n");
+  return opsToText(ops, width);
 }

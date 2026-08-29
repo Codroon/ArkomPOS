@@ -135,6 +135,10 @@ import {
   UsersResetPinResponseSchema,
   UsedCheckImeiRequestSchema,
   UsedCheckImeiResponseSchema,
+  UsedLogRequestSchema,
+  UsedLogResponseSchema,
+  UsedPrintRequestSchema,
+  UsedPrintResponseSchema,
   type MutationCtx,
   type PermissionKey,
 } from "@arkom/core";
@@ -145,8 +149,8 @@ import { resolveScanCode } from "./repos/scan";
 import { addStock, listInventory, listMovements } from "./repos/inventory";
 import { createSupplier, listSuppliers } from "./repos/suppliers";
 import { getSettings, saveSettings } from "./repos/settings";
-import { checkImei, logGateRejection } from "./repos/used";
-import { listPrinters, printTest, printTicket, revealTicket, ticketsDir, printRecoveryCode } from "./print";
+import { checkImei, logGateRejection, logPurchase } from "./repos/used";
+import { listPrinters, printPurchase, printTest, printTicket, revealTicket, ticketsDir, printRecoveryCode } from "./print";
 import { completeFirstRun, demoStatus, isSetupNeeded, removeDemoData } from "./setup";
 import { backupStatus, backupsDir, runBackup } from "./backup";
 import {
@@ -610,6 +614,55 @@ export function registerIpcHandlers(db: ArkomDb): void {
       }
       return result;
     },
+  );
+
+  /**
+   * Log the purchase.
+   *
+   * `usedDevices.create` covers the write AND the two prints that follow it: the
+   * cashier typed the seller's details a moment ago and has to hand them
+   * something to sign, so gating the printout behind `viewSeller` would withhold
+   * data they just entered (ADR-0013 §6, amended). Reading it back later is what
+   * `viewSeller` governs — see used:print.
+   *
+   * Both prints are attempted after the transaction and neither can undo it. A
+   * jammed printer leaves a logged, numbered purchase and a reprint button,
+   * which is the same bargain the sale ticket already makes.
+   */
+  guarded("used:log", "usedDevices.create", UsedLogRequestSchema, UsedLogResponseSchema, async (s, input) => {
+    const result = await logPurchase(db, s.ctx, input);
+    for (const what of ["document", "label"] as const) {
+      try {
+        await printPurchase(db, s.ctx, { purchaseId: result.purchaseId, what, target: "auto", copy: false });
+      } catch (err) {
+        // recorded by the print bridge; the purchase stands either way
+        console.error(`[used] could not print the ${what}:`, err);
+      }
+    }
+    return {
+      purchaseId: result.purchaseId,
+      docNumber: result.docNumber,
+      unitId: result.unitId,
+      productId: result.productId,
+      voucherId: result.voucherId,
+      status: result.status,
+    };
+  });
+
+  /**
+   * Reprint, from the detail view or after a printer failure.
+   *
+   * A reprint of the DOCUMENT reveals the seller block, so it is gated on
+   * `usedDevices.viewSeller` — otherwise the on-screen gate would be decorative,
+   * defeated by anyone who can press "print". The shelf label carries no
+   * personal data and stays on `usedDevices.create`.
+   */
+  guarded(
+    "used:print",
+    (req) => (req.what === "document" ? "usedDevices.viewSeller" : "usedDevices.create"),
+    UsedPrintRequestSchema,
+    UsedPrintResponseSchema,
+    (s, input) => printPurchase(db, s.ctx, input),
   );
 }
 

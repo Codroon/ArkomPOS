@@ -62,6 +62,8 @@ export const IPC_CHANNELS = [
   "users:update",
   "users:resetPin",
   "used:checkImei",
+  "used:log",
+  "used:print",
 ] as const;
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
@@ -837,3 +839,90 @@ export const UsedCheckImeiResponseSchema = z.object({
   existing: UsedImeiConflictSchema.nullable(),
 });
 export type UsedCheckImeiResponse = z.infer<typeof UsedCheckImeiResponseSchema>;
+
+/* ---- used:log — the purchase, in one transaction ---- */
+
+export const DeviceGradeSchema = z.enum(["A", "B", "C"]);
+export const IdDocTypeSchema = z.enum(["DNI", "NIE", "PASAPORTE"]);
+export const PayoutMethodSchema = z.enum(["cash", "transfer", "store_credit"]);
+export const AcquisitionChannelSchema = z.enum(["private_individual", "business"]);
+export const PhotoKindSchema = z.enum(["front", "back", "extra", "seller_id"]);
+
+/**
+ * A photo on its way in.
+ *
+ * The renderer has already resized it to a JPEG data URL, because a purchase id
+ * does not exist until the purchase is logged and staging files before then
+ * leaks photographs of somebody's ID document for every intake a cashier starts
+ * and abandons. Capped so a malformed payload cannot exhaust memory in main.
+ */
+export const UsedPhotoInputSchema = z.object({
+  kind: PhotoKindSchema,
+  dataUrl: z
+    .string()
+    .max(4_000_000)
+    .refine((v) => v.startsWith("data:image/jpeg;base64,"), "Solo se aceptan fotos JPEG."),
+});
+
+export const UsedDeviceInputSchema = z.object({
+  brand: z.string().trim().min(1).max(60),
+  model: z.string().trim().min(1).max(80),
+  storage: z.string().trim().max(20).nullable().default(null),
+  color: z.string().trim().max(40).nullable().default(null),
+  grade: DeviceGradeSchema,
+  batteryPct: z.number().int().min(0).max(100).nullable().default(null),
+  imei: z.string().trim().min(15).max(20),
+  accessories: z.object({
+    charger: z.boolean(),
+    box: z.boolean(),
+    cable: z.boolean(),
+    case: z.boolean(),
+  }),
+});
+
+export const UsedSellerInputSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  phone: z.string().trim().max(40).nullable().default(null),
+  idType: IdDocTypeSchema,
+  idNumber: z.string().trim().min(1).max(40),
+  channel: AcquisitionChannelSchema.default("private_individual"),
+});
+
+export const UsedLogRequestSchema = z.object({
+  device: UsedDeviceInputSchema,
+  seller: UsedSellerInputSchema,
+  photos: z.array(UsedPhotoInputSchema).max(6).default([]),
+  buyPriceCents: z.number().int().min(0),
+  payout: PayoutMethodSchema,
+  payoutReference: z.string().trim().max(80).nullable().default(null),
+  barcode: z.string().trim().max(32).nullable().default(null),
+  /** the cashier ticked the physical-check box. Main refuses without it (V4). */
+  gateConfirmed: z.boolean(),
+  action: z.enum(["hold", "inventory"]),
+  /** required for action "inventory": what it goes on the shelf at */
+  sellPriceCents: z.number().int().min(0).optional(),
+  /** carried when a suggested price was overridden — routes through approval */
+  reason: z.string().trim().max(200).optional(),
+});
+export type UsedLogRequest = z.infer<typeof UsedLogRequestSchema>;
+
+export const UsedLogResponseSchema = z.object({
+  purchaseId: z.string(),
+  docNumber: z.string(),
+  unitId: z.string(),
+  productId: z.string(),
+  voucherId: z.string().nullable(),
+  status: z.enum(["held", "in_stock"]),
+});
+export type UsedLogResponse = z.infer<typeof UsedLogResponseSchema>;
+
+/** Print (or reprint) a purchase document and its shelf label. */
+export const UsedPrintRequestSchema = z.object({
+  purchaseId: z.string(),
+  what: z.enum(["document", "label"]),
+  target: z.enum(["auto", "pdf"]).default("auto"),
+  /** a reprint stamps COPIA and needs usedDevices.viewSeller (ADR-0013 §6) */
+  copy: z.boolean().default(false),
+});
+export type UsedPrintRequest = z.infer<typeof UsedPrintRequestSchema>;
+export const UsedPrintResponseSchema = PrintTicketResponseSchema;

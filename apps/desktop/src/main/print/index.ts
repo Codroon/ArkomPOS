@@ -13,19 +13,24 @@
 import { BrowserWindow, shell } from "electron";
 import { extname, resolve, sep } from "node:path";
 import { mkdir } from "node:fs/promises";
+import { and, eq } from "drizzle-orm";
 import {
   appError,
   mutate,
+  renderPurchaseDoc,
+  renderShelfLabel,
   renderTicket,
   wrapText,
   type MutationCtx,
   type PrinterInfo,
   type PrintTicketRequest,
   type PrintTicketResponse,
+  type PurchaseDoc,
   type TicketDoc,
   type TicketOp,
+  type UsedPrintRequest,
 } from "@arkom/core";
-import type { ArkomDb } from "@arkom/db";
+import { schema, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner } from "../mutate-runner";
 import { peek } from "../repos/sale";
 import { getSettings, shopProfile } from "../repos/settings";
@@ -287,5 +292,159 @@ export async function printRecoveryCode(
     const path = await renderTicketPdf(ops, settings.paperWidthMm, "CODIGO-RECUPERACION");
     logPrint({ ok: false, target: "printer", fellBackToPdf: true });
     return { kind: "pdf", path };
+  }
+}
+
+
+/* --------------------------------------------------- used devices (ADR-0013) */
+
+/**
+ * Load a purchase for printing.
+ *
+ * Reads the seller block unconditionally — it is ON the document, which is the
+ * point of the document. Who may CAUSE a print is decided by the guard: logging
+ * a purchase prints it under `usedDevices.create`, because the cashier typed
+ * those details a moment ago and the seller has to sign the slip; a reprint
+ * afterwards needs `usedDevices.viewSeller`, because that is a way to read the
+ * register back off a till that will not show it on screen (ADR-0013 §6).
+ */
+function loadPurchaseDoc(db: ArkomDb, ctx: MutationCtx, purchaseId: string, isCopy: boolean): {
+  doc: PurchaseDoc;
+  documentId: string;
+  barcode: string | null;
+  sellPriceCents: number | null;
+} {
+  const { usedPurchases, documents, units, users } = schema;
+  const row = db
+    .select({ purchase: usedPurchases, docNumber: documents.docNumber, documentId: documents.id, userId: documents.userId })
+    .from(usedPurchases)
+    .innerJoin(documents, eq(documents.id, usedPurchases.documentId))
+    .where(and(eq(usedPurchases.tenantId, ctx.tenantId), eq(usedPurchases.id, purchaseId)))
+    .limit(1)
+    .all()[0];
+  if (!row) throw appError("VALIDATION", "Esa compra no existe.");
+
+  const cashier = row.userId
+    ? db.select({ name: users.name }).from(users).where(eq(users.id, row.userId)).limit(1).all()[0]
+    : undefined;
+
+  const unit = row.purchase.unitId
+    ? db.select({ salePriceCents: units.salePriceCents }).from(units).where(eq(units.id, row.purchase.unitId)).limit(1).all()[0]
+    : undefined;
+
+  const accessories = (row.purchase.accessories ?? {}) as Partial<Record<"charger" | "box" | "cable" | "case", boolean>>;
+
+  return {
+    documentId: row.documentId,
+    barcode: row.purchase.barcode,
+    sellPriceCents: unit?.salePriceCents ?? null,
+    doc: {
+      docNumber: row.docNumber ?? "",
+      purchasedAtMs: row.purchase.purchasedAt.getTime(),
+      terminalName: tillContext(db).meta.terminal.name,
+      cashierName: cashier?.name ?? "—",
+      isCopy,
+      device: {
+        brand: row.purchase.brand,
+        model: row.purchase.model,
+        storage: row.purchase.storage,
+        color: row.purchase.color,
+        grade: row.purchase.grade,
+        batteryPct: row.purchase.batteryPct,
+        imei: row.purchase.imei,
+        accessories: {
+          charger: accessories.charger === true,
+          box: accessories.box === true,
+          cable: accessories.cable === true,
+          case: accessories.case === true,
+        },
+      },
+      seller: {
+        name: row.purchase.sellerName,
+        phone: row.purchase.sellerPhone,
+        idType: row.purchase.sellerIdType,
+        idNumber: row.purchase.sellerIdNumber,
+        channel: row.purchase.acquisitionChannel,
+      },
+      buyPriceCents: row.purchase.buyPriceCents,
+      payout: row.purchase.payoutMethod,
+      payoutReference: row.purchase.payoutReference,
+      voucherNumber: row.purchase.payoutMethod === "store_credit" ? (row.docNumber ?? null) : null,
+    },
+  };
+}
+
+/**
+ * Print a purchase document or its shelf label.
+ *
+ * Same rule as the sale ticket: **a print failure never touches the record.**
+ * The purchase is logged, numbered and in the books before this runs, so a
+ * jammed printer surfaces as PRINT_FAILED with a PDF to fall back on — never as
+ * a purchase that half happened.
+ */
+export async function printPurchase(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  req: UsedPrintRequest,
+): Promise<PrintTicketResponse> {
+  const settings = getSettings(db, ctx);
+  const loaded = loadPurchaseDoc(db, ctx, req.purchaseId, req.copy);
+  const shop = shopProfile(db, ctx);
+
+  const ops =
+    req.what === "label"
+      ? renderShelfLabel(
+          {
+            barcode: loaded.barcode,
+            device: loaded.doc.device,
+            docNumber: loaded.doc.docNumber,
+            sellPriceCents: loaded.sellPriceCents,
+          },
+          settings.paperWidthMm,
+        )
+      : renderPurchaseDoc(loaded.doc, shop, settings.paperWidthMm);
+
+  const suffix = req.what === "label" ? "-etiqueta" : req.copy ? "-COPIA" : "";
+  const fileBase = `${loaded.doc.docNumber || "COMPRA"}${suffix}`;
+
+  if (req.target === "pdf") {
+    const path = await renderTicketPdf(ops, settings.paperWidthMm, fileBase);
+    logPrintAttempt(db, ctx, loaded.documentId, { ok: true, target: "pdf", path, what: req.what, copy: req.copy });
+    return { kind: "pdf", path };
+  }
+
+  if (!settings.printerName) {
+    logPrintAttempt(db, ctx, loaded.documentId, {
+      ok: false,
+      target: "printer",
+      printer: null,
+      what: req.what,
+      copy: req.copy,
+      error: "NO_PRINTER",
+    });
+    throw appError("PRINT_FAILED", "No hay impresora configurada en Ajustes.");
+  }
+
+  try {
+    await sendRawToPrinter(settings.printerName, encodeEscPos(ops, settings.commandSet, settings.paperWidthMm));
+    logPrintAttempt(db, ctx, loaded.documentId, {
+      ok: true,
+      target: "printer",
+      printer: settings.printerName,
+      what: req.what,
+      copy: req.copy,
+    });
+    return { kind: "printed", printer: settings.printerName };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logPrintAttempt(db, ctx, loaded.documentId, {
+      ok: false,
+      target: "printer",
+      printer: settings.printerName,
+      what: req.what,
+      copy: req.copy,
+      error: message,
+    });
+    throw appError("PRINT_FAILED", `No se pudo imprimir en ${settings.printerName}.`);
   }
 }
