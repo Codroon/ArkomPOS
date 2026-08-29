@@ -311,6 +311,20 @@ export {
   UsedLogResponseSchema,
   UsedPrintRequestSchema,
   UsedPrintResponseSchema,
+  VoucherStatusSchema,
+  UsedDeviceStateSchema,
+  UsedDeviceRowSchema,
+  UsedListRequestSchema,
+  UsedListResponseSchema,
+  UsedPhotoSchema,
+  UsedSellerBlockSchema,
+  UsedTimelineEntrySchema,
+  UsedDeviceDetailSchema,
+  UsedGetRequestSchema,
+  UsedSetReviewRequestSchema,
+  UsedSetRefurbCostRequestSchema,
+  UsedSendToInventoryRequestSchema,
+  UsedSendToInventoryResponseSchema,
 } from "./ipc";
 export type {
   IpcChannel,
@@ -362,4 +376,6 @@ export type {
   UsedLogRequest,
   UsedLogResponse,
   UsedPrintRequest,
+  UsedDeviceRow,
+  UsedDeviceDetail,
 } from "./ipc";

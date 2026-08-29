@@ -38,6 +38,8 @@ import type {
   UsedCheckImeiResponse,
   UsedLogRequest,
   UsedLogResponse,
+  UsedDeviceRow,
+  UsedDeviceDetail,
 } from "@arkom/core";
 
 declare global {
@@ -131,6 +133,26 @@ declare global {
         channel: "used:print",
         payload: { purchaseId: string; what: "document" | "label"; target?: "auto" | "pdf"; copy?: boolean },
       ): Promise<PrintTicketResponse>;
+      invoke(
+        channel: "used:list",
+        payload?: { state?: "held" | "needs_review" | "in_stock" | "sold"; search?: string },
+      ): Promise<{
+        rows: UsedDeviceRow[];
+        counts: { held: number; needs_review: number; in_stock: number; sold: number };
+      }>;
+      invoke(channel: "used:get", payload: { purchaseId: string }): Promise<UsedDeviceDetail>;
+      invoke(
+        channel: "used:setReview",
+        payload: { purchaseId: string; needsReview: boolean },
+      ): Promise<UsedDeviceDetail>;
+      invoke(
+        channel: "used:setRefurbCost",
+        payload: { purchaseId: string; refurbCostCents: number },
+      ): Promise<UsedDeviceDetail>;
+      invoke(
+        channel: "used:sendToInventory",
+        payload: { purchaseId: string; sellPriceCents: number },
+      ): Promise<{ unitId: string; sellPriceCents: number; unitCostCents: number }>;
       invoke(channel: "users:list", payload?: undefined): Promise<UserRow[]>;
       invoke(
         channel: "users:create",

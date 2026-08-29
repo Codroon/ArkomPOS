@@ -106,7 +106,7 @@ warranty tracking on used sales.
       reset, physically verified. **Only this unblocks price and payout.**
 - [x] **V4** Price, payout and both log actions are refused **in main**, not merely
       disabled in the UI, until the gate has passed.
-- [ ] **V5** Gate outcomes — pass and fail, with the reason — are oplogged with the actor.
+- [x] **V5** Gate outcomes — pass and fail, with the reason — are oplogged with the actor.
 - [x] **V6** No network call exists anywhere in this path. Verified by the absence of any
       fetch in the used-device code and stated on screen: the check is physical.
 
@@ -157,22 +157,22 @@ warranty tracking on used sales.
 
 ### Y. Used devices screen
 
-- [ ] **Y1** One list of every purchased device whatever its state, with status chips
+- [x] **Y1** One list of every purchased device whatever its state, with status chips
       **En espera** / **Requiere revisión** / **En stock** / **Vendido** and a counts strip.
-- [ ] **Y2** Filters by status; search by IMEI, model, purchase number, or barcode scan.
-- [ ] **Y3** Detail: photo gallery, device data, seller block **gated on
+- [x] **Y2** Filters by status; search by IMEI, model, purchase number, or barcode scan.
+- [x] **Y3** Detail: photo gallery, device data, seller block **gated on
       `usedDevices.viewSeller`**, buy price + payout, refurb cost, and a timeline built
       from the oplog.
-- [ ] **Y3b** `usedDevices.viewSeller` gates three things and only these three: the seller
+- [x] **Y3b** `usedDevices.viewSeller` gates three things and only these three: the seller
       block, the ID photo in the gallery, and **reprinting the purchase document from the
       detail view**. A reprint after the fact is a way to read the seller's data off a
       till that will not show it on screen, so it is gated with the data it reveals.
-- [ ] **Y4** Actions on a held device: toggle *Requiere revisión*, edit refurb cost, and
+- [x] **Y4** Actions on a held device: toggle *Requiere revisión*, edit refurb cost, and
       *Enviar a inventario* (selling price set at that moment).
-- [ ] **Y5** Refurb cost is editable only while held; once in stock it is frozen, because
+- [x] **Y5** Refurb cost is editable only while held; once in stock it is frozen, because
       it has already been folded into the unit's cost.
-- [ ] **Y6** A sold device links to the sale that sold it.
-- [ ] **Y7** Without `viewSeller`, the handler omits the seller fields from the payload —
+- [x] **Y6** A sold device links to the sale that sold it.
+- [x] **Y7** Without `viewSeller`, the handler omits the seller fields from the payload —
       the UI does not merely hide them.
 
 ### Z. Store credit

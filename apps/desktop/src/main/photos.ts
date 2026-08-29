@@ -11,8 +11,7 @@
  * take with it.
  */
 import { app } from "electron";
-import { mkdir, rm } from "node:fs/promises";
-import { writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
 import type { PhotoKind } from "@arkom/core";
 
@@ -82,6 +81,33 @@ export async function savePurchasePhotos(
     });
   }
   return saved;
+}
+
+/**
+ * Read stored photos back as data URLs for the detail view.
+ *
+ * The renderer never touches the disk (system-design §2), so main does the
+ * reading and hands over something an `<img>` can use. Data URLs rather than a
+ * custom protocol because there are at most five per device, each already
+ * capped at 1600px — a protocol handler would be the right answer for a gallery
+ * of hundreds and overkill for this.
+ *
+ * A photo that has gone missing is skipped, not fatal: a device whose folder
+ * was lost in a partial restore should still open, showing what survived.
+ */
+export async function readPhotos(
+  rows: ReadonlyArray<{ id: string; kind: PhotoKind; path: string }>,
+): Promise<Array<{ id: string; kind: PhotoKind; dataUrl: string }>> {
+  const out: Array<{ id: string; kind: PhotoKind; dataUrl: string }> = [];
+  for (const row of rows) {
+    try {
+      const bytes = await readFile(resolvePhotoPath(row.path));
+      out.push({ id: row.id, kind: row.kind, dataUrl: `${DATA_URL_PREFIX}${bytes.toString("base64")}` });
+    } catch {
+      // missing file: the row is a record, the JPEG is an illustration
+    }
+  }
+  return out;
 }
 
 /**

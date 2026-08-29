@@ -139,6 +139,14 @@ import {
   UsedLogResponseSchema,
   UsedPrintRequestSchema,
   UsedPrintResponseSchema,
+  UsedListRequestSchema,
+  UsedListResponseSchema,
+  UsedGetRequestSchema,
+  UsedDeviceDetailSchema,
+  UsedSetReviewRequestSchema,
+  UsedSetRefurbCostRequestSchema,
+  UsedSendToInventoryRequestSchema,
+  UsedSendToInventoryResponseSchema,
   type MutationCtx,
   type PermissionKey,
 } from "@arkom/core";
@@ -149,7 +157,16 @@ import { resolveScanCode } from "./repos/scan";
 import { addStock, listInventory, listMovements } from "./repos/inventory";
 import { createSupplier, listSuppliers } from "./repos/suppliers";
 import { getSettings, saveSettings } from "./repos/settings";
-import { checkImei, logGateRejection, logPurchase } from "./repos/used";
+import {
+  checkImei,
+  getUsedDevice,
+  listUsedDevices,
+  logGateRejection,
+  logPurchase,
+  sendToInventory,
+  setNeedsReview,
+  setRefurbCost,
+} from "./repos/used";
 import { listPrinters, printPurchase, printTest, printTicket, revealTicket, ticketsDir, printRecoveryCode } from "./print";
 import { completeFirstRun, demoStatus, isSetupNeeded, removeDemoData } from "./setup";
 import { backupStatus, backupsDir, runBackup } from "./backup";
@@ -664,7 +681,62 @@ export function registerIpcHandlers(db: ArkomDb): void {
     UsedPrintResponseSchema,
     (s, input) => printPurchase(db, s.ctx, input),
   );
+
+  guarded("used:list", "usedDevices.create", UsedListRequestSchema, UsedListResponseSchema, (s, input) =>
+    listUsedDevices(db, s.ctx, input ?? {}),
+  );
+
+  /**
+   * The detail, with the seller block included ONLY for those who may read it.
+   *
+   * The permission is resolved here and passed down, so the repo builds a
+   * payload that simply lacks the fields — rather than the UI receiving them
+   * and choosing not to draw them (ADR-0012 §5).
+   */
+  guarded("used:get", "usedDevices.create", UsedGetRequestSchema, UsedDeviceDetailSchema, (s, input) =>
+    getUsedDevice(db, s.ctx, input.purchaseId, s.permissions.includes("usedDevices.viewSeller")),
+  );
+
+  guarded("used:setReview", "usedDevices.create", UsedSetReviewRequestSchema, UsedDeviceDetailSchema, (s, input) => {
+    setNeedsReview(db, s.ctx, input.purchaseId, input.needsReview);
+    return getUsedDevice(db, s.ctx, input.purchaseId, s.permissions.includes("usedDevices.viewSeller"));
+  });
+
+  guarded(
+    "used:setRefurbCost",
+    "usedDevices.editRefurbCost",
+    UsedSetRefurbCostRequestSchema,
+    UsedDeviceDetailSchema,
+    (s, input) => {
+      setRefurbCost(db, s.ctx, input.purchaseId, input.refurbCostCents);
+      return getUsedDevice(db, s.ctx, input.purchaseId, s.permissions.includes("usedDevices.viewSeller"));
+    },
+  );
+
+  /**
+   * Shelve a held device, days after buying it.
+   *
+   * Prints the shelf label afterwards — it now carries a price, which the one
+   * printed at intake did not. As everywhere else, the print cannot undo the
+   * movement that has already been posted.
+   */
+  guarded(
+    "used:sendToInventory",
+    "usedDevices.sendToInventory",
+    UsedSendToInventoryRequestSchema,
+    UsedSendToInventoryResponseSchema,
+    async (s, input) => {
+      const result = sendToInventory(db, s.ctx, input.purchaseId, input.sellPriceCents);
+      try {
+        await printPurchase(db, s.ctx, { purchaseId: input.purchaseId, what: "label", target: "auto", copy: false });
+      } catch (err) {
+        console.error("[used] could not print the shelf label:", err);
+      }
+      return result;
+    },
+  );
 }
+
 
 /**
  * Park whatever is on the screen when someone switches user.

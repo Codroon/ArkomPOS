@@ -64,6 +64,11 @@ export const IPC_CHANNELS = [
   "used:checkImei",
   "used:log",
   "used:print",
+  "used:list",
+  "used:get",
+  "used:setReview",
+  "used:setRefurbCost",
+  "used:sendToInventory",
 ] as const;
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
@@ -847,6 +852,7 @@ export const IdDocTypeSchema = z.enum(["DNI", "NIE", "PASAPORTE"]);
 export const PayoutMethodSchema = z.enum(["cash", "transfer", "store_credit"]);
 export const AcquisitionChannelSchema = z.enum(["private_individual", "business"]);
 export const PhotoKindSchema = z.enum(["front", "back", "extra", "seller_id"]);
+export const VoucherStatusSchema = z.enum(["issued", "redeemed", "void"]);
 
 /**
  * A photo on its way in.
@@ -926,3 +932,127 @@ export const UsedPrintRequestSchema = z.object({
 });
 export type UsedPrintRequest = z.infer<typeof UsedPrintRequestSchema>;
 export const UsedPrintResponseSchema = PrintTicketResponseSchema;
+
+/* ---- the used-devices screen ---- */
+
+/** Derived, never stored — the chip can never disagree with the unit. */
+export const UsedDeviceStateSchema = z.enum(["held", "needs_review", "in_stock", "sold"]);
+
+export const UsedDeviceRowSchema = z.object({
+  purchaseId: z.string(),
+  docNumber: z.string(),
+  unitId: z.string().nullable(),
+  brand: z.string(),
+  model: z.string(),
+  storage: z.string().nullable(),
+  color: z.string().nullable(),
+  grade: DeviceGradeSchema,
+  imei: z.string(),
+  barcode: z.string().nullable(),
+  purchasedAtMs: z.number(),
+  buyPriceCents: z.number().int(),
+  refurbCostCents: z.number().int(),
+  state: UsedDeviceStateSchema,
+  /** the shelf price, once it has one */
+  sellPriceCents: z.number().int().nullable(),
+  /** the sale that sold it, for the link on a sold row */
+  soldDocumentId: z.string().nullable(),
+  soldDocNumber: z.string().nullable(),
+});
+export type UsedDeviceRow = z.infer<typeof UsedDeviceRowSchema>;
+
+export const UsedListRequestSchema = z
+  .object({
+    state: UsedDeviceStateSchema.optional(),
+    /** IMEI, model, purchase number or barcode — one box, like the rest of the app */
+    search: z.string().trim().max(60).optional(),
+  })
+  .optional();
+
+export const UsedListResponseSchema = z.object({
+  rows: z.array(UsedDeviceRowSchema),
+  /** the counts strip: every state, whatever the current filter */
+  counts: z.object({
+    held: z.number().int(),
+    needs_review: z.number().int(),
+    in_stock: z.number().int(),
+    sold: z.number().int(),
+  }),
+});
+
+export const UsedPhotoSchema = z.object({
+  id: z.string(),
+  kind: PhotoKindSchema,
+  /** a data URL: the renderer never reads the disk (system-design §2) */
+  dataUrl: z.string(),
+});
+
+/**
+ * The seller block.
+ *
+ * Absent from the payload — not merely hidden — for anyone without
+ * usedDevices.viewSeller (ADR-0012 §5, ADR-0013 §6). A field the renderer never
+ * receives cannot be leaked by a CSS mistake or an inspector.
+ */
+export const UsedSellerBlockSchema = z.object({
+  name: z.string(),
+  phone: z.string().nullable(),
+  idType: IdDocTypeSchema,
+  idNumber: z.string(),
+  channel: AcquisitionChannelSchema,
+});
+
+export const UsedTimelineEntrySchema = z.object({
+  atMs: z.number(),
+  entity: z.string(),
+  action: z.string(),
+  actorName: z.string().nullable(),
+  approverName: z.string().nullable(),
+});
+
+export const UsedDeviceDetailSchema = UsedDeviceRowSchema.extend({
+  batteryPct: z.number().int().nullable(),
+  accessories: z.object({
+    charger: z.boolean(),
+    box: z.boolean(),
+    cable: z.boolean(),
+    case: z.boolean(),
+  }),
+  payout: PayoutMethodSchema,
+  payoutReference: z.string().nullable(),
+  voucher: z
+    .object({ id: z.string(), status: VoucherStatusSchema, amountCents: z.number().int() })
+    .nullable(),
+  unitCostCents: z.number().int(),
+  needsReview: z.boolean(),
+  /** true while the device is still held: refurb cost is editable only then */
+  editable: z.boolean(),
+  photos: z.array(UsedPhotoSchema),
+  /** present only with usedDevices.viewSeller */
+  seller: UsedSellerBlockSchema.nullable(),
+  canViewSeller: z.boolean(),
+  timeline: z.array(UsedTimelineEntrySchema),
+});
+export type UsedDeviceDetail = z.infer<typeof UsedDeviceDetailSchema>;
+
+export const UsedGetRequestSchema = z.object({ purchaseId: z.string() });
+
+export const UsedSetReviewRequestSchema = z.object({
+  purchaseId: z.string(),
+  needsReview: z.boolean(),
+});
+
+export const UsedSetRefurbCostRequestSchema = z.object({
+  purchaseId: z.string(),
+  refurbCostCents: z.number().int().min(0),
+});
+
+export const UsedSendToInventoryRequestSchema = z.object({
+  purchaseId: z.string(),
+  sellPriceCents: z.number().int().min(1),
+});
+export const UsedSendToInventoryResponseSchema = z.object({
+  unitId: z.string(),
+  sellPriceCents: z.number().int(),
+  unitCostCents: z.number().int(),
+});

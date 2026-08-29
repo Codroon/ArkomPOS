@@ -14,6 +14,7 @@ import { CatalogScreen } from "../screens/catalog/catalog-screen";
 import { InventoryScreen } from "../screens/inventory/inventory-screen";
 import { SaleScreen } from "../screens/sale/sale-screen";
 import { BuyUsedScreen } from "../screens/used/buy-used-screen";
+import { UsedDevicesScreen } from "../screens/used/used-devices-screen";
 import { SettingsScreen } from "../screens/settings/settings-screen";
 import { UsersScreen } from "../screens/users/users-screen";
 
@@ -27,7 +28,7 @@ const NAV_ITEMS: ReadonlyArray<{ n: string; labelKey: TKey; id?: ScreenId; needs
   { n: "02", labelKey: "nav.catalogo", id: "catalogo" },
   { n: "03", labelKey: "nav.inventario", id: "inventario" },
   { n: "04", labelKey: "nav.compraUsados", id: "comprarUsados", needs: "usedDevices.create" },
-  { n: "05", labelKey: "nav.unidadUsada" },
+  { n: "05", labelKey: "nav.unidadUsada", id: "dispositivosUsados", needs: "usedDevices.create" },
   { n: "06", labelKey: "nav.reparacion" },
   { n: "07", labelKey: "nav.taller" },
   { n: "08", labelKey: "nav.transferencias" },
@@ -114,6 +115,10 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
   const can = useCan();
   const { session } = useSession();
   const [screen, setScreen] = useState<ScreenId>("venta");
+  /* bumped on every nav click so a screen that drills into a sub-view returns
+     to its root when the section is chosen again — clicking "05" while reading
+     one device should land on the list, not on the same device */
+  const [navTick, setNavTick] = useState(0);
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -161,7 +166,10 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
               <button
                 key={item.n}
                 type="button"
-                onClick={() => setScreen(item.id!)}
+                onClick={() => {
+                  setScreen(item.id!);
+                  setNavTick((n) => n + 1);
+                }}
                 className={cn(
                   "flex items-center gap-[9px] border-l-[3px] px-3 py-2 text-left",
                   screen === item.id
@@ -206,6 +214,8 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
             <CatalogScreen />
           ) : screen === "comprarUsados" ? (
             <BuyUsedScreen />
+          ) : screen === "dispositivosUsados" ? (
+            <UsedDevicesScreen key={navTick} />
           ) : screen === "ajustes" ? (
             <SettingsScreen />
           ) : screen === "usuarios" ? (

@@ -5,7 +5,7 @@
  * purchase. The rules themselves live in `@arkom/core/used` — this file finds
  * rows, writes rows, and lets core decide what is allowed.
  */
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   allocateNumber,
   appError,
@@ -20,20 +20,26 @@ import {
   suggestedSellPriceCents,
   toOplogJson,
   unitCostCents,
+  usedDeviceState,
   usedProductName,
   uuidv7,
   type LogFn,
   type MutationCtx,
   type UsedCheckImeiResponse,
+  type UsedDeviceDetail,
+  type UsedDeviceRow,
+  type UsedDeviceState,
   type UsedLogRequest,
   type UsedLogResponse,
 } from "@arkom/core";
 import { schema, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner, type DbTx } from "../mutate-runner";
-import { discardPurchasePhotos, savePurchasePhotos } from "../photos";
+import { discardPurchasePhotos, readPhotos, savePurchasePhotos } from "../photos";
 
 const {
   documents,
+  oplog,
+  users,
   numberSeries,
   productGroups,
   productStock,
@@ -540,4 +546,380 @@ function postMovement(
 /** What the suggested selling price would be — the modal prefills from this. */
 export function suggestedPrice(buyPriceCents: number, refurbCostCents: number, marginPct: number): number {
   return suggestedSellPriceCents(unitCostCents(buyPriceCents, refurbCostCents), marginPct);
+}
+
+/* ---------------------------------------------------------------- reading */
+
+/** Everything the list and the detail share, straight off the two tables. */
+const listShape = {
+  purchase: usedPurchases,
+  docNumber: documents.docNumber,
+  unitStatus: units.status,
+  unitId: units.id,
+  sellPriceCents: units.salePriceCents,
+  soldDocumentId: units.soldDocumentId,
+};
+
+function toRow(row: {
+  purchase: typeof usedPurchases.$inferSelect;
+  docNumber: string | null;
+  unitStatus: string | null;
+  unitId: string | null;
+  sellPriceCents: number | null;
+  soldDocumentId: string | null;
+}): UsedDeviceRow {
+  const p = row.purchase;
+  return {
+    purchaseId: p.id,
+    docNumber: row.docNumber ?? "",
+    unitId: row.unitId,
+    brand: p.brand,
+    model: p.model,
+    storage: p.storage,
+    color: p.color,
+    grade: p.grade,
+    imei: p.imei,
+    barcode: p.barcode,
+    purchasedAtMs: p.purchasedAt.getTime(),
+    buyPriceCents: p.buyPriceCents,
+    refurbCostCents: p.refurbCostCents,
+    // derived, never stored: the chip cannot disagree with the unit
+    state: usedDeviceState(row.unitStatus ?? "held", p.needsReview),
+    sellPriceCents: row.sellPriceCents,
+    soldDocumentId: row.soldDocumentId,
+    soldDocNumber: null,
+  };
+}
+
+/**
+ * The used-devices list.
+ *
+ * Filtering and searching happen here rather than in SQL: a shop that buys a
+ * few phones a week will not have a table where that matters for years, and one
+ * query with one shape is easier to keep honest than six. The counts are always
+ * over EVERYTHING, because a filter that also changes its own chip counts is a
+ * filter nobody can navigate back out of.
+ */
+export function listUsedDevices(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  filter: { state?: UsedDeviceState; search?: string } = {},
+): { rows: UsedDeviceRow[]; counts: Record<UsedDeviceState, number> } {
+  const all = db
+    .select(listShape)
+    .from(usedPurchases)
+    .innerJoin(documents, eq(documents.id, usedPurchases.documentId))
+    .leftJoin(units, eq(units.id, usedPurchases.unitId))
+    .where(eq(usedPurchases.tenantId, ctx.tenantId))
+    .all()
+    .map(toRow)
+    .sort((a, b) => b.purchasedAtMs - a.purchasedAtMs);
+
+  /* the sale that sold it, for the link on a sold row */
+  const soldIds = all.map((r) => r.soldDocumentId).filter((id): id is string => id !== null);
+  if (soldIds.length > 0) {
+    const numbers = new Map(
+      db
+        .select({ id: documents.id, docNumber: documents.docNumber })
+        .from(documents)
+        .where(inArray(documents.id, soldIds))
+        .all()
+        .map((d) => [d.id, d.docNumber] as const),
+    );
+    for (const row of all) {
+      if (row.soldDocumentId) row.soldDocNumber = numbers.get(row.soldDocumentId) ?? null;
+    }
+  }
+
+  const counts: Record<UsedDeviceState, number> = { held: 0, needs_review: 0, in_stock: 0, sold: 0 };
+  for (const row of all) counts[row.state] += 1;
+
+  const needle = filter.search?.trim().toLowerCase() ?? "";
+  const rows = all.filter((row) => {
+    if (filter.state && row.state !== filter.state) return false;
+    if (needle === "") return true;
+    // one box: IMEI, model, purchase number or the label on the box
+    return (
+      row.imei.includes(needle) ||
+      `${row.brand} ${row.model}`.toLowerCase().includes(needle) ||
+      row.docNumber.toLowerCase().includes(needle) ||
+      (row.barcode ?? "").toLowerCase().includes(needle)
+    );
+  });
+
+  return { rows, counts };
+}
+
+/** Names for the timeline, resolved once rather than per entry. */
+function userNames(db: ArkomDb, ids: ReadonlyArray<string>): Map<string, string> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return new Map();
+  return new Map(
+    db
+      .select({ id: users.id, name: users.name })
+      .from(users)
+      .where(inArray(users.id, unique))
+      .all()
+      .map((u) => [u.id, u.name] as const),
+  );
+}
+
+/**
+ * One device, in full.
+ *
+ * `canViewSeller` decides whether the seller block is in the payload at all.
+ * Not a flag the UI honours — the fields are absent (ADR-0012 §5): a value the
+ * renderer never receives cannot leak through a CSS mistake or an inspector.
+ */
+export async function getUsedDevice(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  purchaseId: string,
+  canViewSeller: boolean,
+): Promise<UsedDeviceDetail> {
+  const found = db
+    .select(listShape)
+    .from(usedPurchases)
+    .innerJoin(documents, eq(documents.id, usedPurchases.documentId))
+    .leftJoin(units, eq(units.id, usedPurchases.unitId))
+    .where(and(eq(usedPurchases.tenantId, ctx.tenantId), eq(usedPurchases.id, purchaseId)))
+    .limit(1)
+    .all()[0];
+  if (!found) throw appError("VALIDATION", "Ese dispositivo no existe.");
+
+  const row = toRow(found);
+  if (row.soldDocumentId) {
+    row.soldDocNumber =
+      db
+        .select({ docNumber: documents.docNumber })
+        .from(documents)
+        .where(eq(documents.id, row.soldDocumentId))
+        .limit(1)
+        .all()[0]?.docNumber ?? null;
+  }
+
+  const p = found.purchase;
+  const accessories = (p.accessories ?? {}) as Partial<Record<"charger" | "box" | "cable" | "case", boolean>>;
+
+  const voucher = db
+    .select({
+      id: storeCreditVouchers.id,
+      status: storeCreditVouchers.status,
+      amountCents: storeCreditVouchers.amountCents,
+    })
+    .from(storeCreditVouchers)
+    .where(eq(storeCreditVouchers.purchaseId, purchaseId))
+    .limit(1)
+    .all()[0];
+
+  /* the gallery. The seller's ID photo is part of the seller block, so it is
+     withheld with it rather than shown to anyone who opens the page. */
+  const photoRows = db
+    .select()
+    .from(purchasePhotos)
+    .where(eq(purchasePhotos.purchaseId, purchaseId))
+    .all()
+    .filter((photo) => canViewSeller || photo.kind !== "seller_id");
+  const photos = await readPhotos(photoRows);
+
+  /* The history, newest first: the purchase, the unit it created, and the
+     document — prints are logged against the document, and "did that purchase
+     slip ever come out?" is exactly what someone opens this pane to answer. */
+  const ids = [purchaseId, p.documentId, ...(row.unitId ? [row.unitId] : [])];
+  const entries = db
+    .select()
+    .from(oplog)
+    .where(and(eq(oplog.tenantId, ctx.tenantId), inArray(oplog.entityId, ids)))
+    .all()
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  const names = userNames(
+    db,
+    entries.flatMap((e) => [e.userId, e.authorizedByUserId].filter((x): x is string => Boolean(x))),
+  );
+
+  return {
+    ...row,
+    batteryPct: p.batteryPct,
+    accessories: {
+      charger: accessories.charger === true,
+      box: accessories.box === true,
+      cable: accessories.cable === true,
+      case: accessories.case === true,
+    },
+    payout: p.payoutMethod,
+    payoutReference: p.payoutReference,
+    voucher: voucher ?? null,
+    unitCostCents: unitCostCents(p.buyPriceCents, p.refurbCostCents),
+    needsReview: p.needsReview,
+    editable: row.state === "held" || row.state === "needs_review",
+    photos,
+    seller: canViewSeller
+      ? {
+          name: p.sellerName,
+          phone: p.sellerPhone,
+          idType: p.sellerIdType,
+          idNumber: p.sellerIdNumber,
+          channel: p.acquisitionChannel,
+        }
+      : null,
+    canViewSeller,
+    timeline: entries.map((e) => ({
+      atMs: e.createdAt.getTime(),
+      entity: e.entity,
+      action: e.action,
+      actorName: e.userId ? (names.get(e.userId) ?? null) : null,
+      approverName: e.authorizedByUserId ? (names.get(e.authorizedByUserId) ?? null) : null,
+    })),
+  };
+}
+
+/* ---------------------------------------------------------------- editing */
+
+function loadForEdit(db: ArkomDb, ctx: MutationCtx, purchaseId: string) {
+  const found = db
+    .select(listShape)
+    .from(usedPurchases)
+    .innerJoin(documents, eq(documents.id, usedPurchases.documentId))
+    .leftJoin(units, eq(units.id, usedPurchases.unitId))
+    .where(and(eq(usedPurchases.tenantId, ctx.tenantId), eq(usedPurchases.id, purchaseId)))
+    .limit(1)
+    .all()[0];
+  if (!found) throw appError("VALIDATION", "Ese dispositivo no existe.");
+  return found;
+}
+
+/** The "Requiere revisión" switch. A flag on the purchase, not a status. */
+export function setNeedsReview(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  purchaseId: string,
+  needsReview: boolean,
+): void {
+  const found = loadForEdit(db, ctx, purchaseId);
+  if (found.unitStatus !== "held") {
+    throw appError("VALIDATION", "Solo se puede marcar un dispositivo en espera.");
+  }
+  mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    tx.update(usedPurchases)
+      .set({ needsReview, updatedAt: new Date() })
+      .where(eq(usedPurchases.id, purchaseId))
+      .run();
+    log({
+      entity: "used_purchase",
+      entityId: purchaseId,
+      action: needsReview ? "flag_review" : "clear_review",
+      before: { needsReview: found.purchase.needsReview },
+      after: { needsReview },
+    });
+  });
+}
+
+/**
+ * Edit what the shop spent putting the device right.
+ *
+ * Only while it is held. Once it is in stock the figure has been folded into a
+ * posted stock movement, and changing it afterwards would mean either rewriting
+ * that movement — the one thing an insert-only ledger forbids (ADR-0004) — or
+ * letting the unit's cost and its movement disagree. So it freezes, and the
+ * screen says why rather than silently disabling a field.
+ */
+export function setRefurbCost(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  purchaseId: string,
+  refurbCostCents: number,
+): void {
+  const found = loadForEdit(db, ctx, purchaseId);
+  if (found.unitStatus !== "held") {
+    throw appError(
+      "VALIDATION",
+      "El coste ya está incluido en el inventario y no se puede cambiar.",
+      "refurbCostCents",
+    );
+  }
+  mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    const now = new Date();
+    tx.update(usedPurchases)
+      .set({ refurbCostCents, updatedAt: now })
+      .where(eq(usedPurchases.id, purchaseId))
+      .run();
+    // the unit's cost tracks it while nothing has been posted
+    if (found.unitId) {
+      tx.update(units)
+        .set({ costCents: unitCostCents(found.purchase.buyPriceCents, refurbCostCents), updatedAt: now })
+        .where(eq(units.id, found.unitId))
+        .run();
+    }
+    log({
+      entity: "used_purchase",
+      entityId: purchaseId,
+      action: "set_refurb_cost",
+      before: { refurbCostCents: found.purchase.refurbCostCents },
+      after: { refurbCostCents },
+    });
+  });
+}
+
+/**
+ * Send a held device to the shelf.
+ *
+ * The same transition *Enviar a inventario* performs on the buy screen, reached
+ * days later from the detail view: one tradein_in at buy + refurb cost, the unit
+ * priced and flipped to in_stock. planIntake() produces the status and the
+ * movement together, so this cannot post one without the other.
+ */
+export function sendToInventory(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  purchaseId: string,
+  sellPriceCents: number,
+): { unitId: string; sellPriceCents: number; unitCostCents: number } {
+  const found = loadForEdit(db, ctx, purchaseId);
+  if (found.unitStatus !== "held") {
+    throw appError("VALIDATION", "Ese dispositivo ya está en inventario.");
+  }
+  if (!found.unitId) throw appError("VALIDATION", "Esa compra no tiene unidad.");
+
+  const p = found.purchase;
+  const intake = planIntake({
+    target: "in_stock",
+    productId: p.productId!,
+    locationId: p.locationId,
+    unitId: found.unitId,
+    buyPriceCents: p.buyPriceCents,
+    refurbCostCents: p.refurbCostCents,
+  });
+
+  return mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    const now = new Date();
+    tx.update(units)
+      .set({
+        status: "in_stock",
+        salePriceCents: sellPriceCents,
+        costCents: intake.unitCostCents!,
+        updatedAt: now,
+      })
+      .where(eq(units.id, found.unitId!))
+      .run();
+    log({
+      entity: "unit",
+      entityId: found.unitId!,
+      action: "to_inventory",
+      before: { status: "held", salePriceCents: null },
+      after: { status: "in_stock", salePriceCents: sellPriceCents, costCents: intake.unitCostCents },
+    });
+
+    for (const movement of intake.movements) postMovement(tx, ctx, log, movement, now);
+
+    tx.update(usedPurchases)
+      .set({ needsReview: false, updatedAt: now })
+      .where(eq(usedPurchases.id, purchaseId))
+      .run();
+
+    return {
+      unitId: found.unitId!,
+      sellPriceCents,
+      unitCostCents: intake.unitCostCents!,
+    };
+  });
 }
