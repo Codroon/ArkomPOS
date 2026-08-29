@@ -704,6 +704,26 @@ export const en: Record<TKey, string> = {
   "usedAction.print": "Printed",
   "usedAction.issue": "Voucher issued",
 
+/* ---- store credit (Sale) ---- */
+  "pay.storeCredit": "Credit",
+  "voucher.title": "Find store credit",
+  "voucher.searchPlaceholder": "Scan the slip or search by number",
+  "voucher.hint": "Scan the customer's slip or type the purchase number.",
+  "voucher.noMatches": "No voucher matches.",
+  "voucher.usable": "Issued",
+  "voucher.refusalUsed": "Already used",
+  "voucher.refusalTooBig": "Larger than the total",
+  "voucher.refusalEmpty": "No balance",
+  "voucher.wholeOnly": "A voucher is redeemed in full. If it is larger than the total, add items or pay another way.",
+  "voucher.void": "Void voucher",
+  "voucher.voidTitle": "Void this voucher?",
+  "voucher.voidBody": "The customer will no longer be able to redeem it. The reason is recorded.",
+  "voucher.voidReason": "Reason",
+  "voucher.voided": "Voucher voided.",
+  "used.logged.continueSale": "Continue to the sale",
+
+  "pick.grade": "Grade {grade}",
+
   /* backups */
   "bk.section": "Backup",
   "bk.intro": "Backups run on their own every night and when the app closes. The last {keep} are kept.",

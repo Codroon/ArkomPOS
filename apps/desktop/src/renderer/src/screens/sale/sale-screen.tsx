@@ -14,11 +14,13 @@ import {
   type SaleAddLineResponse,
   type SaleLineRow,
   type SaleState,
+  centsToInput,
   formatCents,
+  uuidv7,
 } from "@arkom/core";
 import { cn, GhostButton, ScanInput, Toast, useDataLabel, useT, type ScanInputHandle } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
-import { openCatalogWithBarcode } from "../../lib/screen-bus";
+import { consumePendingVoucher, openCatalogWithBarcode } from "../../lib/screen-bus";
 import { useScanFlow } from "../../lib/use-scan-flow";
 import { ProductGrid } from "./product-grid";
 import { TicketPanel } from "./ticket-panel";
@@ -26,6 +28,7 @@ import { useTicketPrint } from "../../lib/use-ticket-print";
 import { PrintToast } from "../../lib/print-toast";
 import { useApprovalFlow } from "../../lib/use-approval";
 import { CompletedPanel, PaymentPanel, parseTenders, type TenderEntry } from "./payment-panel";
+import { VoucherFinder } from "./voucher-finder";
 import { OverrideModal, ParkModal, ParkedPopover, UnitPickModal, type UnitPickState } from "./sale-modals";
 
 export function SaleScreen({ terminalName }: { terminalName: string }) {
@@ -52,6 +55,26 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
   const [parkedOpen, setParkedOpen] = useState(false);
   const [tenders, setTenders] = useState<TenderEntry[]>([]);
   const [charging, setCharging] = useState(false);
+  const [voucherFinderOpen, setVoucherFinderOpen] = useState(false);
+
+  /* A voucher handed over by "Continuar a la venta" lands as a tender chip the
+     moment this screen mounts, so the customer's credit is already applied
+     when the cashier starts scanning. */
+  useEffect(() => {
+    const pending = consumePendingVoucher();
+    if (!pending) return;
+    setTenders((prev) => [
+      ...prev.filter((entry) => entry.voucherId !== pending.id),
+      {
+        key: uuidv7(),
+        method: "store_credit" as const,
+        amountInput: centsToInput(pending.amountCents),
+        cardReference: "",
+        voucherId: pending.id,
+        voucherLabel: pending.docNumber,
+      },
+    ]);
+  }, []);
   const [toast, setToast] = useState<{ text: string; tone: "neutral" | "danger" } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const printer = useTicketPrint();
@@ -72,7 +95,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
 
   const refreshProducts = useCallback(() => {
     window.arkom
-      .invoke("catalog:list")
+      .invoke("catalog:list", { includeUsed: true })
       // sellable only: active with price + tax (incomplete/inactive can't be sold)
       .then((rows) => setProducts(rows.filter((r) => r.active && r.priceCents != null && r.taxRegime != null)))
       .catch((err) => console.error("catalog:list failed", err));
@@ -495,7 +518,14 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
                   {t("park.button")}
                 </GhostButton>
               </div>
-              <PaymentPanel sale={sale} entries={tenders} charging={charging} onChange={setTenders} onCharge={onCharge} />
+              <PaymentPanel
+                sale={sale}
+                entries={tenders}
+                charging={charging}
+                onChange={setTenders}
+                onCharge={onCharge}
+                onFindVoucher={() => setVoucherFinderOpen(true)}
+              />
             </>
           )}
         </aside>
@@ -506,6 +536,28 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
         <OverrideModal line={overrideLine} onApply={onOverrideApply} onClose={() => setOverrideLine(null)} />
       ) : null}
       {parkOpen ? <ParkModal onPark={onPark} onClose={() => setParkOpen(false)} /> : null}
+      {voucherFinderOpen ? (
+        <VoucherFinder
+          saleTotalCents={sale?.totalCents ?? 0}
+          onCancel={() => setVoucherFinderOpen(false)}
+          onPick={(voucher) => {
+            /* the voucher's amount, not a number the cashier types: it redeems
+               whole or not at all (ADR-0013 §4) */
+            setTenders((prev) => [
+              ...prev.filter((entry) => entry.voucherId !== voucher.id),
+              {
+                key: uuidv7(),
+                method: "store_credit" as const,
+                amountInput: centsToInput(voucher.remainingCents),
+                cardReference: "",
+                voucherId: voucher.id,
+                voucherLabel: voucher.docNumber,
+              },
+            ]);
+            setVoucherFinderOpen(false);
+          }}
+        />
+      ) : null}
       {scanModals}
       <Toast message={toast?.text ?? null} tone={toast?.tone ?? "neutral"} />
       <PrintToast printer={printer} className={toast ? "bottom-16" : undefined} />

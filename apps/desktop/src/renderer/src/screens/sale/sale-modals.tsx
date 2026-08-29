@@ -4,7 +4,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { centsToInput, formatCents, parseMoneyInput, type SaleLineRow } from "@arkom/core";
-import { Field, GhostButton, MoneyText, PrimaryButton, SearchInput, TextInput, useT } from "@arkom/ui";
+import { Chip, Field, GhostButton, MoneyText, PrimaryButton, SearchInput, TextInput, useT } from "@arkom/ui";
 
 function ModalShell({ children, onClose, width = 380 }: { children: React.ReactNode; onClose: () => void; width?: number }) {
   useEffect(() => {
@@ -33,7 +33,15 @@ function ModalShell({ children, onClose, width = 380 }: { children: React.ReactN
 export interface UnitPickState {
   productId: string;
   productName: string;
-  units: { unitId: string; imei: string; createdAtMs: number }[];
+  units: {
+    unitId: string;
+    imei: string;
+    createdAtMs: number;
+    /* set on used devices only: the two things that differ between two phones
+       of the same model (ADR-0013) */
+    grade: string | null;
+    salePriceCents: number | null;
+  }[];
 }
 
 export function UnitPickModal({
@@ -80,9 +88,21 @@ export function UnitPickModal({
               onClick={() => onPick(unit.unitId)}
               className="flex w-full items-baseline justify-between border-b border-line px-2 py-2 text-left hover:bg-hover"
             >
-              <span className="font-mono font-medium text-[12px] tabular-nums">{unit.imei}</span>
-              <span className="text-[10px] text-subtle">
-                {t("pick.inSince")} <span className="font-mono font-medium tabular-nums">{formatDay(unit.createdAtMs)}</span>
+              <span className="flex items-baseline gap-1.5">
+                <span className="font-mono font-medium text-[12px] tabular-nums">{unit.imei}</span>
+                {/* what actually distinguishes two phones of the same model:
+                    a used one is graded and priced individually */}
+                {unit.grade ? <Chip>{t("pick.grade", { grade: unit.grade })}</Chip> : null}
+              </span>
+              <span className="flex items-baseline gap-2 text-[10px] text-subtle">
+                {unit.salePriceCents !== null ? (
+                  <span className="font-mono text-[11px] font-bold tabular-nums text-ink">
+                    {formatCents(unit.salePriceCents)}
+                  </span>
+                ) : null}
+                <span>
+                  {t("pick.inSince")} <span className="font-mono font-medium tabular-nums">{formatDay(unit.createdAtMs)}</span>
+                </span>
               </span>
             </button>
           ))

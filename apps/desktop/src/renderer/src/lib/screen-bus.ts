@@ -7,6 +7,8 @@ export type ScreenId = "venta" | "catalogo" | "inventario" | "comprarUsados" | "
 
 let navigator: ((screen: ScreenId) => void) | null = null;
 let pendingCatalogBarcode: string | null = null;
+/** A voucher the customer just earned, on its way to the till they walk to. */
+let pendingVoucher: { id: string; docNumber: string; amountCents: number } | null = null;
 
 export function registerNavigator(fn: (screen: ScreenId) => void): () => void {
   navigator = fn;
@@ -28,4 +30,22 @@ export function consumeCatalogPrefill(): string | null {
   const code = pendingCatalogBarcode;
   pendingCatalogBarcode = null;
   return code;
+}
+
+/**
+ * "Continuar a la venta".
+ *
+ * The customer who just sold a phone and is buying another should walk through
+ * in one motion, so the voucher travels with them rather than being looked up
+ * again thirty seconds later at the same counter.
+ */
+export function openSaleWithVoucher(voucher: { id: string; docNumber: string; amountCents: number }): void {
+  pendingVoucher = voucher;
+  navigateTo("venta");
+}
+
+export function consumePendingVoucher(): { id: string; docNumber: string; amountCents: number } | null {
+  const voucher = pendingVoucher;
+  pendingVoucher = null;
+  return voucher;
 }

@@ -58,6 +58,8 @@ export interface TicketLine {
   /** set on serialized lines — the phone that left the shop */
   imei: string | null;
   priceOverridden: boolean;
+  /** snapshotted at sale (ADR-0007). "REBU" changes what may be printed. */
+  taxRegime?: string | null;
 }
 
 export interface TicketTender {
@@ -102,6 +104,7 @@ export const TICKET_ES = {
   vat: "IVA 21%",
   total: "TOTAL",
   vatIncluded: "IVA INCLUIDO",
+  rebu: "Régimen especial de bienes usados",
   change: "Cambio",
   thanks: "Gracias por su visita",
   defaultFooter: "Precios claros. Sin letra pequeña.",
@@ -190,6 +193,15 @@ export function renderTicket(doc: TicketDoc, shop: ShopProfile, width: PaperWidt
     ops.push({ op: "text", text: row, align: "left", bold: true, size: "big" });
   }
   text(TICKET_ES.vatIncluded, { align: "right" });
+
+  /* A second-hand device sold under REBU carries no VAT the customer may
+     deduct, and its price must not appear in the IVA breakdown as though it
+     did. Those lines contribute a zero-rate snapshot, so the arithmetic above
+     already excludes them; this is the mention the regime requires on the
+     document itself. */
+  if (doc.lines.some((line) => line.taxRegime === "REBU")) {
+    text(TICKET_ES.rebu, { align: "left" });
+  }
 
   rule();
 

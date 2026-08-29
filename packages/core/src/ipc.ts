@@ -69,6 +69,8 @@ export const IPC_CHANNELS = [
   "used:setReview",
   "used:setRefurbCost",
   "used:sendToInventory",
+  "used:findVoucher",
+  "used:voidVoucher",
 ] as const;
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
@@ -93,6 +95,15 @@ export const ErrorCodeSchema = z.enum([
   "VALIDATION",
 ]);
 export type ErrorCode = z.infer<typeof ErrorCodeSchema>;
+
+/* ---- used devices: the vocabulary, declared up here so every schema below
+     can reach it whatever order the file grows in (ADR-0013) ---- */
+export const DeviceGradeSchema = z.enum(["A", "B", "C"]);
+export const IdDocTypeSchema = z.enum(["DNI", "NIE", "PASAPORTE"]);
+export const PayoutMethodSchema = z.enum(["cash", "transfer", "store_credit"]);
+export const AcquisitionChannelSchema = z.enum(["private_individual", "business"]);
+export const PhotoKindSchema = z.enum(["front", "back", "extra", "seller_id"]);
+export const VoucherStatusSchema = z.enum(["issued", "redeemed", "void"]);
 
 export const IpcErrorSchema = z.object({
   code: ErrorCodeSchema,
@@ -126,6 +137,15 @@ export type CatalogItemType = z.infer<typeof CatalogItemTypeSchema>;
 /** Tax regimes offered in Phase 1 (ADR-0007: IVA21 only; others visible-disabled). */
 export const TaxRegimeP1Schema = z.enum(["IVA21"]);
 
+/**
+ * includeUsed decides whether second-hand products appear.
+ *
+ * They are real, sellable products — but they are created by the buy screen,
+ * one per model, and the owner never maintains them. Catálogo is the list of
+ * things the shop looks after, so it asks without them; the Sale screen asks
+ * with them, because a bought phone that cannot be found is a phone that
+ * cannot be sold (ADR-0013, catalogue noise).
+ */
 export const CatalogListRequestSchema = z
   .object({
     search: z.string().optional(),
@@ -133,6 +153,9 @@ export const CatalogListRequestSchema = z
     itemType: CatalogItemTypeSchema.optional(),
     lowStockOnly: z.boolean().optional(),
     missingDataOnly: z.boolean().optional(),
+    /* second-hand products are hidden from the management list by default; the
+       Sale screen asks for them (ADR-0013, catalogue noise) */
+    includeUsed: z.boolean().optional(),
   })
   .optional();
 export type CatalogListRequest = z.infer<typeof CatalogListRequestSchema>;
@@ -356,7 +379,7 @@ export type StockAddResponse = z.infer<typeof StockAddResponseSchema>;
    addLine; totals are ALWAYS computed server-side (the renderer never
    recomputes money) and travel inside SaleState. ---- */
 
-export const TenderMethodSchema = z.enum(["cash", "card", "bizum", "transfer"]);
+export const TenderMethodSchema = z.enum(["cash", "card", "bizum", "transfer", "store_credit"]);
 
 export const SaleLineRowSchema = z.object({
   id: z.string(),
@@ -408,6 +431,12 @@ export const UnitPickOptionSchema = z.object({
   unitId: z.string(),
   imei: z.string(),
   createdAtMs: z.number().int(), // cost-in date shown in the pick modal
+  /* Used devices differ from each other in the two ways that decide which one
+     the cashier hands over, so the picker — not the product tile — is where
+     they belong: two phones of the same model are rarely the same grade or the
+     same price. Null on new stock, which is priced by its product. */
+  grade: DeviceGradeSchema.nullable().default(null),
+  salePriceCents: z.number().int().nullable().default(null),
 });
 export const SaleAddLineResponseSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("state"), state: SaleStateSchema }),
@@ -454,6 +483,8 @@ export const SaleTenderSchema = z.object({
   method: TenderMethodSchema,
   amountCents: z.number().int().min(1),
   cardReference: z.string().nullish(),
+  /** required for store_credit: which voucher this pays with */
+  voucherId: z.string().nullish(),
 });
 export const SaleCompleteRequestSchema = z.object({
   docId: z.string(),
@@ -483,6 +514,9 @@ export const TicketPeekSchema = z.object({
       totalCents: z.number().int(),
       imei: z.string().nullable(),
       priceOverridden: z.boolean(),
+      /* what the line was sold under. A REBU line prints the regime mention and
+         contributes no VAT to the breakdown (ADR-0007 snapshot, ADR-0013 §5). */
+      taxRegime: z.string().nullable().default(null),
     }),
   ),
   subtotalCents: z.number().int(),
@@ -847,12 +881,6 @@ export type UsedCheckImeiResponse = z.infer<typeof UsedCheckImeiResponseSchema>;
 
 /* ---- used:log — the purchase, in one transaction ---- */
 
-export const DeviceGradeSchema = z.enum(["A", "B", "C"]);
-export const IdDocTypeSchema = z.enum(["DNI", "NIE", "PASAPORTE"]);
-export const PayoutMethodSchema = z.enum(["cash", "transfer", "store_credit"]);
-export const AcquisitionChannelSchema = z.enum(["private_individual", "business"]);
-export const PhotoKindSchema = z.enum(["front", "back", "extra", "seller_id"]);
-export const VoucherStatusSchema = z.enum(["issued", "redeemed", "void"]);
 
 /**
  * A photo on its way in.
@@ -1056,3 +1084,39 @@ export const UsedSendToInventoryResponseSchema = z.object({
   sellPriceCents: z.number().int(),
   unitCostCents: z.number().int(),
 });
+
+/* ---- the voucher finder (Sale screen) ---- */
+
+export const VoucherRowSchema = z.object({
+  id: z.string(),
+  /** the purchase it came from — what is printed on the slip the customer holds */
+  docNumber: z.string(),
+  amountCents: z.number().int(),
+  remainingCents: z.number().int(),
+  status: VoucherStatusSchema,
+  issuedAtMs: z.number(),
+  /**
+   * Present only with usedDevices.viewSeller. The handoff drew the seller's name
+   * in the finder; that would have made this box a way to read the second-hand
+   * register, so the number on the slip is the identification and the name is a
+   * courtesy for those already allowed to see it.
+   */
+  sellerName: z.string().nullable(),
+});
+export type VoucherRow = z.infer<typeof VoucherRowSchema>;
+
+export const UsedFindVoucherRequestSchema = z.object({
+  /** a purchase number, a scanned slip, or part of one */
+  search: z.string().trim().min(1).max(60),
+  /** the ticket it would pay for: an oversized voucher is refused, not part-spent */
+  saleTotalCents: z.number().int().min(0),
+});
+export const UsedFindVoucherResponseSchema = z.object({
+  rows: z.array(VoucherRowSchema.extend({ refusal: z.enum(["not_issued", "exceeds_total", "empty"]).nullable() })),
+});
+
+export const UsedVoidVoucherRequestSchema = z.object({
+  voucherId: z.string(),
+  reason: z.string().trim().min(1).max(200),
+});
+export const UsedVoidVoucherResponseSchema = z.object({ ok: z.boolean() });

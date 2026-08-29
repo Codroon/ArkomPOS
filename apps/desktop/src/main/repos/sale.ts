@@ -23,7 +23,9 @@ import {
   validateCompletion,
   type CompletedSale,
   type MovementDraft,
+  type LogFn,
   type MutationCtx,
+  type TenderDraft,
   type SaleAddLineRequest,
   type SaleAddLineResponse,
   type ParkedSale,
@@ -34,8 +36,17 @@ import {
 import { schema, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner, type DbTx } from "../mutate-runner";
 
-const { documents, documentLines, documentTenders, products, productStock, stockMovements, units, numberSeries } =
-  schema;
+const {
+  documents,
+  documentLines,
+  documentTenders,
+  products,
+  productStock,
+  stockMovements,
+  storeCreditVouchers,
+  units,
+  numberSeries,
+} = schema;
 
 type Reader = ArkomDb | DbTx;
 
@@ -153,23 +164,40 @@ interface SellableProduct {
   name: string;
   itemType: string;
   priceCents: number;
-  taxRegime: "IVA21";
+  taxRegime: "IVA21" | "REBU";
   taxRateBp: number;
 }
 
+/**
+ * Phase 1 sells two regimes, and they are not alternatives — they describe
+ * different goods.
+ *
+ * **IVA21** is everything the shop buys from a distributor: the shelf price
+ * includes 21% and the ticket breaks it out.
+ *
+ * **REBU** is a second-hand device bought from a private individual (ADR-0013
+ * §5). Under the margin scheme the shop pays VAT on its margin, not on the sale,
+ * and the customer's document must NOT show VAT for that line — so the line is
+ * snapshotted at a zero rate and its full price lands in the base. The ticket
+ * prints the regime's mention instead. What the shop owes on the margin is an
+ * accounting matter its gestor settles from the purchase and sale prices, both
+ * of which this app records.
+ */
 function assertSellable(product: typeof products.$inferSelect): SellableProduct {
   if (!product.active) throw appError("VALIDATION", "Artículo inactivo; no se puede vender.");
   if (product.priceCents == null || product.taxRegime == null || product.taxRateBp == null) {
     throw appError("VALIDATION", "Artículo incompleto (PVP/IVA); complétalo en Catálogo.");
   }
-  if (product.taxRegime !== "IVA21") throw appError("VALIDATION", "Régimen de IVA no disponible en Fase 1.");
+  if (product.taxRegime !== "IVA21" && product.taxRegime !== "REBU") {
+    throw appError("VALIDATION", "Régimen de IVA no disponible en Fase 1.");
+  }
   return {
     id: product.id,
     name: product.name,
     itemType: product.itemType,
     priceCents: product.priceCents,
-    taxRegime: "IVA21",
-    taxRateBp: product.taxRateBp,
+    taxRegime: product.taxRegime,
+    taxRateBp: product.taxRegime === "REBU" ? 0 : product.taxRateBp,
   };
 }
 
@@ -203,7 +231,13 @@ export function addLine(db: ArkomDb, ctx: MutationCtx, req: SaleAddLineRequest):
       if (sellable.itemType === "serialized") {
         // handoff 01: scanning/tapping a serialized product opens the unit-pick modal
         const options = db
-          .select({ unitId: units.id, imei: units.imei, createdAt: units.createdAt })
+          .select({
+            unitId: units.id,
+            imei: units.imei,
+            createdAt: units.createdAt,
+            grade: units.grade,
+            salePriceCents: units.salePriceCents,
+          })
           .from(units)
           .where(and(eq(units.productId, product.id), eq(units.status, "in_stock")))
           .orderBy(asc(units.createdAt))
@@ -213,7 +247,13 @@ export function addLine(db: ArkomDb, ctx: MutationCtx, req: SaleAddLineRequest):
           kind: "unitPick",
           productId: product.id,
           productName: product.name,
-          units: options.map((u) => ({ unitId: u.unitId, imei: u.imei, createdAtMs: u.createdAt.getTime() })),
+          units: options.map((u) => ({
+            unitId: u.unitId,
+            imei: u.imei,
+            createdAtMs: u.createdAt.getTime(),
+            grade: u.grade,
+            salePriceCents: u.salePriceCents,
+          })),
         };
       }
       productToAdd = sellable;
@@ -287,7 +327,12 @@ export function addLine(db: ArkomDb, ctx: MutationCtx, req: SaleAddLineRequest):
       }
       const product = tx.select().from(products).where(eq(products.id, unitToAdd.productId)).all()[0]!;
       const sellable = assertSellable(product);
-      const money = computeLine({ qty: 1, unitPriceCents: sellable.priceCents, taxRateBp: sellable.taxRateBp });
+      /* The unit's price wins when it has one, which is the schema's rule read
+         forwards: NULL means "inherit the product's" and every phone bought
+         over the counter is priced individually. Without this a used device
+         would sell at its product's price, which is zero. */
+      const unitPriceCents = unitToAdd.salePriceCents ?? sellable.priceCents;
+      const money = computeLine({ qty: 1, unitPriceCents, taxRateBp: sellable.taxRateBp });
       const line = {
         id: uuidv7(),
         tenantId: ctx.tenantId,
@@ -298,7 +343,7 @@ export function addLine(db: ArkomDb, ctx: MutationCtx, req: SaleAddLineRequest):
         unitId: unitToAdd.id,
         description: product.name, // snapshot (ADR-0007 spirit)
         qty: 1,
-        unitPriceCents: sellable.priceCents,
+        unitPriceCents,
         priceOverridden: false,
         overrideReason: null,
         taxRegime: sellable.taxRegime,
@@ -553,7 +598,7 @@ export function listParked(db: ArkomDb, ctx: MutationCtx): ParkedSale[] {
 export function complete(
   db: ArkomDb,
   ctx: MutationCtx,
-  req: { docId: string; tenders: { method: "cash" | "card" | "bizum" | "transfer"; amountCents: number; cardReference?: string | null }[] },
+  req: { docId: string; tenders: TenderDraft[] },
 ): CompletedSale {
   return mutate(makeMutateRunner(db), ctx, (tx, log) => {
     const now = new Date();
@@ -686,6 +731,16 @@ export function complete(
       };
       tx.insert(documentTenders).values(row).run();
       log({ entity: "document_tender", entityId: row.id, action: "create", before: null, after: toOplogJson(row) });
+
+      /* Store credit is spent HERE, inside the sale's own transaction, by a
+         conditional update that only matches a voucher still marked issued
+         (ADR-0013 §4). Reading the status first and writing it second would
+         leave a window between the two; matching on it makes a second
+         redemption fail rather than be unlikely — and if it fails, the whole
+         sale rolls back with it. */
+      if (tender.method === "store_credit") {
+        redeemVoucher(tx, ctx, tender.voucherId!, doc.id, tender.amountCents, now, log);
+      }
     }
 
     // finalize the document
@@ -740,6 +795,7 @@ export function peek(db: ArkomDb, ctx: MutationCtx, docId: string): TicketPeek {
       totalCents: line.totalCents,
       imei,
       priceOverridden: line.priceOverridden,
+      taxRegime: line.taxRegime,
     })),
     subtotalCents: doc.subtotalCents,
     taxCents: doc.taxCents,
@@ -747,4 +803,69 @@ export function peek(db: ArkomDb, ctx: MutationCtx, docId: string): TicketPeek {
     tenders: tenders.map((t) => ({ method: t.method, amountCents: t.amountCents, cardReference: t.cardReference })),
     changeCents: Math.max(0, paid - doc.totalCents),
   };
+}
+
+
+/* ------------------------- store credit (ADR-0013) ------------------------ */
+
+/**
+ * Spend a voucher, once.
+ *
+ * The guarantee is the WHERE clause: the update matches only a row that is
+ * still `issued`, so two tills — or two clicks — cannot both succeed. If it
+ * matches nothing the sale throws, and because this runs inside the completion
+ * transaction, nothing else about the sale survives either. There is no state
+ * in which the goods left the shop and the voucher stayed spendable.
+ *
+ * The amount is checked against what the voucher actually holds rather than
+ * trusted from the payload: a renderer could otherwise offer 80 € of credit
+ * against a voucher worth 50 €.
+ */
+function redeemVoucher(
+  tx: DbTx,
+  ctx: MutationCtx,
+  voucherId: string,
+  documentId: string,
+  amountCents: number,
+  now: Date,
+  log: LogFn,
+): void {
+  const voucher = tx
+    .select()
+    .from(storeCreditVouchers)
+    .where(and(eq(storeCreditVouchers.tenantId, ctx.tenantId), eq(storeCreditVouchers.id, voucherId)))
+    .all()[0];
+  if (!voucher) throw appError("VALIDATION", "Ese vale no existe.", "voucherId");
+  if (voucher.status !== "issued") {
+    throw appError("VALIDATION", "Ese vale ya no se puede usar.", "voucherId");
+  }
+  if (amountCents !== voucher.remainingCents) {
+    // partial redemption is modelled and deliberately off (ADR-0013 §4): a
+    // voucher is spent whole, or it is not the right way to pay for this sale
+    throw appError("VALIDATION", "Un vale se canjea por su importe completo.", "voucherId");
+  }
+
+  const result = tx
+    .update(storeCreditVouchers)
+    .set({
+      status: "redeemed",
+      remainingCents: 0,
+      redeemedDocumentId: documentId,
+      redeemedAt: now,
+      updatedAt: now,
+    })
+    .where(and(eq(storeCreditVouchers.id, voucherId), eq(storeCreditVouchers.status, "issued")))
+    .run();
+
+  if (result.changes !== 1) {
+    throw appError("VALIDATION", "Ese vale acaba de usarse en otra venta.", "voucherId");
+  }
+
+  log({
+    entity: "store_credit_voucher",
+    entityId: voucherId,
+    action: "redeem",
+    before: { status: "issued", remainingCents: voucher.remainingCents },
+    after: { status: "redeemed", remainingCents: 0, documentId },
+  });
 }

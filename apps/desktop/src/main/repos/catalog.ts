@@ -10,6 +10,7 @@ import {
   generateInternalEan13,
   isLowStock,
   isMissingData,
+  isUsedProductName,
   mutate,
   normalizeScanCode,
   toOplogJson,
@@ -96,6 +97,10 @@ export function listProducts(db: ArkomDb, ctx: MutationCtx, filters: CatalogList
   let rows = selectRows(db, ctx, conds.length ? and(...conds) : undefined);
   // low-stock / missing-data live in core (single source of truth); P1 catalog
   // sizes make post-filtering in JS the simpler correct choice.
+  /* Second-hand products are bookkeeping the buy screen creates, not stock the
+     owner maintains, so the management list leaves them out unless asked. The
+     Sale screen asks. */
+  if (!f.includeUsed) rows = rows.filter((r) => !isUsedProductName(r.name));
   if (f.lowStockOnly) rows = rows.filter((r) => isLowStock(r));
   if (f.missingDataOnly) rows = rows.filter((r) => isMissingData(r));
   return rows;

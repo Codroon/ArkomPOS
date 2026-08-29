@@ -11,6 +11,8 @@ import {
   appError,
   applyMovements,
   assertGatePassed,
+  assertVoidable,
+  checkRedeemable,
   buildMovement,
   evaluateGate,
   isValidImei,
@@ -31,6 +33,8 @@ import {
   type UsedDeviceState,
   type UsedLogRequest,
   type UsedLogResponse,
+  type RedeemRefusal,
+  type VoucherRow,
 } from "@arkom/core";
 import { schema, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner, type DbTx } from "../mutate-runner";
@@ -921,5 +925,110 @@ export function sendToInventory(
       sellPriceCents,
       unitCostCents: intake.unitCostCents!,
     };
+  });
+}
+
+/* ----------------------------------------------------------- store credit */
+
+/**
+ * Find a voucher to pay with.
+ *
+ * Searched by what the customer is holding: the purchase number printed on the
+ * slip, or the slip scanned. NOT by the seller's name unless the session may
+ * read it — the handoff drew a name in these results, and shipping that would
+ * have turned the payment panel into a way to read the second-hand register.
+ *
+ * Every row comes back with its `refusal`, so the finder can show a voided or
+ * spent voucher greyed out with a reason instead of pretending it does not
+ * exist. "That voucher was already used on Tuesday" is an answer; silence is
+ * an argument at the counter.
+ */
+export function findVouchers(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  search: string,
+  saleTotalCents: number,
+  canViewSeller: boolean,
+): { rows: Array<VoucherRow & { refusal: RedeemRefusal | null }> } {
+  const needle = search.trim().toLowerCase();
+  if (needle === "") return { rows: [] };
+
+  const rows = db
+    .select({
+      voucher: storeCreditVouchers,
+      docNumber: documents.docNumber,
+      sellerName: usedPurchases.sellerName,
+    })
+    .from(storeCreditVouchers)
+    .leftJoin(usedPurchases, eq(usedPurchases.id, storeCreditVouchers.purchaseId))
+    .leftJoin(documents, eq(documents.id, usedPurchases.documentId))
+    .where(eq(storeCreditVouchers.tenantId, ctx.tenantId))
+    .all()
+    .filter((row) => {
+      const number = (row.docNumber ?? "").toLowerCase();
+      if (number.includes(needle)) return true;
+      // the name is searchable only by those who may see it at all
+      return canViewSeller && (row.sellerName ?? "").toLowerCase().includes(needle);
+    })
+    .slice(0, 12);
+
+  return {
+    rows: rows.map((row) => ({
+      id: row.voucher.id,
+      docNumber: row.docNumber ?? "",
+      amountCents: row.voucher.amountCents,
+      remainingCents: row.voucher.remainingCents,
+      status: row.voucher.status,
+      issuedAtMs: row.voucher.createdAt.getTime(),
+      sellerName: canViewSeller ? row.sellerName : null,
+      refusal: checkRedeemable(
+        {
+          status: row.voucher.status,
+          amountCents: row.voucher.amountCents,
+          remainingCents: row.voucher.remainingCents,
+        },
+        saleTotalCents,
+      ),
+    })),
+  };
+}
+
+/**
+ * Cancel a voucher the shop is not going to honour.
+ *
+ * Only from `issued`, only with a reason, and never after it has been spent —
+ * voiding a redeemed voucher would erase the record of a payment that was
+ * actually made. The reason goes in the oplog, because "why is there 80 € less
+ * owed than the purchase says?" needs an answer.
+ */
+export function voidVoucher(db: ArkomDb, ctx: MutationCtx, voucherId: string, reason: string): void {
+  const voucher = db
+    .select()
+    .from(storeCreditVouchers)
+    .where(and(eq(storeCreditVouchers.tenantId, ctx.tenantId), eq(storeCreditVouchers.id, voucherId)))
+    .all()[0];
+  if (!voucher) throw appError("VALIDATION", "Ese vale no existe.", "voucherId");
+  assertVoidable(
+    { status: voucher.status, amountCents: voucher.amountCents, remainingCents: voucher.remainingCents },
+    reason,
+  );
+
+  mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    const now = new Date();
+    const result = tx
+      .update(storeCreditVouchers)
+      .set({ status: "void", remainingCents: 0, voidReason: reason.trim(), updatedAt: now })
+      .where(and(eq(storeCreditVouchers.id, voucherId), eq(storeCreditVouchers.status, "issued")))
+      .run();
+    if (result.changes !== 1) {
+      throw appError("VALIDATION", "Ese vale acaba de cambiar de estado.", "voucherId");
+    }
+    log({
+      entity: "store_credit_voucher",
+      entityId: voucherId,
+      action: "void",
+      before: { status: voucher.status, remainingCents: voucher.remainingCents },
+      after: { status: "void", reason: reason.trim() },
+    });
   });
 }

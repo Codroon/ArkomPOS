@@ -23,6 +23,7 @@ import {
   AccentButton,
   Chip,
   GhostButton,
+  PrimaryButton,
   SectionLabel,
   Switch,
   TextInput,
@@ -39,6 +40,12 @@ const STATE_KEYS: Record<UsedDeviceDetail["state"], TKey> = {
   needs_review: "usedState.needs_review",
   in_stock: "usedState.in_stock",
   sold: "usedState.sold",
+};
+
+const VOUCHER_KEYS: Record<"issued" | "redeemed" | "void", TKey> = {
+  issued: "voucher.usable",
+  redeemed: "voucher.refusalUsed",
+  void: "voucher.voided",
 };
 
 const PAYOUT_KEYS: Record<UsedDeviceDetail["payout"], TKey> = {
@@ -69,6 +76,8 @@ export function UsedDeviceDetailPane({
   const [refurbInput, setRefurbInput] = useState<string | null>(null);
   const [priceModal, setPriceModal] = useState(false);
   const [zoom, setZoom] = useState<string | null>(null);
+  const [voidOpen, setVoidOpen] = useState(false);
+  const [voidReason, setVoidReason] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -255,10 +264,26 @@ export function UsedDeviceDetailPane({
                 <Row label={t("used.payout.reference")} value={device.payoutReference} mono />
               ) : null}
               {device.voucher ? (
-                <Row
-                  label={t("usedDetail.voucher")}
-                  value={`${formatCents(device.voucher.amountCents)} · ${device.voucher.status}`}
-                />
+                <div className="flex items-baseline justify-between gap-3 py-px">
+                  <SectionLabel>{t("usedDetail.voucher")}</SectionLabel>
+                  <span className="flex items-baseline gap-2">
+                    <span className="font-mono text-[11px] tabular-nums text-ink-2">
+                      {formatCents(device.voucher.amountCents)}
+                    </span>
+                    <Chip variant={device.voucher.status === "issued" ? "success" : "neutral"}>
+                      {t(VOUCHER_KEYS[device.voucher.status])}
+                    </Chip>
+                    {device.voucher.status === "issued" && can("usedDevices.voidCredit") ? (
+                      <button
+                        type="button"
+                        className="text-[10px] text-muted underline hover:text-danger-ink"
+                        onClick={() => setVoidOpen(true)}
+                      >
+                        {t("voucher.void")}
+                      </button>
+                    ) : null}
+                  </span>
+                </div>
               ) : null}
 
               {/* refurbishment: editable while held, frozen and explained after */}
@@ -382,6 +407,47 @@ export function UsedDeviceDetailPane({
           onCancel={() => setPriceModal(false)}
           onConfirm={(cents) => void shelve(cents)}
         />
+      ) : null}
+
+      {voidOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40">
+          <div className="w-[380px] rounded-[3px] border border-line-strong bg-card shadow-lg">
+            <div className="border-b border-line-strong bg-surface-2 px-4 py-2.5 text-[13px] font-bold">
+              {t("voucher.voidTitle")}
+            </div>
+            <div className="px-4 py-3">
+              <div className="text-[11px] leading-snug text-ink-2">{t("voucher.voidBody")}</div>
+              <div className="mt-2">
+                <SectionLabel>{t("voucher.voidReason")}</SectionLabel>
+                <TextInput
+                  autoFocus
+                  className="mt-1"
+                  value={voidReason}
+                  onChange={(e) => setVoidReason(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-line px-4 py-3">
+              <GhostButton onClick={() => setVoidOpen(false)}>{t("common.cancel")}</GhostButton>
+              <PrimaryButton
+                disabled={busy || voidReason.trim() === ""}
+                onClick={() =>
+                  void act(async () => {
+                    await window.arkom.invoke("used:voidVoucher", {
+                      voucherId: device.voucher!.id,
+                      reason: voidReason.trim(),
+                    });
+                    setVoidOpen(false);
+                    setVoidReason("");
+                    return window.arkom.invoke("used:get", { purchaseId });
+                  })
+                }
+              >
+                {t("voucher.void")}
+              </PrimaryButton>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {zoom ? (

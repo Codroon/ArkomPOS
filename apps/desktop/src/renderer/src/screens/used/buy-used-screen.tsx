@@ -40,6 +40,7 @@ import {
   type ScanInputHandle,
 } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
+import { openSaleWithVoucher } from "../../lib/screen-bus";
 import { GateRail, type GateState } from "./gate-rail";
 import { SellPriceModal } from "./sell-price-modal";
 import { PhotoSlotTile, useHasCamera } from "./photo-slots";
@@ -499,11 +500,37 @@ export function BuyUsedScreen() {
                 <GhostButton className="flex-1" onClick={() => void reprint("document")}>
                   {t("used.logged.printAgain")}
                 </GhostButton>
-                {/* the surface's one blue element once the purchase exists */}
-                <AccentButton className="flex-1" onClick={startOver}>
-                  {t("used.logged.newPurchase")}
-                </AccentButton>
+                {logged.voucherId ? (
+                  /* the customer is standing there with credit; the till should
+                     not make them queue again to spend it */
+                  <AccentButton
+                    className="flex-1"
+                    onClick={() =>
+                      openSaleWithVoucher({
+                        id: logged.voucherId!,
+                        docNumber: logged.docNumber,
+                        amountCents: buyPriceCents(draft) ?? 0,
+                      })
+                    }
+                  >
+                    {t("used.logged.continueSale")}
+                  </AccentButton>
+                ) : (
+                  /* the surface's one blue element once the purchase exists */
+                  <AccentButton className="flex-1" onClick={startOver}>
+                    {t("used.logged.newPurchase")}
+                  </AccentButton>
+                )}
               </div>
+              {logged.voucherId ? (
+                <button
+                  type="button"
+                  className="mt-1.5 w-full text-[10px] text-muted underline hover:text-ink"
+                  onClick={startOver}
+                >
+                  {t("used.logged.newPurchase")}
+                </button>
+              ) : null}
               {notice ? <div className="mt-2 text-[11px] text-ink-2">{notice}</div> : null}
             </div>
           ) : (

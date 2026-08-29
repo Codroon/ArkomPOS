@@ -706,6 +706,26 @@ export const es = {
   "usedAction.print": "Impresión",
   "usedAction.issue": "Vale emitido",
 
+/* ---- saldo a favor (Venta) ---- */
+  "pay.storeCredit": "Saldo",
+  "voucher.title": "Buscar saldo a favor",
+  "voucher.searchPlaceholder": "Escanea el resguardo o busca por número",
+  "voucher.hint": "Escanea el resguardo del cliente o teclea el número de compra.",
+  "voucher.noMatches": "Ningún vale coincide.",
+  "voucher.usable": "Emitido",
+  "voucher.refusalUsed": "Ya usado",
+  "voucher.refusalTooBig": "Mayor que el total",
+  "voucher.refusalEmpty": "Sin saldo",
+  "voucher.wholeOnly": "Un vale se canjea por su importe completo. Si es mayor que el total, añade artículos o paga de otra forma.",
+  "voucher.void": "Anular vale",
+  "voucher.voidTitle": "¿Anular este vale?",
+  "voucher.voidBody": "El cliente dejará de poder canjearlo. Queda registrado con el motivo.",
+  "voucher.voidReason": "Motivo",
+  "voucher.voided": "Vale anulado.",
+  "used.logged.continueSale": "Continuar a la venta",
+
+  "pick.grade": "Grado {grade}",
+
   /* backups */
   "bk.section": "Copia de seguridad",
   "bk.intro": "La copia se hace sola cada noche y al cerrar el programa. Se guardan las {keep} últimas.",

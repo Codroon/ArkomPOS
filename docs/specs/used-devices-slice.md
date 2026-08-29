@@ -85,7 +85,7 @@ warranty tracking on used sales.
       storage + colour**, named `… (usado)` — not one product per physical phone. Grade,
       battery and selling price live on the unit, which is why they are nullable columns
       there and not on the product.
-- [ ] **U4c** Those products are hidden from the **Catálogo management list only**. They
+- [x] **U4c** Those products are hidden from the **Catálogo management list only**. They
       remain fully findable on the **Sale screen** — by barcode/IMEI scan and by model
       search — and every result carries a used marker with the grade, so a cashier can
       tell the new iPhone 11 from the second-hand one at a glance.
@@ -152,7 +152,7 @@ warranty tracking on used sales.
 - [x] **X4** Both actions print a shelf label: barcode, model, grade.
 - [x] **X5** Everything lands in one transaction with one oplog envelope; the actor is the
       session (ADR-0012).
-- [ ] **X6** A held device scanned on the Sale screen reports the near-miss
+- [x] **X6** A held device scanned on the Sale screen reports the near-miss
       (`unavailableUnit`) rather than "unknown code".
 
 ### Y. Used devices screen
@@ -179,20 +179,20 @@ warranty tracking on used sales.
 
 - [x] **Z1** Payout = store credit creates an `issued` voucher for the buy price, linked to
       the purchase.
-- [ ] **Z2** *Flow A* — after logging, **Continuar a la venta** opens Sale with the credit
+- [x] **Z2** *Flow A* — after logging, **Continuar a la venta** opens Sale with the credit
       already applied as a tender chip showing the purchase number and amount.
-- [ ] **Z3** *Flow B* — a **Saldo a favor** tender on any sale opens a finder: scan the
+- [x] **Z3** *Flow B* — a **Saldo a favor** tender on any sale opens a finder: scan the
       purchase slip barcode, or search by number/name.
-- [ ] **Z4** Redemption flips the voucher to `redeemed` **inside the sale's completion
+- [x] **Z4** Redemption flips the voucher to `redeemed` **inside the sale's completion
       transaction**, guarded by a conditional update, so a double redemption is impossible
       rather than merely unlikely.
-- [ ] **Z5** A voucher already `redeemed` or `void` is not offered by the finder and is
+- [x] **Z5** A voucher already `redeemed` or `void` is not offered by the finder and is
       refused by the handler.
-- [ ] **Z6** Credit never appears as a document line. Sale totals remain the value of the
+- [x] **Z6** Credit never appears as a document line. Sale totals remain the value of the
       goods.
-- [ ] **Z7** Void: only from `issued`, only with `users.manage`, only with a reason,
+- [x] **Z7** Void: only from `issued`, only with `users.manage`, only with a reason,
       oplogged.
-- [ ] **Z8** A voucher larger than the sale total is refused with a clear message rather
+- [x] **Z8** A voucher larger than the sale total is refused with a clear message rather
       than silently part-consumed — partial redemption is modelled and disabled
       (see open decisions).
 

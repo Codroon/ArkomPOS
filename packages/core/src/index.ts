@@ -325,6 +325,11 @@ export {
   UsedSetRefurbCostRequestSchema,
   UsedSendToInventoryRequestSchema,
   UsedSendToInventoryResponseSchema,
+  VoucherRowSchema,
+  UsedFindVoucherRequestSchema,
+  UsedFindVoucherResponseSchema,
+  UsedVoidVoucherRequestSchema,
+  UsedVoidVoucherResponseSchema,
 } from "./ipc";
 export type {
   IpcChannel,
@@ -378,4 +383,5 @@ export type {
   UsedPrintRequest,
   UsedDeviceRow,
   UsedDeviceDetail,
+  VoucherRow,
 } from "./ipc";

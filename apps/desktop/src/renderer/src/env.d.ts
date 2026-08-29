@@ -40,6 +40,7 @@ import type {
   UsedLogResponse,
   UsedDeviceRow,
   UsedDeviceDetail,
+  VoucherRow,
 } from "@arkom/core";
 
 declare global {
@@ -153,6 +154,14 @@ declare global {
         channel: "used:sendToInventory",
         payload: { purchaseId: string; sellPriceCents: number },
       ): Promise<{ unitId: string; sellPriceCents: number; unitCostCents: number }>;
+      invoke(
+        channel: "used:findVoucher",
+        payload: { search: string; saleTotalCents: number },
+      ): Promise<{ rows: Array<VoucherRow & { refusal: "not_issued" | "exceeds_total" | "empty" | null }> }>;
+      invoke(
+        channel: "used:voidVoucher",
+        payload: { voucherId: string; reason: string },
+      ): Promise<{ ok: boolean }>;
       invoke(channel: "users:list", payload?: undefined): Promise<UserRow[]>;
       invoke(
         channel: "users:create",

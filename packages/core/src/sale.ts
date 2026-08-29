@@ -89,12 +89,22 @@ export function availableForSale(
 
 /* ------------------------------- tenders ------------------------------- */
 
-export type TenderMethod = "cash" | "card" | "bizum" | "transfer";
+/**
+ * How a sale is paid.
+ *
+ * `store_credit` is a voucher the shop owes the customer (ADR-0013 §4). It is a
+ * TENDER, never a document line: putting it on the ticket as a negative line
+ * would change the taxable base and the printed IVA breakdown, so the goods keep
+ * their value and the voucher pays for them the way cash does.
+ */
+export type TenderMethod = "cash" | "card" | "bizum" | "transfer" | "store_credit";
 
 export interface TenderDraft {
   method: TenderMethod;
   amountCents: number;
   cardReference?: string | null;
+  /** which voucher is being spent — required for, and only for, store_credit */
+  voucherId?: string | null;
 }
 
 export interface TenderSummary {
@@ -145,6 +155,15 @@ export function validateCompletion(args: {
     if (tender.method === "card" && (tender.cardReference ?? "").trim().length < 4) {
       throw appError("VALIDATION", "La referencia del datáfono es obligatoria (≥ 4 caracteres).", "cardReference");
     }
+    // an anonymous credit tender would be money off the total with nothing to
+    // mark spent, which is a hole in the books rather than a payment
+    if (tender.method === "store_credit" && !tender.voucherId) {
+      throw appError("VALIDATION", "Un pago con saldo debe indicar el vale.", "voucherId");
+    }
+  }
+  const vouchers = tenders.filter((t) => t.method === "store_credit").map((t) => t.voucherId);
+  if (new Set(vouchers).size !== vouchers.length) {
+    throw appError("VALIDATION", "Ese vale ya está en este ticket.", "voucherId");
   }
   const summary = tenderSummary(totalCents, tenders);
   if (summary.nonCashExcess) {

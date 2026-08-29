@@ -147,6 +147,10 @@ import {
   UsedSetRefurbCostRequestSchema,
   UsedSendToInventoryRequestSchema,
   UsedSendToInventoryResponseSchema,
+  UsedFindVoucherRequestSchema,
+  UsedFindVoucherResponseSchema,
+  UsedVoidVoucherRequestSchema,
+  UsedVoidVoucherResponseSchema,
   type MutationCtx,
   type PermissionKey,
 } from "@arkom/core";
@@ -166,6 +170,8 @@ import {
   sendToInventory,
   setNeedsReview,
   setRefurbCost,
+  findVouchers,
+  voidVoucher,
 } from "./repos/used";
 import { listPrinters, printPurchase, printTest, printTicket, revealTicket, ticketsDir, printRecoveryCode } from "./print";
 import { completeFirstRun, demoStatus, isSetupNeeded, removeDemoData } from "./setup";
@@ -733,6 +739,40 @@ export function registerIpcHandlers(db: ArkomDb): void {
         console.error("[used] could not print the shelf label:", err);
       }
       return result;
+    },
+  );
+
+  /**
+   * The voucher finder behind the "Saldo a favor" tender.
+   *
+   * Any cashier who may take a payment may find the voucher that pays it —
+   * `usedDevices.redeemCredit`. The seller's NAME rides along only for a
+   * session that may already read it; without that, the purchase number on the
+   * slip is the identification, which is what the customer is holding anyway.
+   */
+  guarded(
+    "used:findVoucher",
+    "usedDevices.redeemCredit",
+    UsedFindVoucherRequestSchema,
+    UsedFindVoucherResponseSchema,
+    (s, input) =>
+      findVouchers(
+        db,
+        s.ctx,
+        input.search,
+        input.saleTotalCents,
+        s.permissions.includes("usedDevices.viewSeller"),
+      ),
+  );
+
+  guarded(
+    "used:voidVoucher",
+    "usedDevices.voidCredit",
+    UsedVoidVoucherRequestSchema,
+    UsedVoidVoucherResponseSchema,
+    (s, input) => {
+      voidVoucher(db, s.ctx, input.voucherId, input.reason);
+      return { ok: true };
     },
   );
 }

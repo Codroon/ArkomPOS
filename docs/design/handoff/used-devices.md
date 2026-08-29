@@ -203,6 +203,17 @@ because the amount is the voucher's, not the cashier's:
 > ScanInput — "Escanea el resguardo o busca por número"
 > results: `C-000123 · 80,00 € · Imran K. · 12/08` with an `Emitido` chip
 
+**The seller's name in that row is shown only with `usedDevices.viewSeller`.** As
+drawn, the finder would have been a way to read the second-hand register from the
+payment panel — type a few letters, collect names. The purchase number printed on
+the slip is the identification, and it is what the customer is holding; the name is
+a courtesy for staff already allowed to see it. Without the permission the row
+reads `C-000123 · 80,00 € · 12/08`.
+
+A voucher that cannot pay for this ticket is **listed and greyed with its reason**
+(*Ya usado*, *Mayor que el total*), never hidden. A cashier who cannot see why is
+a cashier arguing with a customer about a slip the till appears not to know.
+
 Selecting one adds a tender chip reading `Saldo C-000123 · 80,00 €`. It cannot be edited to
 a different amount — a voucher redeems in full — and the ✕ removes it, releasing nothing
 because nothing is committed until Cobrar.
