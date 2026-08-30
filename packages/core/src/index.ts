@@ -157,13 +157,14 @@ export {
 } from "./purchase-doc";
 export type { PurchaseDoc, PurchaseDocDevice, PurchaseDocSeller, ShelfLabel } from "./purchase-doc";
 export {
+  renderQuoteDoc,
   renderIntakeReceipt,
   damageLine,
   promisedLine,
   REPAIR_ES,
   DAMAGE_ES,
 } from "./repair-doc";
-export type { IntakeReceiptDoc, RepairDocDevice } from "./repair-doc";
+export type { IntakeReceiptDoc, RepairDocDevice, QuoteDoc, QuoteDocLine } from "./repair-doc";
 export { opsToText, opBuilder } from "./print-ops";
 export {
   REPAIR_STATUSES,
@@ -402,6 +403,23 @@ export {
   RepairCreateResponseSchema,
   RepairPrintRequestSchema,
   RepairPrintResponseSchema,
+  RepairDocDeviceSchema,
+  RepairLineRowSchema,
+  RepairApprovalRowSchema,
+  RepairNotificationRowSchema,
+  RepairPhotoRefSchema,
+  RepairRefusalSchema,
+  RepairActionsSchema,
+  RepairDetailSchema,
+  RepairGetRequestSchema,
+  RepairAddLineRequestSchema,
+  RepairRemoveLineRequestSchema,
+  RepairSetLineChargeRequestSchema,
+  RepairRecordApprovalRequestSchema,
+  RepairReceivePartRequestSchema,
+  OrderedPartRowSchema,
+  RepairPartsToOrderRequestSchema,
+  RepairPartsToOrderResponseSchema,
 } from "./ipc";
 export type {
   IpcChannel,
@@ -462,4 +480,8 @@ export type {
   RepairCreateRequest,
   RepairCreateResponse,
   RepairPrintRequest,
+  RepairDetail,
+  RepairLineRow,
+  RepairAddLineRequest,
+  OrderedPartRow,
 } from "./ipc";

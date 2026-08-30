@@ -161,6 +161,15 @@ import {
   RepairCreateResponseSchema,
   RepairPrintRequestSchema,
   RepairPrintResponseSchema,
+  RepairDetailSchema,
+  RepairGetRequestSchema,
+  RepairAddLineRequestSchema,
+  RepairRemoveLineRequestSchema,
+  RepairSetLineChargeRequestSchema,
+  RepairRecordApprovalRequestSchema,
+  RepairReceivePartRequestSchema,
+  RepairPartsToOrderRequestSchema,
+  RepairPartsToOrderResponseSchema,
   type MutationCtx,
   type PermissionKey,
 } from "@arkom/core";
@@ -183,7 +192,19 @@ import {
   findVouchers,
   voidVoucher,
 } from "./repos/used";
-import { createTicket, searchCustomers, upsertCustomer } from "./repos/repair";
+import {
+  addLine as addRepairLine,
+  createTicket,
+  getDetail,
+  lineChargeNeedsOverride,
+  partsToOrder,
+  receivePart,
+  recordApproval,
+  removeLine as removeRepairLine,
+  searchCustomers,
+  setLineCharge,
+  upsertCustomer,
+} from "./repos/repair";
 import {
   listPrinters,
   peekPurchase,
@@ -850,6 +871,83 @@ export function registerIpcHandlers(db: ArkomDb): void {
    * document carries a seller's ID number, and this one carries nothing the
    * customer standing at the counter does not already have on their own copy.
    */
+  guarded("repair:get", "repair.view", RepairGetRequestSchema, RepairDetailSchema, (s, { ticketId }) =>
+    getDetail(db, s.ctx, ticketId),
+  );
+
+  /**
+   * The quote.
+   *
+   * `repair.parts.manage` covers all three kinds, including labor: deciding
+   * that a job needs an hour of work is the same act as deciding it needs a
+   * screen, and splitting them would give a technician the right to fit a part
+   * but not to say they fitted it.
+   */
+  guarded("repair:addLine", "repair.parts.manage", RepairAddLineRequestSchema, RepairDetailSchema, (s, input) =>
+    addRepairLine(db, s.ctx, input),
+  );
+
+  guarded(
+    "repair:removeLine",
+    "repair.parts.manage",
+    RepairRemoveLineRequestSchema,
+    RepairDetailSchema,
+    (s, { ticketId, lineId }) => removeRepairLine(db, s.ctx, ticketId, lineId),
+  );
+
+  /**
+   * Moving a charge — and the one place this module escalates.
+   *
+   * Raising a charge needs `repair.quote.set`: the total climbs past what was
+   * approved, the ticket falls back to Presupuestado by itself, and nothing can
+   * be collected until the customer agrees again. Lowering one AFTER they
+   * agreed is the direction that costs the shop money invisibly, so it asks for
+   * `repair.price_override` — approvable, so a cashier presses the button and
+   * an owner's PIN completes it, exactly like a discount on the Sale screen
+   * (ADR-0014 §9a).
+   *
+   * The decision is made from the ticket's own facts, never from the payload: a
+   * renderer that sent a flattering `fromCents` would otherwise gate itself.
+   */
+  guarded(
+    "repair:setLineCharge",
+    (req) => (lineChargeNeedsOverride(db, req) ? "repair.price_override" : "repair.quote.set"),
+    RepairSetLineChargeRequestSchema,
+    RepairDetailSchema,
+    (s, input) => setLineCharge(db, s.ctx, input),
+  );
+
+  guarded(
+    "repair:recordApproval",
+    "repair.quote.approve",
+    RepairRecordApprovalRequestSchema,
+    RepairDetailSchema,
+    (s, { ticketId, method }) => recordApproval(db, s.ctx, ticketId, method),
+  );
+
+  /**
+   * Receiving an ordered part.
+   *
+   * Its own permission, and NOT a technician default: this is the moment a
+   * delivery enters the shop's stock at a cost someone typed, which is exactly
+   * where a part gets quietly written off (ADR-0012's reasoning, applied).
+   */
+  guarded(
+    "repair:receivePart",
+    "repair.parts.receive",
+    RepairReceivePartRequestSchema,
+    RepairDetailSchema,
+    (s, input) => receivePart(db, s.ctx, input),
+  );
+
+  guarded(
+    "repair:partsToOrder",
+    "repair.view",
+    RepairPartsToOrderRequestSchema,
+    RepairPartsToOrderResponseSchema,
+    (s) => ({ rows: partsToOrder(db, s.ctx) }),
+  );
+
   guarded("repair:print", "repair.view", RepairPrintRequestSchema, RepairPrintResponseSchema, (s, input) =>
     printRepair(db, s.ctx, input),
   );

@@ -10,7 +10,13 @@ import { appError } from "./errors";
    type from `purchase_in` so the books can tell supplier stock from what was
    bought over the counter — REBU margin scheme applies to the second and not
    the first — but it obeys exactly the same ledger rules. */
-export const P1_MOVEMENT_TYPES = ["purchase_in", "sale_out", "adjustment", "tradein_in"] as const;
+export const P1_MOVEMENT_TYPES = [
+  "purchase_in",
+  "sale_out",
+  "adjustment",
+  "tradein_in",
+  "repair_part_out",
+] as const;
 export type P1MovementType = (typeof P1_MOVEMENT_TYPES)[number];
 
 export interface MovementInput {
@@ -48,6 +54,16 @@ export function buildMovement(input: MovementInput): MovementDraft {
     }
   } else if (movementType === "sale_out") {
     if (qty >= 0) throw appError("VALIDATION", "Una salida de venta debe tener cantidad negativa.", "qty");
+  } else if (movementType === "repair_part_out") {
+    /* Either sign, and the positive one must say why.
+       A part fitted to a repair leaves the shelf (−). When the line is removed
+       it comes back (+), and ADR-0004 says that is a SECOND movement, never a
+       deleted first one. Keeping both under one type means the movements drawer
+       shows the pair against the same repair document, which is exactly what
+       someone asking "where did that screen go" needs to see. */
+    if (qty > 0 && (!input.reason || input.reason.trim() === "")) {
+      throw appError("VALIDATION", "Devolver una pieza requiere un motivo.", "reason");
+    }
   } else {
     // adjustment: either sign, but always a reason (req 25.3: gated-with-reason)
     if (!input.reason || input.reason.trim() === "") {

@@ -19,6 +19,7 @@ import {
   mutate,
   renderPurchaseDoc,
   renderIntakeReceipt,
+  renderQuoteDoc,
   renderShelfLabel,
   renderTicket,
   wrapText,
@@ -32,11 +33,13 @@ import {
   type UsedPrintRequest,
   type RepairPrintRequest,
   type IntakeReceiptDoc,
+  type QuoteDoc,
 } from "@arkom/core";
 import { schema, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner } from "../mutate-runner";
 import { peek } from "../repos/sale";
 import { getSettings, shopProfile } from "../repos/settings";
+import { getDetail } from "../repos/repair";
 import { tillContext } from "../context";
 import { encodeEscPos } from "./escpos";
 import { renderTicketPdf, ticketsDir as ticketsDirPath } from "./pdf";
@@ -469,20 +472,65 @@ function loadIntakeDoc(
  * the not-repaired return note arrive with the slices that create the facts they
  * report, and are refused rather than half-rendered until then.
  */
+function loadQuoteDoc(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  ticketId: string,
+  isCopy: boolean,
+): { doc: QuoteDoc; documentId: string } {
+  const detail = getDetail(db, ctx, ticketId);
+  const intake = loadIntakeDoc(db, ctx, ticketId, isCopy);
+  // the most recent approval is the one that stands; older ones stay on the
+  // ticket but the paper describes the agreement in force
+  const approval = detail.approvals[0] ?? null;
+
+  return {
+    documentId: intake.documentId,
+    doc: {
+      docNumber: detail.docNumber,
+      quotedAtMs: Date.now(),
+      terminalName: intake.doc.terminalName,
+      cashierName: intake.doc.cashierName,
+      isCopy,
+      customerName: detail.customer.name,
+      customerPhone: detail.customer.phone,
+      device: detail.device,
+      lines: detail.lines.map((line) => ({
+        description: line.description,
+        qty: line.qty,
+        chargeCents: line.chargeCents,
+        onOrder: line.kind === "part_on_order" && line.receivedAt === null,
+      })),
+      totalCents: detail.quoteTotalCents,
+      depositCents: detail.depositCents,
+      approval: approval
+        ? { method: approval.method, atMs: approval.createdAt, approvedTotalCents: approval.approvedTotalCents }
+        : null,
+    },
+  };
+}
+
 export async function printRepair(
   db: ArkomDb,
   ctx: MutationCtx,
   req: RepairPrintRequest,
 ): Promise<PrintTicketResponse> {
-  if (req.what !== "intake") {
+  if (req.what === "receipt" || req.what === "return") {
     throw appError("VALIDATION", "Ese documento todavía no existe.");
   }
   const settings = getSettings(db, ctx);
-  const loaded = loadIntakeDoc(db, ctx, req.ticketId, req.copy);
   const shop = shopProfile(db, ctx);
 
-  const ops = renderIntakeReceipt(loaded.doc, shop, settings.paperWidthMm);
-  const fileBase = `${loaded.doc.docNumber || "REPARACION"}${req.copy ? "-COPIA" : ""}`;
+  const loaded = req.what === "quote"
+    ? loadQuoteDoc(db, ctx, req.ticketId, req.copy)
+    : loadIntakeDoc(db, ctx, req.ticketId, req.copy);
+
+  const ops =
+    req.what === "quote"
+      ? renderQuoteDoc((loaded as { doc: QuoteDoc }).doc, shop, settings.paperWidthMm)
+      : renderIntakeReceipt((loaded as { doc: IntakeReceiptDoc }).doc, shop, settings.paperWidthMm);
+  const suffix = req.what === "quote" ? "-presupuesto" : "";
+  const fileBase = `${loaded.doc.docNumber || "REPARACION"}${suffix}${req.copy ? "-COPIA" : ""}`;
 
   if (req.target === "pdf" || !settings.printerName) {
     const path = await renderTicketPdf(ops, settings.paperWidthMm, fileBase);

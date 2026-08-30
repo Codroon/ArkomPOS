@@ -75,6 +75,13 @@ export const IPC_CHANNELS = [
   "customer:search",
   "customer:upsert",
   "repair:create",
+  "repair:get",
+  "repair:addLine",
+  "repair:removeLine",
+  "repair:setLineCharge",
+  "repair:recordApproval",
+  "repair:receivePart",
+  "repair:partsToOrder",
   "repair:print",
 ] as const;
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
@@ -1249,6 +1256,16 @@ export const RepairDamageSchema = z.object({
   water: z.boolean(),
 });
 
+export const RepairDocDeviceSchema = z.object({
+  description: z.string(),
+  imei: z.string().nullable(),
+  reportedFault: z.string(),
+  conditionAtIntake: z.string().nullable(),
+  damage: RepairDamageSchema,
+  damageNote: z.string().nullable(),
+  accessories: z.string().nullable(),
+});
+
 export const RepairCreateRequestSchema = z.object({
   customerId: z.string(),
   deviceDescription: z.string().trim().min(1).max(200),
@@ -1290,5 +1307,220 @@ export const RepairPrintRequestSchema = z.object({
   target: z.enum(["auto", "pdf"]).default("auto"),
   copy: z.boolean().default(false),
 });
+/* ---- the ticket as the screen sees it ---- */
+
+export const RepairLineRowSchema = z.object({
+  id: z.string(),
+  kind: RepairLineKindSchema,
+  productId: z.string().nullable(),
+  description: z.string(),
+  qty: z.number().int(),
+  /** snapshot from when the part was taken; the charge moves, this does not */
+  unitCostCents: z.number().int().nullable(),
+  chargeCents: z.number().int(),
+  supplierText: z.string().nullable(),
+  expectedCostCents: z.number().int().nullable(),
+  orderedAt: z.number().int().nullable(),
+  receivedAt: z.number().int().nullable(),
+});
+export type RepairLineRow = z.infer<typeof RepairLineRowSchema>;
+
+export const RepairApprovalRowSchema = z.object({
+  id: z.string(),
+  method: RepairApprovalMethodSchema,
+  approvedTotalCents: z.number().int(),
+  userName: z.string().nullable(),
+  createdAt: z.number().int(),
+});
+
+export const RepairNotificationRowSchema = z.object({
+  id: z.string(),
+  method: RepairNotifyMethodSchema,
+  note: z.string().nullable(),
+  userName: z.string().nullable(),
+  createdAt: z.number().int(),
+});
+
+/**
+ * A photo REFERENCE, not the photo.
+ *
+ * Every mutation on this screen returns the whole detail, and shipping four
+ * base64 JPEGs back on each charge edit would be a megabyte per keystroke-ish
+ * action for pictures that never change. The images come once, from
+ * `repair:photos`, when the screen opens.
+ */
+export const RepairPhotoRefSchema = z.object({ id: z.string(), kind: PhotoKindSchema });
+
+export const RepairRefusalSchema = z.enum([
+  "terminal",
+  "no_lines",
+  "not_authorized",
+  "waiting_part",
+  "already_ready",
+  "not_ready",
+  "unresolved_parts",
+  "no_reason",
+]);
+
+/** Which actions the facts allow, and the reason when they do not. */
+export const RepairActionsSchema = z.object({
+  quote: RepairRefusalSchema.nullable(),
+  approve: RepairRefusalSchema.nullable(),
+  receive_part: RepairRefusalSchema.nullable(),
+  mark_ready: RepairRefusalSchema.nullable(),
+  collect: RepairRefusalSchema.nullable(),
+  mark_not_repaired: RepairRefusalSchema.nullable(),
+});
+
+export const RepairDetailSchema = z.object({
+  id: z.string(),
+  docNumber: z.string(),
+  documentId: z.string(),
+  status: RepairStatusSchema,
+
+  customer: z.object({
+    id: z.string(),
+    name: z.string(),
+    phone: z.string(),
+    note: z.string().nullable(),
+  }),
+
+  device: RepairDocDeviceSchema,
+  /**
+   * The device's own passcode — the technician cannot open the phone without it.
+   *
+   * It reaches the SCREEN and nothing else: no print payload carries it, no
+   * oplog entry records it, and the UI masks it behind a tap (ADR-0014 §10).
+   */
+  devicePasscode: z.string().nullable(),
+
+  promisedAt: z.number().int().nullable(),
+  promisedHalf: PromisedHalfSchema.nullable(),
+  assignedUserId: z.string().nullable(),
+  assignedUserName: z.string().nullable(),
+
+  depositCents: z.number().int(),
+  authorizedCapCents: z.number().int().nullable(),
+  diagnosisFeeCents: z.number().int(),
+  warrantyMonths: z.number().int(),
+
+  readyAt: z.number().int().nullable(),
+  notRepairedAt: z.number().int().nullable(),
+  notRepairedReason: NotRepairedReasonSchema.nullable(),
+  collectionDocumentId: z.string().nullable(),
+  collectionDocNumber: z.string().nullable(),
+
+  createdAt: z.number().int(),
+  updatedAt: z.number().int(),
+
+  lines: z.array(RepairLineRowSchema),
+  approvals: z.array(RepairApprovalRowSchema),
+  notifications: z.array(RepairNotificationRowSchema),
+  photos: z.array(RepairPhotoRefSchema),
+
+  /* ---- derived in core, sent down so the screen never re-derives it ---- */
+  quoteTotalCents: z.number().int(),
+  margin: z.object({
+    costCents: z.number().int(),
+    chargeCents: z.number().int(),
+    marginCents: z.number().int(),
+    marginPct: z.number().nullable(),
+  }),
+  authorization: z.object({
+    authorized: z.boolean(),
+    source: z.enum(["approval", "cap"]).nullable(),
+    coveredCents: z.number().int(),
+  }),
+  overdue: z.boolean(),
+  actions: RepairActionsSchema,
+});
+export type RepairDetail = z.infer<typeof RepairDetailSchema>;
+
+export const RepairGetRequestSchema = z.object({ ticketId: z.string() });
+
+/* ---- quote lines ---- */
+
+export const RepairAddLineRequestSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("labor"),
+    ticketId: z.string(),
+    description: z.string().trim().min(1).max(200),
+    chargeCents: z.number().int().min(0),
+  }),
+  z.object({
+    kind: z.literal("inventory_part"),
+    ticketId: z.string(),
+    productId: z.string(),
+    qty: z.number().int().min(1).max(99),
+    /** blank = the shop's sale price for that product, which is the usual answer */
+    chargeCents: z.number().int().min(0).nullish(),
+  }),
+  z.object({
+    kind: z.literal("part_on_order"),
+    ticketId: z.string(),
+    description: z.string().trim().min(1).max(200),
+    qty: z.number().int().min(1).max(99),
+    supplierText: z.string().trim().max(120).nullish(),
+    expectedCostCents: z.number().int().min(0).nullish(),
+    chargeCents: z.number().int().min(0),
+  }),
+]);
+export type RepairAddLineRequest = z.infer<typeof RepairAddLineRequestSchema>;
+
+export const RepairRemoveLineRequestSchema = z.object({
+  ticketId: z.string(),
+  lineId: z.string(),
+});
+
+export const RepairSetLineChargeRequestSchema = z.object({
+  ticketId: z.string(),
+  lineId: z.string(),
+  chargeCents: z.number().int().min(0),
+  /**
+   * Why the charge is going DOWN after the customer already approved it.
+   *
+   * Required only in that direction, and enforced in main: the customer agreed
+   * to a number, and settling quietly below it is money nobody can account for
+   * (ADR-0014 §9a).
+   */
+  reason: z.string().trim().max(200).nullish(),
+});
+
+export const RepairRecordApprovalRequestSchema = z.object({
+  ticketId: z.string(),
+  method: RepairApprovalMethodSchema,
+});
+
+export const RepairReceivePartRequestSchema = z.object({
+  ticketId: z.string(),
+  lineId: z.string(),
+  /** what it actually cost, which is rarely exactly what was expected */
+  unitCostCents: z.number().int().min(0),
+  qty: z.number().int().min(1).max(99),
+  /** which catalogue article it is, when the ordered line named none */
+  productId: z.string().nullish(),
+});
+
+/** Every open ordered line across every ticket — the buying list. */
+export const OrderedPartRowSchema = z.object({
+  lineId: z.string(),
+  ticketId: z.string(),
+  docNumber: z.string(),
+  customerName: z.string(),
+  deviceDescription: z.string(),
+  description: z.string(),
+  qty: z.number().int(),
+  supplierText: z.string().nullable(),
+  expectedCostCents: z.number().int().nullable(),
+  orderedAt: z.number().int().nullable(),
+  promisedAt: z.number().int().nullable(),
+  /** whole days since it was ordered — the column that sorts this screen */
+  daysWaiting: z.number().int(),
+});
+export type OrderedPartRow = z.infer<typeof OrderedPartRowSchema>;
+
+export const RepairPartsToOrderRequestSchema = z.object({}).optional();
+export const RepairPartsToOrderResponseSchema = z.object({ rows: z.array(OrderedPartRowSchema) });
+
 export const RepairPrintResponseSchema = PrintTicketResponseSchema;
 export type RepairPrintRequest = z.infer<typeof RepairPrintRequestSchema>;

@@ -86,6 +86,19 @@ export const REPAIR_ES = {
     "No se realizará ningún trabajo con cargo sin la aprobación previa del cliente.",
   authorizationNoticeCapped:
     "No se realizará ningún trabajo con cargo por encima del importe autorizado sin la aprobación previa del cliente.",
+  quoteTitle: "PRESUPUESTO",
+  quoteLines: "TRABAJO PRESUPUESTADO",
+  quoteTotal: "TOTAL PRESUPUESTADO",
+  quoteDeposit: "Depósito ya entregado",
+  quoteToPay: "Pendiente al recoger",
+  quoteOnOrder: "pieza por pedir",
+  quoteAccept:
+    "Autorizo la reparación por el importe indicado. El taller no realizará ningún trabajo con cargo por encima de este importe sin volver a consultarme.",
+  quoteValidity: "Presupuesto sujeto a la avería declarada. Una avería distinta se presupuesta de nuevo.",
+  quoteApproved: "APROBADO",
+  quoteApprovedBy: "Aprobado {method} el {date}",
+  quoteInPerson: "en persona",
+  quoteByPhone: "por teléfono",
   signature: "Firma del cliente",
   signatureRule: "X",
   thanks: "Gracias por su visita",
@@ -195,6 +208,138 @@ export function renderIntakeReceipt(
   // and a box they have to squeeze into is a signature nobody can stand behind
   b.feed(3);
   b.raw(`${REPAIR_ES.signatureRule} ${"_".repeat(Math.max(0, cols - 2))}`);
+
+  b.rule();
+  b.text(REPAIR_ES.thanks, { align: "center" });
+  b.feed(2);
+  b.cut();
+
+  return b.ops;
+}
+
+/** One priced row of the quote. Enough to print it and nothing more. */
+export interface QuoteDocLine {
+  description: string;
+  qty: number;
+  chargeCents: number;
+  /** true for a part_on_order that has not arrived — the customer should know */
+  onOrder: boolean;
+}
+
+export interface QuoteDoc {
+  docNumber: string;
+  quotedAtMs: number;
+  terminalName: string;
+  cashierName: string;
+  isCopy: boolean;
+  customerName: string;
+  customerPhone: string;
+  device: RepairDocDevice;
+  lines: ReadonlyArray<QuoteDocLine>;
+  totalCents: number;
+  depositCents: number;
+  /**
+   * The approval on record, if any — WITH the amount it was given for.
+   *
+   * The amount is not decoration. An approval binds to a number (ADR-0014 §2),
+   * so one taken at 84,80 € says nothing about a quote that has since grown to
+   * 204,80 €, and a sheet stamped APROBADO over that larger total would be the
+   * shop claiming an agreement the customer never made.
+   */
+  approval: { method: "in_person" | "by_phone"; atMs: number; approvedTotalCents: number } | null;
+}
+
+/**
+ * The quote → the ops that print it.
+ *
+ * Its job is to be the thing a customer signs, so the two halves that matter are
+ * the priced list and the sentence above the signature line. A quote whose lines
+ * do not add up to the total printed beneath them is worse than no quote, so the
+ * total is passed in and asserted rather than recomputed here — the caller has
+ * already put that number in front of the customer on screen.
+ *
+ * Once approved it prints the approval instead of the signature block: the same
+ * document then serves as the record of what was agreed and when.
+ */
+export function renderQuoteDoc(doc: QuoteDoc, shop: ShopProfile, width: PaperWidthMm = 80): TicketOp[] {
+  const cols = COLUMNS_BY_PAPER[width];
+  const b = opBuilder(cols);
+
+  if (doc.isCopy) {
+    b.text(letterSpaced(REPAIR_ES.copy, cols), { align: "center", bold: true });
+    b.feed(1);
+  }
+  b.text(REPAIR_ES.brand, { align: "center", bold: true, size: "big" });
+  b.text(letterSpaced(REPAIR_ES.tagline, cols), { align: "center" });
+  b.feed(1);
+  b.text(shop.legalName, { align: "center", bold: true });
+  b.text(`${REPAIR_ES.nif} ${shop.nif}`, { align: "center" });
+  b.text(shop.address, { align: "center" });
+
+  b.rule();
+  b.text(REPAIR_ES.quoteTitle, { bold: true });
+  b.pair(doc.docNumber, formatPrintDate(doc.quotedAtMs));
+  b.text(`${doc.terminalName} · ${REPAIR_ES.attendedBy} ${doc.cashierName}`);
+
+  b.rule();
+  b.text(REPAIR_ES.customer, { bold: true });
+  b.text(`${doc.customerName} · ${doc.customerPhone}`);
+
+  /* the device, short: the intake receipt carries the full condition record */
+  b.rule();
+  b.text(REPAIR_ES.device, { bold: true });
+  b.text(doc.device.description);
+  if (doc.device.imei) b.text(`${REPAIR_ES.imei} ${doc.device.imei}`);
+  b.text(`${REPAIR_ES.fault}: ${doc.device.reportedFault}`);
+
+  /* ---- what it costs ---- */
+  b.rule();
+  b.text(REPAIR_ES.quoteLines, { bold: true });
+  for (const line of doc.lines) {
+    // the quantity only earns a place when it is not one
+    const label = line.qty === 1 ? line.description : `${line.qty} × ${line.description}`;
+    b.pair(label, formatCents(line.chargeCents));
+    if (line.onOrder) b.text(`  (${REPAIR_ES.quoteOnOrder})`);
+  }
+  b.rule();
+  b.pair(REPAIR_ES.quoteTotal, formatCents(doc.totalCents), { bold: true });
+  if (doc.depositCents > 0) {
+    b.pair(REPAIR_ES.quoteDeposit, `-${formatCents(doc.depositCents)}`);
+    // never below zero on paper: a deposit larger than the quote is money owed
+    // back at hand-back, not a negative amount to hand a customer now
+    b.pair(REPAIR_ES.quoteToPay, formatCents(Math.max(0, doc.totalCents - doc.depositCents)), { bold: true });
+  }
+
+  b.rule();
+  b.text(REPAIR_ES.quoteValidity);
+
+  /* An approval only stands while it still covers the total. Once the quote
+     grows past it the ticket falls back to Presupuestado on screen, and this
+     sheet has to do the same — it is the thing being put back in front of the
+     customer to sign for the NEW number. */
+  const approvalStands = doc.approval !== null && doc.approval.approvedTotalCents >= doc.totalCents;
+
+  if (doc.approval && approvalStands) {
+    /* already agreed: the paper records it rather than asking again */
+    b.feed(1);
+    b.text(letterSpaced(REPAIR_ES.quoteApproved, cols), { align: "center", bold: true });
+    b.text(
+      REPAIR_ES.quoteApprovedBy
+        .replace(
+          "{method}",
+          doc.approval.method === "in_person" ? REPAIR_ES.quoteInPerson : REPAIR_ES.quoteByPhone,
+        )
+        .replace("{date}", formatPrintDate(doc.approval.atMs)),
+      { align: "center" },
+    );
+  } else {
+    b.feed(1);
+    b.text(REPAIR_ES.quoteAccept);
+    b.feed(2);
+    b.text(REPAIR_ES.signature);
+    b.feed(3);
+    b.raw(`${REPAIR_ES.signatureRule} ${"_".repeat(Math.max(0, cols - 2))}`);
+  }
 
   b.rule();
   b.text(REPAIR_ES.thanks, { align: "center" });

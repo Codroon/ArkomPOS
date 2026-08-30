@@ -22,7 +22,7 @@
  *   6. unit lifecycle: sold units carry their document, IMEIs valid and unique
  *   7. product codes: no code twice on one product
  */
-import { isValidImei } from "@arkom/core";
+import { isValidImei, repairStatus } from "@arkom/core";
 import { openDb } from "@arkom/db";
 
 const dbPath = process.env.ARKOM_DB_PATH!;
@@ -289,6 +289,60 @@ check(
   )[0]!.n > 0
     ? ["a product holds one code more than once"]
     : [],
+);
+
+/* 8. repair status is derived, not asserted (ADR-0014 §1) ---------------- */
+/*
+   The status column is a CACHE of what the ticket's own facts say, exactly as
+   product_stock caches the movement ledger. Nothing may write it except
+   syncStatus(), so a row where the two disagree means some path found a way to
+   assert a state the facts do not support — which is the failure that whole
+   design exists to make impossible. Same reasoning as check 1.
+*/
+interface AuditTicket {
+  id: string;
+  doc_number: string | null;
+  status: string;
+  authorized_cap_cents: number | null;
+  ready_at: number | null;
+  collection_document_id: string | null;
+  not_repaired_at: number | null;
+  not_repaired_reason: string | null;
+}
+const asDate = (v: number | null): Date | null => (v === null ? null : new Date(v));
+
+check(
+  "repair status equals what its facts derive",
+  q<AuditTicket>(
+    `SELECT t.id, d.doc_number, t.status, t.authorized_cap_cents, t.ready_at,
+            t.collection_document_id, t.not_repaired_at, t.not_repaired_reason
+       FROM repair_tickets t LEFT JOIN documents d ON d.id = t.document_id`,
+  ).flatMap((t) => {
+    const lines = q<{ kind: string; charge_cents: number; qty: number; received_at: number | null }>(
+      "SELECT kind, charge_cents, qty, received_at FROM repair_lines WHERE ticket_id = ?",
+      t.id,
+    ).map((l) => ({
+      kind: l.kind as "inventory_part" | "labor" | "part_on_order",
+      chargeCents: l.charge_cents,
+      qty: l.qty,
+      receivedAt: asDate(l.received_at),
+    }));
+    const approvals = q<{ approved_total_cents: number; created_at: number }>(
+      "SELECT approved_total_cents, created_at FROM repair_approvals WHERE ticket_id = ?",
+      t.id,
+    ).map((a) => ({ approvedTotalCents: a.approved_total_cents, createdAt: new Date(a.created_at) }));
+
+    const derived = repairStatus({
+      lines,
+      approvals,
+      authorizedCapCents: t.authorized_cap_cents,
+      readyAt: asDate(t.ready_at),
+      collectionDocumentId: t.collection_document_id,
+      notRepairedAt: asDate(t.not_repaired_at),
+      notRepairedReason: t.not_repaired_reason as never,
+    });
+    return derived === t.status ? [] : [`${t.doc_number ?? t.id}: guardado ${t.status}, derivado ${derived}`];
+  }),
 );
 
 console.log(`Auditoría de ${dbPath}\n`);
