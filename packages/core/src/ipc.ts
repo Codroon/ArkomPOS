@@ -82,6 +82,13 @@ export const IPC_CHANNELS = [
   "repair:recordApproval",
   "repair:receivePart",
   "repair:partsToOrder",
+  "repair:list",
+  "repair:photos",
+  "repair:revealPasscode",
+  "repair:edit",
+  "repair:assign",
+  "repair:peek",
+  "workshop:board",
   "repair:print",
 ] as const;
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
@@ -764,7 +771,7 @@ export const BackupPickFolderResponseSchema = z.object({ path: z.string().nullab
 
 /* ------------------------------------------------------ auth (ADR-0012) --- */
 
-export const RoleSchema = z.enum(["owner", "cashier"]);
+export const RoleSchema = z.enum(["owner", "cashier", "technician"]);
 
 /** A PIN in flight. Never stored in a state object, never echoed back. */
 export const PinSchema = z.string().regex(/^\d{4,6}$/, "El PIN debe tener entre 4 y 6 dígitos.");
@@ -1521,6 +1528,139 @@ export type OrderedPartRow = z.infer<typeof OrderedPartRowSchema>;
 
 export const RepairPartsToOrderRequestSchema = z.object({}).optional();
 export const RepairPartsToOrderResponseSchema = z.object({ rows: z.array(OrderedPartRowSchema) });
+
+/* ---- the list ---- */
+
+export const RepairListRowSchema = z.object({
+  ticketId: z.string(),
+  docNumber: z.string(),
+  status: RepairStatusSchema,
+  customerName: z.string(),
+  customerPhone: z.string(),
+  deviceDescription: z.string(),
+  imei: z.string().nullable(),
+  reportedFault: z.string(),
+  technicianName: z.string().nullable(),
+  promisedAt: z.number().int().nullable(),
+  promisedHalf: PromisedHalfSchema.nullable(),
+  createdAt: z.number().int(),
+  /** whole days since the device came in — the column a shop actually scans */
+  daysOpen: z.number().int(),
+  overdue: z.boolean(),
+  quoteTotalCents: z.number().int(),
+});
+export type RepairListRow = z.infer<typeof RepairListRowSchema>;
+
+export const RepairListRequestSchema = z
+  .object({
+    status: RepairStatusSchema.nullish(),
+    technicianId: z.string().nullish(),
+    /** the literal "none" asks for the unassigned ones, which is a real filter */
+    unassignedOnly: z.boolean().nullish(),
+    overdueOnly: z.boolean().nullish(),
+    search: z.string().trim().max(80).nullish(),
+  })
+  .optional();
+
+export const RepairListResponseSchema = z.object({
+  rows: z.array(RepairListRowSchema),
+  /** over EVERYTHING, whatever the filter — otherwise the strip is a maze */
+  counts: z.record(RepairStatusSchema, z.number().int()),
+  openCount: z.number().int(),
+});
+
+/* ---- photos, fetched once when the ficha opens ---- */
+
+export const RepairPhotosRequestSchema = z.object({ ticketId: z.string() });
+export const RepairPhotosResponseSchema = z.object({
+  photos: z.array(z.object({ id: z.string(), kind: PhotoKindSchema, dataUrl: z.string() })),
+});
+
+/**
+ * Looking at the passcode.
+ *
+ * Returns nothing but `ok`: the value already travelled down with the ficha, and
+ * a channel that returns it again would be a second place to leak it from. What
+ * this call is FOR is the oplog entry — who looked, and when. The reveal is the
+ * record (ADR-0014 §10).
+ */
+export const RepairRevealPasscodeRequestSchema = z.object({ ticketId: z.string() });
+export const RepairRevealPasscodeResponseSchema = z.object({ ok: z.boolean() });
+
+/* ---- editing what was taken down at the counter ---- */
+
+export const RepairEditRequestSchema = z.object({
+  ticketId: z.string(),
+  deviceDescription: z.string().trim().min(1).max(200).optional(),
+  imei: z.string().trim().max(20).nullish(),
+  reportedFault: z.string().trim().min(1).max(500).optional(),
+  conditionAtIntake: z.string().trim().max(500).nullish(),
+  damage: RepairDamageSchema.optional(),
+  damageNote: z.string().trim().max(300).nullish(),
+  accessories: z.string().trim().max(200).nullish(),
+  devicePasscode: z.string().max(80).nullish(),
+  promisedDate: z.number().int().nullish(),
+  promisedHalf: PromisedHalfSchema.nullish(),
+});
+
+export const RepairAssignRequestSchema = z.object({
+  ticketId: z.string(),
+  /** null is *Sin asignar*, which is a state and not an absence */
+  userId: z.string().nullable(),
+});
+
+/* ---- the board ---- */
+
+export const BoardCardSchema = z.object({
+  ticketId: z.string(),
+  docNumber: z.string(),
+  deviceDescription: z.string(),
+  reportedFault: z.string(),
+  customerName: z.string(),
+  technicianName: z.string().nullable(),
+  promisedAt: z.number().int().nullable(),
+  promisedHalf: PromisedHalfSchema.nullable(),
+  overdue: z.boolean(),
+  /** days in the CURRENT status, which is what a board is asking about */
+  daysInStatus: z.number().int(),
+});
+
+export const WorkshopBoardRequestSchema = z
+  .object({ technicianId: z.string().nullish(), unassignedOnly: z.boolean().nullish() })
+  .optional();
+
+export const WorkshopBoardResponseSchema = z.object({
+  columns: z.array(z.object({ status: RepairStatusSchema, cards: z.array(BoardCardSchema) })),
+  openCount: z.number().int(),
+});
+export type WorkshopBoard = z.infer<typeof WorkshopBoardResponseSchema>;
+
+/* ---- the peek, for the Documento link on a repair_part_out movement ---- */
+
+export const RepairPeekRequestSchema = z.object({ ticketId: z.string() });
+export const RepairPeekSchema = z.object({
+  ticketId: z.string(),
+  docNumber: z.string(),
+  status: RepairStatusSchema,
+  createdAt: z.number().int(),
+  customerName: z.string(),
+  customerPhone: z.string(),
+  deviceDescription: z.string(),
+  imei: z.string().nullable(),
+  reportedFault: z.string(),
+  technicianName: z.string().nullable(),
+  lines: z.array(
+    z.object({
+      kind: RepairLineKindSchema,
+      description: z.string(),
+      qty: z.number().int(),
+      chargeCents: z.number().int(),
+    }),
+  ),
+  totalCents: z.number().int(),
+  depositCents: z.number().int(),
+});
+export type RepairPeek = z.infer<typeof RepairPeekSchema>;
 
 export const RepairPrintResponseSchema = PrintTicketResponseSchema;
 export type RepairPrintRequest = z.infer<typeof RepairPrintRequestSchema>;

@@ -10,6 +10,7 @@ export type ScreenId =
   | "comprarUsados"
   | "dispositivosUsados"
   | "reparaciones"
+  | "taller"
   | "ajustes"
   | "usuarios";
 
@@ -50,6 +51,20 @@ export function consumeCatalogPrefill(): string | null {
 export function openSaleWithVoucher(voucher: { id: string; docNumber: string; amountCents: number }): void {
   pendingVoucher = voucher;
   navigateTo("venta");
+}
+
+/** A ticket to open on Reparaciones — from the board, or from Inventario. */
+let pendingRepairTicket: string | null = null;
+
+export function openRepairTicket(ticketId: string): void {
+  pendingRepairTicket = ticketId;
+  navigateTo("reparaciones");
+}
+
+export function consumeRepairTarget(): string | null {
+  const id = pendingRepairTicket;
+  pendingRepairTicket = null;
+  return id;
 }
 
 export function consumePendingVoucher(): { id: string; docNumber: string; amountCents: number } | null {

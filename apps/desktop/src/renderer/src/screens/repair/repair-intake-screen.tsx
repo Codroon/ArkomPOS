@@ -85,7 +85,7 @@ function dateToMs(value: string): number | null {
   return new Date(y, m - 1, d).getTime();
 }
 
-export function RepairIntakeScreen() {
+export function RepairIntakeScreen({ onDone }: { onDone: (ticketId: string | null) => void }) {
   const t = useT();
   const hasCamera = useHasCamera();
   const printer = useTicketPrint();
@@ -181,6 +181,7 @@ export function RepairIntakeScreen() {
         <Chip>{t("rep.provisional")}</Chip>
         <div className="text-[11px] text-subtle">{t("rep.provisionalHint")}</div>
         <div className="flex-1" />
+        <GhostButton onClick={() => onDone(created?.ticketId ?? null)}>{t("common.cancel")}</GhostButton>
       </div>
 
       <div className="flex min-h-0 flex-1 gap-4 overflow-y-auto px-4 py-3">
@@ -424,6 +425,9 @@ export function RepairIntakeScreen() {
                 <AccentButton className="flex-1" onClick={startOver}>
                   {t("rep.another")}
                 </AccentButton>
+                <GhostButton className="flex-1" onClick={() => onDone(created.ticketId)}>
+                  {t("rep.openTicket")}
+                </GhostButton>
               </div>
             </div>
           ) : (

@@ -113,12 +113,13 @@ export function permissionLabelEs(key: string): string {
 
 /* ---------------------------------------------------------------- roles */
 
-export const ROLES = ["owner", "cashier"] as const;
+export const ROLES = ["owner", "cashier", "technician"] as const;
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_LABELS_ES: Record<Role, string> = {
   owner: "Responsable",
   cashier: "Cajero",
+  technician: "Técnico",
 };
 
 /**
@@ -163,9 +164,38 @@ export const CASHIER_DEFAULTS: readonly PermissionKey[] = [
   "workshop.view",
 ];
 
+/**
+ * The workshop, not the counter.
+ *
+ * A technician works on devices: they quote, fit parts, mark things ready and
+ * hand them back. They do not sell — `sale.create` is absent, which is the whole
+ * difference from a cashier — and two repair permissions are withheld for the
+ * reason ADR-0012 gave itself: **receiving stock is how a part gets quietly
+ * written off**, and **closing a ticket as unrepairable moves money**. Both are
+ * grantable per person; neither is a default.
+ *
+ * `repair.price_override` is absent from every role but owner because it is
+ * approvable: the technician presses the button and an owner's PIN completes it.
+ */
+export const TECHNICIAN_DEFAULTS: readonly PermissionKey[] = [
+  "catalog.view",
+  "inventory.view",
+  "repair.view",
+  "repair.create",
+  "repair.edit",
+  "repair.quote.set",
+  "repair.quote.approve",
+  "repair.parts.manage",
+  "repair.assign",
+  "repair.markReady",
+  "repair.collect",
+  "workshop.view",
+];
+
 const ROLE_DEFAULTS: Record<Role, readonly PermissionKey[] | "all"> = {
   owner: "all",
   cashier: CASHIER_DEFAULTS,
+  technician: TECHNICIAN_DEFAULTS,
 };
 
 export function isRole(value: string): value is Role {

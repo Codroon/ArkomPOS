@@ -7,7 +7,7 @@
  * whatever transaction just changed one, the way `product_stock` is rewritten
  * beside the movement that moved it.
  */
-import { and, asc, desc, eq, isNull, like, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, like, or, sql } from "drizzle-orm";
 import {
   allocateNumber,
   appError,
@@ -23,6 +23,7 @@ import {
   needsPriceOverride,
   normalizePhone,
   quoteTotalCents,
+  REPAIR_STATUSES,
   repairStatus,
   ticketMargin,
   toOplogJson,
@@ -36,11 +37,14 @@ import {
   type RepairCreateResponse,
   type RepairDetail,
   type RepairFacts,
+  type RepairListRow,
+  type RepairPeek,
   type RepairStatus,
+  type WorkshopBoard,
 } from "@arkom/core";
 import { schema, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner, type DbTx } from "../mutate-runner";
-import { saveRepairPhotos, discardRepairPhotos } from "../photos";
+import { saveRepairPhotos, discardRepairPhotos, readPhotos } from "../photos";
 import { postMovement } from "./stock-ledger";
 import { getSettings } from "./settings";
 
@@ -1128,4 +1132,333 @@ export function lineChargeNeedsOverride(
     { lines: [], approvals, authorizedCapCents: null, readyAt: null, collectionDocumentId: null, notRepairedAt: null, notRepairedReason: null },
     { lineId: input.lineId, fromCents: line.chargeCents, toCents: input.chargeCents },
   );
+}
+
+/* ------------------------------------------------------------- the list */
+
+/** Everything a list or a board row needs, in one query. */
+function ticketRows(db: Reader, ctx: MutationCtx) {
+  return db
+    .select({
+      ticket: repairTickets,
+      docNumber: documents.docNumber,
+      customerName: customers.name,
+      customerPhone: customers.phone,
+      technicianName: users.name,
+    })
+    .from(repairTickets)
+    .innerJoin(documents, eq(documents.id, repairTickets.documentId))
+    .innerJoin(customers, eq(customers.id, repairTickets.customerId))
+    .leftJoin(users, eq(users.id, repairTickets.assignedUserId))
+    .where(eq(repairTickets.tenantId, ctx.tenantId))
+    .orderBy(desc(repairTickets.createdAt))
+    .all();
+}
+
+/** Quote totals for many tickets at once, so the list is not N+1 queries. */
+function totalsByTicket(db: Reader, ticketIds: string[]): Map<string, number> {
+  const out = new Map<string, number>();
+  if (ticketIds.length === 0) return out;
+  for (const row of db
+    .select({ ticketId: repairLines.ticketId, total: sql<number>`sum(${repairLines.chargeCents})` })
+    .from(repairLines)
+    .where(inArray(repairLines.ticketId, ticketIds))
+    .groupBy(repairLines.ticketId)
+    .all()) {
+    out.set(row.ticketId, row.total ?? 0);
+  }
+  return out;
+}
+
+const wholeDays = (from: Date, to: Date): number =>
+  Math.max(0, Math.floor((to.getTime() - from.getTime()) / DAY_MS));
+
+export interface RepairListFilters {
+  status?: RepairStatus | null;
+  technicianId?: string | null;
+  unassignedOnly?: boolean | null;
+  overdueOnly?: boolean | null;
+  search?: string | null;
+}
+
+/**
+ * The Reparaciones list.
+ *
+ * The counts are computed over EVERYTHING before the filters are applied, for
+ * the reason Dispositivos usados gives: a strip whose numbers shrink as you use
+ * it stops being a way to navigate and becomes a maze.
+ */
+export function listTickets(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  filters: RepairListFilters = {},
+  now: Date = new Date(),
+): { rows: RepairListRow[]; counts: Record<RepairStatus, number>; openCount: number } {
+  const all = ticketRows(db, ctx);
+  const totals = totalsByTicket(db, all.map((r) => r.ticket.id));
+
+  const mapped: RepairListRow[] = all.map((r) => ({
+    ticketId: r.ticket.id,
+    docNumber: r.docNumber ?? "",
+    status: r.ticket.status,
+    customerName: r.customerName,
+    customerPhone: r.customerPhone,
+    deviceDescription: r.ticket.deviceDescription,
+    imei: r.ticket.imei,
+    reportedFault: r.ticket.reportedFault,
+    technicianName: r.technicianName,
+    promisedAt: r.ticket.promisedDate?.getTime() ?? null,
+    promisedHalf: r.ticket.promisedHalf,
+    createdAt: r.ticket.createdAt.getTime(),
+    daysOpen: wholeDays(r.ticket.createdAt, now),
+    overdue: isOverdue(r.ticket.promisedDate, r.ticket.status, now),
+    quoteTotalCents: totals.get(r.ticket.id) ?? 0,
+  }));
+
+  const counts = Object.fromEntries(REPAIR_STATUSES.map((st) => [st, 0])) as Record<RepairStatus, number>;
+  for (const row of mapped) counts[row.status] += 1;
+  const openCount = mapped.filter((r) => !isTerminal(r.status)).length;
+
+  const term = filters.search?.trim().toLowerCase() ?? "";
+  const rows = mapped.filter((row) => {
+    if (filters.status && row.status !== filters.status) return false;
+    if (filters.unassignedOnly && row.technicianName !== null) return false;
+    if (filters.technicianId) {
+      const assigned = all.find((r) => r.ticket.id === row.ticketId)!.ticket.assignedUserId;
+      if (assigned !== filters.technicianId) return false;
+    }
+    if (filters.overdueOnly && !row.overdue) return false;
+    if (term) {
+      // number, customer, phone, IMEI, device — the five things someone at the
+      // counter has in front of them
+      const hay = [
+        row.docNumber,
+        row.customerName,
+        row.customerPhone,
+        row.imei ?? "",
+        row.deviceDescription,
+      ]
+        .join(" ")
+        .toLowerCase();
+      if (!hay.includes(term)) return false;
+    }
+    return true;
+  });
+
+  return { rows, counts, openCount };
+}
+
+/**
+ * The Taller board.
+ *
+ * Seven columns in status order. "Days in status" comes from `updated_at`,
+ * which syncStatus() touches on every transition — so the number answers "how
+ * long has this been sitting HERE", which is the only question a board asks.
+ */
+export function board(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  filters: { technicianId?: string | null; unassignedOnly?: boolean | null } = {},
+  now: Date = new Date(),
+): WorkshopBoard {
+  const all = ticketRows(db, ctx).filter((r) => {
+    if (filters.unassignedOnly && r.ticket.assignedUserId !== null) return false;
+    if (filters.technicianId && r.ticket.assignedUserId !== filters.technicianId) return false;
+    return true;
+  });
+
+  return {
+    columns: REPAIR_STATUSES.map((status) => ({
+      status,
+      cards: all
+        .filter((r) => r.ticket.status === status)
+        .map((r) => ({
+          ticketId: r.ticket.id,
+          docNumber: r.docNumber ?? "",
+          deviceDescription: r.ticket.deviceDescription,
+          reportedFault: r.ticket.reportedFault,
+          customerName: r.customerName,
+          technicianName: r.technicianName,
+          promisedAt: r.ticket.promisedDate?.getTime() ?? null,
+          promisedHalf: r.ticket.promisedHalf,
+          overdue: isOverdue(r.ticket.promisedDate, r.ticket.status, now),
+          daysInStatus: wholeDays(r.ticket.updatedAt, now),
+        })),
+    })),
+    openCount: all.filter((r) => !isTerminal(r.ticket.status)).length,
+  };
+}
+
+/* ------------------------------------------------------------ the photos */
+
+/** The images, fetched once when the ficha opens. */
+export async function ticketPhotos(db: ArkomDb, ctx: MutationCtx, ticketId: string) {
+  const rows = db
+    .select({ id: repairPhotos.id, kind: repairPhotos.kind, path: repairPhotos.path })
+    .from(repairPhotos)
+    .where(and(eq(repairPhotos.tenantId, ctx.tenantId), eq(repairPhotos.ticketId, ticketId)))
+    .orderBy(asc(repairPhotos.createdAt))
+    .all();
+  return readPhotos(rows);
+}
+
+/* --------------------------------------------------------- the passcode */
+
+/**
+ * Record that someone looked at the passcode.
+ *
+ * Writes an oplog entry and returns nothing else. The VALUE is not here and
+ * never will be: it already travelled down with the ficha, and a second channel
+ * carrying it would be a second place to leak it from. What this call exists for
+ * is the entry — who looked, and when (ADR-0014 §10).
+ */
+export function revealPasscode(db: ArkomDb, ctx: MutationCtx, ticketId: string): { ok: boolean } {
+  const ticket = getTicketRow(db, ctx, ticketId);
+  return mutate(makeMutateRunner(db), ctx, (_tx, log) => {
+    log({
+      entity: "repair_ticket",
+      entityId: ticket.ticket.id,
+      action: "reveal_passcode",
+      before: null,
+      // no value, in either half of the entry. The fact of looking is the record.
+      after: { docNumber: ticket.docNumber },
+    });
+    return { ok: true };
+  });
+}
+
+/* ------------------------------------------------------------- editing */
+
+/**
+ * Correct what was taken down at the counter.
+ *
+ * Only the intake fields: a misheard IMEI, a fault the customer described better
+ * on the phone an hour later, a promise moved to Thursday. Money and status are
+ * not here — those move by recording facts, not by editing a form.
+ */
+export function editTicket(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  input: {
+    ticketId: string;
+    deviceDescription?: string;
+    imei?: string | null;
+    reportedFault?: string;
+    conditionAtIntake?: string | null;
+    damage?: { screen: boolean; back: boolean; dents: boolean; water: boolean };
+    damageNote?: string | null;
+    accessories?: string | null;
+    devicePasscode?: string | null;
+    promisedDate?: number | null;
+    promisedHalf?: "morning" | "afternoon" | null;
+  },
+): RepairDetail {
+  return mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    const before = liveTicket(tx, ctx, input.ticketId);
+
+    const imei = input.imei === undefined ? undefined : input.imei?.trim() || null;
+    if (imei && !isValidImei(imei)) throw appError("VALIDATION", "El IMEI no es válido.", "imei");
+
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    if (input.deviceDescription !== undefined) patch.deviceDescription = input.deviceDescription;
+    if (imei !== undefined) patch.imei = imei;
+    if (input.reportedFault !== undefined) patch.reportedFault = input.reportedFault;
+    if (input.conditionAtIntake !== undefined) patch.conditionAtIntake = input.conditionAtIntake ?? null;
+    if (input.damage !== undefined) {
+      patch.damageScreen = input.damage.screen;
+      patch.damageBack = input.damage.back;
+      patch.damageDents = input.damage.dents;
+      patch.damageWater = input.damage.water;
+    }
+    if (input.damageNote !== undefined) patch.damageNote = input.damageNote ?? null;
+    if (input.accessories !== undefined) patch.accessories = input.accessories ?? null;
+    if (input.devicePasscode !== undefined) patch.devicePasscode = input.devicePasscode?.trim() || null;
+    if (input.promisedDate !== undefined) {
+      patch.promisedDate = input.promisedDate ? new Date(input.promisedDate) : null;
+    }
+    if (input.promisedHalf !== undefined) patch.promisedHalf = input.promisedHalf ?? null;
+
+    tx.update(repairTickets).set(patch).where(eq(repairTickets.id, before.id)).run();
+    const after = tx.select().from(repairTickets).where(eq(repairTickets.id, before.id)).all()[0]!;
+
+    // the passcode is stripped from BOTH halves: an update entry that carried
+    // the old value would leak it just as surely as one carrying the new
+    log({
+      entity: "repair_ticket",
+      entityId: before.id,
+      action: "update",
+      before: { ...toOplogJson({ ...before, devicePasscode: undefined }), hasPasscode: Boolean(before.devicePasscode) },
+      after: { ...toOplogJson({ ...after, devicePasscode: undefined }), hasPasscode: Boolean(after.devicePasscode) },
+    });
+
+    syncStatus(tx, before.id, log);
+    return getDetail(tx, ctx, before.id);
+  });
+}
+
+/** Hand the ticket to someone — or to nobody, which is a visible state. */
+export function assignTicket(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  ticketId: string,
+  userId: string | null,
+): RepairDetail {
+  return mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    const ticket = liveTicket(tx, ctx, ticketId);
+    if (userId) {
+      const exists = tx
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.tenantId, ctx.tenantId), eq(users.id, userId)))
+        .limit(1)
+        .all()[0];
+      if (!exists) throw appError("VALIDATION", "Ese usuario no existe.", "userId");
+    }
+    tx.update(repairTickets)
+      .set({ assignedUserId: userId, updatedAt: new Date() })
+      .where(eq(repairTickets.id, ticket.id))
+      .run();
+    log({
+      entity: "repair_ticket",
+      entityId: ticket.id,
+      action: "assign",
+      before: { assignedUserId: ticket.assignedUserId },
+      after: { assignedUserId: userId },
+    });
+    return getDetail(tx, ctx, ticket.id);
+  });
+}
+
+/* --------------------------------------------------------------- peek */
+
+/**
+ * The ticket as the SCREEN shows it, for the Documento link on a
+ * `repair_part_out` movement in Inventario.
+ *
+ * Same idea as the used-purchase peek: someone looking at "where did that screen
+ * go" gets the ficha's own summary, not a monospaced reprint of paper that was
+ * never printed for this. **No passcode** — this is a read for a stock question.
+ */
+export function peekTicket(db: ArkomDb, ctx: MutationCtx, ticketId: string): RepairPeek {
+  const detail = getDetail(db, ctx, ticketId);
+  return {
+    ticketId: detail.id,
+    docNumber: detail.docNumber,
+    status: detail.status,
+    createdAt: detail.createdAt,
+    customerName: detail.customer.name,
+    customerPhone: detail.customer.phone,
+    deviceDescription: detail.device.description,
+    imei: detail.device.imei,
+    reportedFault: detail.device.reportedFault,
+    technicianName: detail.assignedUserName,
+    lines: detail.lines.map((l) => ({
+      kind: l.kind,
+      description: l.description,
+      qty: l.qty,
+      chargeCents: l.chargeCents,
+    })),
+    totalCents: detail.quoteTotalCents,
+    depositCents: detail.depositCents,
+  };
 }

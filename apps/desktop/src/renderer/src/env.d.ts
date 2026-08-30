@@ -36,8 +36,15 @@ import type {
   LoginUser,
   UserRow,
   CustomerRow,
+  OrderedPartRow,
+  RepairAddLineRequest,
   RepairCreateRequest,
   RepairCreateResponse,
+  RepairDetail,
+  RepairListRow,
+  RepairPeek,
+  RepairStatus,
+  WorkshopBoard,
   UsedCheckImeiResponse,
   UsedLogRequest,
   UsedLogResponse,
@@ -196,6 +203,44 @@ declare global {
         payload: { id?: string; name: string; phone: string; note?: string | null },
       ): Promise<CustomerRow>;
       invoke(channel: "repair:create", payload: RepairCreateRequest): Promise<RepairCreateResponse>;
+      invoke(channel: "repair:get", payload: { ticketId: string }): Promise<RepairDetail>;
+      invoke(channel: "repair:addLine", payload: RepairAddLineRequest): Promise<RepairDetail>;
+      invoke(channel: "repair:removeLine", payload: { ticketId: string; lineId: string }): Promise<RepairDetail>;
+      invoke(
+        channel: "repair:setLineCharge",
+        payload: { ticketId: string; lineId: string; chargeCents: number; reason?: string | null },
+      ): Promise<RepairDetail>;
+      invoke(
+        channel: "repair:recordApproval",
+        payload: { ticketId: string; method: "in_person" | "by_phone" },
+      ): Promise<RepairDetail>;
+      invoke(
+        channel: "repair:receivePart",
+        payload: { ticketId: string; lineId: string; unitCostCents: number; qty: number; productId?: string | null },
+      ): Promise<RepairDetail>;
+      invoke(channel: "repair:partsToOrder", payload?: undefined): Promise<{ rows: OrderedPartRow[] }>;
+      invoke(
+        channel: "repair:list",
+        payload?: {
+          status?: RepairStatus | null;
+          technicianId?: string | null;
+          unassignedOnly?: boolean | null;
+          overdueOnly?: boolean | null;
+          search?: string | null;
+        },
+      ): Promise<{ rows: RepairListRow[]; counts: Record<RepairStatus, number>; openCount: number }>;
+      invoke(
+        channel: "repair:photos",
+        payload: { ticketId: string },
+      ): Promise<{ photos: Array<{ id: string; kind: string; dataUrl: string }> }>;
+      invoke(channel: "repair:revealPasscode", payload: { ticketId: string }): Promise<{ ok: boolean }>;
+      invoke(channel: "repair:edit", payload: Record<string, unknown> & { ticketId: string }): Promise<RepairDetail>;
+      invoke(channel: "repair:assign", payload: { ticketId: string; userId: string | null }): Promise<RepairDetail>;
+      invoke(channel: "repair:peek", payload: { ticketId: string }): Promise<RepairPeek>;
+      invoke(
+        channel: "workshop:board",
+        payload?: { technicianId?: string | null; unassignedOnly?: boolean | null },
+      ): Promise<WorkshopBoard>;
       invoke(
         channel: "repair:print",
         payload: { ticketId: string; what: "intake" | "quote" | "receipt" | "return"; copy?: boolean; target?: "auto" | "pdf" },

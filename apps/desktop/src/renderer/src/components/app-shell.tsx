@@ -15,7 +15,8 @@ import { InventoryScreen } from "../screens/inventory/inventory-screen";
 import { SaleScreen } from "../screens/sale/sale-screen";
 import { BuyUsedScreen } from "../screens/used/buy-used-screen";
 import { UsedDevicesScreen } from "../screens/used/used-devices-screen";
-import { RepairIntakeScreen } from "../screens/repair/repair-intake-screen";
+import { RepairsScreen } from "../screens/repair/repairs-screen";
+import { WorkshopScreen } from "../screens/repair/workshop-screen";
 import { SettingsScreen } from "../screens/settings/settings-screen";
 import { UsersScreen } from "../screens/users/users-screen";
 
@@ -30,8 +31,8 @@ const NAV_ITEMS: ReadonlyArray<{ n: string; labelKey: TKey; id?: ScreenId; needs
   { n: "03", labelKey: "nav.inventario", id: "inventario" },
   { n: "04", labelKey: "nav.compraUsados", id: "comprarUsados", needs: "usedDevices.create" },
   { n: "05", labelKey: "nav.unidadUsada", id: "dispositivosUsados", needs: "usedDevices.create" },
-  { n: "06", labelKey: "nav.reparacion", id: "reparaciones", needs: "repair.create" },
-  { n: "07", labelKey: "nav.taller" },
+  { n: "06", labelKey: "nav.reparacion", id: "reparaciones", needs: "repair.view" },
+  { n: "07", labelKey: "nav.taller", id: "taller", needs: "workshop.view" },
   { n: "08", labelKey: "nav.transferencias" },
   { n: "09", labelKey: "nav.caja" },
   { n: "10", labelKey: "nav.informes" },
@@ -218,7 +219,9 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
           ) : screen === "dispositivosUsados" ? (
             <UsedDevicesScreen key={navTick} />
           ) : screen === "reparaciones" ? (
-            <RepairIntakeScreen key={navTick} />
+            <RepairsScreen key={navTick} />
+          ) : screen === "taller" ? (
+            <WorkshopScreen key={navTick} />
           ) : screen === "ajustes" ? (
             <SettingsScreen />
           ) : screen === "usuarios" ? (

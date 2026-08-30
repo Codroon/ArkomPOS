@@ -129,7 +129,25 @@ describe("role defaults", () => {
 
   it("recognises its own roles", () => {
     for (const r of ROLES) expect(isRole(r)).toBe(true);
-    expect(isRole("technician")).toBe(false); // sketched in the ADR, not registered yet
+    expect(isRole("manager")).toBe(false); // sketched nowhere; must fail closed
+  });
+
+  /**
+   * The technician, added by the repairs slice (ADR-0014).
+   *
+   * What they are NOT allowed is the interesting half: they do not sell, they do
+   * not receive stock, and they do not close a ticket as unrepairable — the last
+   * two for the reason ADR-0012 gave itself about who may make stock and money
+   * disappear.
+   */
+  it("gives a technician the workshop and not the till", () => {
+    const tech = { role: "technician" };
+    for (const key of ["repair.view", "repair.quote.set", "repair.parts.manage", "repair.markReady", "workshop.view"] as const) {
+      expect(can(tech, key), key).toBe(true);
+    }
+    for (const key of ["sale.create", "repair.parts.receive", "repair.markNotRepaired", "repair.price_override", "users.manage"] as const) {
+      expect(can(tech, key), key).toBe(false);
+    }
   });
 });
 
@@ -180,7 +198,7 @@ describe("edge cases", () => {
 
   it("denies everything to an unknown role with no overrides", () => {
     // a role removed from the registry must fail closed, not open
-    const ghost = { role: "technician" };
+    const ghost = { role: "manager" };
     for (const p of PERMISSIONS) expect(can(ghost, p.key), p.key).toBe(false);
   });
 

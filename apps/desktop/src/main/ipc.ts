@@ -170,6 +170,18 @@ import {
   RepairReceivePartRequestSchema,
   RepairPartsToOrderRequestSchema,
   RepairPartsToOrderResponseSchema,
+  RepairListRequestSchema,
+  RepairListResponseSchema,
+  RepairPhotosRequestSchema,
+  RepairPhotosResponseSchema,
+  RepairRevealPasscodeRequestSchema,
+  RepairRevealPasscodeResponseSchema,
+  RepairEditRequestSchema,
+  RepairAssignRequestSchema,
+  RepairPeekRequestSchema,
+  RepairPeekSchema,
+  WorkshopBoardRequestSchema,
+  WorkshopBoardResponseSchema,
   type MutationCtx,
   type PermissionKey,
 } from "@arkom/core";
@@ -194,7 +206,14 @@ import {
 } from "./repos/used";
 import {
   addLine as addRepairLine,
+  assignTicket,
+  board,
   createTicket,
+  editTicket,
+  listTickets,
+  peekTicket,
+  revealPasscode,
+  ticketPhotos,
   getDetail,
   lineChargeNeedsOverride,
   partsToOrder,
@@ -946,6 +965,45 @@ export function registerIpcHandlers(db: ArkomDb): void {
     RepairPartsToOrderRequestSchema,
     RepairPartsToOrderResponseSchema,
     (s) => ({ rows: partsToOrder(db, s.ctx) }),
+  );
+
+  guarded("repair:list", "repair.view", RepairListRequestSchema, RepairListResponseSchema, (s, input) =>
+    listTickets(db, s.ctx, input ?? {}),
+  );
+
+  guarded("repair:photos", "repair.view", RepairPhotosRequestSchema, RepairPhotosResponseSchema, async (s, input) => ({
+    photos: await ticketPhotos(db, s.ctx, input.ticketId),
+  }));
+
+  /**
+   * Looking at the passcode.
+   *
+   * Returns only `ok` — the value came down with the ficha, and a channel that
+   * returned it again would be a second place to leak it from. The point of the
+   * call is the oplog entry it writes: who looked, and when (ADR-0014 §10).
+   */
+  guarded(
+    "repair:revealPasscode",
+    "repair.view",
+    RepairRevealPasscodeRequestSchema,
+    RepairRevealPasscodeResponseSchema,
+    (s, { ticketId }) => revealPasscode(db, s.ctx, ticketId),
+  );
+
+  guarded("repair:edit", "repair.edit", RepairEditRequestSchema, RepairDetailSchema, (s, input) =>
+    editTicket(db, s.ctx, input),
+  );
+
+  guarded("repair:assign", "repair.assign", RepairAssignRequestSchema, RepairDetailSchema, (s, { ticketId, userId }) =>
+    assignTicket(db, s.ctx, ticketId, userId),
+  );
+
+  guarded("repair:peek", "repair.view", RepairPeekRequestSchema, RepairPeekSchema, (s, { ticketId }) =>
+    peekTicket(db, s.ctx, ticketId),
+  );
+
+  guarded("workshop:board", "workshop.view", WorkshopBoardRequestSchema, WorkshopBoardResponseSchema, (s, input) =>
+    board(db, s.ctx, input ?? {}),
   );
 
   guarded("repair:print", "repair.view", RepairPrintRequestSchema, RepairPrintResponseSchema, (s, input) =>
