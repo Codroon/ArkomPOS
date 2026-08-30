@@ -158,6 +158,67 @@ the document's taxable base and the printed IVA breakdown. Redemption flips the 
 inside the sale's completion transaction under a conditional update, so a double redemption
 is impossible rather than unlikely.
 
+### 4.3 Repairs (ADR-0014)
+
+Every channel is `guarded()`. **No channel accepts a status**: each one records a fact, and
+`repairStatus()` derives the status from the facts in the same transaction (ADR-0014 §1).
+
+| Channel | Payload → Result | Notes |
+|---|---|---|
+| `customer:search` | {query} → CustomerRow[] | `repair.view`. Matches name or normalized phone |
+| `customer:upsert` | {id?, name, phone, note?} → CustomerRow | `repair.create`. Find-or-create deduped on `phone_normalized`; returns the existing row rather than a second one |
+| `repair:create` | IntakeInput{customer, device, imei?, fault, condition, damage, accessories?, passcode?, photos[]{kind,dataUrl}, promisedDate?, promisedHalf?, depositCents?, authorizedCapCents?} → {ticketId, docNumber} | `repair.create`. ONE transaction: `repair` document + `R-` number (ADR-0008) + `repair_tickets` + photos + optional `cash_movements` deposit + oplog. Snapshots `diagnosis_fee_cents` and `warranty_months` from settings. **The passcode is never in the oplog payload** |
+| `repair:list` | {status?, technicianId?, overdueOnly?, search?} → {rows, counts} | `repair.view`. Counts are over everything regardless of filter. Carries no passcode |
+| `repair:get` | {ticketId} → RepairDetail | `repair.view`. Includes the passcode (the technician needs it) — masked in the UI, absent from every print and oplog payload |
+| `repair:revealPasscode` | {ticketId} → {ok} | `repair.view`. Oplogs WHO revealed it and no value; the reveal itself is the record |
+| `repair:edit` | {ticketId, …fields} → RepairDetail | `repair.edit`. Device/fault/condition/promised/passcode/accessories |
+| `repair:assign` | {ticketId, userId\|null} → RepairDetail | `repair.assign`. Null = *Sin asignar*, a visible state |
+| `repair:addLine` | {ticketId, kind, …} → RepairDetail | `repair.parts.manage` (labor/ordered) · `repair.parts.manage` + stock effect for `inventory_part`. An inventory part posts **one `repair_part_out`** immediately, carrying the repair document id. A `part_on_order` posts nothing. Serialized products refused |
+| `repair:removeLine` | {ticketId, lineId} → RepairDetail | `repair.parts.manage`. An inventory part posts the **exact reversal** — a second movement, never a delete |
+| `repair:setLineCharge` | {ticketId, lineId, chargeCents} → RepairDetail | `repair.quote.set`. Cost stays snapshotted; only the charge moves |
+| `repair:recordApproval` | {ticketId, method:'in_person'\|'by_phone'} → RepairDetail | `repair.quote.approve`. Captures the CURRENT quote total as the approved total; a row, so re-approvals keep both |
+| `repair:receivePart` | {ticketId, lineId, unitCostCents, qty} → RepairDetail | `repair.parts.receive` (**not** a technician default). Runs the existing stock-entry flow — find-or-create product, stock-in at real cost — then converts the line and posts its consumption. Net: one stock-in, one consumption |
+| `repair:partsToOrder` | {} → OrderedPartRow[] | `repair.view`. Every open ordered line across tickets, oldest first |
+| `repair:markReady` | {ticketId} → RepairDetail | `repair.markReady`. Sets `ready_at`; refuses unless work is authorized and no ordered part is open |
+| `repair:notify` | {ticketId, method, note?} → RepairDetail | `repair.markReady`. Appends to the notified log with the actor. **Sends nothing** — shaped so a Phase 2 cloud job can |
+| `repair:collect` | {ticketId, tenders[]} → {docId, docNumber, changeCents} | `repair.collect`. Creates the collection document as `doc_type='ticket'` in the till's existing series with IVA21 snapshots (ADR-0007), the deposit as a `deposit` tender, and the same change rules as a sale. Zero remainder completes with no tender |
+| `repair:markNotRepaired` | {ticketId, reason, resolutions[]{lineId, action:'return'\|'charge'}, depositAction:'refund'\|'apply_fee', chargeDiagnosisFee} → RepairDetail | `repair.markNotRepaired` (owner, **approvable**). Refuses while any consumed part is unresolved. The fee is refused unless the intake snapshot is non-zero. A refund posts a `cash_movements` row out |
+| `repair:print` | {ticketId, what:'intake'\|'quote'\|'receipt'\|'return', target, copy} → PrintTicketResponse | `repair.view`. No printer ⇒ a PDF with *Abrir*, never a dead end. **No print payload contains the passcode** |
+| `repair:peek` | {ticketId} → RepairPeek | `repair.view`. The ticket as the SCREEN shows it, for the Documento link on a `repair_part_out` movement in Inventario |
+| `workshop:board` | {technicianId?} → {columns[]{status, cards[]}} | `workshop.view`. Cards carry number, device, fault line, technician, days in status, promised, overdue |
+
+**Schema additions** (migration `0007`, all additive):
+
+```
+customers            id · tenant · name · phone · phone_normalized · note · created/updated
+repair_tickets       id · tenant/location/terminal · document_id (1:1, doc_type='repair')
+                     customer_id · device_description · imei? · reported_fault
+                     condition_at_intake · damage_screen/back/dents/water · damage_note
+                     device_passcode?  ← never printed, never oplogged, never logged
+                     accessories? · promised_date? · promised_half?('morning'|'afternoon')
+                     assigned_user_id? · deposit_cents · authorized_cap_cents?
+                     diagnosis_fee_cents (snapshot) · warranty_months (snapshot)
+                     ready_at? · not_repaired_at? · not_repaired_reason?
+                     collection_document_id? · status (CACHE — audited against derived)
+repair_lines         id · tenant · ticket_id · kind('inventory_part'|'labor'|'part_on_order')
+                     product_id? · description · qty · unit_cost_cents? · charge_cents
+                     supplier_text? · expected_cost_cents? · ordered_at? · received_at?
+repair_approvals     id · tenant · ticket_id · method · approved_total_cents · user_id · at
+repair_notifications id · tenant · ticket_id · method · note? · user_id · at
+repair_photos        id · tenant · ticket_id · kind · path (relative to the photos root)
+cash_movements       id · tenant/location/terminal · amount_cents (signed) · reason
+                     document_id? · ticket_id? · user_id · created_at
+```
+
+`documents.doc_type += 'repair'` · `document_tenders.method += 'deposit'` — TypeScript-only,
+no CHECK constraint exists. `units` is untouched: **the customer's device is never inventory**
+(ADR-0014 §3). `MOVEMENT_TYPES.repair_part_out` and `LINE_TYPES.repair` were parked in the
+enums from day one and are now used.
+
+**Seam, not built:** `used_purchases.customer_id` would link a seller to a customer. Nothing
+is migrated now — deciding whether two similar names are one person is the shop's call, one
+at a time (ADR-0014 §11).
+
 ## 5. Screen ↔ data (Phase 1)
 
 - **Catalog** = `catalog:list` + save form (`catalog:save`). Missing-data chips from NULL columns.
@@ -166,6 +227,7 @@ is impossible rather than unlikely.
 - **Login / Lock / Approval** = `auth:*` only; no business data crosses until a session exists.
 - **Usuarios** = `users:*`, gated on `users.manage`; override toggles render from the core registry, so a new permission key appears with no UI change.
 - **Comprar usados / Dispositivos usados** = `used:*` + `credit:*`. Selling a used phone reuses the ordinary serialized-unit path — no new sale code (ADR-0013).
+- **Reparaciones / Taller** = `repair:*` + `customer:*` + `workshop:board`. The board and the list render DERIVED status (ADR-0014); collection reuses the ordinary document + tender path, so repairs add no second way to take money.
 
 ## 6. Sync (designed now, built Phase 2)
 
