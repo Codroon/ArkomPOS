@@ -45,6 +45,8 @@ describe("registry shape", () => {
         "catalog.create",
         "catalog.edit",
         "inventory.adjust",
+        "repair.markNotRepaired",
+        "repair.price_override",
         "sale.price_override",
         "usedDevices.priceOverride",
       ].sort(),

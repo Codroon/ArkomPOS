@@ -19,10 +19,11 @@ import { PrintTicketResponseSchema } from "@arkom/core";
 import { useT } from "@arkom/ui";
 import { errorMessage } from "./errors";
 
-/** What to print. A sale ticket, or one of the two used-device documents. */
+/** What to print: a sale ticket, a used-device document, or a repair document. */
 export type PrintJob =
   | { kind: "ticket"; docId: string; copy: boolean }
-  | { kind: "purchase"; purchaseId: string; what: "document" | "label"; copy: boolean };
+  | { kind: "purchase"; purchaseId: string; what: "document" | "label"; copy: boolean }
+  | { kind: "repair"; ticketId: string; what: "intake" | "quote" | "receipt" | "return"; copy: boolean };
 
 export interface PrintState {
   busy: boolean;
@@ -78,12 +79,19 @@ export function useTicketPrint() {
         const res = PrintTicketResponseSchema.parse(
           job.kind === "ticket"
             ? await window.arkom.invoke("print:ticket", { docId: job.docId, copy: job.copy, target })
-            : await window.arkom.invoke("used:print", {
-                purchaseId: job.purchaseId,
-                what: job.what,
-                copy: job.copy,
-                target,
-              }),
+            : job.kind === "purchase"
+              ? await window.arkom.invoke("used:print", {
+                  purchaseId: job.purchaseId,
+                  what: job.what,
+                  copy: job.copy,
+                  target,
+                })
+              : await window.arkom.invoke("repair:print", {
+                  ticketId: job.ticketId,
+                  what: job.what,
+                  copy: job.copy,
+                  target,
+                }),
         );
         if (!alive.current) return;
         setState({
@@ -127,6 +135,12 @@ export function useTicketPrint() {
       void run({ kind: "purchase", purchaseId, what, copy }, "auto"),
     [run],
   );
+  /** The intake receipt the customer signs — and, from later slices, the rest. */
+  const printRepair = useCallback(
+    (ticketId: string, what: "intake" | "quote" | "receipt" | "return" = "intake", copy = false) =>
+      void run({ kind: "repair", ticketId, what, copy }, "auto"),
+    [run],
+  );
   const retry = useCallback(() => {
     if (state.failed) void run(state.failed, "auto");
   }, [run, state.failed]);
@@ -146,5 +160,5 @@ export function useTicketPrint() {
     [state.savedPath, t],
   );
 
-  return { state, print, savePdf, printPurchase, retry, savePdfForFailed, reveal, dismiss };
+  return { state, print, savePdf, printPurchase, printRepair, retry, savePdfForFailed, reveal, dismiss };
 }

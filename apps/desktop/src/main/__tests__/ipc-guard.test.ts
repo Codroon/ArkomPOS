@@ -69,6 +69,22 @@ describe("every channel is accounted for", () => {
       ].sort(),
     );
   });
+
+  /**
+   * The gates the design doc names, pinned.
+   *
+   * §4.3 puts reading a customer and reprinting a document behind
+   * `repair.view` and creating either behind `repair.create`, and the two
+   * drifted apart once already. A table here is cheaper than noticing later
+   * that a technician cannot look up whose phone they are holding.
+   */
+  it("gates the repair channels the way §4.3 says", () => {
+    const policy = registeredChannels();
+    expect(policy.get("customer:search")).toBe("repair.view");
+    expect(policy.get("customer:upsert")).toBe("repair.create");
+    expect(policy.get("repair:create")).toBe("repair.create");
+    expect(policy.get("repair:print")).toBe("repair.view");
+  });
 });
 
 describe("without a session", () => {

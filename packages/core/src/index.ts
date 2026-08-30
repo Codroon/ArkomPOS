@@ -156,6 +156,14 @@ export {
   PURCHASE_ES_ACCESSORIES,
 } from "./purchase-doc";
 export type { PurchaseDoc, PurchaseDocDevice, PurchaseDocSeller, ShelfLabel } from "./purchase-doc";
+export {
+  renderIntakeReceipt,
+  damageLine,
+  promisedLine,
+  REPAIR_ES,
+  DAMAGE_ES,
+} from "./repair-doc";
+export type { IntakeReceiptDoc, RepairDocDevice } from "./repair-doc";
 export { opsToText, opBuilder } from "./print-ops";
 export {
   REPAIR_STATUSES,
@@ -378,6 +386,22 @@ export {
   UsedVoidVoucherResponseSchema,
   UsedPeekRequestSchema,
   UsedPeekResponseSchema,
+  CustomerRowSchema,
+  CustomerSearchRequestSchema,
+  CustomerSearchResponseSchema,
+  CustomerUpsertRequestSchema,
+  CustomerUpsertResponseSchema,
+  RepairStatusSchema,
+  RepairLineKindSchema,
+  RepairApprovalMethodSchema,
+  RepairNotifyMethodSchema,
+  NotRepairedReasonSchema,
+  PromisedHalfSchema,
+  RepairDamageSchema,
+  RepairCreateRequestSchema,
+  RepairCreateResponseSchema,
+  RepairPrintRequestSchema,
+  RepairPrintResponseSchema,
 } from "./ipc";
 export type {
   IpcChannel,
@@ -433,4 +457,9 @@ export type {
   UsedDeviceDetail,
   VoucherRow,
   UsedPeek,
+  CustomerRow,
+  CustomerUpsertRequest,
+  RepairCreateRequest,
+  RepairCreateResponse,
+  RepairPrintRequest,
 } from "./ipc";

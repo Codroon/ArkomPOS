@@ -153,6 +153,14 @@ import {
   UsedVoidVoucherResponseSchema,
   UsedPeekRequestSchema,
   UsedPeekResponseSchema,
+  CustomerSearchRequestSchema,
+  CustomerSearchResponseSchema,
+  CustomerUpsertRequestSchema,
+  CustomerUpsertResponseSchema,
+  RepairCreateRequestSchema,
+  RepairCreateResponseSchema,
+  RepairPrintRequestSchema,
+  RepairPrintResponseSchema,
   type MutationCtx,
   type PermissionKey,
 } from "@arkom/core";
@@ -175,7 +183,18 @@ import {
   findVouchers,
   voidVoucher,
 } from "./repos/used";
-import { listPrinters, peekPurchase, printPurchase, printTest, printTicket, revealTicket, ticketsDir, printRecoveryCode } from "./print";
+import { createTicket, searchCustomers, upsertCustomer } from "./repos/repair";
+import {
+  listPrinters,
+  peekPurchase,
+  printPurchase,
+  printRepair,
+  printTest,
+  printTicket,
+  revealTicket,
+  ticketsDir,
+  printRecoveryCode,
+} from "./print";
 import { completeFirstRun, demoStatus, isSetupNeeded, removeDemoData } from "./setup";
 import { backupStatus, backupsDir, runBackup } from "./backup";
 import {
@@ -790,6 +809,49 @@ export function registerIpcHandlers(db: ArkomDb): void {
       voidVoucher(db, s.ctx, input.voucherId, input.reason);
       return { ok: true };
     },
+  );
+
+  /* ---- repairs (ADR-0014) ---- */
+
+  /**
+   * Customers.
+   *
+   * No module of their own: today the only reason the till knows a customer's
+   * name is that they left a device, so the repair permissions govern them.
+   * Looking one up needs only `repair.view` — a technician reading the board
+   * should be able to see whose phone they are holding — while creating or
+   * editing one is part of taking a device in.
+   */
+  guarded("customer:search", "repair.view", CustomerSearchRequestSchema, CustomerSearchResponseSchema, (s, input) => ({
+    rows: searchCustomers(db, s.ctx, input.query),
+  }));
+
+  guarded("customer:upsert", "repair.create", CustomerUpsertRequestSchema, CustomerUpsertResponseSchema, (s, input) =>
+    upsertCustomer(db, s.ctx, input),
+  );
+
+  /**
+   * Take a device in.
+   *
+   * The print is the RENDERER's to drive, through the shared hook — the lesson
+   * the purchase document taught (ADR-0013, amended): a print failure swallowed
+   * in main is a customer sent home with no paperwork and nobody the wiser. The
+   * ticket is committed by the time this returns; the receipt is a separate,
+   * retryable act.
+   */
+  guarded("repair:create", "repair.create", RepairCreateRequestSchema, RepairCreateResponseSchema, (s, input) =>
+    createTicket(db, s.ctx, input),
+  );
+
+  /**
+   * Print or reprint a repair document.
+   *
+   * `repair.view`, unlike `used:print`'s `usedDevices.create`: the purchase
+   * document carries a seller's ID number, and this one carries nothing the
+   * customer standing at the counter does not already have on their own copy.
+   */
+  guarded("repair:print", "repair.view", RepairPrintRequestSchema, RepairPrintResponseSchema, (s, input) =>
+    printRepair(db, s.ctx, input),
   );
 }
 

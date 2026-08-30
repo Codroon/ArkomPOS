@@ -35,6 +35,9 @@ import type {
   SessionInfo,
   LoginUser,
   UserRow,
+  CustomerRow,
+  RepairCreateRequest,
+  RepairCreateResponse,
   UsedCheckImeiResponse,
   UsedLogRequest,
   UsedLogResponse,
@@ -186,6 +189,17 @@ declare global {
       invoke(channel: "backup:now", payload?: undefined): Promise<BackupRunResponse>;
       invoke(channel: "backup:openFolder", payload?: undefined): Promise<{ ok: boolean }>;
       invoke(channel: "backup:pickFolder", payload?: undefined): Promise<{ path: string | null }>;
+      /* repairs (ADR-0014) */
+      invoke(channel: "customer:search", payload: { query: string }): Promise<{ rows: CustomerRow[] }>;
+      invoke(
+        channel: "customer:upsert",
+        payload: { id?: string; name: string; phone: string; note?: string | null },
+      ): Promise<CustomerRow>;
+      invoke(channel: "repair:create", payload: RepairCreateRequest): Promise<RepairCreateResponse>;
+      invoke(
+        channel: "repair:print",
+        payload: { ticketId: string; what: "intake" | "quote" | "receipt" | "return"; copy?: boolean; target?: "auto" | "pdf" },
+      ): Promise<PrintTicketResponse>;
     };
   }
 }

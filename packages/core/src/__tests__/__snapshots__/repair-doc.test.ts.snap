@@ -1,0 +1,89 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the intake receipt > prints on 80mm paper 1`] = `
+"                A R K O M
+   E L E C T R O N I C S · P H O N E S
+
+          Arkom Electronics S.L.
+              NIF B12345678
+        C/ Mayor 14, 28013 Madrid
+------------------------------------------
+RESGUARDO DE DEPÓSITO
+R-000042                  09/08/2026 19:05
+Caja 1 · Atendido por Ana
+------------------------------------------
+CLIENTE
+Joan Puig · +34 671 220 918
+------------------------------------------
+DISPOSITIVO
+Apple iPhone 11 64GB
+IMEI 356938104420030
+Avería: Pantalla rota, táctil intermitente
+Estado: Marcas de uso, trasera correcta
+Daños: pantalla rota
+Accesorios: ninguno
+------------------------------------------
+La reparación tiene 3 meses de garantía en
+piezas y mano de obra.
+
+No se realizará ningún trabajo con cargo
+sin la aprobación previa del cliente.
+
+
+Firma del cliente
+
+
+
+X ________________________________________
+------------------------------------------
+          Gracias por su visita
+
+
+------------------------------------------ ✂"
+`;
+
+exports[`the intake receipt > prints on the 58mm fallback roll 1`] = `
+"          A R K O M
+      ELECTRONICS · PHONES
+
+     Arkom Electronics S.L.
+         NIF B12345678
+   C/ Mayor 14, 28013 Madrid
+--------------------------------
+RESGUARDO DE DEPÓSITO
+R-000042        09/08/2026 19:05
+Caja 1 · Atendido por Ana
+--------------------------------
+CLIENTE
+Joan Puig · +34 671 220 918
+--------------------------------
+DISPOSITIVO
+Apple iPhone 11 64GB
+IMEI 356938104420030
+Avería: Pantalla rota, táctil
+intermitente
+Estado: Marcas de uso, trasera
+correcta
+Daños: pantalla rota
+Accesorios: ninguno
+--------------------------------
+La reparación tiene 3 meses de
+garantía en piezas y mano de
+obra.
+
+No se realizará ningún trabajo
+con cargo sin la aprobación
+previa del cliente.
+
+
+Firma del cliente
+
+
+
+X ______________________________
+--------------------------------
+     Gracias por su visita
+
+
+-------------------------------- ✂"
+`;

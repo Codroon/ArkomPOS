@@ -33,6 +33,10 @@ export const DEFAULT_SETTINGS: Settings = {
   backupLastStatus: "",
   idleLockMinutes: 5,
   usedMarginPct: 25,
+  repairWarrantyMonths: 3,
+  repairDiagnosisFeeCents: 0,
+  repairDepositSuggestionCents: 0,
+  repairCapEnabled: true,
 };
 
 type SettingKey = keyof Settings;
@@ -44,6 +48,10 @@ function decode(key: SettingKey, raw: string): Settings[SettingKey] {
   // 0 is a real answer here ("never lock"), so it must survive the ?? fallback
   if (key === "idleLockMinutes") return Number.isFinite(Number(raw)) ? Number(raw) : 5;
   if (key === "usedMarginPct") return Number.isFinite(Number(raw)) ? Number(raw) : 25;
+  if (key === "repairWarrantyMonths") return Number.isFinite(Number(raw)) ? Number(raw) : 3;
+  if (key === "repairDiagnosisFeeCents") return Number.isFinite(Number(raw)) ? Number(raw) : 0;
+  if (key === "repairDepositSuggestionCents") return Number.isFinite(Number(raw)) ? Number(raw) : 0;
+  if (key === "repairCapEnabled") return raw !== "false";
   return raw;
 }
 function encode(value: Settings[SettingKey]): string {

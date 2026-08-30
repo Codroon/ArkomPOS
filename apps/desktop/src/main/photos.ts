@@ -1,5 +1,6 @@
 /**
- * Photographs of purchased devices.
+ * Photographs of devices the shop is holding — bought (ADR-0013) or in for
+ * repair (ADR-0014).
  *
  * **Files on disk, paths in the database, never blobs** (ADR-0013 §3). A
  * hundred phone photos in SQLite is a database the online-backup API has to
@@ -30,6 +31,12 @@ export function purchasePhotosDir(purchaseId: string): string {
   return join(photosRoot(), "purchases", purchaseId);
 }
 
+/** Intake photos of a customer's device (ADR-0014). Same root, so the backup
+    that already copies photosRoot() covers them with no change. */
+export function repairPhotosDir(ticketId: string): string {
+  return join(photosRoot(), "repairs", ticketId);
+}
+
 /** Absolute path for a stored relative path, refusing anything that escapes the root. */
 export function resolvePhotoPath(relativePath: string): string {
   const root = resolve(photosRoot());
@@ -43,20 +50,19 @@ export function resolvePhotoPath(relativePath: string): string {
 const DATA_URL_PREFIX = "data:image/jpeg;base64,";
 
 /**
- * Write one intake's photos.
+ * Write one intake's photos into a folder.
  *
- * Called BEFORE the purchase transaction opens, under the id about to be
- * inserted — see the note on logPurchase for why that direction is the right
- * one. Failures propagate: a purchase whose photos could not be written should
- * not be logged as though they exist.
+ * Called BEFORE the transaction opens, under the id about to be inserted — see
+ * the note on logPurchase for why that direction is the right one. Failures
+ * propagate: a record whose photos could not be written should not be stored as
+ * though they exist.
  */
-export async function savePurchasePhotos(
-  purchaseId: string,
+async function savePhotosInto(
+  dir: string,
   photos: ReadonlyArray<{ kind: PhotoKind; dataUrl: string }>,
 ): Promise<SavedPhoto[]> {
   if (photos.length === 0) return [];
 
-  const dir = purchasePhotosDir(purchaseId);
   await mkdir(dir, { recursive: true });
 
   const saved: SavedPhoto[] = [];
@@ -110,15 +116,37 @@ export async function readPhotos(
   return out;
 }
 
-/**
- * Remove an intake's folder.
- *
- * Only ever called to clean up after a transaction that failed after the files
- * were written. Nothing in the app deletes a logged purchase's photos: they are
- * part of a record the shop is required to keep.
- */
+export async function savePurchasePhotos(
+  purchaseId: string,
+  photos: ReadonlyArray<{ kind: PhotoKind; dataUrl: string }>,
+): Promise<SavedPhoto[]> {
+  return savePhotosInto(purchasePhotosDir(purchaseId), photos);
+}
+
+export async function saveRepairPhotos(
+  ticketId: string,
+  photos: ReadonlyArray<{ kind: PhotoKind; dataUrl: string }>,
+): Promise<SavedPhoto[]> {
+  return savePhotosInto(repairPhotosDir(ticketId), photos);
+}
+
 export async function discardPurchasePhotos(purchaseId: string): Promise<void> {
-  await rm(purchasePhotosDir(purchaseId), { recursive: true, force: true }).catch(() => {
+  await discardDir(purchasePhotosDir(purchaseId));
+}
+
+export async function discardRepairPhotos(ticketId: string): Promise<void> {
+  await discardDir(repairPhotosDir(ticketId));
+}
+
+/**
+ * Remove a folder whose rows never landed.
+ *
+ * Only ever called to clean up after a transaction that failed AFTER the files
+ * were written. Nothing in the app deletes the photos of a record that exists:
+ * those are part of what the shop is required to keep.
+ */
+async function discardDir(dir: string): Promise<void> {
+  await rm(dir, { recursive: true, force: true }).catch(() => {
     // best effort: an orphaned folder is untidy, not broken
   });
 }

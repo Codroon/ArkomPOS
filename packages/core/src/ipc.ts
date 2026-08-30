@@ -72,6 +72,10 @@ export const IPC_CHANNELS = [
   "used:findVoucher",
   "used:voidVoucher",
   "used:peek",
+  "customer:search",
+  "customer:upsert",
+  "repair:create",
+  "repair:print",
 ] as const;
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
@@ -574,6 +578,16 @@ export const SettingsSchema = z.object({
    * right for a busy Saturday and maddening on a quiet Tuesday (ADR-0012).
    */
   idleLockMinutes: z.number().int().min(0).max(240),
+  /* ---- repairs (ADR-0014). All four are the client's pending answers, so they
+     land as data the owner edits rather than as code anyone has to change. ---- */
+  /** printed on the intake receipt and snapshotted onto every ticket */
+  repairWarrantyMonths: z.number().int().min(0).max(60),
+  /** 0 = the shop does not charge one. Only chargeable if it was ANNOUNCED */
+  repairDiagnosisFeeCents: z.number().int().min(0),
+  /** what the deposit field is prefilled with; 0 = ask every time */
+  repairDepositSuggestionCents: z.number().int().min(0),
+  /** whether the intake screen offers the repair-up-to-cap authorization */
+  repairCapEnabled: z.boolean(),
   /** margin the selling-price modal prefills with, in whole percent (ADR-0013) */
   usedMarginPct: z.number().int().min(0).max(500),
 });
@@ -1184,3 +1198,97 @@ export const UsedPeekResponseSchema = z.object({
     .nullable(),
 });
 export type UsedPeek = z.infer<typeof UsedPeekResponseSchema>;
+
+/* ---- repairs (ADR-0014) ---- */
+
+export const RepairStatusSchema = z.enum([
+  "received",
+  "quoted",
+  "waiting_part",
+  "in_repair",
+  "ready",
+  "collected",
+  "not_repaired",
+]);
+export const RepairLineKindSchema = z.enum(["inventory_part", "labor", "part_on_order"]);
+export const RepairApprovalMethodSchema = z.enum(["in_person", "by_phone"]);
+export const RepairNotifyMethodSchema = z.enum(["phone", "in_person", "other"]);
+export const NotRepairedReasonSchema = z.enum(["customer_declined", "unrepairable", "abandoned"]);
+export const PromisedHalfSchema = z.enum(["morning", "afternoon"]);
+
+/* ---- customers ---- */
+
+export const CustomerRowSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  phone: z.string(),
+  note: z.string().nullable(),
+  /** how many repairs this person has left with the shop — context at the counter */
+  repairCount: z.number().int().default(0),
+});
+export type CustomerRow = z.infer<typeof CustomerRowSchema>;
+
+export const CustomerSearchRequestSchema = z.object({ query: z.string().trim().max(60) });
+export const CustomerSearchResponseSchema = z.object({ rows: z.array(CustomerRowSchema) });
+
+export const CustomerUpsertRequestSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().trim().min(1).max(120),
+  phone: z.string().trim().min(1).max(40),
+  note: z.string().trim().max(300).nullish(),
+});
+export const CustomerUpsertResponseSchema = CustomerRowSchema;
+export type CustomerUpsertRequest = z.infer<typeof CustomerUpsertRequestSchema>;
+
+/* ---- intake ---- */
+
+export const RepairDamageSchema = z.object({
+  screen: z.boolean(),
+  back: z.boolean(),
+  dents: z.boolean(),
+  water: z.boolean(),
+});
+
+export const RepairCreateRequestSchema = z.object({
+  customerId: z.string(),
+  deviceDescription: z.string().trim().min(1).max(200),
+  /** optional: not every device has one, and a receipt is not the place to insist */
+  imei: z.string().trim().max(20).nullish(),
+  reportedFault: z.string().trim().min(1).max(500),
+  conditionAtIntake: z.string().trim().max(500).nullish(),
+  damage: RepairDamageSchema,
+  damageNote: z.string().trim().max(300).nullish(),
+  accessories: z.string().trim().max(200).nullish(),
+  /**
+   * The device's own passcode.
+   *
+   * Travels in on this one channel and never travels back out anywhere it could
+   * be printed or logged (ADR-0014 §10).
+   */
+  devicePasscode: z.string().max(80).nullish(),
+  photos: z.array(UsedPhotoInputSchema).max(6).default([]),
+  promisedDate: z.number().int().nullish(),
+  promisedHalf: PromisedHalfSchema.nullish(),
+  depositCents: z.number().int().min(0).default(0),
+  authorizedCapCents: z.number().int().min(0).nullish(),
+  assignedUserId: z.string().nullish(),
+});
+
+export const RepairCreateResponseSchema = z.object({
+  ticketId: z.string(),
+  docNumber: z.string(),
+  customerName: z.string(),
+  depositCents: z.number().int(),
+});
+export type RepairCreateRequest = z.infer<typeof RepairCreateRequestSchema>;
+export type RepairCreateResponse = z.infer<typeof RepairCreateResponseSchema>;
+
+/** Print (or reprint) one of the repair documents. */
+export const RepairPrintRequestSchema = z.object({
+  ticketId: z.string(),
+  what: z.enum(["intake", "quote", "receipt", "return"]),
+  target: z.enum(["auto", "pdf"]).default("auto"),
+  copy: z.boolean().default(false),
+});
+export const RepairPrintResponseSchema = PrintTicketResponseSchema;
+export type RepairPrintRequest = z.infer<typeof RepairPrintRequestSchema>;

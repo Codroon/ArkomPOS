@@ -18,6 +18,7 @@ import {
   appError,
   mutate,
   renderPurchaseDoc,
+  renderIntakeReceipt,
   renderShelfLabel,
   renderTicket,
   wrapText,
@@ -29,6 +30,8 @@ import {
   type TicketDoc,
   type TicketOp,
   type UsedPrintRequest,
+  type RepairPrintRequest,
+  type IntakeReceiptDoc,
 } from "@arkom/core";
 import { schema, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner } from "../mutate-runner";
@@ -390,6 +393,144 @@ function loadPurchaseDoc(db: ArkomDb, ctx: MutationCtx, purchaseId: string, isCo
  * jammed printer surfaces as PRINT_FAILED with a PDF to fall back on — never as
  * a purchase that half happened.
  */
+/**
+ * Load one repair ticket as the intake receipt.
+ *
+ * Note what this function CANNOT do: build a document carrying the passcode.
+ * `IntakeReceiptDoc` has no field for it (ADR-0014 §10), so the column is not
+ * read here and a future edit that reaches for it does not compile.
+ */
+function loadIntakeDoc(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  ticketId: string,
+  isCopy: boolean,
+): { doc: IntakeReceiptDoc; documentId: string } {
+  const { repairTickets, customers, documents, users } = schema;
+  const row = db
+    .select({
+      ticket: repairTickets,
+      docNumber: documents.docNumber,
+      documentId: documents.id,
+      userId: documents.userId,
+      customerName: customers.name,
+      customerPhone: customers.phone,
+    })
+    .from(repairTickets)
+    .innerJoin(documents, eq(documents.id, repairTickets.documentId))
+    .innerJoin(customers, eq(customers.id, repairTickets.customerId))
+    .where(and(eq(repairTickets.tenantId, ctx.tenantId), eq(repairTickets.id, ticketId)))
+    .limit(1)
+    .all()[0];
+  if (!row) throw appError("VALIDATION", "Esa ficha no existe.");
+
+  const cashier = row.userId
+    ? db.select({ name: users.name }).from(users).where(eq(users.id, row.userId)).limit(1).all()[0]
+    : undefined;
+
+  return {
+    documentId: row.documentId,
+    doc: {
+      docNumber: row.docNumber ?? "",
+      receivedAtMs: row.ticket.createdAt.getTime(),
+      terminalName: tillContext(db).meta.terminal.name,
+      cashierName: cashier?.name ?? "—",
+      isCopy,
+      customerName: row.customerName,
+      customerPhone: row.customerPhone,
+      device: {
+        description: row.ticket.deviceDescription,
+        imei: row.ticket.imei,
+        reportedFault: row.ticket.reportedFault,
+        conditionAtIntake: row.ticket.conditionAtIntake,
+        damage: {
+          screen: row.ticket.damageScreen,
+          back: row.ticket.damageBack,
+          dents: row.ticket.damageDents,
+          water: row.ticket.damageWater,
+        },
+        damageNote: row.ticket.damageNote,
+        accessories: row.ticket.accessories,
+      },
+      depositCents: row.ticket.depositCents,
+      authorizedCapCents: row.ticket.authorizedCapCents,
+      diagnosisFeeCents: row.ticket.diagnosisFeeCents,
+      warrantyMonths: row.ticket.warrantyMonths,
+      promisedAtMs: row.ticket.promisedDate?.getTime() ?? null,
+      promisedHalf: row.ticket.promisedHalf,
+    },
+  };
+}
+
+/**
+ * Print, reprint or PDF one of the repair documents.
+ *
+ * Only the intake receipt exists in this slice; the quote, the final receipt and
+ * the not-repaired return note arrive with the slices that create the facts they
+ * report, and are refused rather than half-rendered until then.
+ */
+export async function printRepair(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  req: RepairPrintRequest,
+): Promise<PrintTicketResponse> {
+  if (req.what !== "intake") {
+    throw appError("VALIDATION", "Ese documento todavía no existe.");
+  }
+  const settings = getSettings(db, ctx);
+  const loaded = loadIntakeDoc(db, ctx, req.ticketId, req.copy);
+  const shop = shopProfile(db, ctx);
+
+  const ops = renderIntakeReceipt(loaded.doc, shop, settings.paperWidthMm);
+  const fileBase = `${loaded.doc.docNumber || "REPARACION"}${req.copy ? "-COPIA" : ""}`;
+
+  if (req.target === "pdf" || !settings.printerName) {
+    const path = await renderTicketPdf(ops, settings.paperWidthMm, fileBase);
+    logPrintAttempt(db, ctx, loaded.documentId, {
+      ok: true,
+      target: "pdf",
+      path,
+      what: req.what,
+      copy: req.copy,
+      ...(settings.printerName ? {} : { fallback: "NO_PRINTER" }),
+    });
+    return { kind: "pdf", path };
+  }
+
+  try {
+    await sendRawToPrinter(settings.printerName, encodeEscPos(ops, settings.commandSet, settings.paperWidthMm));
+    logPrintAttempt(db, ctx, loaded.documentId, {
+      ok: true,
+      target: "printer",
+      printer: settings.printerName,
+      what: req.what,
+      copy: req.copy,
+    });
+    return { kind: "printed", printer: settings.printerName };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logPrintAttempt(db, ctx, loaded.documentId, {
+      ok: false,
+      target: "printer",
+      printer: settings.printerName,
+      what: req.what,
+      copy: req.copy,
+      error: message,
+    });
+    // same bargain as everywhere else: the ticket exists, the paper is a retry
+    const path = await renderTicketPdf(ops, settings.paperWidthMm, fileBase);
+    logPrintAttempt(db, ctx, loaded.documentId, {
+      ok: true,
+      target: "pdf",
+      path,
+      what: req.what,
+      copy: req.copy,
+      fallback: "PRINTER_FAILED",
+    });
+    return { kind: "pdf", path };
+  }
+}
+
 export async function printPurchase(
   db: ArkomDb,
   ctx: MutationCtx,

@@ -18,7 +18,7 @@
  */
 
 /** Groups the Usuarios screen renders as sections, in this order. */
-export const PERMISSION_MODULES = ["sale", "catalog", "inventory", "usedDevices", "admin"] as const;
+export const PERMISSION_MODULES = ["sale", "catalog", "inventory", "usedDevices", "repair", "workshop", "admin"] as const;
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
 
 export interface PermissionDef {
@@ -64,6 +64,27 @@ export const PERMISSIONS = [
   { key: "usedDevices.viewSeller", module: "usedDevices", labelEs: "Ver los datos del vendedor", approvable: false },
   { key: "usedDevices.redeemCredit", module: "usedDevices", labelEs: "Canjear saldo a favor", approvable: false },
   { key: "usedDevices.voidCredit", module: "usedDevices", labelEs: "Anular un vale de saldo", approvable: false },
+
+  /* ---- repairs (ADR-0014) ----
+     The two withheld from a technician are withheld for the reason ADR-0012
+     gave itself: receiving stock is how a part gets quietly written off, and
+     closing a ticket as unrepairable moves money. */
+  { key: "repair.view", module: "repair", labelEs: "Ver reparaciones", approvable: false },
+  { key: "repair.create", module: "repair", labelEs: "Recibir un dispositivo a reparar", approvable: false },
+  { key: "repair.edit", module: "repair", labelEs: "Editar una ficha de reparación", approvable: false },
+  { key: "repair.quote.set", module: "repair", labelEs: "Preparar el presupuesto", approvable: false },
+  { key: "repair.quote.approve", module: "repair", labelEs: "Registrar la aprobación del cliente", approvable: false },
+  { key: "repair.parts.manage", module: "repair", labelEs: "Añadir y quitar piezas", approvable: false },
+  { key: "repair.parts.receive", module: "repair", labelEs: "Recibir una pieza pedida", approvable: false },
+  { key: "repair.assign", module: "repair", labelEs: "Asignar técnico", approvable: false },
+  { key: "repair.markReady", module: "repair", labelEs: "Marcar una reparación como lista", approvable: false },
+  { key: "repair.collect", module: "repair", labelEs: "Cobrar y entregar una reparación", approvable: false },
+  // lowering an agreed charge is the one edit the customer never sees
+  { key: "repair.price_override", module: "repair", labelEs: "Rebajar un cargo ya aprobado", approvable: true },
+  { key: "repair.markNotRepaired", module: "repair", labelEs: "Cerrar una ficha como no reparada", approvable: true },
+
+  /* ---- workshop ---- */
+  { key: "workshop.view", module: "workshop", labelEs: "Ver el taller", approvable: false },
 
   /* ---- admin: owner-only, and not approvable ---- */
   // a cashier does not manage users with the owner leaning over their shoulder;
@@ -126,6 +147,20 @@ export const CASHIER_DEFAULTS: readonly PermissionKey[] = [
   "usedDevices.sendToInventory",
   "usedDevices.editRefurbCost",
   "usedDevices.redeemCredit",
+  /* repairs: counter work and workshop work, but not receiving stock and not
+     closing a ticket as unrepairable — both of those move money or stock in a
+     way that should have an owner behind it */
+  "repair.view",
+  "repair.create",
+  "repair.edit",
+  "repair.quote.set",
+  "repair.quote.approve",
+  "repair.parts.manage",
+  "repair.parts.receive",
+  "repair.assign",
+  "repair.markReady",
+  "repair.collect",
+  "workshop.view",
 ];
 
 const ROLE_DEFAULTS: Record<Role, readonly PermissionKey[] | "all"> = {
