@@ -7,7 +7,8 @@
 import { app } from "electron";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { openDb, runMigrations, type ArkomDb } from "@arkom/db";
+import { openDb, runDataFixups, runMigrations, type ArkomDb } from "@arkom/db";
+import { uuidv7 } from "@arkom/core";
 import type BetterSqlite3 from "better-sqlite3";
 
 // out/main → apps/desktop → apps → repo root
@@ -41,5 +42,11 @@ export function initDb(): ArkomDb {
   const { sqlite, db } = openDb(dbPath);
   sqliteHandle = sqlite;
   runMigrations(db, resolveMigrationsDir());
+  /* Backfills that need a UUIDv7 cannot live in SQL. Idempotent, so this is a
+     no-op on every start after the first that needed it. */
+  const fixups = runDataFixups(db, uuidv7);
+  if (fixups.payoutsBackfilled > 0) {
+    console.log(`[db] cash ledger: backfilled ${fixups.payoutsBackfilled} used-device payout(s)`);
+  }
   return db;
 }

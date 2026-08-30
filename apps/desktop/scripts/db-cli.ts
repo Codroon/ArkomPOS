@@ -6,7 +6,8 @@
  */
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { openDb, runMigrations } from "@arkom/db";
+import { openDb, runDataFixups, runMigrations } from "@arkom/db";
+import { uuidv7 } from "@arkom/core";
 import { seed } from "./db-seed";
 
 const task = process.argv[2];
@@ -25,11 +26,19 @@ try {
   switch (task) {
     case "migrate": {
       runMigrations(db, migrationsDir);
+      /* the same two steps the app runs at startup — a CLI that migrated
+         differently from the app would be a way to produce a database the app
+         has never seen */
+      const fixups = runDataFixups(db, uuidv7);
       console.log(`Migrations applied → ${dbPath}`);
+      if (fixups.payoutsBackfilled > 0) {
+        console.log(`Cash ledger: backfilled ${fixups.payoutsBackfilled} used-device payout(s).`);
+      }
       break;
     }
     case "seed": {
       runMigrations(db, migrationsDir); // seed on a fresh checkout just works
+      runDataFixups(db, uuidv7);
       const result = seed(db);
       console.log(result.message);
       break;

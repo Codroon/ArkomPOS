@@ -1,6 +1,6 @@
 # ADR-0014: Repair tickets — status entailed by facts, parts before revenue
 
-**Status:** Proposed · **Date:** 2026-08-31 · **Deciders:** Zothix (Codroon)
+**Status:** Accepted · **Date:** 2026-08-31 · **Deciders:** Zothix (Codroon)
 **Builds on:** [0004](0004-stock-as-insert-only-movement-ledger.md) (movement ledger) ·
 [0007](0007-tax-snapshot-on-lines.md) (tax snapshot) ·
 [0008](0008-document-numbering-per-till-series.md) (numbering) ·
@@ -165,6 +165,43 @@ Two reasons in one:
    one written later, which is the mistake that produces two answers to "what is in the
    drawer".
 
+**The boundary, drawn explicitly (decided 2026-08-31).** Three things go in the cash ledger
+and one thing deliberately does not:
+
+| Event | In `cash_movements`? |
+|---|---|
+| Repair deposit taken | **Yes**, in |
+| Repair deposit refunded at Not repaired | **Yes**, out |
+| Used-device payout in cash | **Yes**, out — from this version, and backfilled |
+| Sale takings and change | **No** — until the Cash screen slice |
+
+A sale's cash is already recorded, completely and per-document, as a `document_tenders`
+row. Copying it here would create a second place to ask "what did we take today", and the
+two would disagree the first time a copy was missed — which is exactly the failure mode
+this table exists to prevent. What belongs here is what has **no other home**: money that
+moves without a sale.
+
+Used-device payouts do have that shape, so they join from v0.12.0 forward and the historic
+ones are backfilled. Everything needed is already on the purchase — amount, method, when,
+where, and who took it — so the backfill is a join, not a reconstruction. It is idempotent
+(it skips any purchase that already has a payout row) and it lives in TypeScript rather than
+SQL, because SQL cannot mint a UUIDv7 and ADR-0006 does not allow a random id in its place.
+
+When Caja arrives it reconciles the drawer by reading tenders **and** this table. That is
+one query more than reading a single ledger, and one source of truth fewer than maintaining
+a copy.
+
+### 7a. The collection cross-reference is stored both ways
+
+The `R-` number and the `T1-` number answer different questions (§5), so each document
+carries the other's:
+
+- the repair ticket stores `collection_document_id` — the sale that closed it;
+- the printed collection ticket carries the `R-` number as a reference line.
+
+Neither direction is derivable from the other in one hop otherwise: from a till receipt in a
+customer's hand, the repair is one lookup away; from the workshop board, so is the money.
+
 **At collection the deposit is a tender, not a discount.** `TENDER_METHODS` gains
 `deposit`: the collection document's total is the full value of the work, and the deposit
 appears beside cash or card as one of the things that paid it. Exactly the store-credit
@@ -208,6 +245,29 @@ Call sites already pass the ticket's `assignedUserId` where they have it, so the
 one function and a settings flag — not an edit to every guarded handler. That is why the
 parameter has been carried unused since v0.10.0.
 
+### 9a. No release without payment. Instead, one control on the charge.
+
+`repair.release_without_payment` is sketched in ADR-0012 and is **not built**. Collected
+requires a collection document, and a zero-value collection already covers warranty rework
+and "nothing was wrong" — handing a device back on credit is a business decision the shop
+has not asked for.
+
+What replaces it is a control on the other end of the same worry. **The collection always
+settles at exactly the ticket's charged total**; the payment dialog cannot be told a
+different number. So the only way to change what a customer pays is to change what the
+ticket charges — and after they have approved a price, lowering a charge:
+
+- requires a **reason**, and
+- requires `repair.price_override`, which is **approvable** — the same machinery, modal and
+  dual attribution a discount on the Sale screen goes through (ADR-0012 §5).
+
+Raising a charge needs neither, because raising it past the approved total drops the ticket
+back to *Presupuestado* by itself (§2) and nothing can be collected until the customer
+approves again. The dangerous direction is downward, quietly, at the counter.
+
+Warranty rework never triggers this: it is quoted at zero from the start, so there is no
+approved figure to reduce.
+
 ### 10. The passcode is written down, and never printed
 
 A repair needs the device's passcode or pattern, and the customer gives it at the counter.
@@ -225,6 +285,14 @@ Unlike a PIN it is stored in plaintext, because the technician has to read it ba
 control is where it goes, not how it is stored — and a grep-style test asserts it appears
 in no print payload, no oplog row and no log line, the same way the backup test asserts
 what a backup contains.
+
+**And it never leaves the till in plain form.** Phase 2 sync (ADR-0005) ships the oplog to
+the cloud; `device_passcode` is excluded from it or encrypted at rest before it goes, and
+the choice between those two is sync's to make. Recording the intent here rather than
+discovering it during sync design is the entire point: by then the field will exist in
+thousands of rows, and "we should have thought about that" is an expensive sentence. The
+oplog already carries no passcode value, so today the exclusion is nearly free — sync
+inherits a field it must handle deliberately rather than a leak it has to chase.
 
 ### 11. Customers become a table, with a seam and no migration
 

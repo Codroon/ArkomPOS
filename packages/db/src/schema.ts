@@ -15,10 +15,10 @@ import { sqliteTable, text, integer, uniqueIndex, index, primaryKey } from "driz
 export const ITEM_TYPES = ["stocked", "serialized", "used_device", "service", "repair", "agency", "sim", "topup"] as const;
 export const TAX_REGIMES = ["IVA21", "IVA10", "IVA4", "REBU", "EXEMPT"] as const; // P1 uses IVA21 (ADR-0007)
 export const MOVEMENT_TYPES = ["purchase_in", "sale_out", "adjustment", "count_post", "repair_part_out", "tradein_in", "return_in", "transfer"] as const; // P1: first three
-export const DOC_TYPES = ["ticket", "invoice", "credit_note", "purchase"] as const; // "purchase" = used-device intake, own series (ADR-0013)
+export const DOC_TYPES = ["ticket", "invoice", "credit_note", "purchase", "repair"] as const; // "purchase" = used-device intake, own series (ADR-0013)
 export const DOC_STATUSES = ["draft", "parked", "completed"] as const;
 export const LINE_TYPES = ["product", "serialized_unit", "repair", "tradein_credit", "agency", "sim", "topup"] as const; // P1: product, serialized_unit
-export const TENDER_METHODS = ["cash", "card", "bizum", "transfer", "store_credit"] as const; // P1: all but store_credit
+export const TENDER_METHODS = ["cash", "card", "bizum", "transfer", "store_credit", "deposit"] as const; // P1: all but store_credit
 /* "held" = bought but NOT in stock: a unit row with no stock movement, so on-hand
    is 0 and the Sale screen never offers it (ADR-0013 §1). */
 export const UNIT_STATUSES = ["in_stock", "reserved", "sold", "held"] as const;
@@ -414,4 +414,231 @@ export const storeCreditVouchers = sqliteTable("store_credit_vouchers", {
 }, (t) => [
   index("ix_voucher_status").on(t.tenantId, t.status),
   index("ix_voucher_purchase").on(t.purchaseId),
+]);
+
+/* ==================== repairs (ADR-0014) ==================== */
+
+/**
+ * Someone the shop knows by phone.
+ *
+ * Deduped on `phoneNormalized` — digits only, national prefix stripped — because
+ * "671220918", "+34 671 22 09 18" and "0034671220918" are one person, and a shop
+ * that ends up with three of them cannot answer "what have we done for them".
+ */
+export const customers = sqliteTable("customers", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  name: text("name").notNull(),
+  phone: text("phone").notNull(),
+  /** the dedupe key; see normalizePhone() in @arkom/core */
+  phoneNormalized: text("phone_normalized").notNull(),
+  note: text("note"),
+  createdAt: ts("created_at").notNull(),
+  updatedAt: ts("updated_at").notNull(),
+}, (t) => [
+  uniqueIndex("ux_customer_tenant_phone").on(t.tenantId, t.phoneNormalized),
+  index("ix_customer_name").on(t.tenantId, t.name),
+]);
+
+export const REPAIR_STATUSES = [
+  "received",
+  "quoted",
+  "waiting_part",
+  "in_repair",
+  "ready",
+  "collected",
+  "not_repaired",
+] as const;
+
+export const REPAIR_LINE_KINDS = ["inventory_part", "labor", "part_on_order"] as const;
+export const REPAIR_APPROVAL_METHODS = ["in_person", "by_phone"] as const;
+export const REPAIR_NOTIFY_METHODS = ["phone", "in_person", "other"] as const;
+export const NOT_REPAIRED_REASONS = ["customer_declined", "unrepairable", "abandoned"] as const;
+export const PROMISED_HALVES = ["morning", "afternoon"] as const;
+
+/**
+ * A device in the shop's hands.
+ *
+ * 1:1 with a `repair` document, which is where the R- number lives (ADR-0008) and
+ * what the part movements reference. The customer's device is NEVER a unit row:
+ * the shop is holding it, not owning it (ADR-0014 §3).
+ */
+export const repairTickets = sqliteTable("repair_tickets", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  locationId: text("location_id").notNull().references(() => locations.id),
+  terminalId: text("terminal_id").notNull().references(() => terminals.id),
+  /** the numbered R- document handed to the customer at intake */
+  documentId: text("document_id").notNull().references(() => documents.id),
+  customerId: text("customer_id").notNull().references(() => customers.id),
+
+  /* ---- the device, as described. No unit, no stock, no valuation. ---- */
+  deviceDescription: text("device_description").notNull(),
+  imei: text("imei"), // nullable: not every device has one
+  reportedFault: text("reported_fault").notNull(),
+  conditionAtIntake: text("condition_at_intake"),
+  damageScreen: integer("damage_screen", { mode: "boolean" }).notNull().default(false),
+  damageBack: integer("damage_back", { mode: "boolean" }).notNull().default(false),
+  damageDents: integer("damage_dents", { mode: "boolean" }).notNull().default(false),
+  damageWater: integer("damage_water", { mode: "boolean" }).notNull().default(false),
+  damageNote: text("damage_note"),
+  accessories: text("accessories"),
+
+  /**
+   * The device's own passcode or pattern.
+   *
+   * Plaintext, because the technician has to read it back — the control is where
+   * it GOES, not how it is stored (ADR-0014 §10). Never printed, never in an
+   * oplog payload, never in a log line, masked in the UI, and excluded from
+   * Phase 2 sync in plain form.
+   */
+  devicePasscode: text("device_passcode"),
+
+  /* ---- what was agreed ---- */
+  promisedDate: ts("promised_date"),
+  promisedHalf: text("promised_half", { enum: PROMISED_HALVES }),
+  assignedUserId: text("assigned_user_id"),
+  depositCents: integer("deposit_cents").notNull().default(0),
+  /** signed "repair up to X" authorization; NULL = none given */
+  authorizedCapCents: integer("authorized_cap_cents"),
+  /** snapshots, so changing a setting cannot reach back into a ticket (ADR-0014 §8) */
+  diagnosisFeeCents: integer("diagnosis_fee_cents").notNull().default(0),
+  warrantyMonths: integer("warranty_months").notNull().default(3),
+
+  /* ---- the facts that entail the status ---- */
+  readyAt: ts("ready_at"),
+  notRepairedAt: ts("not_repaired_at"),
+  notRepairedReason: text("not_repaired_reason", { enum: NOT_REPAIRED_REASONS }),
+  /** the T1- sale that closed it — the cross-reference, stored both ways */
+  collectionDocumentId: text("collection_document_id"),
+  /**
+   * CACHE of repairStatus(), never a source (ADR-0014 §1).
+   *
+   * Written in the same transaction as the fact that moved it, exactly as
+   * product_stock is written with its movement. `db:audit` checks the two agree,
+   * which is what stops a cache from quietly becoming a second truth.
+   */
+  status: text("status", { enum: REPAIR_STATUSES }).notNull().default("received"),
+
+  createdAt: ts("created_at").notNull(),
+  updatedAt: ts("updated_at").notNull(),
+}, (t) => [
+  uniqueIndex("ux_repair_document").on(t.documentId),
+  index("ix_repair_status").on(t.tenantId, t.status),
+  index("ix_repair_customer").on(t.customerId),
+  index("ix_repair_assigned").on(t.assignedUserId),
+]);
+
+/**
+ * What will be charged, and what it cost.
+ *
+ * An `inventory_part` line has already left the shelf — its consumption movement
+ * is posted when the line is added. A `part_on_order` line has zero stock effect
+ * until it is received. `labor` has no stock at all, which is why it is a line
+ * kind rather than a product (a labor "product" would appear in Catálogo and in
+ * stock counts).
+ */
+export const repairLines = sqliteTable("repair_lines", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  ticketId: text("ticket_id").notNull().references(() => repairTickets.id),
+  kind: text("kind", { enum: REPAIR_LINE_KINDS }).notNull(),
+  productId: text("product_id").references(() => products.id),
+  description: text("description").notNull(),
+  qty: integer("qty").notNull().default(1),
+  /** snapshot at the moment it was taken; the charge may move, this may not */
+  unitCostCents: integer("unit_cost_cents"),
+  chargeCents: integer("charge_cents").notNull().default(0),
+
+  /* ---- part_on_order only ---- */
+  supplierText: text("supplier_text"),
+  expectedCostCents: integer("expected_cost_cents"),
+  orderedAt: ts("ordered_at"),
+  receivedAt: ts("received_at"),
+
+  createdAt: ts("created_at").notNull(),
+  updatedAt: ts("updated_at").notNull(),
+}, (t) => [index("ix_repair_line_ticket").on(t.ticketId)]);
+
+/**
+ * What the customer approved, and for how much.
+ *
+ * Rows, not a flag. Approval binds to an AMOUNT (ADR-0014 §2): if the quote later
+ * rises above it the ticket falls back to Presupuestado and needs a second
+ * approval — and both stay on the record, because "they approved 79 € on Monday
+ * and 145 € on Wednesday" is the sentence that settles a dispute.
+ */
+export const repairApprovals = sqliteTable("repair_approvals", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  ticketId: text("ticket_id").notNull().references(() => repairTickets.id),
+  method: text("method", { enum: REPAIR_APPROVAL_METHODS }).notNull(),
+  approvedTotalCents: integer("approved_total_cents").notNull(),
+  userId: text("user_id"),
+  createdAt: ts("created_at").notNull(),
+}, (t) => [index("ix_repair_approval_ticket").on(t.ticketId)]);
+
+/**
+ * "We called them."
+ *
+ * Nothing is sent from the till. The shape is what a Phase 2 cloud job would need
+ * to send from — method, note, actor, timestamp — so the log is useful now as a
+ * record and useful later as a queue.
+ */
+export const repairNotifications = sqliteTable("repair_notifications", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  ticketId: text("ticket_id").notNull().references(() => repairTickets.id),
+  method: text("method", { enum: REPAIR_NOTIFY_METHODS }).notNull(),
+  note: text("note"),
+  userId: text("user_id"),
+  createdAt: ts("created_at").notNull(),
+}, (t) => [index("ix_repair_notify_ticket").on(t.ticketId)]);
+
+/** Intake photos. Files on disk, paths in rows — same rule as purchases (ADR-0013 §3). */
+export const repairPhotos = sqliteTable("repair_photos", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  ticketId: text("ticket_id").notNull().references(() => repairTickets.id),
+  kind: text("kind", { enum: PHOTO_KINDS }).notNull(),
+  path: text("path").notNull(),
+  createdAt: ts("created_at").notNull(),
+}, (t) => [index("ix_repair_photo_ticket").on(t.ticketId)]);
+
+export const CASH_MOVEMENT_REASONS = [
+  "repair_deposit",
+  "repair_deposit_refund",
+  "used_purchase_payout",
+] as const;
+
+/**
+ * Money in and out of the drawer that is NOT a sale.
+ *
+ * Introduced by the repairs slice (ADR-0014 §7) because a deposit is cash the
+ * shop is holding for a customer, and at hand-back it may have to be given back.
+ *
+ * **The boundary, drawn deliberately:** sale takings and change stay OUT of this
+ * table until the Cash screen slice. They are already fully recorded as document
+ * tenders, and copying them here would create two answers to "what did we take
+ * today" — one of which would be wrong the first time a copy was missed. What
+ * lives here is what has no other home: deposits, their refunds, and used-device
+ * payouts. When Caja lands, it opens the float and reconciles by reading tenders
+ * AND this table, rather than a third ledger written later.
+ */
+export const cashMovements = sqliteTable("cash_movements", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  locationId: text("location_id").notNull().references(() => locations.id),
+  terminalId: text("terminal_id").notNull().references(() => terminals.id),
+  /** signed: + into the drawer, − out of it */
+  amountCents: integer("amount_cents").notNull(),
+  reason: text("reason", { enum: CASH_MOVEMENT_REASONS }).notNull(),
+  /** the R- or C- document this belongs to, when there is one */
+  documentId: text("document_id"),
+  ticketId: text("ticket_id"),
+  userId: text("user_id"),
+  createdAt: ts("created_at").notNull(),
+}, (t) => [
+  index("ix_cash_movement_created").on(t.tenantId, t.createdAt),
+  index("ix_cash_movement_document").on(t.documentId),
 ]);

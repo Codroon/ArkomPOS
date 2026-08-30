@@ -1,6 +1,6 @@
 # Arkom POS — Repairs slice (Reparaciones · Taller · Técnico)
 
-Status: **Stage A — design, awaiting go** · Target: **v0.12.0** · Owner: Zothix (Codroon)
+Status: **Stage B — building** · Target: **v0.12.0** · Owner: Zothix (Codroon)
 Companions: [`ADR-0014`](../adr/0014-repair-tickets-status-from-facts-and-parts-before-revenue.md)
 (decisions) · [`system-design.md`](../design/system-design.md) (schema + IPC) ·
 [`handoff/repairs.md`](../design/handoff/repairs.md) (screens).
@@ -204,7 +204,7 @@ sellers to customers · shifts, float and the Z report that will read `cash_move
 
 ### P. Permissions
 
-- [ ] **P1** New registry keys with these defaults:
+- [ ] **P1** New registry keys with these defaults (thirteen — `repair.price_override` was added by the Stage B call that replaced `release_without_payment`):
 
 | Key | Module | Cashier | Technician | Approvable |
 |---|---|---|---|---|
@@ -218,6 +218,7 @@ sellers to customers · shifts, float and the Z report that will read `cash_move
 | `repair.assign` | repair | ✅ | ❌ | — |
 | `repair.markReady` | repair | ✅ | ✅ | — |
 | `repair.collect` | repair | ✅ | ❌ | — |
+| `repair.price_override` | repair | ❌ | ❌ | ✅ |
 | `repair.markNotRepaired` | repair | ❌ | ❌ | ✅ |
 | `workshop.view` | workshop | ✅ | ✅ | — |
 

@@ -157,6 +157,49 @@ export {
 } from "./purchase-doc";
 export type { PurchaseDoc, PurchaseDocDevice, PurchaseDocSeller, ShelfLabel } from "./purchase-doc";
 export { opsToText, opBuilder } from "./print-ops";
+export {
+  REPAIR_STATUSES,
+  REPAIR_LINE_KINDS,
+  REPAIR_APPROVAL_METHODS,
+  REPAIR_NOTIFY_METHODS,
+  NOT_REPAIRED_REASONS,
+  PROMISED_HALVES,
+  REFUSAL_ES,
+  quoteTotalCents,
+  ticketCostCents,
+  ticketMargin,
+  openOrderedParts,
+  latestApproval,
+  workAuthorization,
+  repairStatus,
+  isTerminal,
+  checkAction,
+  assertAction,
+  needsPriceOverride,
+  collectionTotalCents,
+  warrantyEndsAt,
+  isOverdue,
+  normalizePhone,
+  assertPhone,
+} from "./repair";
+export type {
+  RepairStatus,
+  RepairLineKind,
+  RepairApprovalMethod,
+  RepairNotifyMethod,
+  NotRepairedReason,
+  PromisedHalf,
+  RepairLineLike,
+  RepairApprovalLike,
+  RepairFacts,
+  RepairMargin,
+  Authorization,
+  AuthorizationSource,
+  RepairAction,
+  RepairRefusal,
+  ActionContext,
+  ChargeChange,
+} from "./repair";
 export { AppError, appError, toBridgeError, parseIpcError } from "./errors";
 export {
   TAX_RATE_BP,
