@@ -22,9 +22,15 @@ import {
   mutate,
   needsPriceOverride,
   normalizePhone,
+  collectionTotalCents,
+  computeDocumentTotals,
+  computeLine,
   quoteTotalCents,
   REPAIR_STATUSES,
   repairStatus,
+  TAX_RATE_BP,
+  validateCompletion,
+  warrantyEndsAt,
   ticketMargin,
   toOplogJson,
   uuidv7,
@@ -39,7 +45,10 @@ import {
   type RepairFacts,
   type RepairListRow,
   type RepairPeek,
+  type RepairCollectResponse,
+  type RepairMarkNotRepairedResponse,
   type RepairStatus,
+  type TenderDraft,
   type WorkshopBoard,
 } from "@arkom/core";
 import { schema, type ArkomDb } from "@arkom/db";
@@ -59,6 +68,8 @@ const {
   repairNotifications,
   repairPhotos,
   repairTickets,
+  documentLines,
+  documentTenders,
   users,
 } = schema;
 
@@ -1461,4 +1472,363 @@ export function peekTicket(db: ArkomDb, ctx: MutationCtx, ticketId: string): Rep
     totalCents: detail.quoteTotalCents,
     depositCents: detail.depositCents,
   };
+}
+
+/* ------------------------------------------------------------ hand-back */
+
+/**
+ * The device is fixed and on the shelf.
+ *
+ * `ready_at` is a fact, and the guard refuses it unless the OTHER facts support
+ * it: something was quoted, the customer authorized it, and no ordered part is
+ * still outstanding. Marking a phone ready with a part in the post is how a
+ * customer drives across town for nothing.
+ */
+export function markReady(db: ArkomDb, ctx: MutationCtx, ticketId: string): RepairDetail {
+  return mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    const ticket = liveTicket(tx, ctx, ticketId);
+    assertAction(loadFacts(tx, ticketId), "mark_ready");
+
+    const now = new Date();
+    tx.update(repairTickets).set({ readyAt: now, updatedAt: now }).where(eq(repairTickets.id, ticket.id)).run();
+    log({
+      entity: "repair_ticket",
+      entityId: ticket.id,
+      action: "ready",
+      before: { readyAt: null },
+      after: { readyAt: now.toISOString() },
+    });
+    syncStatus(tx, ticket.id, log);
+    return getDetail(tx, ctx, ticket.id);
+  });
+}
+
+/**
+ * "We called them."
+ *
+ * **Sends nothing.** The till has no phone and no internet; what it has is a
+ * record that someone picked up the handset, which is what settles "nobody told
+ * me". The shape is what a Phase 2 cloud job would send FROM, so the log is
+ * useful now and a queue later (ADR-0014 §5).
+ */
+export function notifyCustomer(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  input: { ticketId: string; method: "phone" | "in_person" | "other"; note?: string | null },
+): RepairDetail {
+  return mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    const ticket = liveTicket(tx, ctx, input.ticketId);
+    const row = {
+      id: uuidv7(),
+      tenantId: ctx.tenantId,
+      ticketId: ticket.id,
+      method: input.method,
+      note: input.note?.trim() || null,
+      userId: ctx.userId ?? null,
+      createdAt: new Date(),
+    };
+    tx.insert(repairNotifications).values(row).run();
+    log({ entity: "repair_notification", entityId: row.id, action: "create", before: null, after: toOplogJson(row) });
+    return getDetail(tx, ctx, ticket.id);
+  });
+}
+
+/**
+ * Cobro y entrega — the fiscal half of a repair.
+ *
+ * The revenue appears HERE and nowhere earlier (ADR-0014 §4): the R- document
+ * is a record of custody with a zero total, and this T1- is the invoice. Its
+ * lines are the quote's lines with an IVA21 snapshot each (ADR-0007), because a
+ * tax rate that moves next year must not reach back into a job done today.
+ *
+ * **No stock moves here.** The parts left the shelf when they were fitted; a
+ * second deduction at hand-back would take every part out of stock twice.
+ *
+ * The deposit is applied as a `deposit` tender, never as a negative line: a
+ * discount line would corrupt the taxable base and the printed IVA breakdown.
+ * It also posts a NEGATIVE cash_movements row — the money is still in the
+ * drawer, but it has stopped being cash the shop is HOLDING for someone and
+ * become takings the T1 accounts for. Netting the ticket's cash rows to zero is
+ * what stops Caja counting the same €30 twice (ADR-0014 §7).
+ */
+export function collect(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  input: { ticketId: string; tenders: TenderDraft[] },
+): RepairCollectResponse {
+  return mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    const ticket = liveTicket(tx, ctx, input.ticketId);
+    const facts = loadFacts(tx, input.ticketId);
+    assertAction(facts, "collect");
+
+    const lines = tx
+      .select()
+      .from(repairLines)
+      .where(eq(repairLines.ticketId, ticket.id))
+      .orderBy(asc(repairLines.createdAt))
+      .all();
+
+    /* exactly the ticket's charged total, never a number from the payload */
+    const totalCents = collectionTotalCents(lines);
+    const depositApplied = Math.min(ticket.depositCents, totalCents);
+    const now = new Date();
+
+    /* the deposit is a tender, and it goes in first so the remainder the
+       cashier is asked for is the real one */
+    const allTenders: TenderDraft[] = [
+      ...(depositApplied > 0 ? [{ method: "deposit" as const, amountCents: depositApplied }] : []),
+      ...input.tenders,
+    ];
+
+    const series = tx
+      .select()
+      .from(numberSeries)
+      .where(and(eq(numberSeries.terminalId, ctx.terminalId), eq(numberSeries.docType, "ticket")))
+      .all()[0];
+    if (!series) throw appError("VALIDATION", "Serie de numeración no configurada para este terminal.");
+
+    const money = lines.map((line) =>
+      computeLine({ qty: 1, unitPriceCents: line.chargeCents, taxRateBp: TAX_RATE_BP.IVA21 }),
+    );
+    const totals = computeDocumentTotals(money);
+    const { changeCents } = validateCompletion({
+      lineCount: lines.length,
+      totalCents: totals.totalCents,
+      tenders: allTenders,
+    });
+
+    const allocation = allocateNumber({ prefix: series.prefix, nextNumber: series.nextNumber });
+    tx.update(numberSeries).set({ nextNumber: allocation.next.nextNumber }).where(eq(numberSeries.id, series.id)).run();
+
+    const docRow = {
+      id: uuidv7(),
+      tenantId: ctx.tenantId,
+      locationId: ctx.locationId,
+      terminalId: ctx.terminalId,
+      docType: "ticket" as const,
+      status: "completed" as const,
+      seriesId: series.id,
+      number: allocation.number,
+      docNumber: allocation.docNumber,
+      subtotalCents: totals.subtotalCents,
+      taxCents: totals.taxCents,
+      totalCents: totals.totalCents,
+      userId: ctx.userId ?? null,
+      createdAt: now,
+      completedAt: now,
+    };
+    tx.insert(documents).values(docRow).run();
+    log({ entity: "document", entityId: docRow.id, action: "create", before: null, after: toOplogJson(docRow) });
+
+    lines.forEach((line, i) => {
+      const m = money[i]!;
+      const lineRow = {
+        id: uuidv7(),
+        tenantId: ctx.tenantId,
+        documentId: docRow.id,
+        lineNo: i + 1,
+        lineType: "product" as const,
+        productId: line.productId,
+        unitId: null,
+        description: line.description,
+        qty: 1,
+        unitPriceCents: line.chargeCents,
+        // the snapshot: regime and rate travel with the line (ADR-0007)
+        taxRegime: "IVA21" as const,
+        taxRateBp: TAX_RATE_BP.IVA21,
+        baseCents: m.baseCents,
+        taxCents: m.taxCents,
+        totalCents: m.totalCents,
+        createdAt: now,
+      };
+      tx.insert(documentLines).values(lineRow).run();
+      log({ entity: "document_line", entityId: lineRow.id, action: "create", before: null, after: toOplogJson(lineRow) });
+    });
+
+    for (const tender of allTenders) {
+      const row = {
+        id: uuidv7(),
+        tenantId: ctx.tenantId,
+        documentId: docRow.id,
+        method: tender.method,
+        amountCents: tender.amountCents,
+        cardReference: tender.cardReference?.trim() || null,
+        createdAt: now,
+      };
+      tx.insert(documentTenders).values(row).run();
+      log({ entity: "document_tender", entityId: row.id, action: "create", before: null, after: toOplogJson(row) });
+    }
+
+    /* the deposit stops being money held on someone's behalf */
+    if (depositApplied > 0) {
+      const cashRow = {
+        id: uuidv7(),
+        tenantId: ctx.tenantId,
+        locationId: ctx.locationId,
+        terminalId: ctx.terminalId,
+        amountCents: -depositApplied,
+        reason: "repair_deposit_applied" as const,
+        documentId: docRow.id,
+        ticketId: ticket.id,
+        userId: ctx.userId ?? null,
+        createdAt: now,
+      };
+      tx.insert(cashMovements).values(cashRow).run();
+      log({ entity: "cash_movement", entityId: cashRow.id, action: "create", before: null, after: toOplogJson(cashRow) });
+    }
+
+    tx.update(repairTickets)
+      .set({ collectionDocumentId: docRow.id, updatedAt: now })
+      .where(eq(repairTickets.id, ticket.id))
+      .run();
+    log({
+      entity: "repair_ticket",
+      entityId: ticket.id,
+      action: "collect",
+      before: { collectionDocumentId: null },
+      // both directions, so either document finds the other (ADR-0014 §7a)
+      after: { collectionDocumentId: docRow.id, docNumber: allocation.docNumber },
+    });
+
+    syncStatus(tx, ticket.id, log);
+
+    return {
+      docId: docRow.id,
+      docNumber: allocation.docNumber,
+      totalCents: totals.totalCents,
+      depositAppliedCents: depositApplied,
+      changeCents,
+    };
+  });
+}
+
+/**
+ * Closing a ticket without repairing the device.
+ *
+ * The bookkeeping this refuses to skip: **every consumed part is resolved
+ * first**. Each one either goes back on the shelf (a reversal movement, never a
+ * deletion) or stays charged because it went into the device and is not coming
+ * out. A part that silently vanished from stock when a ticket closed is the
+ * failure this whole path exists to prevent (ADR-0014 §3).
+ *
+ * The diagnosis fee may be charged only if it was announced on the intake
+ * receipt — that snapshot is the promise, and a fee the customer never saw is
+ * not one the shop may invent later (ADR-0014 §8).
+ */
+export function markNotRepaired(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  input: {
+    ticketId: string;
+    reason: "customer_declined" | "unrepairable" | "abandoned";
+    resolutions: Array<{ lineId: string; action: "return" | "charge" }>;
+    depositAction: "refund" | "apply_fee";
+    chargeDiagnosisFee: boolean;
+  },
+): RepairMarkNotRepairedResponse {
+  return mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    const ticket = liveTicket(tx, ctx, input.ticketId);
+    const now = new Date();
+
+    const consumed = tx
+      .select()
+      .from(repairLines)
+      .where(and(eq(repairLines.ticketId, ticket.id), eq(repairLines.kind, "inventory_part")))
+      .all();
+
+    const decided = new Map(input.resolutions.map((r) => [r.lineId, r.action]));
+    const unresolved = consumed.filter((line) => !decided.has(line.id)).length;
+    assertAction(loadFacts(tx, ticket.id), "mark_not_repaired", {
+      reason: input.reason,
+      unresolvedPartCount: unresolved,
+    });
+
+    /* returns first: each one is a SECOND movement, the exact opposite of the
+       one that took it, and the row it belonged to goes with it */
+    for (const line of consumed) {
+      if (decided.get(line.id) !== "return") continue;
+      if (line.productId) {
+        postMovement(
+          tx,
+          ctx,
+          log,
+          buildMovement({
+            productId: line.productId,
+            locationId: ctx.locationId,
+            movementType: "repair_part_out",
+            qty: line.qty,
+            reason: "reparación cerrada sin reparar",
+          }),
+          now,
+          ticket.documentId,
+        );
+      }
+      tx.delete(repairLines).where(eq(repairLines.id, line.id)).run();
+      log({ entity: "repair_line", entityId: line.id, action: "delete", before: toOplogJson(line), after: null });
+    }
+
+    const chargedParts = consumed.filter((line) => decided.get(line.id) === "charge");
+    const chargedPartsCents = chargedParts.reduce((total, line) => total + line.chargeCents, 0);
+
+    /* a fee that never appeared on the intake receipt cannot be charged now */
+    const feeCents = input.chargeDiagnosisFee ? ticket.diagnosisFeeCents : 0;
+    if (input.chargeDiagnosisFee && ticket.diagnosisFeeCents === 0) {
+      throw appError("VALIDATION", "La tarifa no se anunció en el resguardo.");
+    }
+
+    const owed = chargedPartsCents + feeCents;
+    const depositApplied = input.depositAction === "apply_fee" ? Math.min(ticket.depositCents, owed) : 0;
+    const depositRefunded = ticket.depositCents - depositApplied;
+
+    /* Every deposit resolves exactly once, and the ticket's cash rows net to
+       zero: what was applied became takings, what was refunded left the drawer.
+       Two rows rather than one because they are two different events. */
+    const postCash = (amountCents: number, reason: "repair_deposit_applied" | "repair_deposit_refund") => {
+      if (amountCents <= 0) return;
+      const row = {
+        id: uuidv7(),
+        tenantId: ctx.tenantId,
+        locationId: ctx.locationId,
+        terminalId: ctx.terminalId,
+        amountCents: -amountCents,
+        reason,
+        documentId: ticket.documentId,
+        ticketId: ticket.id,
+        userId: ctx.userId ?? null,
+        createdAt: now,
+      };
+      tx.insert(cashMovements).values(row).run();
+      log({ entity: "cash_movement", entityId: row.id, action: "create", before: null, after: toOplogJson(row) });
+    };
+    postCash(depositApplied, "repair_deposit_applied");
+    postCash(depositRefunded, "repair_deposit_refund");
+
+    tx.update(repairTickets)
+      .set({ notRepairedAt: now, notRepairedReason: input.reason, updatedAt: now })
+      .where(eq(repairTickets.id, ticket.id))
+      .run();
+    log({
+      entity: "repair_ticket",
+      entityId: ticket.id,
+      action: "not_repaired",
+      before: { notRepairedAt: null },
+      after: {
+        notRepairedAt: now.toISOString(),
+        reason: input.reason,
+        diagnosisFeeCents: feeCents,
+        depositAppliedCents: depositApplied,
+        depositRefundedCents: depositRefunded,
+      },
+    });
+
+    syncStatus(tx, ticket.id, log);
+
+    return {
+      detail: getDetail(tx, ctx, ticket.id),
+      diagnosisFeeCents: feeCents,
+      depositAppliedCents: depositApplied,
+      depositRefundedCents: depositRefunded,
+      dueCents: Math.max(0, owed - depositApplied),
+    };
+  });
 }

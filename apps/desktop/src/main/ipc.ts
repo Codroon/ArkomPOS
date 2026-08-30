@@ -182,6 +182,12 @@ import {
   RepairPeekSchema,
   WorkshopBoardRequestSchema,
   WorkshopBoardResponseSchema,
+  RepairMarkReadyRequestSchema,
+  RepairNotifyRequestSchema,
+  RepairCollectRequestSchema,
+  RepairCollectResponseSchema,
+  RepairMarkNotRepairedRequestSchema,
+  RepairMarkNotRepairedResponseSchema,
   type MutationCtx,
   type PermissionKey,
 } from "@arkom/core";
@@ -208,7 +214,11 @@ import {
   addLine as addRepairLine,
   assignTicket,
   board,
+  collect,
   createTicket,
+  markNotRepaired,
+  markReady,
+  notifyCustomer,
   editTicket,
   listTickets,
   peekTicket,
@@ -1004,6 +1014,45 @@ export function registerIpcHandlers(db: ArkomDb): void {
 
   guarded("workshop:board", "workshop.view", WorkshopBoardRequestSchema, WorkshopBoardResponseSchema, (s, input) =>
     board(db, s.ctx, input ?? {}),
+  );
+
+  guarded(
+    "repair:markReady",
+    "repair.markReady",
+    RepairMarkReadyRequestSchema,
+    RepairDetailSchema,
+    (s, { ticketId }) => markReady(db, s.ctx, ticketId),
+  );
+
+  /**
+   * "We called them."
+   *
+   * `repair.markReady`, not a permission of its own: telling the customer is
+   * the same counter act as putting the phone on the ready shelf, and a shop
+   * where one person may do the first and not the second has a phone nobody
+   * collects.
+   */
+  guarded("repair:notify", "repair.markReady", RepairNotifyRequestSchema, RepairDetailSchema, (s, input) =>
+    notifyCustomer(db, s.ctx, input),
+  );
+
+  guarded("repair:collect", "repair.collect", RepairCollectRequestSchema, RepairCollectResponseSchema, (s, input) =>
+    collect(db, s.ctx, input),
+  );
+
+  /**
+   * Closing a ticket unrepaired.
+   *
+   * Owner-only and **approvable**: it moves money — a deposit is refunded or
+   * absorbed, a fee may be charged, and parts are written off or kept — so a
+   * cashier presses the button and an owner's PIN completes it.
+   */
+  guarded(
+    "repair:markNotRepaired",
+    "repair.markNotRepaired",
+    RepairMarkNotRepairedRequestSchema,
+    RepairMarkNotRepairedResponseSchema,
+    (s, input) => markNotRepaired(db, s.ctx, input),
   );
 
   guarded("repair:print", "repair.view", RepairPrintRequestSchema, RepairPrintResponseSchema, (s, input) =>

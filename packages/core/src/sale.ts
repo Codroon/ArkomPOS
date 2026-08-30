@@ -97,7 +97,14 @@ export function availableForSale(
  * would change the taxable base and the printed IVA breakdown, so the goods keep
  * their value and the voucher pays for them the way cash does.
  */
-export type TenderMethod = "cash" | "card" | "bizum" | "transfer" | "store_credit";
+/**
+ * Note `deposit`: it is a tender the till can BUILD but never one a renderer may
+ * SEND. A repair's deposit was taken weeks ago and is applied by main from the
+ * ticket's own row (ADR-0014 §7), so it is absent from `TenderMethodSchema` —
+ * the payload schema — and present here, where main constructs the row. A
+ * renderer that tries to send one is refused at the bridge.
+ */
+export type TenderMethod = "cash" | "card" | "bizum" | "transfer" | "store_credit" | "deposit";
 
 export interface TenderDraft {
   method: TenderMethod;
@@ -127,6 +134,16 @@ export interface TenderSummary {
  */
 const CAN_GIVE_CHANGE: ReadonlySet<TenderMethod> = new Set(["cash", "store_credit"]);
 
+/**
+ * Tenders that cannot leave change but are not a "card excess" either.
+ *
+ * A deposit larger than the final bill is not an overpayment the cashier must
+ * explain — it is money the shop owes back, and the hand-back flow settles it.
+ * Refusing the collection outright would strand a customer whose repair came in
+ * cheaper than quoted.
+ */
+const PREPAID: ReadonlySet<TenderMethod> = new Set(["deposit"]);
+
 /** Pure running summary for the payment panel; throws only on malformed amounts. */
 export function tenderSummary(totalCents: number, tenders: ReadonlyArray<TenderDraft>): TenderSummary {
   let paidCents = 0;
@@ -136,7 +153,9 @@ export function tenderSummary(totalCents: number, tenders: ReadonlyArray<TenderD
       throw appError("VALIDATION", "Importe de pago no válido.", "amountCents");
     }
     paidCents += tender.amountCents;
-    if (!CAN_GIVE_CHANGE.has(tender.method)) nonCashCents += tender.amountCents;
+    if (!CAN_GIVE_CHANGE.has(tender.method) && !PREPAID.has(tender.method)) {
+      nonCashCents += tender.amountCents;
+    }
   }
   const nonCashExcess = nonCashCents > totalCents;
   return {

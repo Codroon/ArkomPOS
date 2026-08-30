@@ -20,6 +20,9 @@ import {
   renderPurchaseDoc,
   renderIntakeReceipt,
   renderQuoteDoc,
+  renderRepairReceipt,
+  renderReturnDoc,
+  warrantyEndsAt,
   renderShelfLabel,
   renderTicket,
   wrapText,
@@ -34,6 +37,8 @@ import {
   type RepairPrintRequest,
   type IntakeReceiptDoc,
   type QuoteDoc,
+  type RepairReceiptDoc,
+  type ReturnDoc,
 } from "@arkom/core";
 import { schema, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner } from "../mutate-runner";
@@ -510,26 +515,151 @@ function loadQuoteDoc(
   };
 }
 
+/**
+ * The collection receipt: the fiscal document AND the warranty statement.
+ *
+ * It reads the T1- the ticket points at, so what prints is the document that
+ * exists rather than a re-derivation of it — the amounts on paper are the
+ * amounts in the books by construction.
+ */
+function loadReceiptDoc(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  ticketId: string,
+  isCopy: boolean,
+): { doc: RepairReceiptDoc; documentId: string } {
+  const detail = getDetail(db, ctx, ticketId);
+  const intake = loadIntakeDoc(db, ctx, ticketId, isCopy);
+  if (!detail.collectionDocumentId) {
+    throw appError("VALIDATION", "Esta ficha todavía no se ha cobrado.");
+  }
+
+  const { documents, documentLines, documentTenders } = schema;
+  const doc = db
+    .select()
+    .from(documents)
+    .where(eq(documents.id, detail.collectionDocumentId))
+    .limit(1)
+    .all()[0];
+  if (!doc) throw appError("VALIDATION", "No se encuentra el recibo.");
+
+  const lines = db.select().from(documentLines).where(eq(documentLines.documentId, doc.id)).all();
+  const tenders = db.select().from(documentTenders).where(eq(documentTenders.documentId, doc.id)).all();
+  const paid = tenders.reduce((total, t) => total + t.amountCents, 0);
+
+  return {
+    documentId: doc.id,
+    doc: {
+      docNumber: doc.docNumber ?? "",
+      repairDocNumber: detail.docNumber,
+      collectedAtMs: (doc.completedAt ?? doc.createdAt).getTime(),
+      terminalName: intake.doc.terminalName,
+      cashierName: intake.doc.cashierName,
+      isCopy,
+      customerName: detail.customer.name,
+      device: detail.device,
+      lines: lines.map((l) => ({ description: l.description, qty: l.qty, chargeCents: l.totalCents })),
+      subtotalCents: doc.subtotalCents,
+      taxCents: doc.taxCents,
+      taxRateBp: lines[0]?.taxRateBp ?? 2100,
+      totalCents: doc.totalCents,
+      tenders: tenders.map((t) => ({
+        method: TENDER_ES[t.method] ?? t.method,
+        amountCents: t.amountCents,
+        isDeposit: t.method === "deposit",
+      })),
+      changeCents: Math.max(0, paid - doc.totalCents),
+      warrantyEndsAtMs: warrantyEndsAt(doc.completedAt ?? doc.createdAt, detail.warrantyMonths).getTime(),
+    },
+  };
+}
+
+/** The paper that closes a ticket nobody repaired. */
+function loadReturnDoc(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  ticketId: string,
+  isCopy: boolean,
+): { doc: ReturnDoc; documentId: string } {
+  const detail = getDetail(db, ctx, ticketId);
+  const intake = loadIntakeDoc(db, ctx, ticketId, isCopy);
+  if (!detail.notRepairedAt || !detail.notRepairedReason) {
+    throw appError("VALIDATION", "Esta ficha no está cerrada como no reparada.");
+  }
+
+  const { cashMovements } = schema;
+  const cash = db.select().from(cashMovements).where(eq(cashMovements.ticketId, ticketId)).all();
+  const sumOf = (reason: string) =>
+    cash.filter((c) => c.reason === reason).reduce((total, c) => total + Math.abs(c.amountCents), 0);
+  const applied = sumOf("repair_deposit_applied");
+  const refunded = sumOf("repair_deposit_refund");
+
+  // whatever survived the resolution is what the customer is being charged for
+  const chargedParts = detail.lines.filter((l) => l.kind === "inventory_part");
+  const owed = chargedParts.reduce((total, l) => total + l.chargeCents, 0) + detail.diagnosisFeeCents;
+
+  return {
+    documentId: detail.documentId,
+    doc: {
+      docNumber: detail.docNumber,
+      returnedAtMs: detail.notRepairedAt,
+      terminalName: intake.doc.terminalName,
+      cashierName: intake.doc.cashierName,
+      isCopy,
+      customerName: detail.customer.name,
+      customerPhone: detail.customer.phone,
+      device: detail.device,
+      reason: detail.notRepairedReason,
+      chargedParts: chargedParts.map((l) => ({
+        description: l.description,
+        qty: l.qty,
+        chargeCents: l.chargeCents,
+      })),
+      diagnosisFeeCents: chargedParts.length > 0 || applied > 0 ? detail.diagnosisFeeCents : 0,
+      depositAppliedCents: applied,
+      depositRefundedCents: refunded,
+      dueCents: Math.max(0, owed - applied),
+    },
+  };
+}
+
+/** Fixed Spanish for the tender names on printed paper (ADR-0011). */
+const TENDER_ES: Record<string, string> = {
+  cash: "Efectivo",
+  card: "Tarjeta",
+  bizum: "Bizum",
+  transfer: "Transferencia",
+  store_credit: "Saldo a favor",
+  deposit: "Depósito",
+};
+
 export async function printRepair(
   db: ArkomDb,
   ctx: MutationCtx,
   req: RepairPrintRequest,
 ): Promise<PrintTicketResponse> {
-  if (req.what === "receipt" || req.what === "return") {
-    throw appError("VALIDATION", "Ese documento todavía no existe.");
-  }
   const settings = getSettings(db, ctx);
   const shop = shopProfile(db, ctx);
 
-  const loaded = req.what === "quote"
-    ? loadQuoteDoc(db, ctx, req.ticketId, req.copy)
-    : loadIntakeDoc(db, ctx, req.ticketId, req.copy);
+  const loaded =
+    req.what === "quote"
+      ? loadQuoteDoc(db, ctx, req.ticketId, req.copy)
+      : req.what === "receipt"
+        ? loadReceiptDoc(db, ctx, req.ticketId, req.copy)
+        : req.what === "return"
+          ? loadReturnDoc(db, ctx, req.ticketId, req.copy)
+          : loadIntakeDoc(db, ctx, req.ticketId, req.copy);
 
   const ops =
     req.what === "quote"
       ? renderQuoteDoc((loaded as { doc: QuoteDoc }).doc, shop, settings.paperWidthMm)
-      : renderIntakeReceipt((loaded as { doc: IntakeReceiptDoc }).doc, shop, settings.paperWidthMm);
-  const suffix = req.what === "quote" ? "-presupuesto" : "";
+      : req.what === "receipt"
+        ? renderRepairReceipt((loaded as { doc: RepairReceiptDoc }).doc, shop, settings.paperWidthMm)
+        : req.what === "return"
+          ? renderReturnDoc((loaded as { doc: ReturnDoc }).doc, shop, settings.paperWidthMm)
+          : renderIntakeReceipt((loaded as { doc: IntakeReceiptDoc }).doc, shop, settings.paperWidthMm);
+  const suffix =
+    req.what === "quote" ? "-presupuesto" : req.what === "return" ? "-devolucion" : "";
   const fileBase = `${loaded.doc.docNumber || "REPARACION"}${suffix}${req.copy ? "-COPIA" : ""}`;
 
   if (req.target === "pdf" || !settings.printerName) {

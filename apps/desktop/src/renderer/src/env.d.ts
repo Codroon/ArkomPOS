@@ -43,7 +43,10 @@ import type {
   RepairDetail,
   RepairListRow,
   RepairPeek,
+  RepairCollectResponse,
+  RepairMarkNotRepairedResponse,
   RepairStatus,
+  TenderDraft,
   WorkshopBoard,
   UsedCheckImeiResponse,
   UsedLogRequest,
@@ -241,6 +244,25 @@ declare global {
         channel: "workshop:board",
         payload?: { technicianId?: string | null; unassignedOnly?: boolean | null },
       ): Promise<WorkshopBoard>;
+      invoke(channel: "repair:markReady", payload: { ticketId: string }): Promise<RepairDetail>;
+      invoke(
+        channel: "repair:notify",
+        payload: { ticketId: string; method: "phone" | "in_person" | "other"; note?: string | null },
+      ): Promise<RepairDetail>;
+      invoke(
+        channel: "repair:collect",
+        payload: { ticketId: string; tenders: TenderDraft[] },
+      ): Promise<RepairCollectResponse>;
+      invoke(
+        channel: "repair:markNotRepaired",
+        payload: {
+          ticketId: string;
+          reason: "customer_declined" | "unrepairable" | "abandoned";
+          resolutions: Array<{ lineId: string; action: "return" | "charge" }>;
+          depositAction: "refund" | "apply_fee";
+          chargeDiagnosisFee: boolean;
+        },
+      ): Promise<RepairMarkNotRepairedResponse>;
       invoke(
         channel: "repair:print",
         payload: { ticketId: string; what: "intake" | "quote" | "receipt" | "return"; copy?: boolean; target?: "auto" | "pdf" },

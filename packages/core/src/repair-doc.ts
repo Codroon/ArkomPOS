@@ -95,6 +95,32 @@ export const REPAIR_ES = {
   quoteAccept:
     "Autorizo la reparación por el importe indicado. El taller no realizará ningún trabajo con cargo por encima de este importe sin volver a consultarme.",
   quoteValidity: "Presupuesto sujeto a la avería declarada. Una avería distinta se presupuesta de nuevo.",
+  receiptTitle: "RECIBO DE REPARACIÓN",
+  receiptWork: "TRABAJO REALIZADO",
+  receiptTotal: "TOTAL",
+  receiptDeposit: "Depósito",
+  receiptPaid: "PAGADO",
+  receiptChange: "Cambio",
+  receiptBase: "Base",
+  receiptTax: "IVA {rate}%",
+  receiptWarrantyUntil:
+    "Garantía hasta el {date} en las piezas y la mano de obra de esta reparación.",
+  receiptWarrantyNote:
+    "No cubre golpes, humedad ni averías distintas de la reparada.",
+  returnTitle: "DEVOLUCIÓN SIN REPARAR",
+  returnReason: "Motivo",
+  returnDeclined: "El cliente no autoriza la reparación",
+  returnUnrepairable: "El dispositivo no tiene reparación viable",
+  returnAbandoned: "Dispositivo no recogido",
+  returnDevice: "Se devuelve al cliente el dispositivo descrito.",
+  returnParts: "PIEZAS",
+  returnPartsCharged: "Piezas montadas y no recuperables",
+  returnFee: "Tarifa de diagnóstico",
+  returnDepositApplied: "Depósito aplicado",
+  returnDepositRefunded: "Depósito devuelto",
+  returnDue: "Pendiente de pago",
+  returnNothingDue: "Nada que pagar",
+  returnReceived: "Recibí el dispositivo",
   quoteApproved: "APROBADO",
   quoteApprovedBy: "Aprobado {method} el {date}",
   quoteInPerson: "en persona",
@@ -340,6 +366,236 @@ export function renderQuoteDoc(doc: QuoteDoc, shop: ShopProfile, width: PaperWid
     b.feed(3);
     b.raw(`${REPAIR_ES.signatureRule} ${"_".repeat(Math.max(0, cols - 2))}`);
   }
+
+  b.rule();
+  b.text(REPAIR_ES.thanks, { align: "center" });
+  b.feed(2);
+  b.cut();
+
+  return b.ops;
+}
+
+/* ------------------------------------------------- the final receipt */
+
+export interface ReceiptDocLine {
+  description: string;
+  qty: number;
+  chargeCents: number;
+}
+
+export interface ReceiptDocTender {
+  method: string;
+  amountCents: number;
+  /** true for the deposit, which was taken weeks ago and is not a payment today */
+  isDeposit: boolean;
+}
+
+export interface RepairReceiptDoc {
+  docNumber: string;
+  /** the R- ticket this settles — the cross-reference ADR-0014 §7a requires */
+  repairDocNumber: string;
+  collectedAtMs: number;
+  terminalName: string;
+  cashierName: string;
+  isCopy: boolean;
+  customerName: string;
+  device: RepairDocDevice;
+  lines: ReadonlyArray<ReceiptDocLine>;
+  subtotalCents: number;
+  taxCents: number;
+  taxRateBp: number;
+  totalCents: number;
+  tenders: ReadonlyArray<ReceiptDocTender>;
+  changeCents: number;
+  warrantyEndsAtMs: number;
+}
+
+const dateOnly = (ms: number): string => formatPrintDate(ms).slice(0, 10);
+
+/**
+ * The receipt the customer walks out with.
+ *
+ * It is a fiscal document — it carries its own T1- number, its IVA breakdown and
+ * every tender — AND the warranty statement, which is the half the customer
+ * actually keeps it for. It names the R- ticket, so the two halves of the job
+ * point at each other from either direction (ADR-0014 §7a).
+ */
+export function renderRepairReceipt(
+  doc: RepairReceiptDoc,
+  shop: ShopProfile,
+  width: PaperWidthMm = 80,
+): TicketOp[] {
+  const cols = COLUMNS_BY_PAPER[width];
+  const b = opBuilder(cols);
+
+  if (doc.isCopy) {
+    b.text(letterSpaced(REPAIR_ES.copy, cols), { align: "center", bold: true });
+    b.feed(1);
+  }
+  b.text(REPAIR_ES.brand, { align: "center", bold: true, size: "big" });
+  b.text(letterSpaced(REPAIR_ES.tagline, cols), { align: "center" });
+  b.feed(1);
+  b.text(shop.legalName, { align: "center", bold: true });
+  b.text(`${REPAIR_ES.nif} ${shop.nif}`, { align: "center" });
+  b.text(shop.address, { align: "center" });
+
+  b.rule();
+  b.text(REPAIR_ES.receiptTitle, { bold: true });
+  b.pair(doc.docNumber, formatPrintDate(doc.collectedAtMs));
+  // both directions: the ticket knows its receipt, the receipt names its ticket
+  b.text(doc.repairDocNumber);
+  b.text(`${doc.terminalName} · ${REPAIR_ES.attendedBy} ${doc.cashierName}`);
+
+  b.rule();
+  b.text(REPAIR_ES.customer, { bold: true });
+  b.text(doc.customerName);
+
+  b.rule();
+  b.text(REPAIR_ES.device, { bold: true });
+  b.text(doc.device.description);
+  if (doc.device.imei) b.text(`${REPAIR_ES.imei} ${doc.device.imei}`);
+  b.text(`${REPAIR_ES.fault}: ${doc.device.reportedFault}`);
+
+  b.rule();
+  b.text(REPAIR_ES.receiptWork, { bold: true });
+  for (const line of doc.lines) {
+    const label = line.qty === 1 ? line.description : `${line.qty} × ${line.description}`;
+    b.pair(label, formatCents(line.chargeCents));
+  }
+
+  b.rule();
+  b.pair(REPAIR_ES.receiptTotal, formatCents(doc.totalCents), { bold: true, size: "wide" });
+  b.pair(REPAIR_ES.receiptBase, formatCents(doc.subtotalCents));
+  b.pair(REPAIR_ES.receiptTax.replace("{rate}", String(doc.taxRateBp / 100)), formatCents(doc.taxCents));
+
+  b.rule();
+  for (const tender of doc.tenders) {
+    // the deposit prints as a payment, because that is what it is — money the
+    // customer already handed over, not a discount on the work (ADR-0014 §7)
+    const label = tender.isDeposit ? REPAIR_ES.receiptDeposit : tender.method;
+    b.pair(label, formatCents(tender.amountCents));
+  }
+  if (doc.changeCents > 0) b.pair(REPAIR_ES.receiptChange, formatCents(doc.changeCents));
+
+  b.rule();
+  b.text(REPAIR_ES.receiptWarrantyUntil.replace("{date}", dateOnly(doc.warrantyEndsAtMs)), { bold: true });
+  b.text(REPAIR_ES.receiptWarrantyNote);
+
+  b.rule();
+  b.text(REPAIR_ES.thanks, { align: "center" });
+  b.feed(2);
+  b.cut();
+
+  return b.ops;
+}
+
+/* ------------------------------------------------ the return document */
+
+export type ReturnReason = "customer_declined" | "unrepairable" | "abandoned";
+
+export interface ReturnDoc {
+  docNumber: string;
+  returnedAtMs: number;
+  terminalName: string;
+  cashierName: string;
+  isCopy: boolean;
+  customerName: string;
+  customerPhone: string;
+  device: RepairDocDevice;
+  reason: ReturnReason;
+  /** parts that went into the device and are not coming back out */
+  chargedParts: ReadonlyArray<ReceiptDocLine>;
+  diagnosisFeeCents: number;
+  depositAppliedCents: number;
+  depositRefundedCents: number;
+  /** what is still owed after the deposit — zero is the common and good case */
+  dueCents: number;
+}
+
+const RETURN_REASON_ES: Record<ReturnReason, string> = {
+  customer_declined: REPAIR_ES.returnDeclined,
+  unrepairable: REPAIR_ES.returnUnrepairable,
+  abandoned: REPAIR_ES.returnAbandoned,
+};
+
+/**
+ * The paper that goes with a device handed back unrepaired.
+ *
+ * Its job is to close the custody the intake receipt opened: this device came
+ * in, here is why nothing was done to it, here is what was charged anyway and
+ * why, and here is the customer's signature saying they took it away.
+ */
+export function renderReturnDoc(doc: ReturnDoc, shop: ShopProfile, width: PaperWidthMm = 80): TicketOp[] {
+  const cols = COLUMNS_BY_PAPER[width];
+  const b = opBuilder(cols);
+
+  if (doc.isCopy) {
+    b.text(letterSpaced(REPAIR_ES.copy, cols), { align: "center", bold: true });
+    b.feed(1);
+  }
+  b.text(REPAIR_ES.brand, { align: "center", bold: true, size: "big" });
+  b.text(letterSpaced(REPAIR_ES.tagline, cols), { align: "center" });
+  b.feed(1);
+  b.text(shop.legalName, { align: "center", bold: true });
+  b.text(`${REPAIR_ES.nif} ${shop.nif}`, { align: "center" });
+  b.text(shop.address, { align: "center" });
+
+  b.rule();
+  b.text(REPAIR_ES.returnTitle, { bold: true });
+  b.pair(doc.docNumber, formatPrintDate(doc.returnedAtMs));
+  b.text(`${doc.terminalName} · ${REPAIR_ES.attendedBy} ${doc.cashierName}`);
+
+  b.rule();
+  b.text(REPAIR_ES.customer, { bold: true });
+  b.text(`${doc.customerName} · ${doc.customerPhone}`);
+
+  b.rule();
+  b.text(REPAIR_ES.device, { bold: true });
+  b.text(doc.device.description);
+  if (doc.device.imei) b.text(`${REPAIR_ES.imei} ${doc.device.imei}`);
+  b.text(`${REPAIR_ES.fault}: ${doc.device.reportedFault}`);
+
+  b.rule();
+  b.text(`${REPAIR_ES.returnReason}: ${RETURN_REASON_ES[doc.reason]}`);
+  b.text(REPAIR_ES.returnDevice);
+
+  /* what the customer is being charged for a repair that did not happen. It
+     prints in full or not at all: a line the shop cannot point at on paper is a
+     line it should not be charging. */
+  if (doc.chargedParts.length > 0 || doc.diagnosisFeeCents > 0) {
+    b.rule();
+    if (doc.chargedParts.length > 0) {
+      b.text(REPAIR_ES.returnPartsCharged, { bold: true });
+      for (const part of doc.chargedParts) {
+        const label = part.qty === 1 ? part.description : `${part.qty} × ${part.description}`;
+        b.pair(label, formatCents(part.chargeCents));
+      }
+    }
+    // a fee that was never announced on the intake receipt cannot appear here
+    if (doc.diagnosisFeeCents > 0) b.pair(REPAIR_ES.returnFee, formatCents(doc.diagnosisFeeCents));
+  }
+
+  if (doc.depositAppliedCents > 0 || doc.depositRefundedCents > 0) {
+    b.rule();
+    if (doc.depositAppliedCents > 0) {
+      b.pair(REPAIR_ES.returnDepositApplied, formatCents(doc.depositAppliedCents));
+    }
+    if (doc.depositRefundedCents > 0) {
+      b.pair(REPAIR_ES.returnDepositRefunded, formatCents(doc.depositRefundedCents));
+    }
+  }
+
+  b.rule();
+  if (doc.dueCents > 0) {
+    b.pair(REPAIR_ES.returnDue, formatCents(doc.dueCents), { bold: true });
+  } else {
+    b.text(REPAIR_ES.returnNothingDue, { bold: true });
+  }
+
+  b.feed(2);
+  b.text(REPAIR_ES.returnReceived);
+  b.feed(3);
+  b.raw(`${REPAIR_ES.signatureRule} ${"_".repeat(Math.max(0, cols - 2))}`);
 
   b.rule();
   b.text(REPAIR_ES.thanks, { align: "center" });

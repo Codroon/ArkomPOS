@@ -7,9 +7,14 @@
 import { centsToInput, parseMoneyInput, tenderSummary, uuidv7, type CompletedSale, type SaleState, type TenderDraft, type TenderMethod } from "@arkom/core";
 import { AccentButton, cn, Field, GhostButton, LockedButton, MoneyText, PrimaryButton, TextInput, useT, type TKey } from "@arkom/ui";
 
+/* The methods a CUSTOMER can choose. "deposit" is a TenderMethod the till can
+   BUILD but never one this panel offers: it is applied by main from a repair
+   ticket's own row, and no sale has one (ADR-0014 §7). */
+export type OfferedMethod = Exclude<TenderMethod, "deposit">;
+
 export interface TenderEntry {
   key: string;
-  method: TenderMethod;
+  method: OfferedMethod;
   amountInput: string;
   cardReference: string;
   /** store_credit only: which voucher, and what to call it on screen */
@@ -17,7 +22,7 @@ export interface TenderEntry {
   voucherLabel?: string;
 }
 
-export function newTenderEntry(method: TenderMethod, remainingCents: number): TenderEntry {
+export function newTenderEntry(method: OfferedMethod, remainingCents: number): TenderEntry {
   return { key: uuidv7(), method, amountInput: centsToInput(Math.max(0, remainingCents)), cardReference: "" };
 }
 
@@ -36,14 +41,14 @@ export function parseTenders(entries: TenderEntry[]): TenderDraft[] | null {
   return out;
 }
 
-const METHOD_KEYS: Record<TenderMethod, TKey> = {
+const METHOD_KEYS: Record<OfferedMethod, TKey> = {
   cash: "pay.cash",
   card: "pay.card",
   bizum: "pay.bizum",
   transfer: "pay.transfer",
   store_credit: "pay.storeCredit",
 };
-const METHODS: TenderMethod[] = ["cash", "card", "bizum", "transfer", "store_credit"];
+const METHODS: OfferedMethod[] = ["cash", "card", "bizum", "transfer", "store_credit"];
 
 export function PaymentPanel({
   sale,

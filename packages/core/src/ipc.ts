@@ -89,6 +89,10 @@ export const IPC_CHANNELS = [
   "repair:assign",
   "repair:peek",
   "workshop:board",
+  "repair:markReady",
+  "repair:notify",
+  "repair:collect",
+  "repair:markNotRepaired",
   "repair:print",
 ] as const;
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
@@ -1661,6 +1665,67 @@ export const RepairPeekSchema = z.object({
   depositCents: z.number().int(),
 });
 export type RepairPeek = z.infer<typeof RepairPeekSchema>;
+
+/* ---- hand-back ---- */
+
+export const RepairMarkReadyRequestSchema = z.object({ ticketId: z.string() });
+
+export const RepairNotifyRequestSchema = z.object({
+  ticketId: z.string(),
+  method: RepairNotifyMethodSchema,
+  note: z.string().trim().max(300).nullish(),
+});
+
+/**
+ * Cobro y entrega.
+ *
+ * No total in the payload. The collection settles at exactly the ticket's
+ * charged total (ADR-0014 §9a): a number typed into a payment dialog would mean
+ * the document says one thing and the ticket says another, with the difference
+ * invisible. The deposit is applied by main as a `deposit` tender — it is not
+ * in this list, and it is not removable.
+ */
+export const RepairCollectRequestSchema = z.object({
+  ticketId: z.string(),
+  tenders: z.array(SaleTenderSchema).default([]),
+});
+
+export const RepairCollectResponseSchema = z.object({
+  docId: z.string(),
+  docNumber: z.string(),
+  totalCents: z.number().int(),
+  depositAppliedCents: z.number().int(),
+  changeCents: z.number().int(),
+});
+export type RepairCollectResponse = z.infer<typeof RepairCollectResponseSchema>;
+
+/**
+ * Closing a ticket without repairing the device.
+ *
+ * Every consumed part must be resolved before this can run — returned to the
+ * shelf or charged for. A part that went into a device does not simply vanish
+ * when the ticket closes (ADR-0014 §3), and this is the one place the UI blocks
+ * on bookkeeping.
+ */
+export const RepairMarkNotRepairedRequestSchema = z.object({
+  ticketId: z.string(),
+  reason: NotRepairedReasonSchema,
+  resolutions: z
+    .array(z.object({ lineId: z.string(), action: z.enum(["return", "charge"]) }))
+    .default([]),
+  depositAction: z.enum(["refund", "apply_fee"]).default("refund"),
+  /** refused unless the intake snapshot is non-zero — a fee not announced, not charged */
+  chargeDiagnosisFee: z.boolean().default(false),
+});
+
+export const RepairMarkNotRepairedResponseSchema = z.object({
+  detail: RepairDetailSchema,
+  diagnosisFeeCents: z.number().int(),
+  depositAppliedCents: z.number().int(),
+  depositRefundedCents: z.number().int(),
+  dueCents: z.number().int(),
+});
+export type RepairMarkNotRepairedResponse = z.infer<typeof RepairMarkNotRepairedResponseSchema>;
 
 export const RepairPrintResponseSchema = PrintTicketResponseSchema;
 export type RepairPrintRequest = z.infer<typeof RepairPrintRequestSchema>;

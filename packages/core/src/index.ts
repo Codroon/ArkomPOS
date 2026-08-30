@@ -158,6 +158,8 @@ export {
 } from "./purchase-doc";
 export type { PurchaseDoc, PurchaseDocDevice, PurchaseDocSeller, ShelfLabel } from "./purchase-doc";
 export {
+  renderRepairReceipt,
+  renderReturnDoc,
   renderQuoteDoc,
   renderIntakeReceipt,
   damageLine,
@@ -165,7 +167,17 @@ export {
   REPAIR_ES,
   DAMAGE_ES,
 } from "./repair-doc";
-export type { IntakeReceiptDoc, RepairDocDevice, QuoteDoc, QuoteDocLine } from "./repair-doc";
+export type {
+  IntakeReceiptDoc,
+  RepairDocDevice,
+  QuoteDoc,
+  QuoteDocLine,
+  RepairReceiptDoc,
+  ReceiptDocLine,
+  ReceiptDocTender,
+  ReturnDoc,
+  ReturnReason,
+} from "./repair-doc";
 export { opsToText, opBuilder } from "./print-ops";
 export {
   REPAIR_STATUSES,
@@ -435,6 +447,12 @@ export {
   WorkshopBoardResponseSchema,
   RepairPeekRequestSchema,
   RepairPeekSchema,
+  RepairMarkReadyRequestSchema,
+  RepairNotifyRequestSchema,
+  RepairCollectRequestSchema,
+  RepairCollectResponseSchema,
+  RepairMarkNotRepairedRequestSchema,
+  RepairMarkNotRepairedResponseSchema,
 } from "./ipc";
 export type {
   IpcChannel,
@@ -502,4 +520,6 @@ export type {
   RepairListRow,
   WorkshopBoard,
   RepairPeek,
+  RepairCollectResponse,
+  RepairMarkNotRepairedResponse,
 } from "./ipc";

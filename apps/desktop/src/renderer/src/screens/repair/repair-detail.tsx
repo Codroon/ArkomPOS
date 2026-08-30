@@ -27,6 +27,7 @@ import { PrintToast } from "../../lib/print-toast";
 import { OverdueChip, StatusChip, STATUS_KEYS, formatDateTime, formatPromised } from "./status-chip";
 import { QuotePanel } from "./quote-panel";
 import { ApprovalDialog, ReceivePartDialog } from "./repair-dialogs";
+import { CollectDialog, NotifyDialog, NotRepairedDialog } from "./handback-dialogs";
 
 const REFUSAL_KEYS: Record<string, TKey> = {
   terminal: "repRefusal.terminal",
@@ -73,7 +74,8 @@ export function RepairDetailPane({
   const [detail, setDetail] = useState<RepairDetail | null>(null);
   const [photos, setPhotos] = useState<Array<{ id: string; kind: string; dataUrl: string }>>([]);
   const [revealed, setRevealed] = useState(false);
-  const [dialog, setDialog] = useState<null | "approve" | "receive">(null);
+  const [dialog, setDialog] = useState<null | "approve" | "receive" | "collect" | "notify" | "close">(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -121,15 +123,23 @@ export function RepairDetailPane({
   /* The primary action changes with the status, and it is the ficha's single
      blue element. What is NOT allowed simply is not rendered; the reason lives
      under the button block. */
+  const markReady = async () => {
+    try {
+      apply(await window.arkom.invoke("repair:markReady", { ticketId }));
+    } catch (err) {
+      setError(errorMessage(t, err));
+    }
+  };
+
   const primary =
     detail.actions.collect === null
-      ? { label: t("rep.action.collect"), run: () => setDialog(null), blocked: "collect" as const }
+      ? { label: t("rep.action.collect"), run: () => setDialog("collect") }
       : detail.actions.mark_ready === null
-        ? { label: t("rep.action.markReady"), run: () => setDialog(null), blocked: "mark_ready" as const }
+        ? { label: t("rep.action.markReady"), run: () => void markReady() }
         : detail.actions.receive_part === null
-          ? { label: t("rep.action.receivePart"), run: () => setDialog("receive"), blocked: "receive_part" as const }
+          ? { label: t("rep.action.receivePart"), run: () => setDialog("receive") }
           : detail.actions.approve === null
-            ? { label: t("rep.action.approve"), run: () => setDialog("approve"), blocked: "approve" as const }
+            ? { label: t("rep.action.approve"), run: () => setDialog("approve") }
             : null;
 
   return (
@@ -174,6 +184,12 @@ export function RepairDetailPane({
           </div>
         ) : null}
       </div>
+
+      {notice ? (
+        <div className="flex-none border-b border-line bg-success-bg px-4 py-1.5 text-[11px] text-success-ink">
+          {notice}
+        </div>
+      ) : null}
 
       <div className="flex min-h-0 flex-1 gap-4 overflow-y-auto px-4 py-3">
         {/* ---- left: what it is ---- */}
@@ -335,15 +351,39 @@ export function RepairDetailPane({
             ) : null}
 
             <div className="mt-2 flex flex-col gap-1.5">
+              {detail.status === "ready" ? (
+                <GhostButton onClick={() => setDialog("notify")}>{t("rep.action.notify")}</GhostButton>
+              ) : null}
               <GhostButton onClick={() => printer.printRepair(ticketId, "intake", true)}>
                 {t("rep.action.printIntake")}
               </GhostButton>
-              {detail.lines.length > 0 ? (
+              {detail.lines.length > 0 && !closed ? (
                 <GhostButton onClick={() => printer.printRepair(ticketId, "quote")}>
                   {t("rep.action.printQuote")}
                 </GhostButton>
               ) : null}
+              {detail.collectionDocumentId ? (
+                <GhostButton onClick={() => printer.printRepair(ticketId, "receipt", true)}>
+                  {t("rep.action.printReceipt")}
+                </GhostButton>
+              ) : null}
+              {detail.notRepairedAt ? (
+                <GhostButton onClick={() => printer.printRepair(ticketId, "return", true)}>
+                  {t("rep.action.printReturn")}
+                </GhostButton>
+              ) : null}
             </div>
+
+            {/* terminal actions do not sit next to routine ones */}
+            {!closed && detail.actions.mark_not_repaired === null ? (
+              <button
+                type="button"
+                onClick={() => setDialog("close")}
+                className="mt-3 w-full border-t border-line pt-2 text-[11px] text-danger-ink underline hover:opacity-80"
+              >
+                {t("rep.action.notRepaired")}
+              </button>
+            ) : null}
 
             {/* what is missing, in words — the strip is where a blocked status
                 explains itself, not a disabled button with no tooltip */}
@@ -389,6 +429,59 @@ export function RepairDetailPane({
             try {
               apply(await window.arkom.invoke("repair:receivePart", { ticketId, ...input }));
               setDialog(null);
+            } catch (err) {
+              setError(errorMessage(t, err));
+            }
+          }}
+        />
+      ) : null}
+
+      {dialog === "notify" ? (
+        <NotifyDialog
+          onCancel={() => setDialog(null)}
+          onConfirm={async (method, note) => {
+            try {
+              apply(await window.arkom.invoke("repair:notify", { ticketId, method, note }));
+              setDialog(null);
+            } catch (err) {
+              setError(errorMessage(t, err));
+            }
+          }}
+        />
+      ) : null}
+
+      {dialog === "collect" ? (
+        <CollectDialog
+          detail={detail}
+          onCancel={() => setDialog(null)}
+          onConfirm={async (tenders) => {
+            try {
+              const result = await window.arkom.invoke("repair:collect", { ticketId, tenders });
+              setDialog(null);
+              setNotice(t("rep.collect.done", { doc: result.docNumber }));
+              await load();
+              onChanged();
+              // the receipt is a separate, retryable act — the same bargain
+              // every other document in this app makes
+              printer.printRepair(ticketId, "receipt");
+            } catch (err) {
+              setError(errorMessage(t, err));
+            }
+          }}
+        />
+      ) : null}
+
+      {dialog === "close" ? (
+        <NotRepairedDialog
+          detail={detail}
+          onCancel={() => setDialog(null)}
+          onConfirm={async (input) => {
+            try {
+              const result = await window.arkom.invoke("repair:markNotRepaired", { ticketId, ...input });
+              setDialog(null);
+              setNotice(t("rep.close.done"));
+              apply(result.detail);
+              printer.printRepair(ticketId, "return");
             } catch (err) {
               setError(errorMessage(t, err));
             }

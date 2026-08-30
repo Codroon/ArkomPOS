@@ -607,6 +607,11 @@ export const repairPhotos = sqliteTable("repair_photos", {
 
 export const CASH_MOVEMENT_REASONS = [
   "repair_deposit",
+  /* the deposit stopped being money HELD for someone and became takings the
+     collection document accounts for. The cash never moved; what changed is
+     whose it is — and posting it keeps a ticket's rows netting to zero, which
+     is what stops Caja counting the same €30 twice (ADR-0014 §7). */
+  "repair_deposit_applied",
   "repair_deposit_refund",
   "used_purchase_payout",
 ] as const;
