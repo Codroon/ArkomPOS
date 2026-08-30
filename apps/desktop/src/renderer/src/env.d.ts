@@ -41,6 +41,7 @@ import type {
   UsedDeviceRow,
   UsedDeviceDetail,
   VoucherRow,
+  UsedPeek,
 } from "@arkom/core";
 
 declare global {
@@ -157,11 +158,15 @@ declare global {
       invoke(
         channel: "used:findVoucher",
         payload: { search: string; saleTotalCents: number },
-      ): Promise<{ rows: Array<VoucherRow & { refusal: "not_issued" | "exceeds_total" | "empty" | null }> }>;
+      ): Promise<{ rows: Array<VoucherRow & { refusal: "not_issued" | "empty" | null }> }>;
       invoke(
         channel: "used:voidVoucher",
         payload: { voucherId: string; reason: string },
       ): Promise<{ ok: boolean }>;
+      invoke(
+        channel: "used:peek",
+        payload: { purchaseId?: string; documentId?: string },
+      ): Promise<UsedPeek>;
       invoke(channel: "users:list", payload?: undefined): Promise<UserRow[]>;
       invoke(
         channel: "users:create",

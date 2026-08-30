@@ -540,7 +540,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
         <VoucherFinder
           saleTotalCents={sale?.totalCents ?? 0}
           onCancel={() => setVoucherFinderOpen(false)}
-          onPick={(voucher) => {
+          onPick={(voucher, plan) => {
             /* the voucher's amount, not a number the cashier types: it redeems
                whole or not at all (ADR-0013 §4) */
             setTenders((prev) => [
@@ -548,7 +548,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
               {
                 key: uuidv7(),
                 method: "store_credit" as const,
-                amountInput: centsToInput(voucher.remainingCents),
+                amountInput: centsToInput(plan.tenderCents),
                 cardReference: "",
                 voucherId: voucher.id,
                 voucherLabel: voucher.docNumber,

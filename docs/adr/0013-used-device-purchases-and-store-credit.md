@@ -162,6 +162,19 @@ The distinction is data the cashier already has in front of them versus reading 
 the till later. A reprint is the loophole that would otherwise make the on-screen gate
 decorative, so it is gated with what it reveals.
 
+**Amended again after two days of live use (2026-08-30), at the shop's request.**
+Reprinting now needs `usedDevices.create` — whoever may buy a device may print
+its paperwork. At the counter the tighter rule meant a cashier who had just
+bought a phone could not reprint the slip when the seller lost it, and had to
+fetch the owner for a piece of paper they had typed themselves an hour earlier.
+
+The shop was told the consequence and accepted it: **a cashier can now read any
+seller's details by printing the document**, so the on-screen block is a courtesy
+rather than a control. What remains is the record — every print is oplogged with
+who asked for it, so the question "who looked at this seller's data" still has an
+answer. Anyone wanting the original control back tightens one string in
+`ipc.ts`; nothing else depends on it.
+
 ### 7. Schema summary
 
 **New tables:** `used_purchases` (1:1 with the purchase document; device attributes, seller
@@ -185,6 +198,25 @@ write.
 
 **Store credit as a negative sale line.** Rejected in §4 — it corrupts the taxable base and
 the printed IVA breakdown.
+
+**Refusing a voucher worth more than the ticket.** Shipped that way and reversed
+after two days of live use (2026-08-30). The original rule — credit applies to a
+purchase of equal or greater value, otherwise pay cash — was defensible on paper:
+silently consuming 80 € of credit against a 50 € sale takes 30 € from the
+customer. It was wrong at the counter. Someone who sold a phone for 50 € and
+wants a 10 € protector is owed the protector, and the till refused to serve them.
+
+The answer to "silently" was never "refuse", it was **ask**. When a voucher
+exceeds the ticket the cashier now chooses: leave the difference on the voucher
+(the default, and the reason a shop offers credit at all), or spend it whole and
+pay the difference from the drawer. `remaining_cents` was in the schema from the
+first day for exactly this, disabled rather than missing, so enabling it changed
+no tables.
+
+The consequence worth naming: store credit joins cash as a tender that may exceed
+the total and produce change. Card, Bizum and transfer still may not — change
+against a card is a cash advance. A voucher is money the shop already owes, so
+handing back the difference settles a debt rather than advancing anything.
 
 **A purchase as a bespoke table with no document.** Simpler by one join, and it gives up
 gap-free numbering, the oplog envelope and the reprint path, all of which a legally

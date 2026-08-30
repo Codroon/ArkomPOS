@@ -93,6 +93,7 @@ export function listMovements(
       unitCostCents: stockMovements.unitCostCents,
       documentId: stockMovements.documentId,
       documentNumber: documents.docNumber,
+      documentType: documents.docType,
       imei: units.imei,
       userId: stockMovements.userId,
     })
@@ -113,6 +114,7 @@ export function listMovements(
     unitCostCents: r.unitCostCents,
     documentId: r.documentId,
     documentNumber: r.documentNumber,
+    documentType: r.documentType,
     imei: r.imei,
     userId: r.userId,
   }));

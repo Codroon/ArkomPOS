@@ -4,23 +4,33 @@
  * The contract this hook exists to honour: **the sale is already done.** By the
  * time anything here runs the money is taken and the number allocated, so a
  * failure is never fatal — it becomes a sticky toast offering Reintentar and
- * Guardar PDF, both bound to the ticket that failed. That binding is why the
+ * Guardar PDF, both bound to the JOB that failed. That binding is why the
  * toast can outlive the completed panel: four seconds later the till has moved
- * on to the next customer, and the owner can still recover the ticket.
+ * on to the next customer, and the owner can still recover the document.
+ *
+ * "Job" rather than "ticket" since v0.11.0: a purchase document and a shelf
+ * label go through the same path as a sale ticket. They have to — the first
+ * version printed purchases inside the log handler and swallowed the failure in
+ * a console line, so a shop with no printer configured got no document, no PDF
+ * and no explanation. One print path, one toast, one recovery route.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PrintTicketResponseSchema } from "@arkom/core";
 import { useT } from "@arkom/ui";
 import { errorMessage } from "./errors";
 
+/** What to print. A sale ticket, or one of the two used-device documents. */
+export type PrintJob =
+  | { kind: "ticket"; docId: string; copy: boolean }
+  | { kind: "purchase"; purchaseId: string; what: "document" | "label"; copy: boolean };
+
 export interface PrintState {
   busy: boolean;
   /** null when nothing to say */
   message: string | null;
   tone: "neutral" | "danger";
-  /** the ticket a failed attempt was for — what Reintentar retries */
-  failedDocId: string | null;
-  failedCopy: boolean;
+  /** the job a failed attempt was for — what Reintentar retries */
+  failed: PrintJob | null;
   /** the PDF a successful save produced — what Abrir opens */
   savedPath: string | null;
 }
@@ -29,8 +39,7 @@ const IDLE: PrintState = {
   busy: false,
   message: null,
   tone: "neutral",
-  failedDocId: null,
-  failedCopy: false,
+  failed: null,
   savedPath: null,
 };
 
@@ -62,11 +71,20 @@ export function useTicketPrint() {
   }, []);
 
   const run = useCallback(
-    async (docId: string, copy: boolean, target: "auto" | "pdf") => {
+    async (job: PrintJob, target: "auto" | "pdf") => {
       clearTimer();
       setState({ ...IDLE, busy: true, message: t("print.printing") });
       try {
-        const res = PrintTicketResponseSchema.parse(await window.arkom.invoke("print:ticket", { docId, copy, target }));
+        const res = PrintTicketResponseSchema.parse(
+          job.kind === "ticket"
+            ? await window.arkom.invoke("print:ticket", { docId: job.docId, copy: job.copy, target })
+            : await window.arkom.invoke("used:print", {
+                purchaseId: job.purchaseId,
+                what: job.what,
+                copy: job.copy,
+                target,
+              }),
+        );
         if (!alive.current) return;
         setState({
           ...IDLE,
@@ -88,22 +106,33 @@ export function useTicketPrint() {
           ...IDLE,
           message: errorMessage(t, err),
           tone: "danger",
-          failedDocId: docId,
-          failedCopy: copy,
+          failed: job,
         });
       }
     },
     [t],
   );
 
-  const print = useCallback((docId: string, copy = false) => void run(docId, copy, "auto"), [run]);
-  const savePdf = useCallback((docId: string, copy = false) => void run(docId, copy, "pdf"), [run]);
+  const print = useCallback(
+    (docId: string, copy = false) => void run({ kind: "ticket", docId, copy }, "auto"),
+    [run],
+  );
+  const savePdf = useCallback(
+    (docId: string, copy = false) => void run({ kind: "ticket", docId, copy }, "pdf"),
+    [run],
+  );
+  /** The purchase document, or the label that goes on the box. */
+  const printPurchase = useCallback(
+    (purchaseId: string, what: "document" | "label", copy = false) =>
+      void run({ kind: "purchase", purchaseId, what, copy }, "auto"),
+    [run],
+  );
   const retry = useCallback(() => {
-    if (state.failedDocId) void run(state.failedDocId, state.failedCopy, "auto");
-  }, [run, state.failedDocId, state.failedCopy]);
+    if (state.failed) void run(state.failed, "auto");
+  }, [run, state.failed]);
   const savePdfForFailed = useCallback(() => {
-    if (state.failedDocId) void run(state.failedDocId, state.failedCopy, "pdf");
-  }, [run, state.failedDocId, state.failedCopy]);
+    if (state.failed) void run(state.failed, "pdf");
+  }, [run, state.failed]);
 
   /** Hand the saved PDF to the OS — open it, or show it in the file manager. */
   const reveal = useCallback(
@@ -117,5 +146,5 @@ export function useTicketPrint() {
     [state.savedPath, t],
   );
 
-  return { state, print, savePdf, retry, savePdfForFailed, reveal, dismiss };
+  return { state, print, savePdf, printPurchase, retry, savePdfForFailed, reveal, dismiss };
 }

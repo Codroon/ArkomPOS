@@ -172,6 +172,30 @@ describe("a purchase sent straight to inventory", () => {
   });
 });
 
+describe("the ledger points back at the paperwork", () => {
+  it("stamps the purchase document on the tradein_in movement", async () => {
+    /* Without this the movements drawer in Inventario showed a link for the
+       sale that took a phone off the shelf and "—" for the purchase that put
+       it there: from the ledger there was no way back to the signed document. */
+    const result = await logPurchase(
+      env.db,
+      ctxOf(),
+      request({ action: "inventory", sellPriceCents: 10000 }),
+    );
+
+    const movement = env.db.select().from(s.stockMovements).all()[0]!;
+    expect(movement.documentId).not.toBeNull();
+
+    const doc = env.db
+      .select()
+      .from(s.documents)
+      .where(eq(s.documents.id, movement.documentId!))
+      .all()[0]!;
+    expect(doc.docType).toBe("purchase");
+    expect(doc.docNumber).toBe(result.docNumber);
+  });
+});
+
 describe("unit status and the ledger can never disagree", () => {
   it("held has zero movements, in stock has exactly one stock-in", async () => {
     const held = await logPurchase(env.db, ctxOf(), request());

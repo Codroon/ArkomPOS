@@ -151,6 +151,8 @@ import {
   UsedFindVoucherResponseSchema,
   UsedVoidVoucherRequestSchema,
   UsedVoidVoucherResponseSchema,
+  UsedPeekRequestSchema,
+  UsedPeekResponseSchema,
   type MutationCtx,
   type PermissionKey,
 } from "@arkom/core";
@@ -173,7 +175,7 @@ import {
   findVouchers,
   voidVoucher,
 } from "./repos/used";
-import { listPrinters, printPurchase, printTest, printTicket, revealTicket, ticketsDir, printRecoveryCode } from "./print";
+import { listPrinters, peekPurchase, printPurchase, printTest, printTicket, revealTicket, ticketsDir, printRecoveryCode } from "./print";
 import { completeFirstRun, demoStatus, isSetupNeeded, removeDemoData } from "./setup";
 import { backupStatus, backupsDir, runBackup } from "./backup";
 import {
@@ -660,14 +662,12 @@ export function registerIpcHandlers(db: ArkomDb): void {
    */
   guarded("used:log", "usedDevices.create", UsedLogRequestSchema, UsedLogResponseSchema, async (s, input) => {
     const result = await logPurchase(db, s.ctx, input);
-    for (const what of ["document", "label"] as const) {
-      try {
-        await printPurchase(db, s.ctx, { purchaseId: result.purchaseId, what, target: "auto", copy: false });
-      } catch (err) {
-        // recorded by the print bridge; the purchase stands either way
-        console.error(`[used] could not print the ${what}:`, err);
-      }
-    }
+    /* Printing is the RENDERER's to drive, through the same hook and the same
+       toast the sale ticket uses. It used to happen here, and a failure went to
+       a console line nobody reads — so a till with no printer configured logged
+       the purchase and produced no document, no PDF and no explanation. The
+       purchase is committed by now either way; what changes is that the cashier
+       is told. */
     return {
       purchaseId: result.purchaseId,
       docNumber: result.docNumber,
@@ -679,16 +679,21 @@ export function registerIpcHandlers(db: ArkomDb): void {
   });
 
   /**
-   * Reprint, from the detail view or after a printer failure.
+   * Print, reprint, or fall back to a PDF — for the document and the label.
    *
-   * A reprint of the DOCUMENT reveals the seller block, so it is gated on
-   * `usedDevices.viewSeller` — otherwise the on-screen gate would be decorative,
-   * defeated by anyone who can press "print". The shelf label carries no
-   * personal data and stays on `usedDevices.create`.
+   * `usedDevices.create`: whoever may buy a device may print its paperwork.
+   *
+   * This is a deliberate loosening (2026-08-29, ADR-0013 §6). The document
+   * carries the seller's name and ID, so gating it behind `viewSeller` was the
+   * tighter reading — but at the counter it meant a cashier who had just bought
+   * a phone could not reprint the slip when the seller lost it, and had to fetch
+   * the owner. The shop accepted the trade: a cashier can read a seller's
+   * details by printing the document, and the on-screen gate is now a courtesy
+   * rather than a control. Every print is oplogged with who asked for it.
    */
   guarded(
     "used:print",
-    (req) => (req.what === "document" ? "usedDevices.viewSeller" : "usedDevices.create"),
+    "usedDevices.create",
     UsedPrintRequestSchema,
     UsedPrintResponseSchema,
     (s, input) => printPurchase(db, s.ctx, input),
@@ -769,6 +774,11 @@ export function registerIpcHandlers(db: ArkomDb): void {
         input.saleTotalCents,
         s.permissions.includes("usedDevices.viewSeller"),
       ),
+  );
+
+  /** Read the purchase document on screen — the movements drawer links here. */
+  guarded("used:peek", "usedDevices.create", UsedPeekRequestSchema, UsedPeekResponseSchema, (s, input) =>
+    peekPurchase(db, s.ctx, input),
   );
 
   guarded(

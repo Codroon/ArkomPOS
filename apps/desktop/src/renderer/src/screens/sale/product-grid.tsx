@@ -17,6 +17,7 @@ function Card({
   onAdd: (p: ProductRow) => void;
 }) {
   const t = useT();
+  const dataLabel = useDataLabel();
   return (
     <button
       type="button"
@@ -27,7 +28,7 @@ function Card({
       )}
     >
       <div className="line-clamp-2 min-h-[28px] text-[11px] leading-snug text-ink">
-        {product.name}
+        {dataLabel(product.name)}
         {product.itemType === "serialized" ? <Chip className="ml-1">{t("chip.serie")}</Chip> : null}
       </div>
       <div className="truncate font-mono font-medium text-[9px] tabular-nums text-subtle">{product.barcode ?? ""}</div>

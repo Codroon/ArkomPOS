@@ -77,8 +77,26 @@ export function useT(): TFn {
  * Display label for a DATA name (group/supplier): mapped only for the known
  * seed dataset, otherwise shown exactly as stored. Spanish = identity.
  */
+/** "Apple iPhone SE 2020 64GB Blanco (usado)" → "… (used)" */
+const USED_SUFFIX = /\s\(usado\)$/;
+
+/**
+ * A data row's display name.
+ *
+ * Anything the shop typed shows exactly as typed — a product called "Funda
+ * azul" is not translated, because it is their word for their thing. Two kinds
+ * of name are exceptions, and both are exceptions for the same reason: the APP
+ * wrote them, in Spanish, on a till that may be running in English.
+ *
+ *   - the demo dataset, mapped name by name below;
+ *   - the "(usado)" suffix the buy screen appends to every second-hand product
+ *     it creates (ADR-0013). The model is the shop's; the marker is ours.
+ */
 export function translateData(locale: Locale, name: string): string {
-  return locale === "en" ? (enDataLabels[name] ?? name) : name;
+  if (locale !== "en") return name;
+  const mapped = enDataLabels[name];
+  if (mapped) return mapped;
+  return USED_SUFFIX.test(name) ? name.replace(USED_SUFFIX, " (used)") : name;
 }
 
 export type DataLabelFn = (name: string) => string;

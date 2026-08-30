@@ -4,7 +4,7 @@
  * valuation is Σ unit costs (computed server-side).
  */
 import { isLowStock, type InventoryRow } from "@arkom/core";
-import { Chip, cn, MoneyText, useT, type TKey } from "@arkom/ui";
+import { Chip, cn, MoneyText, useT, type TKey, useDataLabel } from "@arkom/ui";
 
 function Th({ labelKey, align = "left" }: { labelKey: TKey; align?: "left" | "right" }) {
   const t = useT();
@@ -31,6 +31,7 @@ export function InventoryTable({
   flashIds: ReadonlySet<string>;
   onSelect: (row: InventoryRow) => void;
 }) {
+  const dataLabel = useDataLabel();
   const t = useT();
   return (
     <table className="w-full border-collapse text-[12px]">
@@ -65,7 +66,7 @@ export function InventoryTable({
                   )}
                 >
                   <td className="px-3 py-1.5">
-                    <span className={row.active ? "text-ink" : "text-subtle"}>{row.name}</span>
+                    <span className={row.active ? "text-ink" : "text-subtle"}>{dataLabel(row.name)}</span>
                     {row.itemType === "serialized" ? <Chip className="ml-1.5">{t("chip.serie")}</Chip> : null}
                     <div className="font-mono font-medium text-[10px] tabular-nums text-subtle">
                       {row.barcode ?? t("common.dash")}

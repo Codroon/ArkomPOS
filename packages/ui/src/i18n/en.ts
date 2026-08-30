@@ -733,6 +733,23 @@ export const en: Record<TKey, string> = {
   "set.usedMargin": "Margin for used devices",
   "set.usedMarginHint": "What the selling price is prefilled with when sending to inventory.",
 
+  "used.logged.printLabel": "Print the label",
+
+"voucher.biggerTitle": "The voucher is worth more than the ticket",
+  "voucher.biggerBody": "The voucher is {voucher} and the ticket is {total}. What happens to the remaining {rest}?",
+  "voucher.keepRest": "Leave {rest} on the voucher",
+  "voucher.keepRestHint": "The customer keeps the slip with {rest} on it for another visit.",
+  "voucher.payOut": "Give {rest} back in cash",
+  "voucher.payOutHint": "It is redeemed in full and {rest} comes out of the till.",
+  "voucher.partialChip": "{rest} left",
+
+  "purchasePeek.title": "Purchase document",
+  "common.close": "Close",
+
+  "purchasePeek.chip": "PURCHASE",
+  "purchasePeek.paid": "Amount paid",
+  "purchasePeek.attendedBy": "Served by",
+
   /* backups */
   "bk.section": "Backup",
   "bk.intro": "Backups run on their own every night and when the app closes. The last {keep} are kept.",
@@ -765,6 +782,9 @@ export const enDataLabels: Record<string, string> = {
   "Cargadores y Cables": "Chargers & Cables",
   "Auriculares": "Headphones",
   "Memoria y Ordenador": "Memory & Computing",
+  /* Not demo data: the buy screen creates this group the first time a used
+     device is bought, so it is Spanish on every till including English ones. */
+  Usados: "Used",
   "Distribuidora Madrid Móvil": "Madrid Mobile Distributors",
   "TecnoImport Levante": "TecnoImport Levante",
 };

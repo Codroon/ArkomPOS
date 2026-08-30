@@ -130,15 +130,23 @@ export async function printTicket(
     return { kind: "pdf", path };
   }
 
+  /* No printer configured is a SETTING, not a failure.
+     Throwing here produced a red toast offering "Reintentar" — which would fail
+     identically, because nothing about the till has changed — and left the
+     document nowhere. A shop still setting itself up, or one whose printer died
+     mid-morning, gets the PDF instead and a button that opens it. A printer that
+     is configured and then fails is a different thing: that IS a failure, it
+     probably means paper, and retrying is exactly right. */
   if (!settings.printerName) {
+    const path = await renderTicketPdf(ops, settings.paperWidthMm, fileBase);
     logPrintAttempt(db, ctx, req.docId, {
-      ok: false,
-      target: "printer",
-      printer: null,
+      ok: true,
+      target: "pdf",
+      path,
       copy: req.copy,
-      error: "NO_PRINTER",
+      fallback: "NO_PRINTER",
     });
-    throw appError("PRINT_FAILED", "No hay impresora configurada en Ajustes.");
+    return { kind: "pdf", path };
   }
 
   try {
@@ -413,16 +421,18 @@ export async function printPurchase(
     return { kind: "pdf", path };
   }
 
+  // same bargain as the ticket: no printer means a PDF, not a dead end
   if (!settings.printerName) {
+    const path = await renderTicketPdf(ops, settings.paperWidthMm, fileBase);
     logPrintAttempt(db, ctx, loaded.documentId, {
-      ok: false,
-      target: "printer",
-      printer: null,
+      ok: true,
+      target: "pdf",
+      path,
       what: req.what,
       copy: req.copy,
-      error: "NO_PRINTER",
+      fallback: "NO_PRINTER",
     });
-    throw appError("PRINT_FAILED", "No hay impresora configurada en Ajustes.");
+    return { kind: "pdf", path };
   }
 
   try {
@@ -447,4 +457,69 @@ export async function printPurchase(
     });
     throw appError("PRINT_FAILED", `No se pudo imprimir en ${settings.printerName}.`);
   }
+}
+
+
+/**
+ * One purchase, for the on-screen peek.
+ *
+ * Reads the same rows `renderPurchaseDoc` reads, and returns them as fields
+ * rather than as a rendered receipt — the modal lays them out the way the sale
+ * peek lays out a ticket. Printing still goes through the renderer, so the two
+ * cannot drift apart in the way that matters: what the seller signs.
+ */
+export function peekPurchase(db: ArkomDb, ctx: MutationCtx, ref: { purchaseId?: string; documentId?: string }) {
+  const { usedPurchases, storeCreditVouchers } = schema;
+  const purchaseId =
+    ref.purchaseId ??
+    db
+      .select({ id: usedPurchases.id })
+      .from(usedPurchases)
+      .where(and(eq(usedPurchases.tenantId, ctx.tenantId), eq(usedPurchases.documentId, ref.documentId ?? "")))
+      .limit(1)
+      .all()[0]?.id;
+  if (!purchaseId) throw appError("VALIDATION", "Esa compra no existe.");
+
+  const loaded = loadPurchaseDoc(db, ctx, purchaseId, false);
+  const doc = loaded.doc;
+
+  const voucher = db
+    .select({
+      amountCents: storeCreditVouchers.amountCents,
+      status: storeCreditVouchers.status,
+      remainingCents: storeCreditVouchers.remainingCents,
+    })
+    .from(storeCreditVouchers)
+    .where(eq(storeCreditVouchers.purchaseId, purchaseId))
+    .limit(1)
+    .all()[0];
+
+  const accessories = (["charger", "box", "cable", "case"] as const).filter((key) => doc.device.accessories[key]);
+
+  return {
+    purchaseId,
+    docNumber: doc.docNumber,
+    purchasedAtMs: doc.purchasedAtMs,
+    cashierName: doc.cashierName,
+    device: {
+      brand: doc.device.brand,
+      model: doc.device.model,
+      storage: doc.device.storage,
+      color: doc.device.color,
+      grade: doc.device.grade,
+      batteryPct: doc.device.batteryPct,
+      imei: doc.device.imei,
+      accessories,
+    },
+    seller: {
+      name: doc.seller.name,
+      phone: doc.seller.phone,
+      idType: doc.seller.idType,
+      idNumber: doc.seller.idNumber,
+    },
+    buyPriceCents: doc.buyPriceCents,
+    payout: doc.payout,
+    payoutReference: doc.payoutReference,
+    voucher: voucher ?? null,
+  };
 }

@@ -412,7 +412,7 @@ export async function logPurchase(
       log({ entity: "unit", entityId: unitId, action: "create", before: null, after: toOplogJson(unitRow) });
 
       for (const movement of intake.movements) {
-        postMovement(tx, ctx, log, movement, now);
+        postMovement(tx, ctx, log, movement, now, docRow.id);
       }
 
       for (const photo of photos) {
@@ -495,6 +495,11 @@ function postMovement(
   log: LogFn,
   movement: ReturnType<typeof buildMovement>,
   now: Date,
+  /* The purchase document that caused it. A sale_out has always carried the
+     ticket that took the phone off the shelf; a tradein_in that carried nothing
+     left the movements drawer showing "—" where the sale showed a link, so from
+     Inventario there was no way back to the paperwork. */
+  documentId: string | null = null,
 ): void {
   const key = stockKey(movement.productId, movement.locationId);
   const current = tx
@@ -516,6 +521,7 @@ function postMovement(
     qty: movement.qty,
     unitCostCents: movement.unitCostCents,
     reason: movement.reason,
+    documentId,
     userId: ctx.userId ?? null,
     createdAt: now,
   };
@@ -913,7 +919,7 @@ export function sendToInventory(
       after: { status: "in_stock", salePriceCents: sellPriceCents, costCents: intake.unitCostCents },
     });
 
-    for (const movement of intake.movements) postMovement(tx, ctx, log, movement, now);
+    for (const movement of intake.movements) postMovement(tx, ctx, log, movement, now, p.documentId);
 
     tx.update(usedPurchases)
       .set({ needsReview: false, updatedAt: now })

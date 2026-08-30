@@ -172,34 +172,91 @@ export interface VoucherLike {
   remainingCents: number;
 }
 
-export type RedeemRefusal = "not_issued" | "exceeds_total" | "empty";
+export type RedeemRefusal = "not_issued" | "empty";
 
 /**
  * May this voucher pay for this sale?
  *
- * **A voucher larger than the ticket is refused, not part-consumed.** The shop's
- * rule: credit applies to a purchase of equal or greater value, otherwise the
- * seller is paid cash. Silently consuming an 80 € voucher against a 50 € sale
- * would be taking 30 € from the customer; enabling partial redemption is a
- * separate decision, modelled here (`remainingCents`) and deliberately off.
+ * Only two things stop it: it has been spent or voided, or there is nothing
+ * left on it. The AMOUNT never refuses a voucher.
+ *
+ * That is a change of shop rule (2026-08-29). The first version refused a
+ * voucher larger than the ticket outright, on the reasoning that silently
+ * consuming 80 € against a 50 € sale takes 30 € from the customer — which is
+ * true, and is why it is not silent. In real use the refusal was simply wrong:
+ * someone who sold a phone for 50 € and wants a 10 € protector is owed the
+ * protector. `redeemPlan()` gives the counter the two honest answers instead.
  */
-export function checkRedeemable(voucher: VoucherLike, saleTotalCents: number): RedeemRefusal | null {
+export function checkRedeemable(voucher: VoucherLike, _saleTotalCents: number): RedeemRefusal | null {
   if (voucher.status !== "issued") return "not_issued";
   if (voucher.remainingCents <= 0) return "empty";
-  if (voucher.remainingCents > saleTotalCents) return "exceeds_total";
   return null;
 }
 
-export function assertRedeemable(voucher: VoucherLike, saleTotalCents: number): void {
-  const refusal = checkRedeemable(voucher, saleTotalCents);
-  if (!refusal) return;
-  if (refusal === "exceeds_total") {
-    throw appError(
-      "VALIDATION",
-      "El vale es mayor que el total. Añade artículos o usa otra forma de pago.",
-      "voucher",
-    );
+/** What the cashier is choosing between when a voucher is worth more than the ticket. */
+export type RedeemMode = "keep_rest" | "pay_out";
+
+export interface RedeemPlan {
+  /** what the tender is worth on this ticket */
+  tenderCents: number;
+  /** what is left on the voucher afterwards */
+  remainingAfterCents: number;
+  /** what the shop hands back in cash */
+  changeCents: number;
+  /** true when the voucher covers the whole ticket by itself */
+  coversTicket: boolean;
+}
+
+/**
+ * How a voucher meets a ticket.
+ *
+ * Three situations, and only the third is a decision:
+ *
+ *   - voucher ≤ ticket — it pays what it can, the rest is paid normally.
+ *   - voucher = ticket — it pays the lot.
+ *   - voucher > ticket — the cashier chooses. **keep_rest** spends only what the
+ *     ticket needs and the customer keeps a voucher worth the difference;
+ *     **pay_out** spends it all and the difference comes out of the drawer.
+ *
+ * The default is `keep_rest`, because a shop offers credit precisely so the
+ * money stays in the shop — but a customer who wants their change is entitled
+ * to ask, and the till should not make the cashier argue about it.
+ */
+export function redeemPlan(
+  voucher: VoucherLike,
+  saleTotalCents: number,
+  mode: RedeemMode = "keep_rest",
+): RedeemPlan {
+  if (!Number.isInteger(saleTotalCents) || saleTotalCents < 0) {
+    throw appError("VALIDATION", "El total no es válido.", "saleTotalCents");
   }
+  const available = voucher.remainingCents;
+  if (available <= saleTotalCents) {
+    return {
+      tenderCents: available,
+      remainingAfterCents: 0,
+      changeCents: 0,
+      coversTicket: available === saleTotalCents,
+    };
+  }
+  if (mode === "pay_out") {
+    return {
+      tenderCents: available,
+      remainingAfterCents: 0,
+      changeCents: available - saleTotalCents,
+      coversTicket: true,
+    };
+  }
+  return {
+    tenderCents: saleTotalCents,
+    remainingAfterCents: available - saleTotalCents,
+    changeCents: 0,
+    coversTicket: true,
+  };
+}
+
+export function assertRedeemable(voucher: VoucherLike, saleTotalCents: number): void {
+  if (!checkRedeemable(voucher, saleTotalCents)) return;
   throw appError("VALIDATION", "Ese vale ya no se puede usar.", "voucher");
 }
 

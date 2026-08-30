@@ -226,16 +226,77 @@ describe("redeeming a voucher", () => {
     expect(env.db.select().from(s.documents).all().filter((d) => d.docNumber !== null)).toHaveLength(2); // ticket + purchase
   });
 
-  it("refuses a partial amount: a voucher is spent whole", async () => {
+  it("spends part of a voucher and leaves the rest on it", async () => {
     const { voucherId } = await logPurchase(env.db, ctxOf(), purchase());
     const { docId, totalCents } = cart(5);
+
+    complete(env.db, ctxOf(), {
+      docId,
+      tenders: [
+        { method: "store_credit", amountCents: 2000, voucherId },
+        { method: "cash", amountCents: totalCents - 2000 },
+      ],
+    });
+
+    const voucher = env.db.select().from(s.storeCreditVouchers).all()[0]!;
+    // 50 € voucher, 20 € spent: still issued, still worth 30 € to the customer
+    expect(voucher.status).toBe("issued");
+    expect(voucher.remainingCents).toBe(3000);
+    // and it belongs to no single ticket yet, so it names none
+    expect(voucher.redeemedDocumentId).toBeNull();
+  });
+
+  it("closes the voucher on the redemption that empties it", async () => {
+    const { voucherId } = await logPurchase(env.db, ctxOf(), purchase());
+
+    const first = cart(5);
+    complete(env.db, ctxOf(), {
+      docId: first.docId,
+      tenders: [
+        { method: "store_credit", amountCents: 2000, voucherId },
+        { method: "cash", amountCents: first.totalCents - 2000 },
+      ],
+    });
+
+    const second = cart(5);
+    complete(env.db, ctxOf(), {
+      docId: second.docId,
+      tenders: [
+        { method: "store_credit", amountCents: 3000, voucherId },
+        { method: "cash", amountCents: second.totalCents - 3000 },
+      ],
+    });
+
+    const voucher = env.db.select().from(s.storeCreditVouchers).all()[0]!;
+    expect(voucher.status).toBe("redeemed");
+    expect(voucher.remainingCents).toBe(0);
+    expect(voucher.redeemedDocumentId).toBe(second.docId);
+
+    // a third attempt has nothing to take
+    const third = cart(5);
+    expect(
+      await codeOf(() =>
+        complete(env.db, ctxOf(), {
+          docId: third.docId,
+          tenders: [
+            { method: "store_credit", amountCents: 1, voucherId },
+            { method: "cash", amountCents: third.totalCents - 1 },
+          ],
+        }),
+      ),
+    ).toBe("VALIDATION");
+  });
+
+  it("refuses to take more than the voucher holds", async () => {
+    const { voucherId } = await logPurchase(env.db, ctxOf(), purchase());
+    const { docId, totalCents } = cart(9);
     expect(
       await codeOf(() =>
         complete(env.db, ctxOf(), {
           docId,
           tenders: [
-            { method: "store_credit", amountCents: 2000, voucherId },
-            { method: "cash", amountCents: totalCents - 2000 },
+            { method: "store_credit", amountCents: 6000, voucherId },
+            { method: "cash", amountCents: totalCents - 6000 },
           ],
         }),
       ),
@@ -274,16 +335,30 @@ describe("redeeming a voucher", () => {
     ).toBe("VALIDATION");
   });
 
-  it("refuses a voucher bigger than the ticket, as non-cash excess", async () => {
+  it("lets a voucher exceed the ticket and gives the difference back", async () => {
     const { voucherId } = await logPurchase(env.db, ctxOf(), purchase({ buyPriceCents: 9000 }));
-    const { docId } = cart(1); // 12,90 €
-    // the shop rule: credit buys something of equal or greater value, and the
-    // existing tender guard already refuses non-cash over the total
+    const { docId, totalCents } = cart(1); // 12,90 €
+
+    // the cashier chose "pay_out": the voucher is spent whole and the drawer
+    // settles the difference, which is the shop paying a debt it already owed
+    const done = complete(env.db, ctxOf(), {
+      docId,
+      tenders: [{ method: "store_credit", amountCents: 9000, voucherId }],
+    });
+    expect(done.changeCents).toBe(9000 - totalCents);
+
+    const voucher = env.db.select().from(s.storeCreditVouchers).all()[0]!;
+    expect(voucher.status).toBe("redeemed");
+    expect(voucher.remainingCents).toBe(0);
+  });
+
+  it("still refuses change against a card, which is a cash advance", async () => {
+    const { docId } = cart(1);
     expect(
       await codeOf(() =>
         complete(env.db, ctxOf(), {
           docId,
-          tenders: [{ method: "store_credit", amountCents: 9000, voucherId }],
+          tenders: [{ method: "card", amountCents: 9000, cardReference: "1234" }],
         }),
       ),
     ).toBe("TENDER_MISMATCH");
@@ -299,10 +374,14 @@ describe("the finder", () => {
     expect(rows[0]!.remainingCents).toBe(5000);
   });
 
-  it("says WHY an unusable voucher cannot be used, rather than hiding it", async () => {
+  it("offers a voucher worth more than the ticket rather than refusing it", async () => {
     await logPurchase(env.db, ctxOf(), purchase());
-    // too big for this ticket
-    expect(findVouchers(env.db, ctxOf(), "C-000001", 1000, true).rows[0]!.refusal).toBe("exceeds_total");
+    /* A 50 € voucher against a 10 € ticket used to come back refused. The
+       cashier now gets it as usable and chooses what happens to the rest —
+       the finder is not the place to decide the shop cannot serve someone. */
+    const row = findVouchers(env.db, ctxOf(), "C-000001", 1000, true).rows[0]!;
+    expect(row.refusal).toBeNull();
+    expect(row.remainingCents).toBe(5000);
   });
 
   it("withholds the seller's name from a session that may not read it", async () => {

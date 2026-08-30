@@ -40,6 +40,8 @@ import {
   type ScanInputHandle,
 } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
+import { PrintToast } from "../../lib/print-toast";
+import { useTicketPrint } from "../../lib/use-ticket-print";
 import { openSaleWithVoucher } from "../../lib/screen-bus";
 import { GateRail, type GateState } from "./gate-rail";
 import { SellPriceModal } from "./sell-price-modal";
@@ -75,6 +77,7 @@ export function BuyUsedScreen() {
   /* the shop's own margin, not the built-in one: the default is a starting
      point, and Ajustes is where the owner moves it */
   const [marginPct, setMarginPct] = useState(DEFAULT_MARGIN_PCT);
+  const printer = useTicketPrint();
 
   const patch = useCallback((next: Partial<BuyDraft>) => setDraft((d) => ({ ...d, ...next })), []);
 
@@ -207,6 +210,10 @@ export function BuyUsedScreen() {
       const result = await window.arkom.invoke("used:log", toRequest(action, sellPriceCents));
       setPriceModalOpen(false);
       setLogged(result);
+      /* The document first — it is the one the seller signs. The label follows
+         only if the document got out, so a failure is reported once rather than
+         twice about the same dead printer. */
+      printer.printPurchase(result.purchaseId, "document");
     } catch (err) {
       setLogError(errorMessage(t, err));
     } finally {
@@ -226,14 +233,9 @@ export function BuyUsedScreen() {
     setTimeout(() => imeiRef.current?.focus(), 0);
   };
 
-  const reprint = async (what: "document" | "label") => {
+  const reprint = (what: "document" | "label") => {
     if (!logged) return;
-    try {
-      const result = await window.arkom.invoke("used:print", { purchaseId: logged.purchaseId, what, copy: true });
-      setNotice(result.kind === "pdf" ? t("used.logged.pdfSaved") : t("used.logged.printed"));
-    } catch (err) {
-      setNotice(errorMessage(t, err));
-    }
+    printer.printPurchase(logged.purchaseId, what, true);
   };
 
   const done = completeness(draft);
@@ -504,8 +506,11 @@ export function BuyUsedScreen() {
                 </div>
               ) : null}
               <div className="mt-2.5 flex gap-2">
-                <GhostButton className="flex-1" onClick={() => void reprint("document")}>
+                <GhostButton className="flex-1" onClick={() => reprint("document")}>
                   {t("used.logged.printAgain")}
+                </GhostButton>
+                <GhostButton className="flex-1" onClick={() => reprint("label")}>
+                  {t("used.logged.printLabel")}
                 </GhostButton>
                 {logged.voucherId ? (
                   /* the customer is standing there with credit; the till should
@@ -577,6 +582,8 @@ export function BuyUsedScreen() {
           onConfirm={(sellPriceCents) => void submit("inventory", sellPriceCents)}
         />
       ) : null}
+
+      <PrintToast printer={printer} />
     </div>
   );
 }

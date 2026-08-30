@@ -735,6 +735,23 @@ export const es = {
   "set.usedMargin": "Margen para dispositivos usados",
   "set.usedMarginHint": "Con lo que se rellena el precio de venta al enviar a inventario.",
 
+  "used.logged.printLabel": "Imprimir etiqueta",
+
+"voucher.biggerTitle": "El vale es mayor que el total",
+  "voucher.biggerBody": "El vale es de {voucher} y el ticket es de {total}. ¿Qué hacemos con los {rest} restantes?",
+  "voucher.keepRest": "Dejar {rest} en el vale",
+  "voucher.keepRestHint": "El cliente conserva el resguardo con {rest} para otra compra.",
+  "voucher.payOut": "Devolver {rest} en efectivo",
+  "voucher.payOutHint": "Se canjea entero y salen {rest} de la caja.",
+  "voucher.partialChip": "Queda {rest}",
+
+  "purchasePeek.title": "Documento de compra",
+  "common.close": "Cerrar",
+
+  "purchasePeek.chip": "COMPRA",
+  "purchasePeek.paid": "Importe pagado",
+  "purchasePeek.attendedBy": "Atendido por",
+
   /* backups */
   "bk.section": "Copia de seguridad",
   "bk.intro": "La copia se hace sola cada noche y al cerrar el programa. Se guardan las {keep} últimas.",

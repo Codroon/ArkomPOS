@@ -34,8 +34,8 @@ function ToastButton({ onClick, children }: { onClick: () => void; children: Rea
 
 export function PrintToast({ printer, className }: { printer: Printer; className?: string }) {
   const t = useT();
-  const { failedDocId, savedPath, message, tone } = printer.state;
-  const hasActions = failedDocId !== null || savedPath !== null;
+  const { failed, savedPath, message, tone } = printer.state;
+  const hasActions = failed !== null || savedPath !== null;
 
   return (
     <Toast
@@ -45,7 +45,7 @@ export function PrintToast({ printer, className }: { printer: Printer; className
       actions={
         hasActions ? (
           <>
-            {failedDocId ? (
+            {failed ? (
               <>
                 <ToastButton onClick={printer.retry}>{t("print.retry")}</ToastButton>
                 <ToastButton onClick={printer.savePdfForFailed}>{t("print.savePdf")}</ToastButton>

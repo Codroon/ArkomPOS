@@ -32,6 +32,8 @@ import {
   type TKey,
 } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
+import { PrintToast } from "../../lib/print-toast";
+import { useTicketPrint } from "../../lib/use-ticket-print";
 import { useCan } from "../../lib/use-session";
 import { SellPriceModal } from "./sell-price-modal";
 
@@ -79,6 +81,7 @@ export function UsedDeviceDetailPane({
   const [voidOpen, setVoidOpen] = useState(false);
   const [voidReason, setVoidReason] = useState("");
   const [marginPct, setMarginPct] = useState(DEFAULT_MARGIN_PCT);
+  const printer = useTicketPrint();
 
   const load = useCallback(async () => {
     try {
@@ -120,15 +123,7 @@ export function UsedDeviceDetailPane({
     }
   };
 
-  const reprint = async (what: "document" | "label") => {
-    setError(null);
-    try {
-      const result = await window.arkom.invoke("used:print", { purchaseId, what, copy: true });
-      setNotice(result.kind === "pdf" ? t("used.logged.pdfSaved") : t("used.logged.printed"));
-    } catch (err) {
-      setError(errorMessage(t, err));
-    }
-  };
+  const reprint = (what: "document" | "label") => printer.printPurchase(purchaseId, what, true);
 
   const shelve = async (sellPriceCents: number) => {
     setBusy(true);
@@ -387,14 +382,8 @@ export function UsedDeviceDetailPane({
             )}
 
             <div className="mt-3 flex flex-col gap-1.5">
-              {device.canViewSeller ? (
-                <GhostButton onClick={() => void reprint("document")}>{t("usedDetail.reprint")}</GhostButton>
-              ) : (
-                // a reprint is a way to read the seller off a till that will not
-                // show them on screen, so it is gated with the data it reveals
-                <div className="text-[10px] leading-snug text-subtle">{t("usedDetail.reprintHidden")}</div>
-              )}
-              <GhostButton onClick={() => void reprint("label")}>{t("usedDetail.reprintLabel")}</GhostButton>
+              <GhostButton onClick={() => reprint("document")}>{t("usedDetail.reprint")}</GhostButton>
+              <GhostButton onClick={() => reprint("label")}>{t("usedDetail.reprintLabel")}</GhostButton>
             </div>
 
             {error ? <div className="mt-2 text-[11px] text-danger-ink">{error}</div> : null}
@@ -454,6 +443,8 @@ export function UsedDeviceDetailPane({
           </div>
         </div>
       ) : null}
+
+      <PrintToast printer={printer} />
 
       {zoom ? (
         <button

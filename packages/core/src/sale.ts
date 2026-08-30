@@ -112,9 +112,20 @@ export interface TenderSummary {
   nonCashCents: number;
   remainingCents: number;
   changeCents: number;
-  /** true when non-cash tenders exceed the total — completion must refuse (TENDER_MISMATCH). */
+  /** true when a tender that cannot give change exceeds the total (TENDER_MISMATCH). */
   nonCashExcess: boolean;
 }
+
+/**
+ * Which tenders may exceed the total, i.e. may leave change in the drawer.
+ *
+ * **Cash**, obviously. **Store credit**, since v0.11.0: a voucher is money the
+ * shop already owes this customer, so handing back the difference is settling a
+ * debt, not advancing cash — and the cashier chose to do it (see redeemPlan).
+ * Card, Bizum and transfer never can: change against a card payment is a cash
+ * advance, and the way that gets abused is well known.
+ */
+const CAN_GIVE_CHANGE: ReadonlySet<TenderMethod> = new Set(["cash", "store_credit"]);
 
 /** Pure running summary for the payment panel; throws only on malformed amounts. */
 export function tenderSummary(totalCents: number, tenders: ReadonlyArray<TenderDraft>): TenderSummary {
@@ -125,7 +136,7 @@ export function tenderSummary(totalCents: number, tenders: ReadonlyArray<TenderD
       throw appError("VALIDATION", "Importe de pago no válido.", "amountCents");
     }
     paidCents += tender.amountCents;
-    if (tender.method !== "cash") nonCashCents += tender.amountCents;
+    if (!CAN_GIVE_CHANGE.has(tender.method)) nonCashCents += tender.amountCents;
   }
   const nonCashExcess = nonCashCents > totalCents;
   return {
@@ -167,7 +178,7 @@ export function validateCompletion(args: {
   }
   const summary = tenderSummary(totalCents, tenders);
   if (summary.nonCashExcess) {
-    throw appError("TENDER_MISMATCH", "Los pagos no en efectivo no pueden superar el total.");
+    throw appError("TENDER_MISMATCH", "Tarjeta, Bizum y transferencia no pueden superar el total.");
   }
   if (summary.paidCents < totalCents) {
     throw appError("VALIDATION", "Los pagos no cubren el total.", "amountCents");

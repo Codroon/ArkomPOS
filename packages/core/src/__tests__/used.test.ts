@@ -9,6 +9,7 @@ import {
   expectedStockInCount,
   isUsedProductName,
   planIntake,
+  redeemPlan,
   suggestedSellPriceCents,
   unitCostCents,
   usedDeviceState,
@@ -141,16 +142,76 @@ describe("store credit", () => {
     expect(checkRedeemable(issued(), 12000)).toBeNull();
   });
 
-  it("refuses a voucher larger than the ticket rather than part-consuming it", () => {
-    // the shop's rule: 80 € of credit does not quietly settle a 50 € sale
-    expect(checkRedeemable(issued(), 5000)).toBe("exceeds_total");
-    expect(code(() => assertRedeemable(issued(), 5000))).toBe("VALIDATION");
+  it("accepts a voucher larger than the ticket — the amount never refuses one", () => {
+    /* This reverses the original rule (2026-08-29). Refusing 80 € of credit
+       against a 50 € sale sounded protective and was simply wrong at the
+       counter: the customer is owed the goods. What must not happen is a
+       SILENT part-consumption, and redeemPlan is what makes it explicit. */
+    expect(checkRedeemable(issued(), 5000)).toBeNull();
+    expect(() => assertRedeemable(issued(), 5000)).not.toThrow();
+  });
+
+  describe("how a bigger voucher meets a smaller ticket", () => {
+    it("keeps the difference on the voucher by default", () => {
+      const plan = redeemPlan(issued(), 1000);
+      expect(plan.tenderCents).toBe(1000);
+      expect(plan.remainingAfterCents).toBe(7000);
+      expect(plan.changeCents).toBe(0);
+      expect(plan.coversTicket).toBe(true);
+    });
+
+    it("or pays the difference out of the drawer when the cashier says so", () => {
+      const plan = redeemPlan(issued(), 1000, "pay_out");
+      expect(plan.tenderCents).toBe(8000);
+      expect(plan.remainingAfterCents).toBe(0);
+      expect(plan.changeCents).toBe(7000);
+    });
+
+    it("neither mode ever loses a cent", () => {
+      for (const mode of ["keep_rest", "pay_out"] as const) {
+        const plan = redeemPlan(issued(), 1000, mode);
+        // what actually settles the ticket is the same either way — the modes
+        // differ only in where the difference goes, never in how much there is
+        expect(plan.tenderCents - plan.changeCents).toBe(1000);
+        // and the voucher's value is fully accounted for: spent, or still on it
+        expect(plan.tenderCents + plan.remainingAfterCents).toBe(8000);
+      }
+    });
+  });
+
+  it("spends what it can against a bigger ticket, leaving nothing on it", () => {
+    const plan = redeemPlan(issued(), 20000);
+    expect(plan.tenderCents).toBe(8000);
+    expect(plan.remainingAfterCents).toBe(0);
+    expect(plan.coversTicket).toBe(false); // the rest is paid some other way
+  });
+
+  it("treats an exact match as covering the ticket with nothing left over", () => {
+    const plan = redeemPlan(issued(), 8000);
+    expect(plan).toEqual({
+      tenderCents: 8000,
+      remainingAfterCents: 0,
+      changeCents: 0,
+      coversTicket: true,
+    });
+  });
+
+  it("still refuses a voucher that is spent or void, whatever the total", () => {
+    expect(checkRedeemable(issued({ status: "redeemed", remainingCents: 0 }), 100)).toBe("not_issued");
+    expect(checkRedeemable(issued({ status: "void" }), 100)).toBe("not_issued");
+    expect(checkRedeemable(issued({ remainingCents: 0 }), 100)).toBe("empty");
   });
 
   it("refuses a second redemption", () => {
     const spent = issued({ status: "redeemed", remainingCents: 0 });
     expect(checkRedeemable(spent, 20000)).toBe("not_issued");
     expect(code(() => assertRedeemable(spent, 20000))).toBe("VALIDATION");
+  });
+
+  it("refuses a partly-spent voucher only once it is empty", () => {
+    // 30 € left on an 80 € voucher is still 30 € the shop owes
+    expect(checkRedeemable(issued({ remainingCents: 3000 }), 20000)).toBeNull();
+    expect(redeemPlan(issued({ remainingCents: 3000 }), 20000).tenderCents).toBe(3000);
   });
 
   it("refuses a voided voucher", () => {

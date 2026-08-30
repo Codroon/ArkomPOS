@@ -71,6 +71,7 @@ export const IPC_CHANNELS = [
   "used:sendToInventory",
   "used:findVoucher",
   "used:voidVoucher",
+  "used:peek",
 ] as const;
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
@@ -327,8 +328,10 @@ export const MovementRowSchema = z.object({
   movementType: z.string(),
   qty: z.number().int(),
   unitCostCents: z.number().int().nullable(),
-  documentId: z.string().nullable(), // link target for the ticket peek
+  documentId: z.string().nullable(), // link target for the peek
   documentNumber: z.string().nullable(),
+  /** "ticket" | "purchase" — which peek the link opens */
+  documentType: z.string().nullable(),
   imei: z.string().nullable(),
   userId: z.string().nullable(), // "—" until auth (ADR-0010)
 });
@@ -1123,7 +1126,7 @@ export const UsedFindVoucherRequestSchema = z.object({
   saleTotalCents: z.number().int().min(0),
 });
 export const UsedFindVoucherResponseSchema = z.object({
-  rows: z.array(VoucherRowSchema.extend({ refusal: z.enum(["not_issued", "exceeds_total", "empty"]).nullable() })),
+  rows: z.array(VoucherRowSchema.extend({ refusal: z.enum(["not_issued", "empty"]).nullable() })),
 });
 
 export const UsedVoidVoucherRequestSchema = z.object({
@@ -1131,3 +1134,53 @@ export const UsedVoidVoucherRequestSchema = z.object({
   reason: z.string().trim().min(1).max(200),
 });
 export const UsedVoidVoucherResponseSchema = z.object({ ok: z.boolean() });
+
+/** The purchase document as it prints, for reading on screen. */
+export const UsedPeekRequestSchema = z.object({
+  /** either identifier: the movements drawer has the document, the list has the purchase */
+  purchaseId: z.string().optional(),
+  documentId: z.string().optional(),
+});
+/**
+ * The purchase, as the screen shows it.
+ *
+ * Deliberately NOT the printed document. The sale ticket's peek is a structured
+ * summary — labelled rows, aligned money, the app's own type — and a purchase
+ * opened from the same drawer should read the same way. A monospaced copy of the
+ * receipt was the first attempt and it made one link in that drawer open a
+ * screen and the other open a picture of paper.
+ *
+ * The declaration and the signature rule are absent on purpose: they exist so a
+ * person can sign them, and nobody signs a screen. Reimprimir is right there for
+ * when the paper is what is wanted.
+ */
+export const UsedPeekResponseSchema = z.object({
+  purchaseId: z.string(),
+  docNumber: z.string(),
+  purchasedAtMs: z.number(),
+  cashierName: z.string(),
+  device: z.object({
+    brand: z.string(),
+    model: z.string(),
+    storage: z.string().nullable(),
+    color: z.string().nullable(),
+    grade: DeviceGradeSchema,
+    batteryPct: z.number().int().nullable(),
+    imei: z.string(),
+    /** the ones that came with it, already filtered */
+    accessories: z.array(z.enum(["charger", "box", "cable", "case"])),
+  }),
+  seller: z.object({
+    name: z.string(),
+    phone: z.string().nullable(),
+    idType: IdDocTypeSchema,
+    idNumber: z.string(),
+  }),
+  buyPriceCents: z.number().int(),
+  payout: PayoutMethodSchema,
+  payoutReference: z.string().nullable(),
+  voucher: z
+    .object({ amountCents: z.number().int(), status: VoucherStatusSchema, remainingCents: z.number().int() })
+    .nullable(),
+});
+export type UsedPeek = z.infer<typeof UsedPeekResponseSchema>;

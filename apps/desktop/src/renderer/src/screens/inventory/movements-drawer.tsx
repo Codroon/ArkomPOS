@@ -6,8 +6,9 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { InventoryRow, MovementRow } from "@arkom/core";
-import { Chip, cn, MoneyText, useT, type ChipVariant, type TKey } from "@arkom/ui";
+import { Chip, cn, MoneyText, useT, type ChipVariant, type TKey, useDataLabel } from "@arkom/ui";
 import { TicketPeekModal } from "../../components/ticket-peek-modal";
+import { PurchasePeekModal } from "../../components/purchase-peek-modal";
 
 const TYPE_KEYS: Record<string, TKey> = {
   purchase_in: "mov.entrada",
@@ -30,11 +31,14 @@ function formatShort(ms: number): string {
 
 export function MovementsDrawer({ product, onClose }: { product: InventoryRow; onClose: () => void }) {
   const t = useT();
+  const dataLabel = useDataLabel();
   const [rows, setRows] = useState<MovementRow[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [peekDocId, setPeekDocId] = useState<string | null>(null);
+  /* which document the link opened, and what kind — a purchase document is not
+     a ticket and does not render as one */
+  const [peek, setPeek] = useState<{ id: string; type: string | null } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const loadPage = useCallback(
@@ -62,11 +66,11 @@ export function MovementsDrawer({ product, onClose }: { product: InventoryRow; o
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !peekDocId) onClose();
+      if (e.key === "Escape" && !peek) onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, peekDocId]);
+  }, [onClose, peek]);
 
   const onScroll = () => {
     const el = scrollRef.current;
@@ -81,7 +85,7 @@ export function MovementsDrawer({ product, onClose }: { product: InventoryRow; o
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-baseline gap-2 border-b border-line-strong bg-surface-2 px-4 py-2.5">
-          <div className="text-[13px] font-bold">{product.name}</div>
+          <div className="text-[13px] font-bold">{dataLabel(product.name)}</div>
           <div className="font-mono font-medium text-[11px] tabular-nums text-muted">
             {t("drawer.onHand", { n: product.onHand })}
           </div>
@@ -153,7 +157,7 @@ export function MovementsDrawer({ product, onClose }: { product: InventoryRow; o
                           <button
                             type="button"
                             className="text-ink-2 underline hover:text-ink"
-                            onClick={() => setPeekDocId(m.documentId)}
+                            onClick={() => setPeek({ id: m.documentId!, type: m.documentType })}
                           >
                             {m.documentNumber}
                           </button>
@@ -175,7 +179,11 @@ export function MovementsDrawer({ product, onClose }: { product: InventoryRow; o
           {t("drawer.footerNote")}
         </div>
       </div>
-      {peekDocId ? <TicketPeekModal docId={peekDocId} onClose={() => setPeekDocId(null)} /> : null}
+      {peek?.type === "purchase" ? (
+        <PurchasePeekModal documentId={peek.id} onClose={() => setPeek(null)} />
+      ) : peek ? (
+        <TicketPeekModal docId={peek.id} onClose={() => setPeek(null)} />
+      ) : null}
     </div>
   );
 }

@@ -7,7 +7,7 @@
  * allocation (ADR-0008), oplog rows for every write — NEGATIVE_STOCK /
  * UNIT_NOT_AVAILABLE roll everything back and leave the sale open.
  */
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
 import {
   appError,
   applyMovements,
@@ -839,22 +839,35 @@ function redeemVoucher(
   if (voucher.status !== "issued") {
     throw appError("VALIDATION", "Ese vale ya no se puede usar.", "voucherId");
   }
-  if (amountCents !== voucher.remainingCents) {
-    // partial redemption is modelled and deliberately off (ADR-0013 §4): a
-    // voucher is spent whole, or it is not the right way to pay for this sale
-    throw appError("VALIDATION", "Un vale se canjea por su importe completo.", "voucherId");
+  if (amountCents > voucher.remainingCents) {
+    throw appError("VALIDATION", "El vale no tiene saldo suficiente.", "voucherId");
   }
+
+  /* A voucher may be spent in parts (2026-08-29): a customer with 50 € of
+     credit buying a 10 € protector keeps 40 € on the slip. It is only finished
+     when nothing is left, and only then does it point at the sale that closed
+     it — a partially spent voucher belongs to no single ticket. */
+  const remainingAfter = voucher.remainingCents - amountCents;
+  const spent = remainingAfter === 0;
 
   const result = tx
     .update(storeCreditVouchers)
     .set({
-      status: "redeemed",
-      remainingCents: 0,
-      redeemedDocumentId: documentId,
-      redeemedAt: now,
+      status: spent ? "redeemed" : "issued",
+      remainingCents: remainingAfter,
+      ...(spent ? { redeemedDocumentId: documentId, redeemedAt: now } : {}),
       updatedAt: now,
     })
-    .where(and(eq(storeCreditVouchers.id, voucherId), eq(storeCreditVouchers.status, "issued")))
+    /* The guarantee, unchanged and now doing more work: the row must still be
+       issued AND still hold what we are about to take. Two tills spending the
+       same 50 € voucher on 40 € each cannot both match. */
+    .where(
+      and(
+        eq(storeCreditVouchers.id, voucherId),
+        eq(storeCreditVouchers.status, "issued"),
+        gte(storeCreditVouchers.remainingCents, amountCents),
+      ),
+    )
     .run();
 
   if (result.changes !== 1) {
@@ -864,8 +877,13 @@ function redeemVoucher(
   log({
     entity: "store_credit_voucher",
     entityId: voucherId,
-    action: "redeem",
+    action: spent ? "redeem" : "redeem_partial",
     before: { status: "issued", remainingCents: voucher.remainingCents },
-    after: { status: "redeemed", remainingCents: 0, documentId },
+    after: {
+      status: spent ? "redeemed" : "issued",
+      spentCents: amountCents,
+      remainingCents: remainingAfter,
+      documentId,
+    },
   });
 }

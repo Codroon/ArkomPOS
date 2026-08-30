@@ -121,6 +121,7 @@ export {
   unitCostCents,
   suggestedSellPriceCents,
   checkRedeemable,
+  redeemPlan,
   assertRedeemable,
   assertVoidable,
   usedDeviceState,
@@ -140,6 +141,8 @@ export type {
   ImeiRejection,
   VoucherLike,
   RedeemRefusal,
+  RedeemMode,
+  RedeemPlan,
   UsedDeviceState,
   IntakeInput,
   IntakeResult,
@@ -330,6 +333,8 @@ export {
   UsedFindVoucherResponseSchema,
   UsedVoidVoucherRequestSchema,
   UsedVoidVoucherResponseSchema,
+  UsedPeekRequestSchema,
+  UsedPeekResponseSchema,
 } from "./ipc";
 export type {
   IpcChannel,
@@ -384,4 +389,5 @@ export type {
   UsedDeviceRow,
   UsedDeviceDetail,
   VoucherRow,
+  UsedPeek,
 } from "./ipc";
