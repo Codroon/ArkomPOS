@@ -10,7 +10,7 @@ shop's data lives in one SQLite file on the counter PC.
 
 ---
 
-## Current state — v0.11.0
+## Current state — v0.12.0
 
 Phase 1 is complete and packaged. Verified on a clean Windows machine end to
 end, with one exception noted below.
@@ -30,13 +30,19 @@ end, with one exception noted below.
 | **Auth** | PIN login with roles, per-action owner approval with dual attribution, idle lock, per-user permission overrides, owner recovery code |
 | **Used devices** | Buy over the counter behind an offline IMEI gate, photos, printed purchase document with a signature line, shelf label, hold or shelve, refurbishment cost, and a register of every device bought |
 | **Store credit** | Paying a seller in credit issues a voucher; it pays for a later sale as a tender, redeemed inside that sale's transaction so it cannot be spent twice |
+| **Repairs** | Intake with damage marks, photos and a signed deposit receipt; quote with per-line margin; approval bound to an amount; parts from stock or on order with goods-received; a workshop board; collection onto a normal fiscal ticket with the deposit applied as a tender; and closing a ticket unrepaired with every consumed part resolved first |
 
 ### Not built yet
 
-Shifts / float / Z report · refunds and voids · full invoices (tickets only) ·
-card-terminal SDK integration (references are typed in) · sync and the web
-dashboard · repairs, agency and SIM sales · the refurbishment pipeline and the
-second-hand police-register export (the data for it is captured at intake).
+Shifts / float / Z report and the Caja screen · refunds and voids · full
+invoices (tickets only) · card-terminal SDK integration (references are typed
+in) · sync and the web dashboard · transfers, agency and SIM sales · the
+refurbishment pipeline and the second-hand police-register export (the data for
+it is captured at intake).
+
+Dragging a card between columns on the workshop board is not built either: the
+honest version runs the same guard as the ficha's buttons, so a card opens its
+ficha rather than pretending to move.
 
 The schema already anticipates all of these — nullable `shift_id`, tenancy keys,
 document types — so they extend rather than replace what is here. A new role or
@@ -135,6 +141,7 @@ Read in roughly this order.
 | [`docs/specs/phase1-prd.md`](docs/specs/phase1-prd.md) | What Phase 1 promised, requirement by requirement, with what is still owed by the client |
 | [`docs/specs/auth-slice.md`](docs/specs/auth-slice.md) | The v0.10.0 auth slice, acceptance criteria A1–K3 |
 | [`docs/specs/used-devices-slice.md`](docs/specs/used-devices-slice.md) | The v0.11.0 used-devices slice, acceptance criteria U1–B3 |
+| [`docs/specs/repairs-slice.md`](docs/specs/repairs-slice.md) | The v0.12.0 repairs slice, acceptance criteria R1–B3 |
 | [`docs/design/handoff/`](docs/design/handoff/) | Per-screen specs: foundations (brand tokens, the one-blue rule), sale, catalog, inventory, auth |
 | [`TESTING.md`](TESTING.md) | Manual walkthroughs in plain Spanish/English, for the owner to drive |
 | [`DEPLOYMENT.md`](DEPLOYMENT.md) | Installing on the shop PC, printer and scanner setup, backups, restore, the shop-visit checklist |

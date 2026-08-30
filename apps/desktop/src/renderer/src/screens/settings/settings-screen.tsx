@@ -12,6 +12,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  centsToInput,
+  parseMoneyInput,
   SettingsSchema,
   PrintPrintersResponseSchema,
   PrintTicketResponseSchema,
@@ -30,6 +32,7 @@ import {
   SectionLabel,
   SelectInput,
   Segmented,
+  Switch,
   TextInput,
   Toast,
   useT,
@@ -283,6 +286,52 @@ export function SettingsScreen() {
             </Field>
           </section>
 
+          {/* ---------------- repairs (ADR-0014) ----------------
+              All four land as DATA, and the first two are snapshotted onto every
+              ticket at intake: changing them tomorrow must not reach back into a
+              device taken in today (ADR-0014 §8). */}
+          <section className="flex flex-col gap-2">
+            <SectionLabel>{t("set.repairSection")}</SectionLabel>
+
+            <Field label={t("set.repairWarranty")} hint={t("set.repairWarrantyHint")}>
+              <div className="flex items-center gap-1.5">
+                <SelectInput
+                  value={String(settings.repairWarrantyMonths)}
+                  onChange={(e) => void save({ repairWarrantyMonths: Number(e.target.value) })}
+                >
+                  {[0, 1, 3, 6, 12, 24].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </SelectInput>
+                <span className="text-[12px] text-muted">{t("set.repairMonths")}</span>
+              </div>
+            </Field>
+
+            <Field label={t("set.repairFee")} hint={t("set.repairFeeHint")}>
+              <MoneySetting
+                cents={settings.repairDiagnosisFeeCents}
+                onCommit={(cents) => void save({ repairDiagnosisFeeCents: cents })}
+              />
+            </Field>
+
+            <Field label={t("set.repairDeposit")} hint={t("set.repairDepositHint")}>
+              <MoneySetting
+                cents={settings.repairDepositSuggestionCents}
+                onCommit={(cents) => void save({ repairDepositSuggestionCents: cents })}
+              />
+            </Field>
+
+            <Field label={t("set.repairCap")} hint={t("set.repairCapHint")}>
+              <Switch
+                label={t("set.repairCapOn")}
+                checked={settings.repairCapEnabled}
+                onChange={(next) => void save({ repairCapEnabled: next })}
+              />
+            </Field>
+          </section>
+
           <BackupPanel say={say} />
 
           {/* ---------------- demo data ---------------- */}
@@ -365,5 +414,36 @@ function ShopField({
         }}
       />
     </Field>
+  );
+}
+
+/**
+ * A money setting.
+ *
+ * Commits on blur, not on every keystroke: each save is a write plus an oplog
+ * entry, and "1", "15", "150" on the way to 1,50 € would be three of them.
+ */
+function MoneySetting({ cents, onCommit }: { cents: number; onCommit: (cents: number) => void }) {
+  const [draft, setDraft] = useState(() => centsToInput(cents));
+  useEffect(() => setDraft(centsToInput(cents)), [cents]);
+
+  const commit = () => {
+    const parsed = parseMoneyInput(draft);
+    if (parsed === null) {
+      setDraft(centsToInput(cents)); // unparseable: put the stored value back
+      return;
+    }
+    if (parsed !== cents) onCommit(parsed);
+  };
+
+  return (
+    <TextInput
+      mono
+      inputMode="decimal"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => e.key === "Enter" && commit()}
+    />
   );
 }

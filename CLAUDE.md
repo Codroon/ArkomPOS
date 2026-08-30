@@ -10,13 +10,15 @@ Operating instructions for Claude Code in this repo. Read before writing anythin
 
 ## What we are building right now (Phase 1 only)
 Desktop till (Electron): **Sale**, **Catalog**, **Inventory (+ minimal add-stock)**, **Ajustes-lite**
-(printer + paper + command set + the shop's legal block), **Usuarios**, and since v0.11.0
-**Comprar usados** + **Dispositivos usados** (nav 04, 05, 11 and 12).
+(printer + paper + command set + the shop's legal block), **Usuarios**, **Comprar usados** +
+**Dispositivos usados**, and since v0.12.0 **Reparaciones** + **Taller**
+(nav 01–07, 11 and 12).
 Since v0.10.0 the till has PIN login, roles and per-action approval (ADR-0012).
 Ticket printing is in: ESC/POS through the Windows RAW spooler, PDF fallback, reprints stamped COPIA.
 Since v0.11.0 the till buys used devices: gate, purchase document, shelf label, store credit (ADR-0013).
+Since v0.12.0 the till repairs devices: intake, quote, approval, parts, board, collection (ADR-0014).
 NOT yet: shifts/float/Z report, refunds/voids, full invoices, card-terminal SDK, sync, web app,
-repairs/agency/SIM screens, the refurbishment pipeline, the police-register export.
+transfers/agency/SIM screens, the Caja screen, the refurbishment pipeline, the police-register export.
 Schema already anticipates them — build nothing for them.
 
 ## Hard rules
@@ -41,7 +43,27 @@ Schema already anticipates them — build nothing for them.
   relative to that root. Never a blob — it defeats the backup design (ADR-0013).
 - **Store credit is a tender, never a line.** A voucher pays for a sale the way
   cash does; putting it on the document as a negative line corrupts the taxable
-  base and the printed IVA breakdown.
+  base and the printed IVA breakdown. **A repair deposit is a tender too**, for
+  the same reason (ADR-0014 §7).
+- **A repair's status is derived, never assigned.** `repairStatus()` computes it
+  from the ticket's own facts and `syncStatus()` is the only writer of the
+  column — there is no `setStatus`, and no channel accepts a status. Where a
+  status would change, the UI offers the action that records the fact.
+  `db:audit` asserts stored equals derived, the same way it does for the stock
+  cache (ADR-0014 §1).
+- **A repair part leaves the shelf when it is FITTED**, not at hand-back — the
+  on-hand figure has to be right for every day the phone sits in the workshop.
+  Removing the line posts the exact reversal as a second movement (ADR-0004).
+  Collection moves no stock at all.
+- **Revenue for a repair lands on the collection ticket and nowhere earlier.**
+  The `R-` document is a record of custody with a zero total; the `T1-` created
+  at hand-back is the invoice.
+- **The device passcode is redacted like a PIN.** Never printed on any document,
+  never in an oplog payload (the entry records `hasPasscode`, and an *update*
+  strips it from BOTH halves), never in a list, board or peek. It reaches the
+  ficha because the technician has to open the phone, and it is masked there;
+  revealing it writes an oplog entry naming who looked and no value. Phase 2
+  sync must exclude or encrypt the column (ADR-0014 §10).
 - **Brand tokens only.** Colours and faces come from `packages/ui/src/styles/tokens.css` by
   meaning (`canvas`, `ink`, `accent`, `warning-bg`…). No raw hex in components. Signal Blue lands
   on exactly **one** element per screen — the primary action. **White-on-blue is banned** (text on

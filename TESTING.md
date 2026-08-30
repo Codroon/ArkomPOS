@@ -751,7 +751,147 @@ pnpm db:audit --verify
 
 ---
 
-## 13. Final check
+## 13. Repairs (v0.12.0)
+
+Sign in as **Ahmer / 8317**. No hardware needed: every print falls back to a PDF
+you can open from the toast.
+
+### (a) Taking a device in
+
+**06 · Reparaciones → Nueva reparación.**
+
+Search the customer by phone. Nobody matches yet, so press **Nuevo cliente**,
+fill `Joan Puig` / `671 220 918`, and create. The block collapses to one line.
+
+Fill the device: `Apple iPhone 11 64GB`, fault `Pantalla rota, táctil
+intermitente`. Tick **Pantalla rota** and **Golpes**. Type `0451` in
+**Código / patrón** and press **Ver** — it reveals, and **Ocultar** hides it
+again. Set a **Depósito** of `20`.
+
+Press **Crear ficha e imprimir resguardo**.
+
+- ✅ The panel says **Ficha R-000001 creada** and **Depósito de 20,00 € registrado en caja**.
+- ✅ A toast offers the saved PDF. Open it. The receipt is **in Spanish even if
+  the UI is in English** — flip the ES · EN toggle first and check.
+- ✅ It lists the damage marks, the deposit, the warranty sentence, the notice
+  about not doing chargeable work without approval, and a signature line.
+- ✅ **The passcode is nowhere on it.** Search the PDF for `0451`.
+
+### (b) Quoting, and what the customer agreed to
+
+Open the ficha. Under **Presupuesto**:
+
+1. **Añadir mano de obra** → `Cambio de pantalla`, `30`.
+   - ✅ The status chip moves to **PRESUPUESTADO**. Nothing was clicked to do that.
+2. **Añadir pieza del inventario** → pick any accessory with stock, quantity 1.
+   - ✅ The row says **Descontada del inventario**.
+   - ✅ Check **03 · Inventario**: that article's on-hand has dropped **now**,
+     not at hand-back. Open its movements — the row is a `repair_part_out`
+     carrying **R-000001** as its document.
+3. Press the blue **Registrar aprobación** → **En persona** → confirm.
+   - ✅ The status moves to **EN REPARACIÓN** and the strip shows the amount
+     approved, who recorded it and when.
+4. Now add another labour line for `50`.
+   - ✅ The ticket falls **back to PRESUPUESTADO** by itself: the quote grew past
+     what was approved.
+   - ✅ Print the quote. It asks for a **new signature** rather than saying
+     APROBADO — the paper agrees with the screen.
+5. Approve again.
+   - ✅ **Aprobaciones** now lists **two** rows, oldest last. Neither was overwritten.
+
+### (c) Lowering a charge after approval
+
+Click the **charge** amount on the labour line and type something lower.
+
+- ✅ A **Motivo de la rebaja** field appears. Leaving it empty refuses the save.
+- ✅ Fill it in and save. It goes through.
+- Now sign out and back in as **Ana / 5162** (cashier) and try the same.
+  - ✅ Ana is asked for an owner's PIN. Type Ahmer's `8317`.
+  - ✅ It goes through, and the oplog entry names **both** people.
+
+### (d) A part you have to order
+
+**Añadir pieza por pedir** → `Batería iPhone 11`, supplier `Movilex`,
+expected `18`, charge `45`. Approve the new total.
+
+- ✅ The ticket sits at **ESPERANDO PIEZA**.
+- ✅ **Piezas por pedir** (the second tab) lists it with the ticket number, the
+  customer, the expected cost and days waiting.
+
+Press **Recibida** on that row. Pick a catalogue article, set the real cost to
+`21` (not the 18 that was expected), confirm.
+
+- ✅ The toast says the stock entry was recorded **and** the part was taken.
+- ✅ In **03 · Inventario** the article shows **two** new movements: a
+  `purchase_in` of +1 at 21,00 € and a `repair_part_out` of −1. Net zero on the
+  shelf, both halves visible.
+- ✅ That article's **cost** is now 21,00 € — it came from the invoice.
+- ✅ The ticket is back at **EN REPARACIÓN**, and the buying list is empty.
+
+### (e) The board
+
+**07 · Taller.**
+
+- ✅ Seven columns, with **Entregado** and **No reparado** hidden until you turn
+  on *Ver cerradas*.
+- ✅ The card shows the number, the device, the fault in one line, the technician
+  (or *Sin asignar* in italics) and days in the current status.
+- ✅ Clicking a card opens its ficha. Cards do not drag — see the README.
+
+### (f) Handing it back
+
+Back on the ficha, press the blue **Marcar listo**.
+
+- ✅ **LISTO**. Try it on a ticket with a part still on order — refused, and the
+  reason is in words.
+
+**Avisar al cliente** → Teléfono, note `Avisado, pasa mañana` → confirm.
+
+- ✅ It appears under **Avisos al cliente** with your name and the time.
+- ✅ Nothing was sent anywhere. The dialog says so.
+
+**Cobrar y entregar.**
+
+- ✅ The **Depósito · 20,00 €** is already there and cannot be removed. The
+  total is still the full value of the work — the deposit is a payment, not a
+  discount.
+- ✅ **Pendiente** is the remainder. Pay it in cash with more than is due.
+- ✅ **Cambio** appears, using the same rules as the Sale screen.
+
+Confirm.
+
+- ✅ The ticket is **ENTREGADO** and shows its **T1-** number.
+- ✅ The printed receipt names **both** documents, breaks out base and IVA 21%
+  adding back to the total exactly, lists the deposit as a payment, and carries
+  the **warranty end date**.
+- ✅ The passcode is not on it.
+- ✅ **03 · Inventario**: no new movement. The parts left when they were fitted.
+
+### (g) A device you could not fix
+
+Take in a second device with a deposit and fit a part to it. Then press
+**Marcar no reparado** at the bottom of the actions card.
+
+- ✅ The confirm stays **disabled** until every consumed part is resolved.
+- ✅ Choose **Devolver al inventario** for the part. Choose **Devolver** for the
+  deposit. Confirm.
+- ✅ In **03 · Inventario** the part is back, as a **second movement** — the
+  original is still there. Nothing was deleted.
+- ✅ The return document prints: what came back, why, the deposit returned, and
+  a line the customer signs.
+- ✅ As **Ana**, the same action asks for an owner's PIN first.
+
+### (h) The passcode, one last time
+
+Open a ficha with a passcode.
+
+- ✅ It shows as `••••` until you press **Ver código**.
+- ✅ Run `pnpm db:audit` — no complaint. Then search every printed PDF you
+  produced in this section for the passcode. It is in none of them.
+
+---
+
+## 14. Final check
 
 ```bash
 pnpm db:audit --verify

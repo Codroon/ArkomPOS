@@ -232,7 +232,11 @@ Since v0.11.0 each backup is **two things**, not one:
 | `arkom-20260829-0330.db-photos\` | the photographs of used devices taken up to that moment |
 
 They are made together, pruned together, and **must be restored together**.
-Restoring only the database leaves every used-device purchase listing photos that
+The repairs slice needed **no change here**: `photos/repairs/…` sits under the same
+root the backup already copies recursively, which was verified against a real
+backup rather than assumed.
+
+Restoring only the database leaves every purchase and repair listing photos that
 no longer exist — the record is there and the evidence is gone, which is the worst
 of both. If the photo folder cannot be copied, the whole backup is discarded and
 recorded as failed rather than left looking complete.
