@@ -11,15 +11,16 @@ Operating instructions for Claude Code in this repo. Read before writing anythin
 ## What we are building right now (Phase 1 only)
 Desktop till (Electron): **Sale**, **Catalog**, **Inventory (+ minimal add-stock)**, **Ajustes-lite**
 (printer + paper + command set + the shop's legal block), **Usuarios**, **Comprar usados** +
-**Dispositivos usados**, **Reparaciones** + **Taller**, and since v0.13.0 **Caja**
-(nav 01–07, 09, 11 and 12).
+**Dispositivos usados**, **Reparaciones** + **Taller**, **Caja**, and since
+v0.14.0 **Informes** (nav 01–07 and 09–12).
 Since v0.10.0 the till has PIN login, roles and per-action approval (ADR-0012).
 Ticket printing is in: ESC/POS through the Windows RAW spooler, PDF fallback, reprints stamped COPIA.
 Since v0.11.0 the till buys used devices: gate, purchase document, shelf label, store credit (ADR-0013).
 Since v0.12.0 the till repairs devices: intake, quote, approval, parts, board, collection (ADR-0014).
 Since v0.13.0 the till has shifts: float, drawer ledger, X preview, close with variance, Z report (ADR-0015).
+Since v0.14.0 the till reports: sales/tax, repairs, used holding, valuation, dead stock, CSV export (ADR-0016).
 NOT yet: refunds/voids, full invoices, card-terminal SDK, sync, web app, transfers/agency/SIM
-screens, the Reports screen, the refurbishment pipeline, the police-register export.
+screens, margin on SOLD used devices, the refurbishment pipeline, the police-register export.
 Schema already anticipates them — build nothing for them.
 
 ## Hard rules
@@ -85,6 +86,18 @@ Schema already anticipates them — build nothing for them.
   fiscal document or moves notes raises `SHIFT_REQUIRED` when none is open; the Sale screen
   answers it with the open dialog and re-runs the charge. Receiving stock and a depositless
   repair intake need no shift, and stamp one if it exists.
+- **Reports read COMPLETED documents, dated by `completed_at`, and never write.**
+  A draft is a ticket somebody is still building and a parked sale is one nobody
+  has paid for; `created_at` answers "when did someone start typing", which is not
+  a question anybody asks about money. Aggregation is SQL in main returning shaped
+  rows — summing in the renderer would be a second implementation of the money
+  (ADR-0016 §1, §3).
+- **Cost is snapshotted on the sale line, exactly as tax is.**
+  `document_lines.unit_cost_cents` is written at completion from the same figure
+  the stock movement records. Joining `products.cost_cents` at report time would
+  make last month's margin move when this month's delivery arrives at a different
+  price. A NULL means "before v0.14.0": reports fall back to the current cost and
+  say so on screen and in the export, never silently (ADR-0016 §2).
 - **Brand tokens only.** Colours and faces come from `packages/ui/src/styles/tokens.css` by
   meaning (`canvas`, `ink`, `accent`, `warning-bg`…). No raw hex in components. Signal Blue lands
   on exactly **one** element per screen — the primary action. **White-on-blue is banned** (text on

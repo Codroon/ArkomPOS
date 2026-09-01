@@ -368,6 +368,29 @@ export function SettingsScreen() {
             </Field>
           </section>
 
+          {/* ---------------- reports (ADR-0016) ----------------
+              One knob, and it is deliberately not a filter on the Stock muerto
+              screen: a threshold in the filter bar invites fishing for a number
+              that looks better than the one the shop agreed on. */}
+          <section className="flex flex-col gap-2">
+            <SectionLabel>{t("set.reportsSection")}</SectionLabel>
+            <Field label={t("set.deadStockDays")} hint={t("set.deadStockDaysHint")}>
+              <div className="flex items-center gap-1.5">
+                <SelectInput
+                  value={String(settings.deadStockDays)}
+                  onChange={(e) => void save({ deadStockDays: Number(e.target.value) })}
+                >
+                  {[30, 60, 90, 120, 180, 365].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </SelectInput>
+                <span className="text-[12px] text-muted">{t("rep2.dead.col.days").toLowerCase()}</span>
+              </div>
+            </Field>
+          </section>
+
           <BackupPanel say={say} />
 
           {/* ---------------- demo data ---------------- */}

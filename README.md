@@ -10,7 +10,7 @@ shop's data lives in one SQLite file on the counter PC.
 
 ---
 
-## Current state — v0.13.0
+## Current state — v0.14.0
 
 Phase 1 is complete and packaged. Verified on a clean Windows machine end to
 end, with one exception noted below.
@@ -31,12 +31,14 @@ end, with one exception noted below.
 | **Used devices** | Buy over the counter behind an offline IMEI gate, photos, printed purchase document with a signature line, shelf label, hold or shelve, refurbishment cost, and a register of every device bought |
 | **Store credit** | Paying a seller in credit issues a voucher; it pays for a later sale as a tender, redeemed inside that sale's transaction so it cannot be spent twice |
 | **Repairs** | Intake with damage marks, photos and a signed deposit receipt; quote with per-line margin; approval bound to an amount; parts from stock or on order with goods-received; a workshop board; collection onto a normal fiscal ticket with the deposit applied as a tender; and closing a ticket unrepaired with every consumed part resolved first |
+| **Reports** | Five reports on the data the till already holds — sales and tax by day, group, item, user or payment method with margin; repairs open and closed with turnaround; used devices held with cost tied up; inventory valuation that equals the Inventario header to the cent; and dead stock. Every one exports a CSV a Spanish Excel opens on a double-click |
 | **Cash** | A shift per till with a counted float, one expected-cash figure derived from the tenders and the drawer ledger, an X preview that is exactly what a close would freeze, cash paid in and out with approval over a threshold, and a close that freezes an immutable numbered Z with the variance, its reason and its approver |
 
 ### Not built yet
 
-Refunds and voids · full invoices (tickets only) · the Reports screen (a Z
-snapshot is its future source, and the seam is documented) · card-terminal SDK
+Refunds and voids · full invoices (tickets only) · margin on SOLD used devices
+(a real report needing purchase, refurbishment and sale joined; the sale line now
+carries the cost it will want) · card-terminal SDK
 integration (references are typed in) · sync and the web dashboard · transfers,
 agency and SIM sales · reopening a closed shift, which is deliberate rather than
 missing · the refurbishment pipeline and the second-hand police-register export

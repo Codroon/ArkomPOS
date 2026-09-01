@@ -1043,8 +1043,142 @@ Run `pnpm db:audit --verify`.
 
 ---
 
-## 15. Final check
+## 15. Informes (v0.14.0)
 
+Sign in as **Ahmer / 8317**. Everything here is read-only: you can run any of it
+twice and nothing changes.
+
+### (a) The hub
+
+**10 · Informes.**
+
+- ✅ Five cards. Each one shows a single number **and the window it covers**:
+  *Neto · este mes*, *Ahora*, *Coste inmovilizado · ahora*, *A coste · ahora*,
+  *Sin venta en 90 días · ahora*.
+- ✅ The Reparaciones card's overdue half is red only when it is not zero.
+- ✅ There is no date selector in the header. Three of the five reports answer
+  "right now", so a global range would be a lie for most of the screen.
+
+### (b) Ventas — and the tax figures
+
+Open **Ventas**.
+
+- ✅ Presets: Hoy · Ayer · Semana · Mes · Mes pasado · Personalizado. Pick
+  **Mes**; the header says the range.
+- ✅ The strip: Tickets · Neto · IVA 21% · Bruto · Ticket medio, and
+  **Usado (REBU, sin IVA)** on its own — a margin-scheme sale carries no VAT and
+  adding it to the taxable base would misstate the return.
+- ✅ **This is the tax report.** Neto + IVA = Bruto for the period.
+
+Switch **Agrupar por** through Día · Grupo · Artículo · Usuario · Medio de pago.
+
+- ✅ Every grouping's Bruto column adds up to the same Bruto in the strip. Check
+  one with a calculator — that equality is a test, and it is worth seeing once.
+- ✅ Grouped by **Artículo** you get three more columns: Coste, Margen, Margen %.
+- ✅ Grouped by **Grupo**, a repair you have collected appears under
+  **Reparaciones**. The `T1-` a hand-back creates is an invoice like any other.
+
+Click a **Día** row.
+
+- ✅ A list of that day's tickets. Click one: the usual ticket peek.
+
+Now the cross-check that matters. Pick a closed shift in the **Turno** dropdown.
+
+- ✅ Tickets, Neto, IVA and Bruto match that shift's printed Z exactly. Open the
+  Z PDF beside it and compare. If they ever differ, one of them is lying.
+
+### (c) The estimated-cost warning
+
+If the shop has sales from before v0.14.0, group by **Artículo**:
+
+- ✅ A yellow strip under the summary: *N de M líneas son anteriores a v0.14.0 y
+  usan el coste actual del artículo. El margen es aproximado.*
+- ✅ Sell something new, then look again: the new line is exact, and the count in
+  the warning goes up by one on the M side, not the N side.
+
+The reason this exists: before this version the till never recorded what a thing
+cost when it was sold, so those rows can only use today's cost. That is the best
+answer available, and it is not the same kind of answer.
+
+### (d) Reparaciones
+
+- ✅ **Abiertas** lists every open ticket with days in status and days since
+  intake. Vencidas is red when non-zero; **Esperando al cliente** (quoted) is
+  highlighted, because that pile grows without anyone touching it.
+- ✅ Filter by status and by technician, including *Sin asignar*.
+- ✅ Click a row: it opens the repair page.
+- ✅ **Cerradas en el periodo** shows Entregadas · Ingresos · Piezas · Mano de
+  obra · Margen · Tiempo medio · No reparadas, with the reasons broken out below.
+- ✅ Turn on **Agrupar por técnico**: one row per person, same money columns.
+- ✅ Ingresos equals the sum of the collection tickets in the period.
+
+### (e) Dispositivos usados
+
+- ✅ Three status figures, each *count · cost*, plus **Saldo a favor pendiente** —
+  money the shop owes, beside money it is holding.
+- ✅ The table is **oldest first**. Days over 60 go amber and over 120 go red.
+- ✅ Filter by grade: the table narrows and the summary figures **do not move**.
+  A filter narrows what you are looking at, not how much money is asleep.
+- ✅ Click a row: the used device detail.
+
+### (f) Valoración de inventario
+
+- ✅ One big number: **Total a coste**.
+- ✅ Now open **03 · Inventario** in the same session and read its header total.
+  **They must be identical to the cent.** This is the check worth doing by hand
+  once, because two screens disagreeing about the same money is worse than
+  neither existing.
+- ✅ A serialized product shows `—` for Coste unitario and a real Valor: five
+  identical phones bought at three prices have no single unit cost.
+
+### (g) Stock muerto
+
+- ✅ Header says *Sin venta en 90 días · ahora*. The threshold is in
+  **Ajustes → Informes**, not in the filter bar — a threshold you can twiddle on
+  the report is an invitation to fish for a nicer number.
+- ✅ Sorted by **Coste inmovilizado**, largest first: 40 unsold cases at 2 € are
+  a tidy-up, one unsold laptop at 900 € is the point.
+- ✅ A product that never sold shows *nunca* in italics.
+- ✅ Used phones are absent. Section (e) covers them.
+
+Change the setting to 30 days in Ajustes and come back:
+
+- ✅ More products, and the header now says *Sin venta en 30 días*.
+
+### (h) The CSV — open one in Excel
+
+On any report, press **Exportar**.
+
+- ✅ A save dialog with a name like `informe-ventas-2026-09-02.csv`.
+- ✅ Save it and **double-click it**. This is the whole test:
+  - Columns land in separate columns, not all in column A (semicolons).
+  - Money is right-aligned and can be summed — Excel sees numbers, not text
+    (decimal comma).
+  - Accents in your product names are correct, not `Ã­` (UTF-8 with a BOM).
+  - Dates read `02/09/2026`, not `2026-09-02`.
+- ✅ The first line names the report and its period. If a margin was estimated,
+  the second line is the **AVISO** — the warning cannot be lost by exporting.
+- ✅ Export with a filter set, then check the file contains only the filtered
+  rows. The export re-runs the query rather than copying what is on screen.
+
+### (i) The permissions
+
+**12 · Usuarios** → open a cashier → grant **Ver informes** but not
+**Ver costes y márgenes en informes**. Sign in as them.
+
+- ✅ **10 · Informes** appears, with **two** cards: Ventas and Reparaciones. The
+  other three are not rendered at all — not greyed.
+- ✅ Ventas grouped by Artículo has **five** columns. No Coste, no Margen.
+- ✅ Reparaciones has no **Cerradas** tab.
+- ✅ Export Ventas: the file has no cost columns either.
+
+Now take **Ver informes** away as well.
+
+- ✅ The Informes menu item is gone.
+
+---
+
+## 16. Final check
 ```bash
 pnpm db:audit --verify
 ```
