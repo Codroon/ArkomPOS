@@ -11,6 +11,7 @@ export {
   marginCents,
   marginPct,
 } from "./money";
+export { parseDayInput, dayToInput, startOfDay, addDays } from "./day";
 export { ean13CheckDigit, isValidEan13, ean13WithCheckDigit, generateInternalEan13 } from "./barcode";
 export { imeiCheckDigit, imeiWithCheckDigit, isValidImei, validateImeiBatch } from "./imei";
 export { resolveScan, normalizeScanCode } from "./scan";

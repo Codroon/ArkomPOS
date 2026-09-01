@@ -768,6 +768,17 @@ intermitente`. Tick **Pantalla rota** and **Golpes**. Type `0451` in
 **Código / patrón** and press **Ver** — it reveals, and **Ocultar** hides it
 again. Set a **Depósito** of `20`.
 
+Now **Entrega prevista**. It is a typed field, not the operating system's date
+picker, so it reads the same on a Spanish Windows and an English one.
+
+- Type `hoy`. ✅ It says **La fecha de entrega no es válida** and
+  **Crear ficha** goes grey. Your keystrokes are still there to correct.
+- Type `31/02/2026`. ✅ Refused too — February has no 31st, and a date picker
+  would have quietly offered you 3 March.
+- Type `3-9` and click away. ✅ It becomes **03/09/2026** — day first, always,
+  and the missing year is the next one, never a date already gone by.
+- Press **+1 semana**. ✅ Seven days from today, in the same spelling.
+
 Press **Crear ficha e imprimir resguardo**.
 
 - ✅ The panel says **Ficha R-000001 creada** and **Depósito de 20,00 € registrado en caja**.

@@ -15,9 +15,12 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import {
+  addDays,
   centsToInput,
+  dayToInput,
   formatCents,
   isValidImei,
+  parseDayInput,
   parseMoneyInput,
   type CustomerRow,
   type RepairCreateResponse,
@@ -77,13 +80,15 @@ const emptyDraft = (): IntakeDraft => ({
   cap: "",
 });
 
-/** "2026-09-04" → local midnight, which is what "entrega el 4" means to a shop. */
-function dateToMs(value: string): number | null {
-  if (!value) return null;
-  const [y, m, d] = value.split("-").map(Number);
-  if (!y || !m || !d) return null;
-  return new Date(y, m - 1, d).getTime();
-}
+/**
+ * The shortcuts, in days.
+ *
+ * Labelled by the offset rather than by the word "tomorrow": the Spanish for
+ * tomorrow is *mañana*, which is also the Spanish for the morning half sitting
+ * two rows below it. Two chips reading "Mañana" and meaning different things is
+ * a defect, not a translation.
+ */
+const PROMISE_SHORTCUTS = [1, 2, 7] as const;
 
 export function RepairIntakeScreen({ onDone }: { onDone: (ticketId: string | null) => void }) {
   const t = useT();
@@ -115,8 +120,15 @@ export function RepairIntakeScreen({ onDone }: { onDone: (ticketId: string | nul
   }, []);
 
   const imeiBad = draft.imei.trim() !== "" && !isValidImei(draft.imei.trim());
+  /* The promise is optional, so an empty field is fine and a typed one that
+     nobody can read is not — the same shape as the IMEI above. */
+  const promisedMs = useMemo(
+    () => (draft.promisedDate.trim() === "" ? null : parseDayInput(draft.promisedDate)),
+    [draft.promisedDate],
+  );
+  const promisedBad = draft.promisedDate.trim() !== "" && promisedMs === null;
   const deviceDone = draft.deviceDescription.trim() !== "" && draft.reportedFault.trim() !== "";
-  const canSubmit = customer !== null && deviceDone && !imeiBad && !submitting;
+  const canSubmit = customer !== null && deviceDone && !imeiBad && !promisedBad && !submitting;
 
   const missing = !customer
     ? t("rep.missing.customer")
@@ -124,7 +136,9 @@ export function RepairIntakeScreen({ onDone }: { onDone: (ticketId: string | nul
       ? t("rep.missing.device")
       : imeiBad
         ? t("rep.missing.imei")
-        : t("rep.ready");
+        : promisedBad
+          ? t("rep.missing.promised")
+          : t("rep.ready");
 
   const depositCents = useMemo(() => parseMoneyInput(draft.deposit) ?? 0, [draft.deposit]);
   const capCents = useMemo(() => (draft.cap.trim() === "" ? null : parseMoneyInput(draft.cap)), [draft.cap]);
@@ -153,7 +167,7 @@ export function RepairIntakeScreen({ onDone }: { onDone: (ticketId: string | nul
         accessories: draft.accessories.trim() || null,
         devicePasscode: draft.devicePasscode.trim() || null,
         photos: Object.values(draft.photos).map((p) => ({ kind: slotKind(p.slot), dataUrl: p.dataUrl })),
-        promisedDate: dateToMs(draft.promisedDate),
+        promisedDate: promisedMs,
         promisedHalf: draft.promisedHalf || null,
         depositCents,
         authorizedCapCents: capCents,
@@ -329,16 +343,47 @@ export function RepairIntakeScreen({ onDone }: { onDone: (ticketId: string | nul
           >
             <SectionLabel>{t("rep.agreement.section")}</SectionLabel>
 
-            <Field className="mt-2" label={t("rep.agreement.promised")} hint={t("rep.agreement.promisedHint")}>
-              {/* stacked, not side by side: a native date control is as wide as
-                  the browser wants it to be, and the pair overflowed the rail */}
+            <Field
+              className="mt-2"
+              label={t("rep.agreement.promised")}
+              error={promisedBad ? t("rep.missing.promised") : null}
+              hint={t("rep.agreement.promisedHint")}
+            >
+              {/* Typed, not picked. `<input type=date>` renders in the OS
+                  locale, so an English Windows would offer mm/dd/yyyy while
+                  every other date in the app — and every printed one — says
+                  dd/mm/yyyy. The shop should not have to know which machine it
+                  is standing at. Stacked because the row overflowed the rail. */}
               <div className="flex flex-col gap-1.5">
                 <TextInput
                   mono
-                  type="date"
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder={t("rep.agreement.promisedFormat")}
                   value={draft.promisedDate}
                   onChange={(e) => patch({ promisedDate: e.target.value })}
+                  /* on the way out, rewrite whatever parsed into the one
+                     spelling: "3-9" typed becomes 03/09/2026 read back */
+                  onBlur={() => promisedMs !== null && patch({ promisedDate: dayToInput(promisedMs) })}
                 />
+                <div className="flex gap-1">
+                  {PROMISE_SHORTCUTS.map((days) => (
+                    <GhostButton
+                      key={days}
+                      className="flex-1"
+                      onClick={() => patch({ promisedDate: dayToInput(addDays(new Date(), days)) })}
+                    >
+                      {t(
+                        days === 1
+                          ? "rep.agreement.plusDay"
+                          : days === 7
+                            ? "rep.agreement.plusWeek"
+                            : "rep.agreement.plusDays",
+                        { n: days },
+                      )}
+                    </GhostButton>
+                  ))}
+                </div>
                 <div className="flex overflow-hidden rounded-[3px] border border-line-strong">
                   {(
                     [

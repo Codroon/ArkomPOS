@@ -51,6 +51,13 @@ Schema already anticipates them — build nothing for them.
   status would change, the UI offers the action that records the fact.
   `db:audit` asserts stored equals derived, the same way it does for the stock
   cache (ADR-0014 §1).
+- **A printed document derives from recorded facts, the same way a status does —
+  and its type must be unable to express a claim the facts do not support.**
+  A doc type carries no field the shop could fill in with a wish: the intake
+  receipt has no passcode field at all, and an approval carries the amount it was
+  given for, so no caller can stamp APROBADO over a total nobody agreed to. Where
+  a loader could get it wrong, move the constraint into the type — a document is
+  evidence, and evidence a caller can shape is not evidence.
 - **A repair part leaves the shelf when it is FITTED**, not at hand-back — the
   on-hand figure has to be right for every day the phone sits in the workshop.
   Removing the line posts the exact reversal as a second movement (ADR-0004).
