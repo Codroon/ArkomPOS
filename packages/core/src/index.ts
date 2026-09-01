@@ -12,6 +12,34 @@ export {
   marginPct,
 } from "./money";
 export { parseDayInput, dayToInput, startOfDay, addDays } from "./day";
+export {
+  shiftStatus,
+  DENOMINATIONS_CENTS,
+  NOTE_DENOMINATIONS_CENTS,
+  COIN_DENOMINATIONS_CENTS,
+  breakdownTotalCents,
+  assertBreakdownMatches,
+  DRAWER_EFFECT,
+  movesDrawer,
+  documentCashDelta,
+  computeShiftTotals,
+  varianceCents,
+  needsVarianceApproval,
+} from "./shift";
+export type {
+  ShiftStatus,
+  Breakdown,
+  CashMovementReason,
+  TenderLike,
+  ShiftDocumentFact,
+  ShiftMovementFact,
+  ShiftDepositFact,
+  ShiftPayoutFact,
+  ShiftFacts,
+  ShiftTotals,
+  SeriesRun,
+  MethodLine,
+} from "./shift";
 export { ean13CheckDigit, isValidEan13, ean13WithCheckDigit, generateInternalEan13 } from "./barcode";
 export { imeiCheckDigit, imeiWithCheckDigit, isValidImei, validateImeiBatch } from "./imei";
 export { resolveScan, normalizeScanCode } from "./scan";

@@ -9,13 +9,17 @@
  * arrive incomplete, req 3.3 flags them). Completeness is enforced at the domain
  * layer on every save (req 4.1) — never "fixed" by tightening the DB.
  */
+import { sql } from "drizzle-orm";
 import { sqliteTable, text, integer, uniqueIndex, index, primaryKey } from "drizzle-orm/sqlite-core";
 
 /* ---------------- enums: single source of truth ---------------- */
 export const ITEM_TYPES = ["stocked", "serialized", "used_device", "service", "repair", "agency", "sim", "topup"] as const;
 export const TAX_REGIMES = ["IVA21", "IVA10", "IVA4", "REBU", "EXEMPT"] as const; // P1 uses IVA21 (ADR-0007)
 export const MOVEMENT_TYPES = ["purchase_in", "sale_out", "adjustment", "count_post", "repair_part_out", "tradein_in", "return_in", "transfer"] as const; // P1: first three
-export const DOC_TYPES = ["ticket", "invoice", "credit_note", "purchase", "repair"] as const; // "purchase" = used-device intake, own series (ADR-0013)
+/* "purchase" = used-device intake, own series (ADR-0013). "shift" numbers nothing in this
+   table — it exists so the Z report borrows ADR-0008's series machinery instead of growing a
+   second counter that can produce gaps (ADR-0015 §2). */
+export const DOC_TYPES = ["ticket", "invoice", "credit_note", "purchase", "repair", "shift"] as const;
 export const DOC_STATUSES = ["draft", "parked", "completed"] as const;
 export const LINE_TYPES = ["product", "serialized_unit", "repair", "tradein_credit", "agency", "sim", "topup"] as const; // P1: product, serialized_unit
 export const TENDER_METHODS = ["cash", "card", "bizum", "transfer", "store_credit", "deposit"] as const; // P1: all but store_credit
@@ -29,6 +33,15 @@ export const ID_DOC_TYPES = ["DNI", "NIE", "PASAPORTE"] as const;
 /** Decides the resale tax regime months later: private ⇒ REBU (ADR-0007). */
 export const ACQUISITION_CHANNELS = ["private_individual", "business"] as const;
 export const PAYOUT_METHODS = ["cash", "transfer", "store_credit"] as const;
+/**
+ * How a repair deposit was taken, and how it is given back.
+ *
+ * The sale's tender list minus store credit: a voucher is money the shop already
+ * owes, and holding a deposit "in credit" would be owing the same money twice.
+ * Only `cash` reaches the drawer (ADR-0015 §5) — the rest are recorded so the Z
+ * can report them by method and the shop can tick them off a bank statement.
+ */
+export const DEPOSIT_METHODS = ["cash", "card", "bizum", "transfer"] as const;
 export const PHOTO_KINDS = ["front", "back", "extra", "seller_id"] as const;
 export const VOUCHER_STATUSES = ["issued", "redeemed", "void"] as const;
 
@@ -499,6 +512,15 @@ export const repairTickets = sqliteTable("repair_tickets", {
   promisedHalf: text("promised_half", { enum: PROMISED_HALVES }),
   assignedUserId: text("assigned_user_id"),
   depositCents: integer("deposit_cents").notNull().default(0),
+  /** how it was taken. Pre-v0.13.0 rows default to cash, which is what they were */
+  depositMethod: text("deposit_method", { enum: DEPOSIT_METHODS }).notNull().default("cash"),
+  /* How much of the deposit went back, how, and in which shift — set only by
+     markNotRepaired, the one path that refunds. The shift is stamped rather than
+     inferred from a timestamp because a non-cash refund writes no cash movement
+     to carry it, and a refund that belongs to no shift appears on no Z. */
+  depositRefundedCents: integer("deposit_refunded_cents").notNull().default(0),
+  depositRefundMethod: text("deposit_refund_method", { enum: DEPOSIT_METHODS }),
+  depositRefundShiftId: text("deposit_refund_shift_id"),
   /** signed "repair up to X" authorization; NULL = none given */
   authorizedCapCents: integer("authorized_cap_cents"),
   /** snapshots, so changing a setting cannot reach back into a ticket (ADR-0014 §8) */
@@ -614,6 +636,9 @@ export const CASH_MOVEMENT_REASONS = [
   "repair_deposit_applied",
   "repair_deposit_refund",
   "used_purchase_payout",
+  /* manual, typed by a human, with a concept saying why (ADR-0015 §9) */
+  "paid_in",
+  "paid_out",
 ] as const;
 
 /**
@@ -641,9 +666,65 @@ export const cashMovements = sqliteTable("cash_movements", {
   /** the R- or C- document this belongs to, when there is one */
   documentId: text("document_id"),
   ticketId: text("ticket_id"),
+  /** why, in the shop's own words. Manual rows only (ADR-0015 §9) */
+  concept: text("concept"),
+  /** NULL = written before shifts existed (ADR-0010's convention, ADR-0015) */
+  shiftId: text("shift_id"),
   userId: text("user_id"),
   createdAt: ts("created_at").notNull(),
 }, (t) => [
   index("ix_cash_movement_created").on(t.tenantId, t.createdAt),
   index("ix_cash_movement_document").on(t.documentId),
+  index("ix_cash_movement_shift").on(t.shiftId),
+]);
+
+/* ---------------- shifts: the drawer, opened and counted (ADR-0015) ----------------
+ *
+ * A shift belongs to the TILL, not to a person: two cashiers work one afternoon and the
+ * drawer does not change hands when they do. Open and close each record who counted, and
+ * that is the whole of the attribution a drawer needs.
+ *
+ * **There is no status column.** Open means `closed_at IS NULL` — the ADR-0014 discipline
+ * applied to cash. And at most one open shift per till is a PARTIAL UNIQUE INDEX rather
+ * than a check in code, because a code check loses races and the failure mode is two open
+ * shifts computing overlapping expected-cash figures, both wrong, neither obviously so.
+ */
+export const shifts = sqliteTable("shifts", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  locationId: text("location_id").notNull().references(() => locations.id),
+  terminalId: text("terminal_id").notNull().references(() => terminals.id),
+
+  openedByUserId: text("opened_by_user_id"),
+  openedAt: ts("opened_at").notNull(),
+  openingFloatCents: integer("opening_float_cents").notNull().default(0),
+  /** {"<value in cents>": quantity} — evidence for the figure beside it (ADR-0015 §11) */
+  openingBreakdown: text("opening_breakdown", { mode: "json" }),
+
+  /** the ONLY status fact. NULL = open. */
+  closedAt: ts("closed_at"),
+  closedByUserId: text("closed_by_user_id"),
+  countedCashCents: integer("counted_cash_cents"),
+  closingBreakdown: text("closing_breakdown", { mode: "json" }),
+  expectedCashCents: integer("expected_cash_cents"),
+  /** counted − expected. Negative is SHORT. */
+  varianceCents: integer("variance_cents"),
+  varianceReason: text("variance_reason"),
+  /** set only when the variance needed an owner's PIN (ADR-0012 §5) */
+  approvedByUserId: text("approved_by_user_id"),
+
+  zSeriesId: text("z_series_id").references(() => numberSeries.id),
+  zNumber: integer("z_number"),
+  zDocNumber: text("z_doc_number"), // "Z1-000007"
+  /** the frozen Z. A reprint renders THIS, never a recomputation (ADR-0015 §7) */
+  snapshot: text("snapshot", { mode: "json" }),
+
+  createdAt: ts("created_at").notNull(),
+  updatedAt: ts("updated_at").notNull(),
+}, (t) => [
+  index("ix_shift_terminal_opened").on(t.terminalId, t.openedAt),
+  uniqueIndex("ux_shift_z_number").on(t.zSeriesId, t.zNumber), // gap-free, like documents
+  /* THE guarantee, not a convenience: one open shift per till, decided by SQLite
+     rather than by whichever code path happened to check first (ADR-0015 §1). */
+  uniqueIndex("ux_shift_open_per_terminal").on(t.terminalId).where(sql`${t.closedAt} is null`),
 ]);

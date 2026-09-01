@@ -55,6 +55,7 @@ import { schema, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner, type DbTx } from "../mutate-runner";
 import { saveRepairPhotos, discardRepairPhotos, readPhotos } from "../photos";
 import { postMovement } from "./stock-ledger";
+import { currentShiftId } from "./shift";
 import { getSettings } from "./settings";
 
 const {
@@ -281,6 +282,7 @@ export interface CreateTicketInput {
   photos: ReadonlyArray<{ kind: "front" | "back" | "extra" | "seller_id"; dataUrl: string }>;
   promisedDate?: number | null;
   promisedHalf?: "morning" | "afternoon" | null;
+  depositMethod?: "cash" | "card" | "bizum" | "transfer";
   depositCents: number;
   authorizedCapCents?: number | null;
   assignedUserId?: string | null;
@@ -325,6 +327,7 @@ export async function createTicket(
   try {
     return mutate(makeMutateRunner(db), ctx, (tx, log) => {
       const now = new Date();
+      const shiftId = currentShiftId(tx, ctx);
 
       /* the numbered document the customer is handed (ADR-0008) */
       const series = repairSeries(tx, ctx);
@@ -349,6 +352,7 @@ export async function createTicket(
         subtotalCents: 0,
         taxCents: 0,
         totalCents: 0,
+        shiftId,
         userId: ctx.userId ?? null,
         createdAt: now,
         completedAt: now,
@@ -378,6 +382,10 @@ export async function createTicket(
         promisedHalf: input.promisedHalf ?? null,
         assignedUserId: input.assignedUserId ?? null,
         depositCents: input.depositCents,
+        depositMethod: input.depositMethod ?? "cash",
+        depositRefundedCents: 0,
+        depositRefundMethod: null,
+        depositRefundShiftId: null,
         authorizedCapCents: input.authorizedCapCents ?? null,
         /* snapshots: changing a setting tomorrow must not reach back into a
            ticket taken in today (ADR-0014 §8) */
@@ -419,8 +427,12 @@ export async function createTicket(
         log({ entity: "repair_photo", entityId: photoRow.id, action: "create", before: null, after: toOplogJson(photoRow) });
       }
 
-      /* money in: cash the shop is holding for the customer, not revenue */
-      if (input.depositCents > 0) {
+      /* Money in: cash the shop is holding for the customer, not revenue.
+         ONLY when it was actually handed over in notes — a card or Bizum deposit
+         is real money and a real obligation, but it never reaches the drawer, so
+         a movement row for it would make the shift come up over (ADR-0015 §5).
+         The method lives on the ticket, which is where the Z reads it from. */
+      if (input.depositCents > 0 && (input.depositMethod ?? "cash") === "cash") {
         const cashRow = {
           id: uuidv7(),
           tenantId: ctx.tenantId,
@@ -430,6 +442,8 @@ export async function createTicket(
           reason: "repair_deposit" as const,
           documentId: docRow.id,
           ticketId,
+          concept: null,
+          shiftId,
           userId: ctx.userId ?? null,
           createdAt: now,
         };
@@ -1560,6 +1574,7 @@ export function collect(
     const ticket = liveTicket(tx, ctx, input.ticketId);
     const facts = loadFacts(tx, input.ticketId);
     assertAction(facts, "collect");
+    const shiftId = currentShiftId(tx, ctx);
 
     const lines = tx
       .select()
@@ -1613,6 +1628,7 @@ export function collect(
       subtotalCents: totals.subtotalCents,
       taxCents: totals.taxCents,
       totalCents: totals.totalCents,
+      shiftId,
       userId: ctx.userId ?? null,
       createdAt: now,
       completedAt: now,
@@ -1670,6 +1686,8 @@ export function collect(
         reason: "repair_deposit_applied" as const,
         documentId: docRow.id,
         ticketId: ticket.id,
+        concept: null,
+        shiftId,
         userId: ctx.userId ?? null,
         createdAt: now,
       };
@@ -1723,6 +1741,8 @@ export function markNotRepaired(
     reason: "customer_declined" | "unrepairable" | "abandoned";
     resolutions: Array<{ lineId: string; action: "return" | "charge" }>;
     depositAction: "refund" | "apply_fee";
+    /** how the money goes back. Defaults to however it was taken. */
+    refundMethod?: "cash" | "card" | "bizum" | "transfer";
     chargeDiagnosisFee: boolean;
   },
 ): RepairMarkNotRepairedResponse {
@@ -1782,9 +1802,19 @@ export function markNotRepaired(
 
     /* Every deposit resolves exactly once, and the ticket's cash rows net to
        zero: what was applied became takings, what was refunded left the drawer.
-       Two rows rather than one because they are two different events. */
+       Two rows rather than one because they are two different events.
+
+       The refund goes back the way it came unless told otherwise, and only a
+       CASH refund reaches the drawer — a transfer back to the customer's bank is
+       a real refund that moves no notes (ADR-0015 §5). The applied row is
+       bookkeeping and is posted whatever the method, because it is what keeps a
+       ticket's rows netting to zero. */
+    const refundMethod = input.refundMethod ?? ticket.depositMethod;
+    const shiftId = currentShiftId(tx, ctx);
+
     const postCash = (amountCents: number, reason: "repair_deposit_applied" | "repair_deposit_refund") => {
       if (amountCents <= 0) return;
+      if (reason === "repair_deposit_refund" && refundMethod !== "cash") return;
       const row = {
         id: uuidv7(),
         tenantId: ctx.tenantId,
@@ -1794,6 +1824,8 @@ export function markNotRepaired(
         reason,
         documentId: ticket.documentId,
         ticketId: ticket.id,
+        concept: null,
+        shiftId,
         userId: ctx.userId ?? null,
         createdAt: now,
       };
@@ -1804,7 +1836,19 @@ export function markNotRepaired(
     postCash(depositRefunded, "repair_deposit_refund");
 
     tx.update(repairTickets)
-      .set({ notRepairedAt: now, notRepairedReason: input.reason, updatedAt: now })
+      .set({
+        notRepairedAt: now,
+        notRepairedReason: input.reason,
+        /* the refund's own record. A non-cash refund writes no movement, so
+           without this it would appear on no Z at all — and the shift is stamped
+           rather than inferred from the timestamp, because inference at a shift
+           boundary is a second attribution mechanism that can disagree with the
+           first (ADR-0015 §5). */
+        depositRefundedCents: depositRefunded,
+        depositRefundMethod: depositRefunded > 0 ? refundMethod : null,
+        depositRefundShiftId: depositRefunded > 0 ? shiftId : null,
+        updatedAt: now,
+      })
       .where(eq(repairTickets.id, ticket.id))
       .run();
     log({

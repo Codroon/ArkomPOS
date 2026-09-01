@@ -115,6 +115,11 @@ export const ErrorCodeSchema = z.enum([
   "NEGATIVE_STOCK",
   "UNIT_NOT_AVAILABLE",
   "TENDER_MISMATCH",
+  /* No shift is open on this till (ADR-0015 §9). The second code that is an
+     invitation rather than a refusal: the Sale screen answers it by offering to
+     open one inline, because blocking a sale to teach someone about process is
+     how a till gets bypassed with a paper notebook. */
+  "SHIFT_REQUIRED",
   "VALIDATION",
 ]);
 export type ErrorCode = z.infer<typeof ErrorCodeSchema>;

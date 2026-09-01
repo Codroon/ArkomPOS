@@ -19,6 +19,7 @@ If a decision must change, the ADR is superseded by a new one — never silently
 | [0012](0012-local-pin-auth-and-permission-registry.md) | Local PIN auth, session in main, permissions as a typed registry | Accepted |
 | [0013](0013-used-device-purchases-and-store-credit.md) | Used devices as serialized units; purchase document; store credit as a tender | Accepted |
 | [0014](0014-repair-tickets-status-from-facts-and-parts-before-revenue.md) | Repair status derived from facts; parts move on consumption, revenue only at collection | Accepted |
+| [0015](0015-cash-shifts-derived-status-and-one-drawer-truth.md) | Shift status derived from facts; sale cash never copied into the drawer ledger; the Z is frozen | Proposed |
 
 Constraints common to all: team = one developer + Claude Code · Phase 1 = 2 weeks (sale screen, catalog, inventory) ·
 client = retail mobile shop in Spain (unreliable connectivity, Spanish fiscal rules ahead) · product intent = resell to

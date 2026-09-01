@@ -3,8 +3,9 @@
 Authority order: `docs/adr/` → this document → `packages/db/src/schema.ts`. Phase 1 scope:
 sale screen, catalog, inventory (+ minimal add-stock), ticket printing, Ajustes-lite. Auth
 arrived in v0.10.0 (ADR-0012) — §3, §4 and §4.1 below describe the guarded write path.
-Used-device purchases and store credit arrived in v0.11.0 (ADR-0013) — §4.2. Shifts and
-sync remain *designed* here, built later.
+Used-device purchases and store credit arrived in v0.11.0 (ADR-0013) — §4.2. Repairs arrived
+in v0.12.0 (ADR-0014) — §4.3. Shifts, the drawer ledger and the Z report arrive in v0.13.0
+(ADR-0015) — §4.4. Sync remains *designed* here, built later.
 
 ## 1. Component map
 
@@ -105,7 +106,7 @@ business rows + `product_stock` cache + `oplog` entry → typed result back.
 | `credit:find` | {search?} → VoucherRow[] | `usedDevices.redeemCredit`. Only `issued` vouchers |
 | `credit:void` | {voucherId, reason} → VoucherRow | `usedDevices.voidCredit`. Only from `issued`; reason required and oplogged |
 
-Typed errors: `{code: 'AUTH_REQUIRED' | 'PERMISSION_DENIED' | 'APPROVAL_REQUIRED' | 'INVALID_PIN' | 'USER_LOCKED' | 'WEAK_PIN' | 'LAST_OWNER' | 'PRINT_FAILED' | 'DUPLICATE_NAME' | 'DUPLICATE_BARCODE' | 'DUPLICATE_IMEI' | 'NEGATIVE_STOCK' | 'UNIT_NOT_AVAILABLE' | 'TENDER_MISMATCH' | 'VALIDATION' , message, field?}` — renderer maps codes to UI, never parses strings. (DUPLICATE_NAME added with the catalog slice: req 4.4 wants name and barcode duplicates distinguished per field. DUPLICATE_IMEI added with the inventory slice: req 6.1 rejects duplicate IMEIs at entry. PRINT_FAILED added with the ticket slice: the sale is already complete when it is raised, so the UI offers Reintentar/Guardar PDF rather than treating it as a write failure. The seven auth codes arrived with ADR-0012; APPROVAL_REQUIRED is the unusual one — it names the permission and is an invitation to retry with an approver's PIN, not a refusal.)
+Typed errors: `{code: 'AUTH_REQUIRED' | 'PERMISSION_DENIED' | 'APPROVAL_REQUIRED' | 'INVALID_PIN' | 'USER_LOCKED' | 'WEAK_PIN' | 'LAST_OWNER' | 'PRINT_FAILED' | 'DUPLICATE_NAME' | 'DUPLICATE_BARCODE' | 'DUPLICATE_IMEI' | 'NEGATIVE_STOCK' | 'UNIT_NOT_AVAILABLE' | 'TENDER_MISMATCH' | 'SHIFT_REQUIRED' | 'VALIDATION' , message, field?}` — renderer maps codes to UI, never parses strings. (DUPLICATE_NAME added with the catalog slice: req 4.4 wants name and barcode duplicates distinguished per field. DUPLICATE_IMEI added with the inventory slice: req 6.1 rejects duplicate IMEIs at entry. PRINT_FAILED added with the ticket slice: the sale is already complete when it is raised, so the UI offers Reintentar/Guardar PDF rather than treating it as a write failure. The seven auth codes arrived with ADR-0012; APPROVAL_REQUIRED is the unusual one — it names the permission and is an invitation to retry with an approver's PIN, not a refusal. SHIFT_REQUIRED arrived with ADR-0015 and is the second of that kind: it means "no shift is open on this till", and the Sale screen answers it by offering to open one inline rather than by showing an error.)
 
 ### 4.1 Users and permissions (ADR-0012)
 
@@ -220,6 +221,72 @@ enums from day one and are now used.
 is migrated now — deciding whether two similar names are one person is the shop's call, one
 at a time (ADR-0014 §11).
 
+### 4.4 Cash, shifts and the Z report (ADR-0015)
+
+**A shift has no status column.** `shiftStatus()` derives `open`/`closed` from `closed_at`,
+and no channel accepts a status — the ADR-0014 discipline, applied to the drawer. **Sale cash
+is never written into `cash_movements`**: the expected figure reads document tenders AND that
+table, and copying one into the other would create two answers to "what did we take today"
+(ADR-0015 §3).
+
+| Channel | Payload → Result | Notes |
+|---|---|---|
+| `cash:current` | {} → ShiftState \| null | `cash.view`. The open shift on THIS till with live totals, or null. What the top-bar chip and the screen both render |
+| `cash:open` | {floatCents, breakdown?} → ShiftState | `cash.open`. Refused when one is already open — and refused again by a partial unique index, which is the actual guarantee. A breakdown whose quantities do not total `floatCents` is refused |
+| `cash:preview` | {} → ShiftTotals | `cash.view`. The **X**: exactly what a close now would freeze, from the same `computeShiftTotals()`. Writes no shift row, allocates no number, oplogs `shift.preview` |
+| `cash:close` | {countedCents, breakdown?, reason?} → {shiftId, zDocNumber, totals} | `cash.close` — **or `cash.close_over_tolerance`** when \|counted − expected\| exceeds the tolerance setting; the gate is chosen per call, like `repair:setLineCharge`. Non-zero variance without a `reason` is refused. ONE tx: snapshot frozen + `Z1-` number (ADR-0008) + `closed_at` + oplog |
+| `cash:movements` | {shiftId?} → CashMovementRow[] | `cash.view`. Defaults to the open shift. Automatic rows carry their document for the peek link; `repair_deposit_applied` rows are flagged `movesCash: false` |
+| `cash:paidIn` / `cash:paidOut` | {amountCents, concept} → CashMovementRow[] | `cash.movement` — **or `cash.movement_over_threshold`** above the settings threshold, chosen per call. Amount is always positive; the channel decides the sign. Concept required |
+| `cash:history` | {limit?, cursor?} → ShiftListRow[] | `cash.history` (owner, grantable). Closed shifts, newest first |
+| `cash:get` | {shiftId} → ShiftDetail | `cash.history`. Returns **the stored snapshot**, never a recomputation |
+| `cash:print` | {shiftId?, what:'z'\|'x', target, copy} → PrintTicketResponse | `cash.view` for the X and the current shift; `cash.history` to reprint a past Z. A reprint renders the frozen snapshot (ADR-0015 §7). No printer ⇒ a PDF, never a dead end |
+
+**Shift preconditions.** `sale:complete`, `used:log`, `repair:collect`, `cash:paidIn` and
+`cash:paidOut` are refused with `SHIFT_REQUIRED` when no shift is open on the till.
+`repair:create` and `repair:markNotRepaired` require one **only on the branch that moves a
+deposit**, checked inside the transaction where the branch is known. `stock:add`, catalogue
+work and a depositless intake need none — and stamp the shift when one is open. A registry
+test pins the list beside the permission policy.
+
+**Schema additions** (migration `0008`, all additive):
+
+```
+shifts               id · tenant/location/terminal
+                     opened_by_user_id · opened_at · opening_float_cents
+                     opening_breakdown?  (JSON: {"<cents>": qty})
+                     closed_by_user_id? · closed_at?      ← the ONLY status fact
+                     counted_cash_cents? · closing_breakdown?
+                     expected_cash_cents? · variance_cents?   (counted − expected)
+                     variance_reason? · approved_by_user_id?
+                     z_series_id? · z_number? · z_doc_number?  ("Z1-000007")
+                     snapshot?  (JSON, frozen at close, incl. snapshotVersion)
+                     created_at · updated_at
+  ux_shift_open_per_terminal  UNIQUE (terminal_id) WHERE closed_at IS NULL
+  ux_shift_z_number           UNIQUE (z_series_id, z_number)
+  ix_shift_terminal_opened    (terminal_id, opened_at)
+
+cash_movements  +=   shift_id?   (NULL = pre-shift, ADR-0010's convention)
+                     concept?    (free text; the "why" for a manual row)
+```
+
+`documents.shift_id` **already exists** and was nullable from day one (ADR-0010) — no column
+is added there, only stamped. `CASH_MOVEMENT_REASONS += 'paid_in' | 'paid_out'` and
+`DOC_TYPES += 'shift'` (for the `Z1-` series row) are TypeScript-only: drizzle's SQLite text
+enums emit no CHECK. Old rows keep `shift_id = NULL` and **nothing is backfilled** — inventing
+which shift a July sale belonged to would be fiction.
+
+**Behaviour change on an existing path:** a used-device **cash** payout is written into
+`cash_movements` inside the `used:log` transaction, instead of by the idempotent startup
+fix-up. The fix-up stays for historic rows and still skips anything already recorded, so the
+two cannot double-post (ADR-0015 §6).
+
+**New settings keys:** `cashDefaultFloatCents` · `cashVarianceToleranceCents` (default 300) ·
+`cashMovementApprovalCents` · `cashConcepts` (string[]).
+
+**Seam, not built:** the Reports screen (nav 10). A Z snapshot is a frozen, numbered summary
+of a period and is its natural source; `snapshotVersion` exists so a future reader knows which
+fields it may rely on. Nothing else is designed for it now.
+
 ## 5. Screen ↔ data (Phase 1)
 
 - **Catalog** = `catalog:list` + save form (`catalog:save`). Missing-data chips from NULL columns.
@@ -228,6 +295,9 @@ at a time (ADR-0014 §11).
 - **Login / Lock / Approval** = `auth:*` only; no business data crosses until a session exists.
 - **Usuarios** = `users:*`, gated on `users.manage`; override toggles render from the core registry, so a new permission key appears with no UI change.
 - **Comprar usados / Dispositivos usados** = `used:*` + `credit:*`. Selling a used phone reuses the ordinary serialized-unit path — no new sale code (ADR-0013).
+- **Caja** = `cash:*` only. The top-bar chip and the Sale screen's inline open both read
+  `cash:current`; the X preview and the close call the same core computation, so the number on
+  screen and the number on the Z cannot diverge (ADR-0015 §12).
 - **Reparaciones / Taller** = `repair:*` + `customer:*` + `workshop:board`. The board and the list render DERIVED status (ADR-0014); collection reuses the ordinary document + tender path, so repairs add no second way to take money.
 
 ## 6. Sync (designed now, built Phase 2)

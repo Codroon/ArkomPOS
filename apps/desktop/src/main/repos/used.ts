@@ -38,10 +38,12 @@ import {
 } from "@arkom/core";
 import { schema, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner, type DbTx } from "../mutate-runner";
+import { currentShiftId } from "./shift";
 import { postMovement } from "./stock-ledger";
 import { discardPurchasePhotos, readPhotos, savePurchasePhotos } from "../photos";
 
 const {
+  cashMovements,
   documents,
   oplog,
   users,
@@ -303,6 +305,7 @@ export async function logPurchase(
   try {
     result = mutate(makeMutateRunner(db), ctx, (tx, log) => {
       const now = new Date();
+      const shiftId = currentShiftId(tx, ctx);
       const productId = findOrCreateUsedProduct(tx, ctx, log, req.device, now);
 
       /* ---- the numbered document (ADR-0008: allocated in THIS transaction) ---- */
@@ -327,12 +330,38 @@ export async function logPurchase(
         subtotalCents: 0,
         taxCents: 0,
         totalCents: 0,
+        shiftId,
         userId: ctx.userId ?? null,
         createdAt: now,
         completedAt: now,
       };
       tx.insert(documents).values(docRow).run();
       log({ entity: "document", entityId: docRow.id, action: "create", before: null, after: toOplogJson(docRow) });
+
+      /* ---- the drawer, if the seller was paid in notes ----
+         Written HERE rather than by the startup fix-up that used to do it
+         (ADR-0015 §6). A row that appears only after the next restart makes the
+         open shift's expected cash wrong all day, then lands inside a shift that
+         has already closed and frozen its Z. Transfers and store credit are not
+         drawer events and post nothing. */
+      if (req.payout === "cash") {
+        const cashRow = {
+          id: uuidv7(),
+          tenantId: ctx.tenantId,
+          locationId: ctx.locationId,
+          terminalId: ctx.terminalId,
+          amountCents: -req.buyPriceCents,
+          reason: "used_purchase_payout" as const,
+          documentId: docRow.id,
+          ticketId: null,
+          concept: null,
+          shiftId,
+          userId: ctx.userId ?? null,
+          createdAt: now,
+        };
+        tx.insert(cashMovements).values(cashRow).run();
+        log({ entity: "cash_movement", entityId: cashRow.id, action: "create", before: null, after: toOplogJson(cashRow) });
+      }
 
       /* ---- status and movements, decided together (the slice-1 invariant) ---- */
       const intake = planIntake({

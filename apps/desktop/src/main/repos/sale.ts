@@ -35,6 +35,7 @@ import {
 } from "@arkom/core";
 import { schema, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner, type DbTx } from "../mutate-runner";
+import { currentShiftId } from "./shift";
 
 const {
   documents,
@@ -747,6 +748,10 @@ export function complete(
     tx.update(documents)
       .set({
         status: "completed",
+        /* stamped at COMPLETION, not when the draft was started: a ticket begun
+           before the shift opened and charged after it belongs to the shift that
+           took the money (ADR-0015 §9) */
+        shiftId: currentShiftId(tx, ctx),
         seriesId: series.id,
         number: allocation.number,
         docNumber: allocation.docNumber,
