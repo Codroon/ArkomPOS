@@ -11,14 +11,15 @@ Operating instructions for Claude Code in this repo. Read before writing anythin
 ## What we are building right now (Phase 1 only)
 Desktop till (Electron): **Sale**, **Catalog**, **Inventory (+ minimal add-stock)**, **Ajustes-lite**
 (printer + paper + command set + the shop's legal block), **Usuarios**, **Comprar usados** +
-**Dispositivos usados**, and since v0.12.0 **Reparaciones** + **Taller**
-(nav 01–07, 11 and 12).
+**Dispositivos usados**, **Reparaciones** + **Taller**, and since v0.13.0 **Caja**
+(nav 01–07, 09, 11 and 12).
 Since v0.10.0 the till has PIN login, roles and per-action approval (ADR-0012).
 Ticket printing is in: ESC/POS through the Windows RAW spooler, PDF fallback, reprints stamped COPIA.
 Since v0.11.0 the till buys used devices: gate, purchase document, shelf label, store credit (ADR-0013).
 Since v0.12.0 the till repairs devices: intake, quote, approval, parts, board, collection (ADR-0014).
-NOT yet: shifts/float/Z report, refunds/voids, full invoices, card-terminal SDK, sync, web app,
-transfers/agency/SIM screens, the Caja screen, the refurbishment pipeline, the police-register export.
+Since v0.13.0 the till has shifts: float, drawer ledger, X preview, close with variance, Z report (ADR-0015).
+NOT yet: refunds/voids, full invoices, card-terminal SDK, sync, web app, transfers/agency/SIM
+screens, the Reports screen, the refurbishment pipeline, the police-register export.
 Schema already anticipates them — build nothing for them.
 
 ## Hard rules
@@ -71,6 +72,19 @@ Schema already anticipates them — build nothing for them.
   ficha because the technician has to open the phone, and it is masked there;
   revealing it writes an oplog entry naming who looked and no value. Phase 2
   sync must exclude or encrypt the column (ADR-0014 §10).
+- **Sale cash never enters `cash_movements`.** Takings are `document_tenders` rows on a
+  completed document and are READ from there; the ledger holds only what has no other home —
+  deposits, refunds, used-device payouts, manual paid-in/out. One fact stored twice is a
+  reconciliation bug waiting for the first path that forgets to write the copy, and the
+  drawer would then have two answers with nothing to say which is right (ADR-0015 §3).
+- **A closed shift is immutable.** No reopening, no editing, no deleting; a reprint renders
+  the FROZEN Z snapshot and never a recomputation. A miscount found tomorrow is a movement in
+  tomorrow's shift with a reason naming the Z it corrects. Correcting by editing the record
+  destroys the evidence that there was anything to correct (ADR-0015 §7–8).
+- **Money needs an open shift, and the refusal is an invitation.** Any action that creates a
+  fiscal document or moves notes raises `SHIFT_REQUIRED` when none is open; the Sale screen
+  answers it with the open dialog and re-runs the charge. Receiving stock and a depositless
+  repair intake need no shift, and stamp one if it exists.
 - **Brand tokens only.** Colours and faces come from `packages/ui/src/styles/tokens.css` by
   meaning (`canvas`, `ink`, `accent`, `warning-bg`…). No raw hex in components. Signal Blue lands
   on exactly **one** element per screen — the primary action. **White-on-blue is banned** (text on

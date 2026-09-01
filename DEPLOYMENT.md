@@ -325,6 +325,44 @@ it. *(Verified on a clean machine.)*
 
 ---
 
+### Updating a v0.12.0 till to v0.13.0 — opening the till each day
+
+v0.13.0 adds the **Caja** screen: a shift per till, a counted float, and a Z
+report at the end of the day. The upgrade is one installer over the top and
+**no data is touched**. Every past sale, purchase and repair keeps working
+exactly as before; they simply belong to no shift, which is the truth about
+them — they happened before shifts existed.
+
+**The one thing to tell the shop.** After the upgrade there is no shift open, so
+the first attempt to charge a customer, buy a phone or take a deposit will stop
+and offer to open one. That is the feature, not a fault. It takes ten seconds:
+
+1. The dialog appears with the usual float already filled in (**Ajustes →
+   Caja → Fondo inicial**, 200 € out of the box).
+2. Press **Contar…** to count the drawer properly, or just accept the figure.
+3. **Abrir turno** — and the charge they already pressed goes through by itself.
+
+From then on the top bar shows a green **Turno abierto · 08:32** chip. If it ever
+shows a red **Sin turno**, nobody has opened the till today.
+
+**At the end of the day**, from **09 · Caja**: count the drawer with the same
+helper, compare against **Efectivo esperado**, write a line if there is a
+difference, and press **Cerrar turno**. A difference over 3 € needs the owner's
+PIN. The Z prints, and it is the shop's record of the day.
+
+Two things worth saying out loud to the client:
+
+- **A closed shift cannot be reopened.** If a mistake turns up tomorrow, it is
+  recorded as a cash movement tomorrow with a note saying which Z it corrects.
+  Yesterday's Z keeps its figures, because that is what was counted.
+- **Sales are not in the movements list.** That list is for money that is not a
+  sale — deposits, refunds, buying a phone, taking cash to the bank. The takings
+  are on the tickets, and the Z adds them up.
+
+The tolerance (3 €), the default float, the approval limit for a manual movement
+and the list of frequent concepts all live in **Ajustes → Caja** and are the
+owner's to change.
+
 ## 9. Shop-visit checklist
 
 In order. Do not skip ahead — each step assumes the one above worked.

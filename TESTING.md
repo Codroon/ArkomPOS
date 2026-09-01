@@ -902,7 +902,148 @@ Open a ficha with a passcode.
 
 ---
 
-## 14. Final check
+## 14. Caja — el turno (v0.13.0)
+
+Sign in as **Ahmer / 8317**. No hardware needed: every print falls back to a PDF.
+
+### (a) The till will not take money until somebody opens it
+
+Go straight to **01 · Venta**, add any product and press **Cobrar (F4)**.
+
+- ✅ The sale is **not** refused with a red error. A dialog appears saying
+  *Para cobrar hace falta un turno abierto*, with the float already filled in.
+- ✅ Look at the top bar first: a red **▲ Sin turno** chip. Click it — it goes to
+  **09 · Caja**.
+
+Back on the sale, press **Cobrar** again to bring the dialog back. Press
+**Contar…**.
+
+- ✅ Two columns, notes and coins, largest first. Type `4` beside 20,00 € and
+  `10` beside 10,00 €. The TOTAL reads **180,00 €** as you type.
+- ✅ **Usar este total** puts 180,00 € in the field and shows the breakdown under it.
+
+Press **Abrir turno**.
+
+- ✅ The dialog closes and **the charge you already pressed goes through by
+  itself**. You are not asked to press Cobrar twice.
+- ✅ The top-bar chip is now green: **Turno abierto · HH:MM**.
+
+### (b) What needs a shift and what does not
+
+With the shift still open, close it for a moment — do §(f) first if you want to
+try this, or simply trust the tests. What matters on screen:
+
+- ✅ **03 · Inventario → Entrada de stock** works with no shift open. A delivery
+  is unpacked before the shop opens and involves no drawer.
+- ✅ **06 · Reparaciones → Nueva reparación** with the deposit left empty works
+  with no shift. Put `20` in **Depósito** and it asks for a shift instead.
+
+### (c) The drawer ledger, and why sales are not in it
+
+**09 · Caja.**
+
+- ✅ Left: **TURNO** with the float, who counted it, when, and the breakdown on
+  one line.
+- ✅ Right: **MOVIMIENTOS DE EFECTIVO (NO VENTAS)**, and under the heading, in
+  small type: *Las ventas no aparecen aquí: se leen de los tickets.* The sale
+  you just made is **not** in this list. That is the design, not a bug.
+
+Take in a repair with a **20 €** deposit (§13a) and pick **Efectivo** as the
+method.
+
+- ✅ A **DEPÓSITO** row appears, +20,00 €, with the `R-` number.
+- ✅ Click the row: the document opens.
+
+Now take in a second device with a **30 €** deposit and pick **Tarjeta**.
+
+- ✅ **No row appears.** A card deposit is real money and a real obligation, but
+  it never reached the drawer. It is on the ticket, and the Z will report it.
+
+Press **Salida** in the panel header. Amount `200`, and tap the
+**A la caja fuerte / banco** chip.
+
+- ✅ A **SALIDA** row, −200,00 €, with your name.
+- ✅ The footer strip: Entradas **+20,00 €** · Salidas **−200,00 €** · Neto **−180,00 €**.
+
+Try **Salida** again with `150`.
+
+- ✅ Above the 100 € limit, so it warns you before you submit and then asks for
+  an owner's PIN. As Ahmer you are not asked — you already hold it. Sign in as a
+  cashier to see the keypad.
+
+### (d) The X, before committing to anything
+
+Look at the **CIERRE** panel on the left, marked **PREVIEW**.
+
+- ✅ **Efectivo esperado** is float + the cash part of your sale + 20,00 −
+  200,00. Check it by hand.
+- ✅ Open **Ver detalle Z**: base, IVA, total, and a line per payment method.
+- ✅ **Imprimir X** saves a PDF headed **VISTA X (PROVISIONAL)** with **PREVIEW**
+  where the number goes and a closing line *No es un cierre. No consume número.*
+- ✅ Nothing was written: the panel still says PREVIEW and no Z number exists.
+
+### (e) Counting, and a difference you have to explain
+
+Press **Contar…** in the Cierre panel and count **10 €** less than expected.
+
+- ✅ **Descuadre −10,00 €** in red, with **FALTA 10,00 €** beside it.
+- ✅ A **Motivo del descuadre** field appears. **Cerrar turno** stays grey while
+  it is empty.
+- ✅ A line warns that 10,00 € is over the 3,00 € tolerance and will need a
+  manager.
+
+Type `Se dio mal el cambio por la tarde` and press **Cerrar turno**.
+
+- ✅ A confirmation showing expected, counted, variance and your reason — not a
+  second form. You do not type the count twice.
+
+Press **Cerrar e imprimir Z**. As a cashier you would be asked for an owner's
+PIN here; as Ahmer you are not.
+
+### (f) The Z
+
+- ✅ The panel becomes **Turno Z1-000001 cerrado** with **Reimprimir Z** and
+  **Abrir nuevo turno**.
+- ✅ Open the PDF. Check, in order: the Z number and the till · who opened and
+  who closed · **DOCUMENTOS** with a count and a first→last number per series ·
+  **VENTAS** with base and IVA 21% · **COBROS**, one line per method, whose
+  **TOTAL COBRADO equals TOTAL VENTAS** · **MOVIMIENTOS (NO VENTAS)** ·
+  **POR MEDIO DE PAGO** with Entra / Sale / Neto per method · the counts · and
+  the drawer block ending in **DESCUADRE** and **FALTAN 10,00 €**, your reason,
+  and the approver if one was needed.
+- ✅ The **card deposit from §(c) is on the Z** under Tarjeta, even though it
+  never touched the drawer.
+- ✅ The **cash** line of POR MEDIO DE PAGO equals expected minus the float.
+- ✅ There is no *Devoluciones 0,00 €* line. Refunds do not exist in this phase,
+  and printing a zero for them would imply they do.
+
+Now try to sell something.
+
+- ✅ Refused with the open-a-shift dialog again. The till is closed.
+
+### (g) A closed shift does not change its mind
+
+Press **Historial** in the Caja header (owner only).
+
+- ✅ One row: Z1-000001, both names, expected, counted, descuadre, approver.
+- ✅ **Reimprimir Z** produces the same figures stamped **C O P I A**.
+
+The proof that matters is in the tests: the reprint renders the frozen snapshot,
+so deleting every tender from that shift afterwards does not change one number on
+the paper. Nothing on this screen offers to reopen or edit a closed shift, and
+nothing anywhere else does either.
+
+### (h) The audit
+
+Run `pnpm db:audit --verify`.
+
+- ✅ Thirteen checks, all OK. Four of them are new: one open shift per till,
+  gap-free Z numbers, every closed shift still computing to what it froze, and
+  every stamped row sitting inside the shift that signs it.
+
+---
+
+## 15. Final check
 
 ```bash
 pnpm db:audit --verify

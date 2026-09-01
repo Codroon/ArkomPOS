@@ -17,11 +17,23 @@ import {
   type Breakdown,
   type ShiftTotalsPayload,
 } from "@arkom/core";
-import { AccentButton, Chip, Field, GhostButton, SectionLabel, TextInput, cn, useT } from "@arkom/ui";
+import { AccentButton, Chip, Field, GhostButton, SectionLabel, TextInput, cn, useT, type TKey } from "@arkom/ui";
+
 import { errorMessage } from "../../lib/errors";
 import { useApprovalFlow } from "../../lib/use-approval";
 import { useTicketPrint } from "../../lib/use-ticket-print";
 import { DenominationDialog } from "./denomination-dialog";
+
+/** The Z prints Spanish always; the screen follows the staff toggle (ADR-0011). */
+const METHOD_KEYS: Record<string, TKey> = {
+  cash: "pay.cash",
+  card: "pay.card",
+  bizum: "pay.bizum",
+  transfer: "pay.transfer",
+  store_credit: "pay.storeCredit",
+  deposit: "rep.agreement.deposit",
+};
+
 
 function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
@@ -32,7 +44,14 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
   );
 }
 
-export function ClosePanel({ onClosed }: { onClosed: (zDocNumber: string) => void }) {
+export function ClosePanel({
+  reloadKey,
+  onClosed,
+}: {
+  /** bumped whenever a movement lands, so the expected figure is never stale */
+  reloadKey: number;
+  onClosed: (closed: { shiftId: string; zDocNumber: string }) => void;
+}) {
   const t = useT();
   const approval = useApprovalFlow();
   const printer = useTicketPrint();
@@ -57,13 +76,19 @@ export function ClosePanel({ onClosed }: { onClosed: (zDocNumber: string) => voi
       .catch((err) => console.error("cash:preview failed", err));
   }, []);
 
+  /* Re-read when a movement lands. A cashier who pays 50 € out and then counts
+     against a figure computed before it would come up exactly 50 € over — the
+     kind of "discrepancy" that teaches people the tolerance is noise. */
   useEffect(() => {
     load();
+  }, [load, reloadKey]);
+
+  useEffect(() => {
     window.arkom
       .invoke("settings:get")
       .then((s) => setTolerance(s.cashVarianceToleranceCents))
       .catch((err) => console.error("settings:get failed", err));
-  }, [load]);
+  }, []);
 
   const countedCents = useMemo(() => parseMoneyInput(counted), [counted]);
   const expected = totals?.expectedCashCents ?? 0;
@@ -91,8 +116,10 @@ export function ClosePanel({ onClosed }: { onClosed: (zDocNumber: string) => voi
         },
       );
       setConfirming(false);
-      printer.printShift(undefined, "z");
-      onClosed(res.zDocNumber);
+      /* by its ID, not "the open shift": this one has just stopped being open,
+         and asking for the open shift now finds none */
+      printer.printShift(res.shiftId, "z");
+      onClosed({ shiftId: res.shiftId, zDocNumber: res.zDocNumber });
     } catch (err) {
       setError(errorMessage(t, err));
       setBusy(false);
@@ -241,7 +268,7 @@ function ZFigures({ totals }: { totals: ShiftTotalsPayload }) {
 
       <div className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-muted">{t("cash.z.byMethod")}</div>
       {totals.byMethod.map((row) => (
-        <Row key={row.method} label={row.method} value={formatCents(row.netCents)} />
+        <Row key={row.method} label={t(METHOD_KEYS[row.method] ?? "common.dash")} value={formatCents(row.netCents)} />
       ))}
     </div>
   );

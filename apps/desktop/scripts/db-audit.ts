@@ -21,8 +21,12 @@
  *   5. completed sales balance: Σ line totals ≡ document total, tenders ≥ total
  *   6. unit lifecycle: sold units carry their document, IMEIs valid and unique
  *   7. product codes: no code twice on one product
+ *   8. repair status equals what its facts derive (ADR-0014)
+ *   9. the drawer: one open shift per till, gap-free Z numbers, every closed
+ *      shift still computing to what it froze, and every stamped row inside the
+ *      shift that signs it (ADR-0015)
  */
-import { isValidImei, repairStatus } from "@arkom/core";
+import { computeShiftTotals, isValidImei, repairStatus } from "@arkom/core";
 import { openDb } from "@arkom/db";
 
 const dbPath = process.env.ARKOM_DB_PATH!;
@@ -229,7 +233,12 @@ check(
 
 /* 4. document numbering (ADR-0008) ------------------------------------ */
 const numberProblems: string[] = [];
-for (const series of q<{ id: string; prefix: string; next_number: number }>("SELECT id, prefix, next_number FROM number_series")) {
+/* `doc_type = 'shift'` borrows this table to number the Z report (ADR-0015 §2)
+   and issues no documents at all, so it is checked by its own gap-free check
+   further down rather than reported here as a series that has lost its rows. */
+for (const series of q<{ id: string; prefix: string; next_number: number }>(
+  "SELECT id, prefix, next_number FROM number_series WHERE doc_type <> 'shift'",
+)) {
   const numbers = q<{ number: number; doc_number: string }>(
     "SELECT number, doc_number FROM documents WHERE series_id = ? ORDER BY number",
     series.id,
@@ -311,6 +320,23 @@ interface AuditTicket {
 }
 const asDate = (v: number | null): Date | null => (v === null ? null : new Date(v));
 
+interface AuditShift {
+  id: string;
+  z_doc_number: string | null;
+  opening_float_cents: number;
+  expected_cash_cents: number | null;
+  snapshot: string | null;
+}
+interface AuditShiftDoc {
+  id: string;
+  doc_type: string;
+  doc_number: string | null;
+  number: number | null;
+  subtotal_cents: number;
+  tax_cents: number;
+  total_cents: number;
+}
+
 check(
   "repair status equals what its facts derive",
   q<AuditTicket>(
@@ -343,6 +369,172 @@ check(
     });
     return derived === t.status ? [] : [`${t.doc_number ?? t.id}: guardado ${t.status}, derivado ${derived}`];
   }),
+);
+
+
+/* ---------------------------------------------------- shifts (ADR-0015) */
+
+/**
+ * At most one open shift per till.
+ *
+ * The partial unique index makes this impossible, so a failure here means the
+ * index is missing — which is exactly what would happen if a migration were
+ * skipped or a database were rebuilt by hand.
+ */
+check(
+  "un solo turno abierto por caja",
+  q<{ terminal_id: string; n: number }>(
+    "SELECT terminal_id, COUNT(*) n FROM shifts WHERE closed_at IS NULL GROUP BY terminal_id HAVING n > 1",
+  ).map((r) => `caja ${r.terminal_id}: ${r.n} turnos abiertos`),
+);
+
+/**
+ * Z numbers are gap-free per till.
+ *
+ * The same proof the document series get (ADR-0008): the numbers a till has
+ * issued must be 1..n with nothing missing, because a missing Z is a day whose
+ * takings nobody can account for.
+ */
+check(
+  "números Z sin huecos por caja",
+  q<{ terminal_id: string; n: number; max_z: number; min_z: number }>(
+    `SELECT terminal_id, COUNT(*) n, MAX(z_number) max_z, MIN(z_number) min_z
+       FROM shifts WHERE z_number IS NOT NULL GROUP BY terminal_id`,
+  ).flatMap((r) =>
+    r.n === r.max_z && r.min_z === 1
+      ? []
+      : [`caja ${r.terminal_id}: ${r.n} cierres pero numeración ${r.min_z}–${r.max_z}`],
+  ),
+);
+
+/**
+ * Every closed shift still computes to what it froze.
+ *
+ * The recomputation lives HERE rather than in the reprint (ADR-0015 §7): a Z the
+ * owner signed must not rewrite itself, but a divergence must not go unnoticed
+ * either. This is the check that would catch a payout written after the fact, or
+ * a snapshot produced by a formula that has since changed.
+ */
+check(
+  "el efectivo esperado de cada turno cerrado coincide con su Z",
+  q<AuditShift>(
+    `SELECT id, z_doc_number, opening_float_cents, expected_cash_cents, snapshot
+       FROM shifts WHERE closed_at IS NOT NULL`,
+  ).flatMap((sh) => {
+    const documents = q<AuditShiftDoc>(
+      `SELECT id, doc_type, doc_number, number, subtotal_cents, tax_cents, total_cents
+         FROM documents WHERE shift_id = ? AND status = 'completed'`,
+      sh.id,
+    ).map((d) => ({
+      documentId: d.id,
+      docType: d.doc_type,
+      docNumber: d.doc_number,
+      number: d.number,
+      subtotalCents: d.subtotal_cents,
+      taxCents: d.tax_cents,
+      totalCents: d.total_cents,
+      tenders: q<{ method: string; amount_cents: number }>(
+        "SELECT method, amount_cents FROM document_tenders WHERE document_id = ?",
+        d.id,
+      ).map((t) => ({ method: t.method, amountCents: t.amount_cents })),
+      lines: q<{ tax_regime: string; base_cents: number; tax_cents: number; total_cents: number }>(
+        "SELECT tax_regime, base_cents, tax_cents, total_cents FROM document_lines WHERE document_id = ?",
+        d.id,
+      ).map((l) => ({
+        taxRegime: l.tax_regime,
+        baseCents: l.base_cents,
+        taxCents: l.tax_cents,
+        totalCents: l.total_cents,
+      })),
+    }));
+
+    const movements = q<{ reason: string; amount_cents: number }>(
+      "SELECT reason, amount_cents FROM cash_movements WHERE shift_id = ?",
+      sh.id,
+    ).map((m) => ({ reason: m.reason, amountCents: m.amount_cents }));
+
+    const deposits = [
+      ...q<{ amount_cents: number; method: string }>(
+        `SELECT t.deposit_cents amount_cents, t.deposit_method method
+           FROM repair_tickets t JOIN documents d ON d.id = t.document_id
+          WHERE d.shift_id = ? AND t.deposit_cents > 0`,
+        sh.id,
+      ).map((r) => ({ kind: "taken" as const, method: r.method, amountCents: r.amount_cents })),
+      ...q<{ amount_cents: number; method: string | null }>(
+        `SELECT deposit_refunded_cents amount_cents, deposit_refund_method method
+           FROM repair_tickets WHERE deposit_refund_shift_id = ? AND deposit_refunded_cents > 0`,
+        sh.id,
+      ).map((r) => ({ kind: "refunded" as const, method: r.method ?? "cash", amountCents: r.amount_cents })),
+    ];
+
+    const payouts = q<{ method: string; amount_cents: number }>(
+      `SELECT p.payout_method method, p.buy_price_cents amount_cents
+         FROM used_purchases p JOIN documents d ON d.id = p.document_id
+        WHERE d.shift_id = ?`,
+      sh.id,
+    ).map((r) => ({ method: r.method, amountCents: r.amount_cents }));
+
+    const repairsCollected = q<{ n: number }>(
+      `SELECT COUNT(*) n FROM repair_tickets t JOIN documents d ON d.id = t.collection_document_id
+        WHERE d.shift_id = ?`,
+      sh.id,
+    )[0]!.n;
+
+    const recomputed = computeShiftTotals({
+      openingFloatCents: sh.opening_float_cents,
+      documents,
+      movements,
+      deposits,
+      payouts,
+      /* parked tickets are a live count and cannot be reconstructed for a past
+         day, so the comparison deliberately stops at the money */
+      parkedCount: 0,
+      repairsCollectedCount: repairsCollected,
+    });
+
+    const frozen = sh.snapshot ? (JSON.parse(sh.snapshot) as { totals?: { expectedCashCents?: number } }) : null;
+    const stored = frozen?.totals?.expectedCashCents ?? sh.expected_cash_cents;
+    return recomputed.expectedCashCents === stored
+      ? []
+      : [
+          `${sh.z_doc_number ?? sh.id}: la Z dice ${(stored ?? 0) / 100} € y los apuntes dan ${
+            recomputed.expectedCashCents / 100
+          } €`,
+        ];
+  }),
+);
+
+/**
+ * Every row written since shifts existed belongs to a shift that was open then.
+ *
+ * Rows from before v0.13.0 carry `shift_id = NULL`, which means "before shifts"
+ * and is not a fault (ADR-0010's convention). What would be a fault is a row
+ * stamped with a shift that was already closed when it was written.
+ */
+check(
+  "cada documento y movimiento pertenece a un turno que estaba abierto",
+  [
+    /* COMPLETED_AT, not created_at. A draft legitimately starts before the shift
+       does — that is the inline-open flow: the cashier adds lines, presses
+       Cobrar, is asked to open the till, and the same ticket is charged. What
+       must fall inside the shift is the moment the money moved. */
+    ...q<{ doc_number: string | null; id: string; at: number; opened_at: number; closed_at: number | null }>(
+      `SELECT d.doc_number, d.id, COALESCE(d.completed_at, d.created_at) at, s.opened_at, s.closed_at
+         FROM documents d JOIN shifts s ON s.id = d.shift_id`,
+    ).flatMap((r) =>
+      r.at >= r.opened_at && (r.closed_at === null || r.at <= r.closed_at)
+        ? []
+        : [`documento ${r.doc_number ?? r.id} fuera del turno que lo firma`],
+    ),
+    ...q<{ id: string; created_at: number; opened_at: number; closed_at: number | null }>(
+      `SELECT m.id, m.created_at, s.opened_at, s.closed_at
+         FROM cash_movements m JOIN shifts s ON s.id = m.shift_id`,
+    ).flatMap((r) =>
+      r.created_at >= r.opened_at && (r.closed_at === null || r.created_at <= r.closed_at)
+        ? []
+        : [`movimiento ${r.id} fuera del turno que lo firma`],
+    ),
+  ],
 );
 
 console.log(`Auditoría de ${dbPath}\n`);

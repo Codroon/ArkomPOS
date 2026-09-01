@@ -332,6 +332,42 @@ export function SettingsScreen() {
             </Field>
           </section>
 
+          {/* ---------------- cash (ADR-0015) ----------------
+              The client's answers about their own drawer, as data. None of
+              these is snapshotted: a shift reads them at the moment it opens or
+              closes, and changing one tomorrow changes tomorrow. */}
+          <section className="flex flex-col gap-2">
+            <SectionLabel>{t("set.cashSection")}</SectionLabel>
+
+            <Field label={t("set.cashFloat")} hint={t("set.cashFloatHint")}>
+              <MoneySetting
+                cents={settings.cashDefaultFloatCents}
+                onCommit={(cents) => void save({ cashDefaultFloatCents: cents })}
+              />
+            </Field>
+
+            <Field label={t("set.cashTolerance")} hint={t("set.cashToleranceHint")}>
+              <MoneySetting
+                cents={settings.cashVarianceToleranceCents}
+                onCommit={(cents) => void save({ cashVarianceToleranceCents: cents })}
+              />
+            </Field>
+
+            <Field label={t("set.cashThreshold")} hint={t("set.cashThresholdHint")}>
+              <MoneySetting
+                cents={settings.cashMovementApprovalCents}
+                onCommit={(cents) => void save({ cashMovementApprovalCents: cents })}
+              />
+            </Field>
+
+            <Field label={t("set.cashConcepts")} hint={t("set.cashConceptsHint")}>
+              <ConceptsSetting
+                concepts={settings.cashConcepts}
+                onCommit={(next) => void save({ cashConcepts: next })}
+              />
+            </Field>
+          </section>
+
           <BackupPanel say={say} />
 
           {/* ---------------- demo data ---------------- */}
@@ -444,6 +480,38 @@ function MoneySetting({ cents, onCommit }: { cents: number; onCommit: (cents: nu
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => e.key === "Enter" && commit()}
+    />
+  );
+}
+
+/**
+ * The preset concepts, one per line.
+ *
+ * A textarea rather than a chip editor: the shop will set this once, and a list
+ * of five short strings does not need a widget with add and remove buttons.
+ * Commits on blur, like the money fields, so typing does not write a row per
+ * keystroke.
+ */
+function ConceptsSetting({ concepts, onCommit }: { concepts: string[]; onCommit: (next: string[]) => void }) {
+  const [draft, setDraft] = useState(() => concepts.join("\n"));
+  useEffect(() => setDraft(concepts.join("\n")), [concepts]);
+
+  const commit = () => {
+    const next = draft
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 20);
+    if (next.join("\n") !== concepts.join("\n")) onCommit(next);
+  };
+
+  return (
+    <textarea
+      rows={5}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      className="w-full rounded-[3px] border border-line-strong bg-card px-2 py-1.5 text-[12px] leading-snug outline-none focus:border-focus"
     />
   );
 }

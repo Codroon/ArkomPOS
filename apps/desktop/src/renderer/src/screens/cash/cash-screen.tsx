@@ -9,11 +9,13 @@ import { useEffect, useState } from "react";
 import { formatCents } from "@arkom/core";
 import { AccentButton, Chip, GhostButton, SectionLabel, useT } from "@arkom/ui";
 import { useShift } from "../../lib/use-shift";
+import { useCan } from "../../lib/use-session";
 import { useTicketPrint } from "../../lib/use-ticket-print";
 import { PrintToast } from "../../lib/print-toast";
 import { OpenShiftDialog } from "./open-shift-dialog";
 import { MovementsPanel } from "./movements-panel";
 import { ClosePanel } from "./close-panel";
+import { HistoryModal } from "./history-modal";
 import { TicketPeekModal } from "../../components/ticket-peek-modal";
 
 function stamp(ms: number): string {
@@ -35,10 +37,14 @@ export function CashScreen() {
   const t = useT();
   const { shift, refresh } = useShift();
   const printer = useTicketPrint();
+  const can = useCan();
   const [opening, setOpening] = useState(false);
   const [peekDocId, setPeekDocId] = useState<string | null>(null);
   /* the Z just produced — the panel becomes a result rather than vanishing */
-  const [closed, setClosed] = useState<string | null>(null);
+  const [closed, setClosed] = useState<{ shiftId: string; zDocNumber: string } | null>(null);
+  const [history, setHistory] = useState(false);
+  /* bumped by the movements panel so the close panel re-reads its figures */
+  const [movementTick, setMovementTick] = useState(0);
 
   /* re-read on every visit: another window, or the last close, may have moved
      on since this component was last mounted */
@@ -61,6 +67,10 @@ export function CashScreen() {
         ) : (
           <Chip variant="danger">{t("cash.noShift")}</Chip>
         )}
+        <div className="flex-1" />
+        {can("cash.history") ? (
+          <GhostButton onClick={() => setHistory(true)}>{t("cash.history")}</GhostButton>
+        ) : null}
       </div>
 
       <div className="flex min-h-0 flex-1 gap-4 overflow-y-auto px-4 py-3">
@@ -70,9 +80,9 @@ export function CashScreen() {
               /* the shift that just ended, with its number and the paper it
                  produced — the shape the intake and purchase screens use */
               <>
-                <div className="text-[13px] font-bold">{t("cash.close.done", { number: closed })}</div>
+                <div className="text-[13px] font-bold">{t("cash.close.done", { number: closed.zDocNumber })}</div>
                 <div className="mt-3.5 flex justify-center gap-2">
-                  <GhostButton onClick={() => printer.printShift(undefined, "z", true)}>
+                  <GhostButton onClick={() => printer.printShift(closed.shiftId, "z", true)}>
                     {t("cash.close.reprint")}
                   </GhostButton>
                   <AccentButton onClick={() => setOpening(true)}>{t("cash.close.newShift")}</AccentButton>
@@ -113,17 +123,19 @@ export function CashScreen() {
             ) : null}
           </div>
           <ClosePanel
-            onClosed={async (zDocNumber) => {
-              setClosed(zDocNumber);
+            reloadKey={movementTick}
+            onClosed={async (result) => {
+              setClosed(result);
               await refresh();
             }}
           />
           </div>
-          <MovementsPanel onPeekDocument={setPeekDocId} />
+          <MovementsPanel onPeekDocument={setPeekDocId} onChanged={() => setMovementTick((n) => n + 1)} />
           </>
         )}
       </div>
 
+      {history ? <HistoryModal onClose={() => setHistory(false)} /> : null}
       <PrintToast printer={printer} />
       {peekDocId ? <TicketPeekModal docId={peekDocId} onClose={() => setPeekDocId(null)} /> : null}
       {opening ? (

@@ -100,7 +100,8 @@ export function MovementsPanel({
         <span className="text-muted">{t("cash.mov.in")}</span>
         <span className="font-mono font-bold tabular-nums">{formatCents(data.inCents)}</span>
         <span className="text-muted">{t("cash.mov.out")}</span>
-        <span className="font-mono font-bold tabular-nums text-danger-ink">−{formatCents(data.outCents)}</span>
+        {/* the same minus formatCents uses, so the strip and the rows agree */}
+        <span className="font-mono font-bold tabular-nums text-danger-ink">{formatCents(-data.outCents)}</span>
         <div className="flex-1" />
         <span className="text-muted">{t("cash.mov.net")}</span>
         <span className="font-mono font-bold tabular-nums">{formatCents(data.netCents)}</span>

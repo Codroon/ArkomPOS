@@ -10,7 +10,7 @@ shop's data lives in one SQLite file on the counter PC.
 
 ---
 
-## Current state — v0.12.0
+## Current state — v0.13.0
 
 Phase 1 is complete and packaged. Verified on a clean Windows machine end to
 end, with one exception noted below.
@@ -31,20 +31,22 @@ end, with one exception noted below.
 | **Used devices** | Buy over the counter behind an offline IMEI gate, photos, printed purchase document with a signature line, shelf label, hold or shelve, refurbishment cost, and a register of every device bought |
 | **Store credit** | Paying a seller in credit issues a voucher; it pays for a later sale as a tender, redeemed inside that sale's transaction so it cannot be spent twice |
 | **Repairs** | Intake with damage marks, photos and a signed deposit receipt; quote with per-line margin; approval bound to an amount; parts from stock or on order with goods-received; a workshop board; collection onto a normal fiscal ticket with the deposit applied as a tender; and closing a ticket unrepaired with every consumed part resolved first |
+| **Cash** | A shift per till with a counted float, one expected-cash figure derived from the tenders and the drawer ledger, an X preview that is exactly what a close would freeze, cash paid in and out with approval over a threshold, and a close that freezes an immutable numbered Z with the variance, its reason and its approver |
 
 ### Not built yet
 
-Shifts / float / Z report and the Caja screen · refunds and voids · full
-invoices (tickets only) · card-terminal SDK integration (references are typed
-in) · sync and the web dashboard · transfers, agency and SIM sales · the
-refurbishment pipeline and the second-hand police-register export (the data for
-it is captured at intake).
+Refunds and voids · full invoices (tickets only) · the Reports screen (a Z
+snapshot is its future source, and the seam is documented) · card-terminal SDK
+integration (references are typed in) · sync and the web dashboard · transfers,
+agency and SIM sales · reopening a closed shift, which is deliberate rather than
+missing · the refurbishment pipeline and the second-hand police-register export
+(the data for it is captured at intake).
 
 Dragging a card between columns on the workshop board is not built either: the
 honest version runs the same guard as the ficha's buttons, so a card opens its
 ficha rather than pretending to move.
 
-The schema already anticipates all of these — nullable `shift_id`, tenancy keys,
+The schema already anticipates all of these — tenancy keys,
 document types — so they extend rather than replace what is here. A new role or
 module is an edit to the permission registry, not a migration (ADR-0012).
 
