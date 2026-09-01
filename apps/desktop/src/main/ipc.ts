@@ -166,6 +166,14 @@ import {
   CashManualRequestSchema,
   CashMovementsRequestSchema,
   CashMovementsResponseSchema,
+  CashPreviewResponseSchema,
+  CashCloseRequestSchema,
+  CashCloseResponseSchema,
+  CashHistoryRequestSchema,
+  CashHistoryResponseSchema,
+  CashGetRequestSchema,
+  CashGetResponseSchema,
+  CashPrintRequestSchema,
   ShiftStateSchema,
   RepairDetailSchema,
   RepairGetRequestSchema,
@@ -241,13 +249,20 @@ import {
   upsertCustomer,
 } from "./repos/repair";
 import {
+  closeNeedsApproval,
+  closeShiftTx,
+  logShiftPreview,
   movementRows,
   movementTotals,
   openShift,
   openShiftTx,
   postManualMovement,
   requireOpenShift,
+  shiftById,
+  shiftListRows,
+  shiftTotals,
   toShiftState,
+  totalsFor,
 } from "./repos/shift";
 import {
   listPrinters,
@@ -259,6 +274,7 @@ import {
   revealTicket,
   ticketsDir,
   printRecoveryCode,
+  printShiftReport,
 } from "./print";
 import { completeFirstRun, demoStatus, isSetupNeeded, removeDemoData } from "./setup";
 import { backupStatus, backupsDir, runBackup } from "./backup";
@@ -1139,6 +1155,58 @@ export function registerIpcHandlers(db: ArkomDb): void {
 
   guarded("cash:paidOut", manualPermission, CashManualRequestSchema, CashMovementsResponseSchema, (s, input) =>
     postManualMovement(db, s.ctx, { ...input, direction: "out" }),
+  );
+
+  /* The X. The same computation a close would freeze, uncommitted — literally
+     the same function over the same rows, which is the whole guarantee
+     (ADR-0015 §12). It oplogs, because "someone took an X at 19:40" is exactly
+     the fact that matters later when the count is short. */
+  guarded("cash:preview", "cash.view", z.object({}).default({}), CashPreviewResponseSchema, (s) => {
+    const shift = requireOpenShift(db, s.ctx);
+    const totals = shiftTotals(db, shift);
+    logShiftPreview(db, s.ctx, shift.id, totals.expectedCashCents);
+    return { shift: toShiftState(db, shift), totals };
+  });
+
+  /**
+   * Closing.
+   *
+   * The permission is chosen per call: within tolerance this is counter work,
+   * outside it somebody else has to say yes. The expected figure comes from the
+   * database and only the counted one from the payload, because nothing else
+   * could supply it.
+   */
+  guarded(
+    "cash:close",
+    (req: { countedCents: number }) =>
+      closeNeedsApproval(db, tillContext(db).ctx, req.countedCents, getSettings(db, tillContext(db).ctx).cashVarianceToleranceCents)
+        ? "cash.close_over_tolerance"
+        : "cash.close",
+    CashCloseRequestSchema,
+    CashCloseResponseSchema,
+    (s, input) => closeShiftTx(db, s.ctx, input),
+  );
+
+  guarded("cash:history", "cash.history", CashHistoryRequestSchema, CashHistoryResponseSchema, (s, input) => ({
+    rows: shiftListRows(db, s.ctx, input.limit),
+  }));
+
+  guarded("cash:get", "cash.history", CashGetRequestSchema, CashGetResponseSchema, (s, { shiftId }) => {
+    const shift = shiftById(db, shiftId);
+    if (!shift) throw appError("VALIDATION", "Ese turno no existe.");
+    return {
+      shift: toShiftState(db, shift),
+      totals: totalsFor(db, shift),
+      movements: movementRows(db, shift.id),
+    };
+  });
+
+  guarded(
+    "cash:print",
+    (req: { what: "z" | "x"; shiftId?: string }) => (req.what === "x" || !req.shiftId ? "cash.view" : "cash.history"),
+    CashPrintRequestSchema,
+    PrintTicketResponseSchema,
+    (s, input) => printShiftReport(db, s.ctx, input),
   );
 }
 

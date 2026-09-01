@@ -22,6 +22,7 @@ import {
   renderQuoteDoc,
   renderRepairReceipt,
   renderReturnDoc,
+  renderZReport,
   warrantyEndsAt,
   renderShelfLabel,
   renderTicket,
@@ -40,10 +41,12 @@ import {
   type RepairReceiptDoc,
   type ReturnDoc,
 } from "@arkom/core";
+import type { ShiftReportDoc, ShiftTotals } from "@arkom/core";
 import { schema, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner } from "../mutate-runner";
 import { peek } from "../repos/sale";
 import { getSettings, shopProfile } from "../repos/settings";
+import { openShift, shiftById, shiftTotals } from "../repos/shift";
 import { getDetail } from "../repos/repair";
 import { tillContext } from "../context";
 import { encodeEscPos } from "./escpos";
@@ -841,4 +844,107 @@ export function peekPurchase(db: ArkomDb, ctx: MutationCtx, ref: { purchaseId?: 
     payoutReference: doc.payoutReference,
     voucher: voucher ?? null,
   };
+}
+
+/* ----------------------------------------------------- the Z and the X */
+
+/**
+ * A shift print is not a document print.
+ *
+ * `logPrintAttempt` hangs its entry off a `documents` row, and a Z has none — it
+ * is the shop's summary of a period, not one of the things in it. Its own entity
+ * keeps `db:audit --entity document` meaning what it has always meant.
+ */
+function logShiftPrint(db: ArkomDb, ctx: MutationCtx, shiftId: string, after: Record<string, unknown>): void {
+  mutate(makeMutateRunner(db), ctx, (_tx, log) => {
+    log({ entity: "shift", entityId: shiftId, action: "print", before: null, after });
+  });
+}
+
+/**
+ * A shift's own paper.
+ *
+ * A **reprint renders the stored snapshot** and never a recomputation
+ * (ADR-0015 §7): the Z is the shop's statement about a day, and a later change
+ * to the underlying rows must not silently rewrite a document somebody already
+ * signed and filed. An X, by contrast, is a live computation by definition.
+ */
+export async function printShiftReport(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  req: { shiftId?: string; what: "z" | "x"; target: "auto" | "pdf"; copy: boolean },
+): Promise<PrintTicketResponse> {
+  const { users } = schema;
+  const settings = getSettings(db, ctx);
+  const shop = shopProfile(db, ctx);
+
+  const shift = req.shiftId ? shiftById(db, req.shiftId) : openShift(db, ctx);
+  if (!shift) throw appError("VALIDATION", "No hay ningún turno que imprimir.");
+
+  const snapshot = shift.snapshot as
+    | {
+        totals: ShiftTotals;
+        countedCashCents: number;
+        varianceCents: number;
+        varianceReason: string | null;
+        approvedByUserId: string | null;
+      }
+    | null;
+
+  const isZ = req.what === "z" && snapshot !== null;
+  const totals = isZ ? snapshot!.totals : shiftTotals(db, shift);
+  const name = (id: string | null) =>
+    id ? (db.select({ name: users.name }).from(users).where(eq(users.id, id)).all()[0]?.name ?? null) : null;
+
+  const doc: ShiftReportDoc = {
+    zDocNumber: isZ ? shift.zDocNumber : null,
+    terminalName: tillContext(db).meta.terminal.name,
+    openedAtMs: shift.openedAt.getTime(),
+    openedByName: name(shift.openedByUserId),
+    closedAtMs: isZ ? (shift.closedAt?.getTime() ?? null) : null,
+    closedByName: isZ ? name(shift.closedByUserId) : null,
+    printedAtMs: Date.now(),
+    isCopy: req.copy,
+    totals,
+    countedCashCents: isZ ? snapshot!.countedCashCents : null,
+    varianceCents: isZ ? snapshot!.varianceCents : null,
+    varianceReason: isZ ? snapshot!.varianceReason : null,
+    approvedByName: isZ ? name(snapshot!.approvedByUserId) : null,
+  };
+
+  const ops = renderZReport(doc, shop, settings.paperWidthMm);
+  const fileBase = `${doc.zDocNumber ?? "X"}${req.copy ? "-COPIA" : ""}`;
+  const what = isZ ? "shift_z" : "shift_x";
+
+  if (req.target === "pdf" || !settings.printerName) {
+    const path = await renderTicketPdf(ops, settings.paperWidthMm, fileBase);
+    logShiftPrint(db, ctx, shift.id, {
+      ok: true,
+      target: "pdf",
+      path,
+      what,
+      copy: req.copy,
+      ...(settings.printerName ? {} : { fallback: "NO_PRINTER" }),
+    });
+    return { kind: "pdf", path };
+  }
+
+  try {
+    await sendRawToPrinter(settings.printerName, encodeEscPos(ops, settings.commandSet, settings.paperWidthMm));
+    logShiftPrint(db, ctx, shift.id, { ok: true, target: "printer", printer: settings.printerName, what, copy: req.copy });
+    return { kind: "printed", printer: settings.printerName };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logShiftPrint(db, ctx, shift.id, {
+      ok: false,
+      target: "printer",
+      printer: settings.printerName,
+      what,
+      copy: req.copy,
+      error: message,
+    });
+    const path = await renderTicketPdf(ops, settings.paperWidthMm, fileBase);
+    logShiftPrint(db, ctx, shift.id, { ok: true, target: "pdf", path, what, copy: req.copy, fallback: "PRINTER_FAILED" });
+    return { kind: "pdf", path };
+  }
 }

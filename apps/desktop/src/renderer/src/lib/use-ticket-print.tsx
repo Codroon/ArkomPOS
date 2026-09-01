@@ -19,11 +19,13 @@ import { PrintTicketResponseSchema } from "@arkom/core";
 import { useT } from "@arkom/ui";
 import { errorMessage } from "./errors";
 
-/** What to print: a sale ticket, a used-device document, or a repair document. */
+/** What to print: a sale ticket, a used-device document, a repair, or a shift. */
 export type PrintJob =
   | { kind: "ticket"; docId: string; copy: boolean }
   | { kind: "purchase"; purchaseId: string; what: "document" | "label"; copy: boolean }
-  | { kind: "repair"; ticketId: string; what: "intake" | "quote" | "receipt" | "return"; copy: boolean };
+  | { kind: "repair"; ticketId: string; what: "intake" | "quote" | "receipt" | "return"; copy: boolean }
+  /** no shiftId = the open shift, which is the only one an X can be taken of */
+  | { kind: "shift"; shiftId: string | undefined; what: "z" | "x"; copy: boolean };
 
 export interface PrintState {
   busy: boolean;
@@ -86,12 +88,19 @@ export function useTicketPrint() {
                   copy: job.copy,
                   target,
                 })
-              : await window.arkom.invoke("repair:print", {
-                  ticketId: job.ticketId,
-                  what: job.what,
-                  copy: job.copy,
-                  target,
-                }),
+              : job.kind === "repair"
+                ? await window.arkom.invoke("repair:print", {
+                    ticketId: job.ticketId,
+                    what: job.what,
+                    copy: job.copy,
+                    target,
+                  })
+                : await window.arkom.invoke("cash:print", {
+                    ...(job.shiftId ? { shiftId: job.shiftId } : {}),
+                    what: job.what,
+                    copy: job.copy,
+                    target,
+                  }),
         );
         if (!alive.current) return;
         setState({
@@ -141,6 +150,12 @@ export function useTicketPrint() {
       void run({ kind: "repair", ticketId, what, copy }, "auto"),
     [run],
   );
+  /** The Z of a shift, or the X of the open one. No shiftId = the open shift. */
+  const printShift = useCallback(
+    (shiftId: string | undefined, what: "z" | "x", copy = false) =>
+      void run({ kind: "shift", shiftId, what, copy }, "auto"),
+    [run],
+  );
   const retry = useCallback(() => {
     if (state.failed) void run(state.failed, "auto");
   }, [run, state.failed]);
@@ -160,5 +175,5 @@ export function useTicketPrint() {
     [state.savedPath, t],
   );
 
-  return { state, print, savePdf, printPurchase, printRepair, retry, savePdfForFailed, reveal, dismiss };
+  return { state, print, savePdf, printPurchase, printRepair, printShift, retry, savePdfForFailed, reveal, dismiss };
 }

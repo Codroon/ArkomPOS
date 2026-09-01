@@ -12,14 +12,17 @@
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { ArkomDb } from "@arkom/db";
 import * as schema from "@arkom/db/schema";
-import { makeMutateRunner } from "../mutate-runner";
+import { makeMutateRunner, type DbTx } from "../mutate-runner";
 import {
+  allocateNumber,
   appError,
   assertBreakdownMatches,
   computeShiftTotals,
   mutate,
   movesDrawer,
   toOplogJson,
+  needsVarianceApproval,
+  varianceCents,
   shiftStatus,
   uuidv7,
   type MutationCtx,
@@ -84,7 +87,7 @@ export function currentShiftId(db: Reader, ctx: MutationCtx): string | null {
 /* ---------------------------------------------------------- series */
 
 /** The till's `Z1-` series, created on demand — the ADR-0008 pattern (ADR-0015 §2). */
-export function shiftSeries(tx: ArkomDb, ctx: MutationCtx) {
+export function shiftSeries(tx: DbTx, ctx: MutationCtx) {
   const existing = tx
     .select()
     .from(numberSeries)
@@ -402,5 +405,144 @@ export function postManualMovement(
 
     const rows = movementRows(tx, shift.id);
     return { rows, ...movementTotals(rows) };
+  });
+}
+
+/* ----------------------------------------------------------- closing */
+
+/**
+ * Close the drawer, and freeze what it said.
+ *
+ * One transaction: the snapshot, the Z number, the stamp and the oplog. Any
+ * failure and nothing happened — a shift half-closed, numbered but not stamped,
+ * would be the one state nothing else in this file knows how to read.
+ *
+ * The reason is required for ANY non-zero variance, not merely a large one: a
+ * shop that writes "cuadra" for every 40-cent difference is a shop where the
+ * field means nothing, and 40 cents every day is a pattern worth a sentence.
+ */
+export function closeShiftTx(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  input: { countedCents: number; breakdown: Record<string, number> | null; reason: string | null },
+) {
+  return mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    const shift = requireOpenShift(tx, ctx);
+    assertBreakdownMatches(input.countedCents, input.breakdown);
+
+    const totals = computeShiftTotals(loadShiftFacts(tx, shift));
+    const variance = varianceCents(input.countedCents, totals.expectedCashCents);
+    const reason = input.reason?.trim() || null;
+    if (variance !== 0 && !reason) {
+      throw appError("VALIDATION", "Indica el motivo del descuadre.", "reason");
+    }
+
+    const series = shiftSeries(tx, ctx);
+    const allocation = allocateNumber({ prefix: series.prefix, nextNumber: series.nextNumber });
+    tx.update(numberSeries).set({ nextNumber: allocation.next.nextNumber }).where(eq(numberSeries.id, series.id)).run();
+
+    const now = new Date();
+    const before = { ...shift };
+    /* The Z as a document, frozen. A reprint renders THIS; the recomputation
+       lives in db:audit, where a divergence is reported rather than silently
+       applied (ADR-0015 §7). */
+    const snapshot = {
+      snapshotVersion: 1 as const,
+      zDocNumber: allocation.docNumber,
+      terminalId: shift.terminalId,
+      openedAtMs: shift.openedAt.getTime(),
+      openedByUserId: shift.openedByUserId,
+      closedAtMs: now.getTime(),
+      closedByUserId: ctx.userId ?? null,
+      approvedByUserId: ctx.authorizedByUserId ?? null,
+      countedCashCents: input.countedCents,
+      varianceCents: variance,
+      varianceReason: reason,
+      closingBreakdown: input.breakdown,
+      totals,
+    };
+
+    tx.update(shifts)
+      .set({
+        closedAt: now,
+        closedByUserId: ctx.userId ?? null,
+        countedCashCents: input.countedCents,
+        closingBreakdown: input.breakdown,
+        expectedCashCents: totals.expectedCashCents,
+        varianceCents: variance,
+        varianceReason: reason,
+        approvedByUserId: ctx.authorizedByUserId ?? null,
+        zSeriesId: series.id,
+        zNumber: allocation.number,
+        zDocNumber: allocation.docNumber,
+        snapshot,
+        updatedAt: now,
+      })
+      .where(eq(shifts.id, shift.id))
+      .run();
+
+    const after = tx.select().from(shifts).where(eq(shifts.id, shift.id)).all()[0]!;
+    log({ entity: "shift", entityId: shift.id, action: "close", before: toOplogJson(before), after: toOplogJson(after) });
+
+    return {
+      shiftId: shift.id,
+      zDocNumber: allocation.docNumber,
+      countedCents: input.countedCents,
+      expectedCents: totals.expectedCashCents,
+      varianceCents: variance,
+    };
+  });
+}
+
+/**
+ * Would this close need an owner's PIN?
+ *
+ * Read-only, used by the IPC layer to pick the permission before the handler
+ * runs. The expected figure comes from the DATABASE; only the counted figure
+ * comes from the payload, because nothing else could supply it. That is not a
+ * hole: a false count does not dodge the approval, it records a lie under the
+ * sender's name, and a LOWER count makes the variance larger, not smaller.
+ */
+export function closeNeedsApproval(db: ArkomDb, ctx: MutationCtx, countedCents: number, toleranceCents: number): boolean {
+  const shift = openShift(db, ctx);
+  if (!shift) return false; // no shift: the handler refuses it a moment later, honestly
+  const totals = computeShiftTotals(loadShiftFacts(db, shift));
+  return needsVarianceApproval(varianceCents(countedCents, totals.expectedCashCents), toleranceCents);
+}
+
+/* ------------------------------------------------------- reading back */
+
+export function shiftListRows(db: Reader, ctx: MutationCtx, limit: number) {
+  return closedShifts(db, ctx, limit).map((row) => ({
+    id: row.id,
+    zDocNumber: row.zDocNumber,
+    openedAtMs: row.openedAt.getTime(),
+    closedAtMs: row.closedAt?.getTime() ?? null,
+    openedByName: userName(db, row.openedByUserId),
+    closedByName: userName(db, row.closedByUserId),
+    expectedCashCents: row.expectedCashCents,
+    countedCashCents: row.countedCashCents,
+    varianceCents: row.varianceCents,
+    approvedByName: userName(db, row.approvedByUserId),
+  }));
+}
+
+/** The stored snapshot's totals, or a live computation while the shift is open. */
+export function totalsFor(db: Reader, shift: ShiftRow): ShiftTotals | null {
+  const snapshot = shift.snapshot as { totals?: ShiftTotals } | null;
+  if (snapshot?.totals) return snapshot.totals; // frozen: never recomputed
+  return shift.closedAt === null ? computeShiftTotals(loadShiftFacts(db, shift)) : null;
+}
+
+/**
+ * Record that somebody looked.
+ *
+ * An oplog entry with no business row, the shape auth events already use. "An X
+ * was taken at 19:40 and said 742,60" is exactly the fact that matters later
+ * when the count comes up short (ADR-0015 §12).
+ */
+export function logShiftPreview(db: ArkomDb, ctx: MutationCtx, shiftId: string, expectedCashCents: number): void {
+  mutate(makeMutateRunner(db), ctx, (_tx, log) => {
+    log({ entity: "shift", entityId: shiftId, action: "preview", before: null, after: { expectedCashCents } });
   });
 }

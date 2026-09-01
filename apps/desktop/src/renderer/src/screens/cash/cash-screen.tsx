@@ -7,10 +7,13 @@
  */
 import { useEffect, useState } from "react";
 import { formatCents } from "@arkom/core";
-import { AccentButton, Chip, SectionLabel, useT } from "@arkom/ui";
+import { AccentButton, Chip, GhostButton, SectionLabel, useT } from "@arkom/ui";
 import { useShift } from "../../lib/use-shift";
+import { useTicketPrint } from "../../lib/use-ticket-print";
+import { PrintToast } from "../../lib/print-toast";
 import { OpenShiftDialog } from "./open-shift-dialog";
 import { MovementsPanel } from "./movements-panel";
+import { ClosePanel } from "./close-panel";
 import { TicketPeekModal } from "../../components/ticket-peek-modal";
 
 function stamp(ms: number): string {
@@ -31,8 +34,11 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export function CashScreen() {
   const t = useT();
   const { shift, refresh } = useShift();
+  const printer = useTicketPrint();
   const [opening, setOpening] = useState(false);
   const [peekDocId, setPeekDocId] = useState<string | null>(null);
+  /* the Z just produced — the panel becomes a result rather than vanishing */
+  const [closed, setClosed] = useState<string | null>(null);
 
   /* re-read on every visit: another window, or the last close, may have moved
      on since this component was last mounted */
@@ -60,11 +66,27 @@ export function CashScreen() {
       <div className="flex min-h-0 flex-1 gap-4 overflow-y-auto px-4 py-3">
         {shift === null ? (
           <div className="mx-auto mt-16 w-[420px] rounded-[3px] border border-line-strong bg-card px-4 py-5 text-center">
-            <div className="text-[13px] font-bold">{t("cash.noShiftTitle")}</div>
-            <div className="mt-1.5 text-[11px] leading-snug text-muted">{t("cash.noShiftBody")}</div>
-            <div className="mt-3.5 flex justify-center">
-              <AccentButton onClick={() => setOpening(true)}>{t("cash.openShift")}</AccentButton>
-            </div>
+            {closed ? (
+              /* the shift that just ended, with its number and the paper it
+                 produced — the shape the intake and purchase screens use */
+              <>
+                <div className="text-[13px] font-bold">{t("cash.close.done", { number: closed })}</div>
+                <div className="mt-3.5 flex justify-center gap-2">
+                  <GhostButton onClick={() => printer.printShift(undefined, "z", true)}>
+                    {t("cash.close.reprint")}
+                  </GhostButton>
+                  <AccentButton onClick={() => setOpening(true)}>{t("cash.close.newShift")}</AccentButton>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-[13px] font-bold">{t("cash.noShiftTitle")}</div>
+                <div className="mt-1.5 text-[11px] leading-snug text-muted">{t("cash.noShiftBody")}</div>
+                <div className="mt-3.5 flex justify-center">
+                  <AccentButton onClick={() => setOpening(true)}>{t("cash.openShift")}</AccentButton>
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <>
@@ -90,18 +112,26 @@ export function CashScreen() {
               </div>
             ) : null}
           </div>
+          <ClosePanel
+            onClosed={async (zDocNumber) => {
+              setClosed(zDocNumber);
+              await refresh();
+            }}
+          />
           </div>
           <MovementsPanel onPeekDocument={setPeekDocId} />
           </>
         )}
       </div>
 
+      <PrintToast printer={printer} />
       {peekDocId ? <TicketPeekModal docId={peekDocId} onClose={() => setPeekDocId(null)} /> : null}
       {opening ? (
         <OpenShiftDialog
           onCancel={() => setOpening(false)}
           onOpened={async () => {
             setOpening(false);
+            setClosed(null);
             await refresh();
           }}
         />

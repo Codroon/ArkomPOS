@@ -208,6 +208,8 @@ export type {
   ReturnReason,
 } from "./repair-doc";
 export { opsToText, opBuilder } from "./print-ops";
+export { renderZReport, SHIFT_ES } from "./shift-doc";
+export type { ShiftReportDoc } from "./shift-doc";
 export {
   REPAIR_STATUSES,
   REPAIR_LINE_KINDS,

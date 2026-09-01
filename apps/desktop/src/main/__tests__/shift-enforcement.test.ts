@@ -19,7 +19,8 @@ import { SHIFT_REQUIRED_CHANNELS, registerIpcHandlers } from "../ipc";
 import { endSession, startSession } from "../auth/session";
 import { resetTillContext } from "../context";
 import { createUser } from "../auth/users";
-import { shiftTotals } from "../repos/shift";
+import { computeShiftTotals } from "@arkom/core";
+import { loadShiftFacts, shiftTotals } from "../repos/shift";
 
 const MIGRATIONS = join(__dirname, "../../../../../packages/db/drizzle");
 const IMEI = imeiWithCheckDigit("35209411880318");
@@ -399,5 +400,188 @@ describe("the movements list", () => {
     };
     expect(res.rows[0]!.documentId).not.toBeNull();
     expect(res.rows[0]!.docNumber).toMatch(/^C-/);
+  });
+});
+
+/* ------------------------------------------------------- closing */
+
+/** Sell something for cash so the drawer has a figure worth counting. */
+async function sellForCash(amountCents: number) {
+  const draft = await handlers.get("sale:addLine")!({}, { productId, qty: 1 });
+  const docId = (draft as { state: { docId: string } }).state.docId;
+  await handlers.get("sale:complete")!({}, { docId, tenders: [{ method: "cash", amountCents }] });
+  return docId;
+}
+
+describe("the X preview", () => {
+  it("is exactly what a close would freeze", async () => {
+    await openTheTill();
+    await sellForCash(1000);
+
+    const preview = (await handlers.get("cash:preview")!({}, {})) as { totals: { expectedCashCents: number } };
+    expect(preview.totals.expectedCashCents).toBe(20000 + 1000);
+
+    await handlers.get("cash:close")!({}, { countedCents: preview.totals.expectedCashCents, breakdown: null, reason: null });
+    const shift = env.db.select().from(s.shifts).all()[0]!;
+    // the same function over the same rows, so these cannot diverge
+    expect(shift.expectedCashCents).toBe(preview.totals.expectedCashCents);
+  });
+
+  it("commits nothing and consumes no number", async () => {
+    await openTheTill();
+    await handlers.get("cash:preview")!({}, {});
+    const shift = env.db.select().from(s.shifts).all()[0]!;
+    expect(shift.closedAt).toBeNull();
+    expect(shift.zDocNumber).toBeNull();
+    expect(env.db.select().from(s.numberSeries).all().find((r) => r.docType === "shift")).toBeUndefined();
+  });
+
+  it("records that somebody looked", async () => {
+    await openTheTill();
+    await handlers.get("cash:preview")!({}, {});
+    const entry = env.db.select().from(s.oplog).all().find((e) => e.entity === "shift" && e.action === "preview");
+    expect(entry).toBeDefined();
+  });
+
+  it("needs an open shift", async () => {
+    expect(await call("cash:preview", {})).toBe("SHIFT_REQUIRED");
+  });
+});
+
+describe("closing", () => {
+  it("refuses a non-zero variance with no reason, however small", async () => {
+    await openTheTill();
+    // 40 cents every day is a pattern worth a sentence
+    expect(await call("cash:close", { countedCents: 20040, breakdown: null, reason: null })).toBe("VALIDATION");
+    expect(await call("cash:close", { countedCents: 20040, breakdown: null, reason: "  " })).toBe("VALIDATION");
+    expect(await call("cash:close", { countedCents: 20040, breakdown: null, reason: "Propina" })).toBe("OK");
+  });
+
+  it("closes silently when it balances", async () => {
+    await openTheTill();
+    expect(await call("cash:close", { countedCents: 20000, breakdown: null, reason: null })).toBe("OK");
+    const shift = env.db.select().from(s.shifts).all()[0]!;
+    expect(shift.varianceCents).toBe(0);
+    expect(shift.varianceReason).toBeNull();
+  });
+
+  it("records the variance signed: negative is short", async () => {
+    await openTheTill();
+    await call("cash:close", { countedCents: 19800, breakdown: null, reason: "Cambio mal dado" });
+    const shift = env.db.select().from(s.shifts).all()[0]!;
+    expect(shift.varianceCents).toBe(-200);
+    expect(shift.countedCashCents).toBe(19800);
+    expect(shift.expectedCashCents).toBe(20000);
+  });
+
+  it("asks for an owner's PIN past the tolerance, and not within it", async () => {
+    await openTheTill();
+    const cashier = createUser(env.db, env.ctx, { name: "Ana", role: "cashier", pin: "5162" }).user;
+    startSession({ id: cashier.id, name: "Ana", role: "cashier", overrides: {} });
+
+    // default tolerance is 3,00 EUR: 4,00 short needs a witness, 2,00 does not
+    expect(await call("cash:close", { countedCents: 19600, breakdown: null, reason: "Descuadre" })).toBe(
+      "APPROVAL_REQUIRED",
+    );
+    expect(await call("cash:close", { countedCents: 19800, breakdown: null, reason: "Cambio" })).toBe("OK");
+  });
+
+  it("stamps the approver on the shift when one was needed", async () => {
+    await openTheTill();
+    const cashier = createUser(env.db, env.ctx, { name: "Ana", role: "cashier", pin: "5162" }).user;
+    startSession({ id: cashier.id, name: "Ana", role: "cashier", overrides: {} });
+
+    await handlers.get("cash:close")!(
+      {},
+      { countedCents: 19000, breakdown: null, reason: "Faltaba dinero" },
+      { userId: owner.id, pin: "8317" },
+    );
+    const shift = env.db.select().from(s.shifts).all()[0]!;
+    expect(shift.closedByUserId).toBe(cashier.id);
+    expect(shift.approvedByUserId).toBe(owner.id);
+  });
+
+  it("refuses a closing count whose breakdown does not add up", async () => {
+    await openTheTill();
+    expect(await call("cash:close", { countedCents: 20000, breakdown: { "2000": 3 }, reason: null })).toBe("VALIDATION");
+  });
+
+  it("allocates a gap-free Z number per till", async () => {
+    for (const n of [1, 2, 3]) {
+      await openTheTill();
+      await call("cash:close", { countedCents: 20000, breakdown: null, reason: null });
+      const rows = env.db.select().from(s.shifts).all();
+      expect(rows.at(-1)!.zDocNumber).toBe(`Z1-${String(n).padStart(6, "0")}`);
+    }
+    const numbers = env.db.select().from(s.shifts).all().map((r) => r.zNumber);
+    expect(numbers).toEqual([1, 2, 3]);
+  });
+
+  it("freezes a snapshot that a recomputation agrees with", async () => {
+    await openTheTill();
+    await sellForCash(1000);
+    await call("cash:close", { countedCents: 21000, breakdown: null, reason: null });
+
+    const shift = env.db.select().from(s.shifts).all()[0]!;
+    const snapshot = shift.snapshot as { snapshotVersion: number; totals: { expectedCashCents: number } };
+    expect(snapshot.snapshotVersion).toBe(1);
+    // the audit check in the next slice does exactly this, months later
+    expect(computeShiftTotals(loadShiftFacts(env.db, shift)).expectedCashCents).toBe(snapshot.totals.expectedCashCents);
+  });
+
+  it("blocks a second close, and money, until a new shift is opened", async () => {
+    await openTheTill();
+    await call("cash:close", { countedCents: 20000, breakdown: null, reason: null });
+    expect(await call("cash:close", { countedCents: 20000, breakdown: null, reason: null })).toBe("SHIFT_REQUIRED");
+    expect(await call("used:log", purchasePayload)).toBe("SHIFT_REQUIRED");
+    expect(await openTheTill()).toBe("OK");
+  });
+
+  it("counts parked sales without blocking on them", async () => {
+    await openTheTill();
+    const draft = await handlers.get("sale:addLine")!({}, { productId, qty: 1 });
+    const docId = (draft as { state: { docId: string } }).state.docId;
+    await handlers.get("sale:park")!({}, { docId, label: "Joan" });
+
+    // a parked ticket has no tenders and no number: it cannot affect a drawer
+    expect(await call("cash:close", { countedCents: 20000, breakdown: null, reason: null })).toBe("OK");
+    const shift = env.db.select().from(s.shifts).all()[0]!;
+    const snapshot = shift.snapshot as { totals: { parkedCount: number } };
+    expect(snapshot.totals.parkedCount).toBe(1);
+  });
+});
+
+describe("a closed shift", () => {
+  it("hands back the STORED snapshot, not a recomputation", async () => {
+    await openTheTill();
+    await sellForCash(1000);
+    await call("cash:close", { countedCents: 21000, breakdown: null, reason: null });
+    const shift = env.db.select().from(s.shifts).all()[0]!;
+
+    const before = (await handlers.get("cash:get")!({}, { shiftId: shift.id })) as {
+      totals: { expectedCashCents: number; grossSalesCents: number };
+    };
+
+    /* the underlying rows change afterwards — a correction, a fixed bug, a
+       voided voucher. A Z the owner already signed must not rewrite itself. */
+    env.db.delete(s.documentTenders).run();
+
+    const after = (await handlers.get("cash:get")!({}, { shiftId: shift.id })) as {
+      totals: { expectedCashCents: number; grossSalesCents: number };
+    };
+    expect(after.totals).toEqual(before.totals);
+    expect(after.totals.expectedCashCents).toBe(21000);
+  });
+
+  it("appears in the history with its figures", async () => {
+    await openTheTill();
+    await call("cash:close", { countedCents: 19800, breakdown: null, reason: "Cambio" });
+    const res = (await handlers.get("cash:history")!({}, { limit: 50 })) as {
+      rows: Array<{ zDocNumber: string | null; varianceCents: number | null; closedByName: string | null }>;
+    };
+    expect(res.rows).toHaveLength(1);
+    expect(res.rows[0]!.zDocNumber).toBe("Z1-000001");
+    expect(res.rows[0]!.varianceCents).toBe(-200);
+    expect(res.rows[0]!.closedByName).toBe("Ahmer");
   });
 });

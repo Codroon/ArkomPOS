@@ -223,19 +223,19 @@ export interface ShiftTotals {
   usedSalesCents: number;
   grossSalesCents: number;
 
-  tendersByMethod: ReadonlyArray<{ method: string; amountCents: number }>;
+  tendersByMethod: Array<{ method: string; amountCents: number }>;
   tendersTotalCents: number;
   /** gross − tenders. Non-zero means the till has a bug; the Z says so out loud. */
   tenderImbalanceCents: number;
 
-  movementsByReason: ReadonlyArray<{ reason: string; count: number; amountCents: number }>;
-  depositsByMethod: ReadonlyArray<{ method: string; count: number; amountCents: number }>;
-  refundsByMethod: ReadonlyArray<{ method: string; count: number; amountCents: number }>;
-  payoutsByMethod: ReadonlyArray<{ method: string; count: number; amountCents: number }>;
+  movementsByReason: Array<{ reason: string; count: number; amountCents: number }>;
+  depositsByMethod: Array<{ method: string; count: number; amountCents: number }>;
+  refundsByMethod: Array<{ method: string; count: number; amountCents: number }>;
+  payoutsByMethod: Array<{ method: string; count: number; amountCents: number }>;
   /** one line per payment method, netting everything the shift did with it */
-  byMethod: ReadonlyArray<MethodLine>;
+  byMethod: Array<MethodLine>;
 
-  series: ReadonlyArray<SeriesRun>;
+  series: Array<SeriesRun>;
   usedPurchaseCount: number;
   repairsCollectedCount: number;
   parkedCount: number;
