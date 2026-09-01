@@ -19,6 +19,7 @@ import { registerIpcHandlers } from "../ipc";
 import { endSession, startSession } from "../auth/session";
 import { resetTillContext } from "../context";
 import { createUser } from "../auth/users";
+import { openShiftTx } from "../repos/shift";
 import {
   addLine,
   collect,
@@ -108,6 +109,7 @@ function intake(over: Partial<RepairCreateRequest> = {}): RepairCreateRequest {
     promisedDate: null,
     promisedHalf: null,
     depositCents: 0,
+    depositMethod: "cash",
     authorizedCapCents: null,
     assignedUserId: null,
     ...over,
@@ -121,6 +123,8 @@ beforeEach(() => {
   env = freshDb();
   owner = createUser(env.db, env.ctx, { name: "Ahmer", role: "owner", pin: "8317" }).user;
   registerIpcHandlers(env.db);
+  /* money now needs an open drawer (ADR-0015 §9) */
+  openShiftTx(env.db, ctxOf(), { floatCents: 20000, breakdown: null });
   customerId = upsertCustomer(env.db, ctxOf(), { name: "Joan Puig", phone: "+34 671 220 918" }).id;
   screenId = makeProduct("Pantalla iPhone 11", { costCents: 4200, priceCents: 8900, onHand: 5 });
 });

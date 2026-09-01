@@ -55,7 +55,7 @@ import { schema, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner, type DbTx } from "../mutate-runner";
 import { saveRepairPhotos, discardRepairPhotos, readPhotos } from "../photos";
 import { postMovement } from "./stock-ledger";
-import { currentShiftId } from "./shift";
+import { currentShiftId, requireOpenShift } from "./shift";
 import { getSettings } from "./settings";
 
 const {
@@ -282,7 +282,7 @@ export interface CreateTicketInput {
   photos: ReadonlyArray<{ kind: "front" | "back" | "extra" | "seller_id"; dataUrl: string }>;
   promisedDate?: number | null;
   promisedHalf?: "morning" | "afternoon" | null;
-  depositMethod?: "cash" | "card" | "bizum" | "transfer";
+  depositMethod?: "cash" | "card" | "bizum" | "transfer" | undefined;
   depositCents: number;
   authorizedCapCents?: number | null;
   assignedUserId?: string | null;
@@ -327,7 +327,11 @@ export async function createTicket(
   try {
     return mutate(makeMutateRunner(db), ctx, (tx, log) => {
       const now = new Date();
-      const shiftId = currentShiftId(tx, ctx);
+      /* Taking a device in needs no shift; taking MONEY for it does — including
+         a card deposit, which moves no notes but still has to belong to a Z
+         (ADR-0015 §9). An intake with no deposit stamps the shift if there is
+         one and proceeds if there is not. */
+      const shiftId = input.depositCents > 0 ? requireOpenShift(tx, ctx).id : currentShiftId(tx, ctx);
 
       /* the numbered document the customer is handed (ADR-0008) */
       const series = repairSeries(tx, ctx);
@@ -1742,7 +1746,7 @@ export function markNotRepaired(
     resolutions: Array<{ lineId: string; action: "return" | "charge" }>;
     depositAction: "refund" | "apply_fee";
     /** how the money goes back. Defaults to however it was taken. */
-    refundMethod?: "cash" | "card" | "bizum" | "transfer";
+    refundMethod?: "cash" | "card" | "bizum" | "transfer" | undefined;
     chargeDiagnosisFee: boolean;
   },
 ): RepairMarkNotRepairedResponse {
@@ -1810,7 +1814,10 @@ export function markNotRepaired(
        bookkeeping and is posted whatever the method, because it is what keeps a
        ticket's rows netting to zero. */
     const refundMethod = input.refundMethod ?? ticket.depositMethod;
-    const shiftId = currentShiftId(tx, ctx);
+    /* resolving a deposit — refunding it or eating it as a fee — is a money
+       event and needs a shift to belong to; closing a ticket that never had one
+       does not (ADR-0015 §9) */
+    const shiftId = ticket.depositCents > 0 ? requireOpenShift(tx, ctx).id : currentShiftId(tx, ctx);
 
     const postCash = (amountCents: number, reason: "repair_deposit_applied" | "repair_deposit_refund") => {
       if (amountCents <= 0) return;

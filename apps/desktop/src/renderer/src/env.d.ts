@@ -55,6 +55,7 @@ import type {
   UsedDeviceDetail,
   VoucherRow,
   UsedPeek,
+  ShiftState,
 } from "@arkom/core";
 
 declare global {
@@ -267,6 +268,13 @@ declare global {
         channel: "repair:print",
         payload: { ticketId: string; what: "intake" | "quote" | "receipt" | "return"; copy?: boolean; target?: "auto" | "pdf" },
       ): Promise<PrintTicketResponse>;
+
+      /* ---- cash / shifts (ADR-0015) ---- */
+      invoke(channel: "cash:current", payload?: Record<string, never>): Promise<ShiftState | null>;
+      invoke(
+        channel: "cash:open",
+        payload: { floatCents: number; breakdown: Record<string, number> | null },
+      ): Promise<ShiftState>;
     };
   }
 }

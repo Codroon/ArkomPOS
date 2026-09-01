@@ -29,6 +29,7 @@ import { resetTillContext } from "../context";
 import { createUser } from "../auth/users";
 import { createTicket, searchCustomers, upsertCustomer } from "../repos/repair";
 import { repairPhotosDir } from "../photos";
+import { openShiftTx } from "../repos/shift";
 
 const MIGRATIONS = join(__dirname, "../../../../../packages/db/drizzle");
 
@@ -68,6 +69,8 @@ beforeEach(() => {
   env = freshDb();
   owner = createUser(env.db, env.ctx, { name: "Ahmer", role: "owner", pin: "8317" }).user;
   registerIpcHandlers(env.db);
+  /* money now needs an open drawer (ADR-0015 §9) */
+  openShiftTx(env.db, ctxOf(), { floatCents: 20000, breakdown: null });
   customerId = upsertCustomer(env.db, ctxOf(), { name: "Imran Khan", phone: "+34 632 118 044" }).id;
 });
 
@@ -86,6 +89,7 @@ function request(over: Partial<RepairCreateRequest> = {}): RepairCreateRequest {
     promisedDate: null,
     promisedHalf: null,
     depositCents: 0,
+    depositMethod: "cash",
     authorizedCapCents: null,
     assignedUserId: null,
     ...over,

@@ -37,6 +37,17 @@ export const DEFAULT_SETTINGS: Settings = {
   repairDiagnosisFeeCents: 0,
   repairDepositSuggestionCents: 0,
   repairCapEnabled: true,
+  /* the client's answers, landing as data (ADR-0015 §11) */
+  cashDefaultFloatCents: 20000, // 200,00 €
+  cashVarianceToleranceCents: 300, // 3,00 €
+  cashMovementApprovalCents: 10000, // 100,00 €
+  cashConcepts: [
+    "A la caja fuerte / banco",
+    "Proveedor",
+    "Gastos",
+    "Cambio para la caja",
+    "Corrección de arqueo",
+  ],
 };
 
 type SettingKey = keyof Settings;
@@ -52,10 +63,22 @@ function decode(key: SettingKey, raw: string): Settings[SettingKey] {
   if (key === "repairDiagnosisFeeCents") return Number.isFinite(Number(raw)) ? Number(raw) : 0;
   if (key === "repairDepositSuggestionCents") return Number.isFinite(Number(raw)) ? Number(raw) : 0;
   if (key === "repairCapEnabled") return raw !== "false";
+  if (key === "cashDefaultFloatCents") return Number.isFinite(Number(raw)) ? Number(raw) : 20000;
+  if (key === "cashVarianceToleranceCents") return Number.isFinite(Number(raw)) ? Number(raw) : 300;
+  if (key === "cashMovementApprovalCents") return Number.isFinite(Number(raw)) ? Number(raw) : 10000;
+  /* a list, so it rides as JSON rather than as a delimiter nobody can type */
+  if (key === "cashConcepts") {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : DEFAULT_SETTINGS.cashConcepts;
+    } catch {
+      return DEFAULT_SETTINGS.cashConcepts;
+    }
+  }
   return raw;
 }
 function encode(value: Settings[SettingKey]): string {
-  return String(value);
+  return Array.isArray(value) ? JSON.stringify(value) : String(value);
 }
 
 export function getSettings(db: ArkomDb, ctx: MutationCtx): Settings {

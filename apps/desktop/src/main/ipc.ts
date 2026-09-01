@@ -161,6 +161,9 @@ import {
   RepairCreateResponseSchema,
   RepairPrintRequestSchema,
   RepairPrintResponseSchema,
+  CashCurrentResponseSchema,
+  CashOpenRequestSchema,
+  ShiftStateSchema,
   RepairDetailSchema,
   RepairGetRequestSchema,
   RepairAddLineRequestSchema,
@@ -234,6 +237,7 @@ import {
   setLineCharge,
   upsertCustomer,
 } from "./repos/repair";
+import { openShift, openShiftTx, requireOpenShift, toShiftState } from "./repos/shift";
 import {
   listPrinters,
   peekPurchase,
@@ -310,6 +314,29 @@ const registered = new Map<string, PermissionKey | "*" | null>();
 export function registeredChannels(): ReadonlyMap<string, PermissionKey | "*" | null> {
   return registered;
 }
+
+/**
+ * Channels that always move money, and therefore always need an open shift.
+ *
+ * A declared list rather than a call scattered through the handlers, so a test
+ * can pin it — a new money channel that forgets the gate should fail the build
+ * the same way one that forgets a permission does (ADR-0015 §9).
+ *
+ * The two conditional ones are deliberately absent. `repair:create` moves cash
+ * only when it takes a deposit and `repair:markNotRepaired` only when it
+ * resolves one, so both check inside their own transaction, where the branch is
+ * known. Receiving stock is absent because a delivery is unpacked before the
+ * shop opens and involves no drawer.
+ */
+export const SHIFT_REQUIRED_CHANNELS: ReadonlySet<string> = new Set([
+  "sale:complete",
+  "used:log",
+  "repair:collect",
+  "cash:paidIn",
+  "cash:paidOut",
+  "cash:preview",
+  "cash:close",
+]);
 
 /* ------------------------------------------------------------ registrars */
 
@@ -403,6 +430,11 @@ function guarded<Req, Res>(
       const session = requireSession();
       const req = reqSchema.parse(payload);
       const key = typeof permission === "function" ? permission(req) : permission;
+
+      /* An open shift is a precondition, not a permission: it is about the
+         state of the till rather than about who is standing at it, so it is
+         checked before authorization and raises its own code (ADR-0015 §9). */
+      if (SHIFT_REQUIRED_CHANNELS.has(channel)) requireOpenShift(dbRef!, withCtx(session).ctx);
 
       // session.permissions is already resolved (owner holds everything), so
       // this one lookup IS the authorization decision
@@ -1057,6 +1089,17 @@ export function registerIpcHandlers(db: ArkomDb): void {
 
   guarded("repair:print", "repair.view", RepairPrintRequestSchema, RepairPrintResponseSchema, (s, input) =>
     printRepair(db, s.ctx, input),
+  );
+
+  /* ------------------------------------------------------ cash (ADR-0015) */
+
+  guarded("cash:current", "cash.view", z.object({}).default({}), CashCurrentResponseSchema, (s) => {
+    const shift = openShift(db, s.ctx);
+    return shift ? toShiftState(db, shift) : null;
+  });
+
+  guarded("cash:open", "cash.open", CashOpenRequestSchema, ShiftStateSchema, (s, input) =>
+    openShiftTx(db, s.ctx, input),
   );
 }
 

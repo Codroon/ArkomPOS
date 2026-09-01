@@ -21,6 +21,7 @@ import { resetTillContext } from "../context";
 import { createUser } from "../auth/users";
 import { logPurchase, findVouchers, voidVoucher } from "../repos/used";
 import { addLine, complete } from "../repos/sale";
+import { openShiftTx } from "../repos/shift";
 
 const MIGRATIONS = join(__dirname, "../../../../../packages/db/drizzle");
 const IMEI_A = imeiWithCheckDigit("35209411880318");
@@ -131,6 +132,8 @@ beforeEach(() => {
   env = freshDb();
   owner = createUser(env.db, env.ctx, { name: "Ahmer", role: "owner", pin: "8317" }).user;
   registerIpcHandlers(env.db);
+  /* money now needs an open drawer (ADR-0015 §9) */
+  openShiftTx(env.db, ctxOf(), { floatCents: 20000, breakdown: null });
 });
 
 const codeOf = async (fn: () => Promise<unknown> | unknown): Promise<string> => {

@@ -25,6 +25,7 @@ import { endSession } from "../auth/session";
 import { resetTillContext } from "../context";
 import { createUser } from "../auth/users";
 import { logPurchase } from "../repos/used";
+import { openShiftTx } from "../repos/shift";
 
 const MIGRATIONS = join(__dirname, "../../../../../packages/db/drizzle");
 
@@ -84,6 +85,8 @@ beforeEach(() => {
   env = freshDb();
   owner = createUser(env.db, env.ctx, { name: "Ahmer", role: "owner", pin: "8317" }).user;
   registerIpcHandlers(env.db);
+  /* money now needs an open drawer (ADR-0015 §9) */
+  openShiftTx(env.db, ctxOf(), { floatCents: 20000, breakdown: null });
 });
 
 const payouts = () =>

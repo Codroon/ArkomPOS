@@ -23,6 +23,7 @@ import {
   parseDayInput,
   parseMoneyInput,
   type CustomerRow,
+  type DepositMethod,
   type RepairCreateResponse,
 } from "@arkom/core";
 import {
@@ -35,6 +36,7 @@ import {
   TextInput,
   cn,
   useT,
+  type TKey,
 } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
 import { PrintToast } from "../../lib/print-toast";
@@ -61,6 +63,7 @@ interface IntakeDraft {
   promisedDate: string;
   promisedHalf: "morning" | "afternoon" | "";
   deposit: string;
+  depositMethod: DepositMethod;
   cap: string;
 }
 
@@ -77,6 +80,7 @@ const emptyDraft = (): IntakeDraft => ({
   promisedDate: "",
   promisedHalf: "",
   deposit: "",
+  depositMethod: "cash",
   cap: "",
 });
 
@@ -89,6 +93,15 @@ const emptyDraft = (): IntakeDraft => ({
  * a defect, not a translation.
  */
 const PROMISE_SHORTCUTS = [1, 2, 7] as const;
+
+/** The sale's tenders minus store credit (ADR-0015 §5), in counter order. */
+const DEPOSIT_METHODS: ReadonlyArray<DepositMethod> = ["cash", "card", "bizum", "transfer"];
+const DEPOSIT_METHOD_KEYS: Record<DepositMethod, TKey> = {
+  cash: "pay.cash",
+  card: "pay.card",
+  bizum: "pay.bizum",
+  transfer: "pay.transfer",
+};
 
 export function RepairIntakeScreen({ onDone }: { onDone: (ticketId: string | null) => void }) {
   const t = useT();
@@ -170,6 +183,7 @@ export function RepairIntakeScreen({ onDone }: { onDone: (ticketId: string | nul
         promisedDate: promisedMs,
         promisedHalf: draft.promisedHalf || null,
         depositCents,
+        depositMethod: draft.depositMethod,
         authorizedCapCents: capCents,
         assignedUserId: null,
       });
@@ -425,6 +439,28 @@ export function RepairIntakeScreen({ onDone }: { onDone: (ticketId: string | nul
                   </GhostButton>
                 ) : null}
               </div>
+              {/* How it was taken. Only cash reaches the drawer, so the Z can
+                  report a card deposit without the shift coming up over
+                  (ADR-0015 §5). Hidden until there is a deposit to describe. */}
+              {depositCents > 0 ? (
+                <div className="mt-1.5 flex overflow-hidden rounded-[3px] border border-line-strong">
+                  {DEPOSIT_METHODS.map((method) => (
+                    <button
+                      key={method}
+                      type="button"
+                      onClick={() => patch({ depositMethod: method })}
+                      className={cn(
+                        "flex-1 border-r border-line px-1 py-1 text-[11px] last:border-r-0",
+                        draft.depositMethod === method
+                          ? "bg-ink font-semibold text-inverse-ink"
+                          : "bg-card text-ink-2 hover:bg-hover",
+                      )}
+                    >
+                      {t(DEPOSIT_METHOD_KEYS[method])}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </Field>
 
             {settings.capEnabled ? (

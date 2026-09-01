@@ -1,7 +1,7 @@
 /**
  * App frame — docs/design/handoff/00-foundations.md ("App shell") + mockup.
- * Topbar 44px: brand · spacer · locale toggle · Till chip · date (no
- * shift/cashier chips — ADR-0010). Left nav 186px: 01–03 and 11 (Ajustes)
+ * Topbar 44px: brand · spacer · shift chip (ADR-0015) · user chip · locale
+ * toggle · Till chip · date. Left nav 186px: 01–03 and 11 (Ajustes)
  * enabled in Phase 1, the rest muted with a LOCK badge, non-navigable. All strings via useT()
  * (ADR-0011); the date format stays dd/mm/yyyy hh:mm regardless of locale.
  */
@@ -17,6 +17,8 @@ import { BuyUsedScreen } from "../screens/used/buy-used-screen";
 import { UsedDevicesScreen } from "../screens/used/used-devices-screen";
 import { RepairsScreen } from "../screens/repair/repairs-screen";
 import { WorkshopScreen } from "../screens/repair/workshop-screen";
+import { CashScreen } from "../screens/cash/cash-screen";
+import { ShiftChip } from "../screens/cash/shift-chip";
 import { SettingsScreen } from "../screens/settings/settings-screen";
 import { UsersScreen } from "../screens/users/users-screen";
 
@@ -34,7 +36,7 @@ const NAV_ITEMS: ReadonlyArray<{ n: string; labelKey: TKey; id?: ScreenId; needs
   { n: "06", labelKey: "nav.reparacion", id: "reparaciones", needs: "repair.view" },
   { n: "07", labelKey: "nav.taller", id: "taller", needs: "workshop.view" },
   { n: "08", labelKey: "nav.transferencias" },
-  { n: "09", labelKey: "nav.caja" },
+  { n: "09", labelKey: "nav.caja", id: "caja", needs: "cash.view" },
   { n: "10", labelKey: "nav.informes" },
   { n: "11", labelKey: "nav.ajustes", id: "ajustes", needs: "settings.edit" },
   { n: "12", labelKey: "usr.title", id: "usuarios", needs: "users.manage" },
@@ -146,6 +148,7 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
           </span>
         </div>
         <div className="flex-1" />
+        {session ? <ShiftChip /> : null}
         {session ? <UserChip name={session.name} role={session.role} /> : null}
         <div className="flex items-center border-l border-inverse-2 px-3.5">
           <LocaleToggle />
@@ -222,6 +225,8 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
             <RepairsScreen key={navTick} />
           ) : screen === "taller" ? (
             <WorkshopScreen key={navTick} />
+          ) : screen === "caja" ? (
+            <CashScreen key={navTick} />
           ) : screen === "ajustes" ? (
             <SettingsScreen />
           ) : screen === "usuarios" ? (

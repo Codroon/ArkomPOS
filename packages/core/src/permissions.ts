@@ -18,7 +18,7 @@
  */
 
 /** Groups the Usuarios screen renders as sections, in this order. */
-export const PERMISSION_MODULES = ["sale", "catalog", "inventory", "usedDevices", "repair", "workshop", "admin"] as const;
+export const PERMISSION_MODULES = ["sale", "catalog", "inventory", "usedDevices", "repair", "workshop", "cash", "admin"] as const;
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
 
 export interface PermissionDef {
@@ -85,6 +85,22 @@ export const PERMISSIONS = [
 
   /* ---- workshop ---- */
   { key: "workshop.view", module: "workshop", labelEs: "Ver el taller", approvable: false },
+
+  /* ---- cash (ADR-0015) ----
+     Opening, counting and closing the drawer is counter work: a cashier who
+     cannot open a till cannot start the day, and a cashier who cannot close one
+     leaves the count to somebody who was not there. The two the cashier does not
+     hold are the two that need a witness — a real discrepancy, and money leaving
+     the drawer in a lump — and both are approvable, so the button is there and an
+     owner's PIN completes it. Reading past shifts is owner-only because a Z is
+     the shop's own statement of a day. */
+  { key: "cash.view", module: "cash", labelEs: "Ver la caja y la vista X", approvable: false },
+  { key: "cash.open", module: "cash", labelEs: "Abrir turno", approvable: false },
+  { key: "cash.close", module: "cash", labelEs: "Cerrar turno", approvable: false },
+  { key: "cash.close_over_tolerance", module: "cash", labelEs: "Cerrar turno con descuadre", approvable: true },
+  { key: "cash.movement", module: "cash", labelEs: "Registrar entradas y salidas de efectivo", approvable: false },
+  { key: "cash.movement_over_threshold", module: "cash", labelEs: "Registrar un movimiento de efectivo alto", approvable: true },
+  { key: "cash.history", module: "cash", labelEs: "Ver turnos anteriores y reimprimir la Z", approvable: false },
 
   /* ---- admin: owner-only, and not approvable ---- */
   // a cashier does not manage users with the owner leaning over their shoulder;
@@ -162,6 +178,12 @@ export const CASHIER_DEFAULTS: readonly PermissionKey[] = [
   "repair.markReady",
   "repair.collect",
   "workshop.view",
+  /* the drawer: open it, count it, close it, and move money in and out of it up
+     to the threshold. What is missing is a real discrepancy and a big movement */
+  "cash.view",
+  "cash.open",
+  "cash.close",
+  "cash.movement",
 ];
 
 /**

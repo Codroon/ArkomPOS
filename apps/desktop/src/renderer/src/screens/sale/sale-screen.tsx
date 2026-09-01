@@ -7,6 +7,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  parseIpcError,
   availableForSale,
   type CompletedSale,
   type EntityRef,
@@ -20,6 +21,8 @@ import {
 } from "@arkom/core";
 import { cn, GhostButton, ScanInput, Toast, useDataLabel, useT, type ScanInputHandle } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
+import { refreshShift } from "../../lib/use-shift";
+import { OpenShiftDialog } from "../cash/open-shift-dialog";
 import { consumePendingVoucher, openCatalogWithBarcode } from "../../lib/screen-bus";
 import { useScanFlow } from "../../lib/use-scan-flow";
 import { ProductGrid } from "./product-grid";
@@ -55,6 +58,8 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
   const [parkedOpen, setParkedOpen] = useState(false);
   const [tenders, setTenders] = useState<TenderEntry[]>([]);
   const [charging, setCharging] = useState(false);
+  /* the till has no open shift and the cashier pressed Cobrar (ADR-0015 §9) */
+  const [needsShift, setNeedsShift] = useState(false);
   const [voucherFinderOpen, setVoucherFinderOpen] = useState(false);
 
   /* A voucher handed over by "Continuar a la venta" lands as a tender chip the
@@ -324,6 +329,14 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
         refreshProducts();
       })
       .catch((err) => {
+        /* Not an error the cashier can do anything about by reading it: there
+           is no shift open, and the fix is ten seconds away. Offer it here
+           rather than sending them to another screen with a customer waiting
+           (ADR-0015 §9). */
+        if (parseIpcError(err)?.code === "SHIFT_REQUIRED") {
+          setNeedsShift(true);
+          return;
+        }
         showToast(errorMessage(t, err));
         setShake(true); // failure: sale stays open, ticket flashes
         setTimeout(() => setShake(false), 350);
@@ -555,6 +568,20 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
               },
             ]);
             setVoucherFinderOpen(false);
+          }}
+        />
+      ) : null}
+      {needsShift ? (
+        <OpenShiftDialog
+          preamble={t("cash.openSaleHint")}
+          onCancel={() => setNeedsShift(false)}
+          onOpened={async () => {
+            setNeedsShift(false);
+            await refreshShift();
+            /* the charge they already pressed now goes through. Making them
+               press Cobrar again after solving the problem the app raised is
+               the kind of small rudeness a till gets blamed for. */
+            onCharge();
           }}
         />
       ) : null}

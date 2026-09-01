@@ -42,6 +42,8 @@ describe("registry shape", () => {
     const approvable = PERMISSIONS.filter((p) => p.approvable).map((p) => p.key);
     expect(approvable.sort()).toEqual(
       [
+        "cash.close_over_tolerance",
+        "cash.movement_over_threshold",
         "catalog.create",
         "catalog.edit",
         "inventory.adjust",

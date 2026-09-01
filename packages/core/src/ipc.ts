@@ -94,6 +94,8 @@ export const IPC_CHANNELS = [
   "repair:collect",
   "repair:markNotRepaired",
   "repair:print",
+  "cash:current",
+  "cash:open",
 ] as const;
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
@@ -129,6 +131,9 @@ export type ErrorCode = z.infer<typeof ErrorCodeSchema>;
 export const DeviceGradeSchema = z.enum(["A", "B", "C"]);
 export const IdDocTypeSchema = z.enum(["DNI", "NIE", "PASAPORTE"]);
 export const PayoutMethodSchema = z.enum(["cash", "transfer", "store_credit"]);
+/** How a repair deposit is taken and given back (ADR-0015 §5). */
+export const DepositMethodSchema = z.enum(["cash", "card", "bizum", "transfer"]);
+export type DepositMethod = z.infer<typeof DepositMethodSchema>;
 export const AcquisitionChannelSchema = z.enum(["private_individual", "business"]);
 export const PhotoKindSchema = z.enum(["front", "back", "extra", "seller_id"]);
 export const VoucherStatusSchema = z.enum(["issued", "redeemed", "void"]);
@@ -613,6 +618,15 @@ export const SettingsSchema = z.object({
   repairCapEnabled: z.boolean(),
   /** margin the selling-price modal prefills with, in whole percent (ADR-0013) */
   usedMarginPct: z.number().int().min(0).max(500),
+  /* ---- cash (ADR-0015). The client's answers about their own drawer, as data. ---- */
+  /** prefilled when opening a shift; the shop can still count something else */
+  cashDefaultFloatCents: z.number().int().min(0),
+  /** |variance| above this needs an owner's PIN to close. A reason is ALWAYS needed */
+  cashVarianceToleranceCents: z.number().int().min(0),
+  /** a manual paid-in/out above this runs the approval modal */
+  cashMovementApprovalCents: z.number().int().min(0),
+  /** one-tap concepts for the movement dialog; free text is always allowed */
+  cashConcepts: z.array(z.string().max(80)).max(20),
 });
 export type Settings = z.infer<typeof SettingsSchema>;
 
@@ -1303,6 +1317,9 @@ export const RepairCreateRequestSchema = z.object({
   promisedDate: z.number().int().nullish(),
   promisedHalf: PromisedHalfSchema.nullish(),
   depositCents: z.number().int().min(0).default(0),
+  /* how it was taken. The sale's tenders minus store credit: a voucher is money
+     the shop already owes, and holding a deposit in credit would owe it twice. */
+  depositMethod: DepositMethodSchema.default("cash"),
   authorizedCapCents: z.number().int().min(0).nullish(),
   assignedUserId: z.string().nullish(),
 });
@@ -1719,6 +1736,8 @@ export const RepairMarkNotRepairedRequestSchema = z.object({
     .array(z.object({ lineId: z.string(), action: z.enum(["return", "charge"]) }))
     .default([]),
   depositAction: z.enum(["refund", "apply_fee"]).default("refund"),
+  /** how the money goes back; defaults to however it was taken */
+  refundMethod: DepositMethodSchema.optional(),
   /** refused unless the intake snapshot is non-zero — a fee not announced, not charged */
   chargeDiagnosisFee: z.boolean().default(false),
 });
@@ -1734,3 +1753,182 @@ export type RepairMarkNotRepairedResponse = z.infer<typeof RepairMarkNotRepaired
 
 export const RepairPrintResponseSchema = PrintTicketResponseSchema;
 export type RepairPrintRequest = z.infer<typeof RepairPrintRequestSchema>;
+
+/* ============================ cash / shifts (ADR-0015) ============================ */
+
+/**
+ * A denomination count: quantities keyed by the coin or note's value in cents.
+ *
+ * The total is the stored authority and this is the evidence for it, so the
+ * domain refuses a pair that disagrees (`assertBreakdownMatches`). Two numbers
+ * that can drift is what this design rejects everywhere else.
+ */
+export const BreakdownSchema = z.record(z.string(), z.number().int().min(0));
+
+export const ShiftStateSchema = z.object({
+  id: z.string(),
+  zDocNumber: z.string().nullable(),
+  openedAtMs: z.number().int(),
+  openedByName: z.string().nullable(),
+  openingFloatCents: z.number().int(),
+  openingBreakdown: BreakdownSchema.nullable(),
+  closedAtMs: z.number().int().nullable(),
+  closedByName: z.string().nullable(),
+  countedCashCents: z.number().int().nullable(),
+  expectedCashCents: z.number().int().nullable(),
+  varianceCents: z.number().int().nullable(),
+  varianceReason: z.string().nullable(),
+  approvedByName: z.string().nullable(),
+  /** hours the shift has been open — the top bar warns past 20 (handoff) */
+  openHours: z.number(),
+});
+export type ShiftState = z.infer<typeof ShiftStateSchema>;
+
+export const CashCurrentResponseSchema = ShiftStateSchema.nullable();
+
+export const CashOpenRequestSchema = z.object({
+  floatCents: z.number().int().min(0),
+  breakdown: BreakdownSchema.nullable().default(null),
+});
+
+/* ---- the figures, shared by the X preview, the close and the stored Z ---- */
+
+const MethodAmountSchema = z.object({ method: z.string(), amountCents: z.number().int() });
+const MethodCountSchema = z.object({ method: z.string(), count: z.number().int(), amountCents: z.number().int() });
+
+export const ShiftTotalsSchema = z.object({
+  openingFloatCents: z.number().int(),
+  salesCashCents: z.number().int(),
+  movementsCashCents: z.number().int(),
+  expectedCashCents: z.number().int(),
+
+  netSalesCents: z.number().int(),
+  taxCents: z.number().int(),
+  usedSalesCents: z.number().int(),
+  grossSalesCents: z.number().int(),
+
+  tendersByMethod: z.array(MethodAmountSchema),
+  tendersTotalCents: z.number().int(),
+  /** non-zero means the till has a bug, and the Z prints it rather than hiding it */
+  tenderImbalanceCents: z.number().int(),
+
+  movementsByReason: z.array(
+    z.object({ reason: z.string(), count: z.number().int(), amountCents: z.number().int() }),
+  ),
+  depositsByMethod: z.array(MethodCountSchema),
+  refundsByMethod: z.array(MethodCountSchema),
+  payoutsByMethod: z.array(MethodCountSchema),
+  byMethod: z.array(
+    z.object({
+      method: z.string(),
+      inCents: z.number().int(),
+      outCents: z.number().int(),
+      netCents: z.number().int(),
+    }),
+  ),
+
+  series: z.array(
+    z.object({
+      docType: z.string(),
+      count: z.number().int(),
+      firstNumber: z.string().nullable(),
+      lastNumber: z.string().nullable(),
+    }),
+  ),
+  usedPurchaseCount: z.number().int(),
+  repairsCollectedCount: z.number().int(),
+  parkedCount: z.number().int(),
+});
+export type ShiftTotalsPayload = z.infer<typeof ShiftTotalsSchema>;
+
+/** The X: the same figures a close would freeze, plus who would be freezing them. */
+export const CashPreviewResponseSchema = z.object({
+  shift: ShiftStateSchema,
+  totals: ShiftTotalsSchema,
+});
+export type CashPreviewResponse = z.infer<typeof CashPreviewResponseSchema>;
+
+export const CashCloseRequestSchema = z.object({
+  countedCents: z.number().int().min(0),
+  breakdown: BreakdownSchema.nullable().default(null),
+  /** required for ANY non-zero variance, not merely a large one (ADR-0015 §10) */
+  reason: z.string().max(300).nullable().default(null),
+});
+
+export const CashCloseResponseSchema = z.object({
+  shiftId: z.string(),
+  zDocNumber: z.string(),
+  countedCents: z.number().int(),
+  expectedCents: z.number().int(),
+  varianceCents: z.number().int(),
+});
+export type CashCloseResponse = z.infer<typeof CashCloseResponseSchema>;
+
+/* ---- movements ---- */
+
+export const CashMovementRowSchema = z.object({
+  id: z.string(),
+  atMs: z.number().int(),
+  reason: z.string(),
+  /** false for repair_deposit_applied: it is bookkeeping, not a drawer event */
+  movesCash: z.boolean(),
+  amountCents: z.number().int(),
+  concept: z.string().nullable(),
+  userName: z.string().nullable(),
+  documentId: z.string().nullable(),
+  docNumber: z.string().nullable(),
+  ticketId: z.string().nullable(),
+  /** what the Concepto column shows for an automatic row */
+  label: z.string(),
+});
+export type CashMovementRow = z.infer<typeof CashMovementRowSchema>;
+
+export const CashMovementsRequestSchema = z.object({ shiftId: z.string().optional() });
+export const CashMovementsResponseSchema = z.object({
+  rows: z.array(CashMovementRowSchema),
+  inCents: z.number().int(),
+  outCents: z.number().int(),
+  netCents: z.number().int(),
+});
+export type CashMovementsResponse = z.infer<typeof CashMovementsResponseSchema>;
+
+/** Always positive: the channel decides the sign, never a minus the cashier typed. */
+export const CashManualRequestSchema = z.object({
+  amountCents: z.number().int().positive(),
+  concept: z.string().trim().min(1).max(200),
+});
+
+/* ---- history ---- */
+
+export const ShiftListRowSchema = z.object({
+  id: z.string(),
+  zDocNumber: z.string().nullable(),
+  openedAtMs: z.number().int(),
+  closedAtMs: z.number().int().nullable(),
+  openedByName: z.string().nullable(),
+  closedByName: z.string().nullable(),
+  expectedCashCents: z.number().int().nullable(),
+  countedCashCents: z.number().int().nullable(),
+  varianceCents: z.number().int().nullable(),
+  approvedByName: z.string().nullable(),
+});
+export type ShiftListRow = z.infer<typeof ShiftListRowSchema>;
+
+export const CashHistoryRequestSchema = z.object({ limit: z.number().int().min(1).max(200).default(50) });
+export const CashHistoryResponseSchema = z.object({ rows: z.array(ShiftListRowSchema) });
+
+export const CashGetRequestSchema = z.object({ shiftId: z.string() });
+/** The STORED snapshot, never a recomputation (ADR-0015 §7). */
+export const CashGetResponseSchema = z.object({
+  shift: ShiftStateSchema,
+  totals: ShiftTotalsSchema.nullable(),
+  movements: z.array(CashMovementRowSchema),
+});
+export type CashGetResponse = z.infer<typeof CashGetResponseSchema>;
+
+export const CashPrintRequestSchema = z.object({
+  shiftId: z.string().optional(),
+  what: z.enum(["z", "x"]),
+  target: z.enum(["auto", "pdf"]).default("auto"),
+  copy: z.boolean().default(false),
+});

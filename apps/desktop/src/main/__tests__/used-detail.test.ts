@@ -20,6 +20,7 @@ import { endSession, startSession } from "../auth/session";
 import { resetTillContext } from "../context";
 import { createUser } from "../auth/users";
 import { getUsedDevice, listUsedDevices, logPurchase, sendToInventory, setNeedsReview, setRefurbCost } from "../repos/used";
+import { openShiftTx } from "../repos/shift";
 
 const MIGRATIONS = join(__dirname, "../../../../../packages/db/drizzle");
 
@@ -90,6 +91,8 @@ beforeEach(() => {
   owner = createUser(env.db, env.ctx, { name: "Ahmer", role: "owner", pin: "8317" }).user;
   cashier = createUser(env.db, env.ctx, { name: "Ana", role: "cashier", pin: "5162" }).user;
   registerIpcHandlers(env.db);
+  /* money now needs an open drawer (ADR-0015 §9) */
+  openShiftTx(env.db, ctxOf(), { floatCents: 20000, breakdown: null });
 });
 
 const codeOf = async (fn: () => Promise<unknown>): Promise<string> => {

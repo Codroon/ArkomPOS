@@ -12,9 +12,13 @@
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { ArkomDb } from "@arkom/db";
 import * as schema from "@arkom/db/schema";
+import { makeMutateRunner } from "../mutate-runner";
 import {
   appError,
+  assertBreakdownMatches,
   computeShiftTotals,
+  mutate,
+  toOplogJson,
   shiftStatus,
   uuidv7,
   type MutationCtx,
@@ -246,3 +250,69 @@ export function closedShifts(db: Reader, ctx: MutationCtx, limit = 50): ShiftRow
 }
 
 export { shiftStatus, asc };
+
+/* ------------------------------------------------------------ writing */
+
+/** Names for the state payload — a shift is read far more often than written. */
+function userName(db: Reader, id: string | null): string | null {
+  if (!id) return null;
+  return db.select({ name: schema.users.name }).from(schema.users).where(eq(schema.users.id, id)).all()[0]?.name ?? null;
+}
+
+const HOUR_MS = 60 * 60 * 1000;
+
+export function toShiftState(db: Reader, row: ShiftRow, now = Date.now()) {
+  return {
+    id: row.id,
+    zDocNumber: row.zDocNumber,
+    openedAtMs: row.openedAt.getTime(),
+    openedByName: userName(db, row.openedByUserId),
+    openingFloatCents: row.openingFloatCents,
+    openingBreakdown: (row.openingBreakdown as Record<string, number> | null) ?? null,
+    closedAtMs: row.closedAt?.getTime() ?? null,
+    closedByName: userName(db, row.closedByUserId),
+    countedCashCents: row.countedCashCents,
+    expectedCashCents: row.expectedCashCents,
+    varianceCents: row.varianceCents,
+    varianceReason: row.varianceReason,
+    approvedByName: userName(db, row.approvedByUserId),
+    openHours: ((row.closedAt?.getTime() ?? now) - row.openedAt.getTime()) / HOUR_MS,
+  };
+}
+
+/**
+ * Open the drawer for the day.
+ *
+ * The refusal for a second open is raised here so the cashier gets a sentence
+ * rather than a constraint violation — but the index underneath is what actually
+ * guarantees it, and it is the one that survives a race (ADR-0015 §1).
+ */
+export function openShiftTx(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  input: { floatCents: number; breakdown: Record<string, number> | null },
+) {
+  return mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    if (openShift(tx, ctx)) {
+      throw appError("VALIDATION", "Ya hay un turno abierto en esta caja.");
+    }
+    assertBreakdownMatches(input.floatCents, input.breakdown);
+
+    const now = new Date();
+    const row = {
+      id: uuidv7(),
+      tenantId: ctx.tenantId,
+      locationId: ctx.locationId,
+      terminalId: ctx.terminalId,
+      openedByUserId: ctx.userId ?? null,
+      openedAt: now,
+      openingFloatCents: input.floatCents,
+      openingBreakdown: input.breakdown,
+      createdAt: now,
+      updatedAt: now,
+    };
+    tx.insert(shifts).values(row).run();
+    log({ entity: "shift", entityId: row.id, action: "open", before: null, after: toOplogJson(row) });
+    return toShiftState(tx, tx.select().from(shifts).where(eq(shifts.id, row.id)).all()[0]!);
+  });
+}
