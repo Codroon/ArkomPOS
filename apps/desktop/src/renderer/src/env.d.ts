@@ -56,6 +56,7 @@ import type {
   VoucherRow,
   UsedPeek,
   ShiftState,
+  CashMovementsResponse,
 } from "@arkom/core";
 
 declare global {
@@ -275,6 +276,17 @@ declare global {
         channel: "cash:open",
         payload: { floatCents: number; breakdown: Record<string, number> | null },
       ): Promise<ShiftState>;
+      invoke(channel: "cash:movements", payload: { shiftId?: string }): Promise<CashMovementsResponse>;
+      invoke(
+        channel: "cash:paidIn",
+        payload: { amountCents: number; concept: string },
+        approval?: { userId: string; pin: string },
+      ): Promise<CashMovementsResponse>;
+      invoke(
+        channel: "cash:paidOut",
+        payload: { amountCents: number; concept: string },
+        approval?: { userId: string; pin: string },
+      ): Promise<CashMovementsResponse>;
     };
   }
 }

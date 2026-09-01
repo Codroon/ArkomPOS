@@ -19,6 +19,7 @@ import { SHIFT_REQUIRED_CHANNELS, registerIpcHandlers } from "../ipc";
 import { endSession, startSession } from "../auth/session";
 import { resetTillContext } from "../context";
 import { createUser } from "../auth/users";
+import { shiftTotals } from "../repos/shift";
 
 const MIGRATIONS = join(__dirname, "../../../../../packages/db/drizzle");
 const IMEI = imeiWithCheckDigit("35209411880318");
@@ -280,5 +281,123 @@ describe("cash:current", () => {
     // numbers that can drift is what this design rejects everywhere
     expect(await call("cash:open", { floatCents: 20000, breakdown: { "2000": 3 } })).toBe("VALIDATION");
     expect(await call("cash:open", { floatCents: 20000, breakdown: { "2000": 10 } })).toBe("OK");
+  });
+});
+
+/* ------------------------------------------------- manual movements */
+
+describe("paid in and paid out", () => {
+  const openThen = async (fn: () => Promise<string>) => {
+    await openTheTill();
+    return fn();
+  };
+
+  it("needs an open shift like every other money channel", async () => {
+    expect(await call("cash:paidOut", { amountCents: 5000, concept: "Proveedor" })).toBe("SHIFT_REQUIRED");
+  });
+
+  it("takes the amount positive and decides the sign itself", async () => {
+    await openThen(() => call("cash:paidOut", { amountCents: 20000, concept: "A la caja fuerte" }));
+    const row = env.db.select().from(s.cashMovements).all()[0]!;
+    // a cashier typing -200 in a field labelled Salida is a bug waiting to happen
+    expect(row.amountCents).toBe(-20000);
+    expect(row.reason).toBe("paid_out");
+    expect(row.concept).toBe("A la caja fuerte");
+  });
+
+  it("refuses a negative or zero amount outright", async () => {
+    await openTheTill();
+    expect(await call("cash:paidIn", { amountCents: -100, concept: "x" })).toBe("VALIDATION");
+    expect(await call("cash:paidIn", { amountCents: 0, concept: "x" })).toBe("VALIDATION");
+  });
+
+  it("refuses an empty concept — the row would say nothing", async () => {
+    await openTheTill();
+    expect(await call("cash:paidIn", { amountCents: 100, concept: "   " })).toBe("VALIDATION");
+  });
+
+  it("moves the drawer in both directions", async () => {
+    await openTheTill();
+    await call("cash:paidIn", { amountCents: 10000, concept: "Cambio" });
+    await call("cash:paidOut", { amountCents: 20000, concept: "Proveedor" });
+
+    const shift = env.db.select().from(s.shifts).all()[0]!;
+    expect(shiftTotals(env.db, shift).expectedCashCents).toBe(20000 + 10000 - 20000);
+  });
+
+  it("stamps the shift and the actor on every row", async () => {
+    await openTheTill();
+    await call("cash:paidIn", { amountCents: 10000, concept: "Cambio" });
+    const shift = env.db.select().from(s.shifts).all()[0]!;
+    const row = env.db.select().from(s.cashMovements).all()[0]!;
+    expect(row.shiftId).toBe(shift.id);
+    expect(row.userId).toBe(owner.id);
+  });
+
+  it("asks for an owner's PIN above the threshold, and not below it", async () => {
+    await openTheTill();
+    const cashier = createUser(env.db, env.ctx, { name: "Ana", role: "cashier", pin: "5162" }).user;
+    startSession({ id: cashier.id, name: "Ana", role: "cashier", overrides: {} });
+
+    // the default threshold is 100,00 €
+    expect(await call("cash:paidOut", { amountCents: 9000, concept: "Gastos" })).toBe("OK");
+    expect(await call("cash:paidOut", { amountCents: 15000, concept: "Proveedor" })).toBe("APPROVAL_REQUIRED");
+  });
+
+  it("goes through with one, and stamps both people", async () => {
+    await openTheTill();
+    const cashier = createUser(env.db, env.ctx, { name: "Ana", role: "cashier", pin: "5162" }).user;
+    startSession({ id: cashier.id, name: "Ana", role: "cashier", overrides: {} });
+
+    const fn = handlers.get("cash:paidOut")!;
+    await fn({}, { amountCents: 15000, concept: "Proveedor" }, { userId: owner.id, pin: "8317" });
+
+    const entry = env.db
+      .select()
+      .from(s.oplog)
+      .all()
+      .filter((e) => e.entity === "cash_movement")
+      .at(-1)!;
+    // "Ana took 150 € out" and "Ana took it out and Ahmer approved" differ
+    expect(entry.userId).toBe(cashier.id);
+    expect(entry.authorizedByUserId).toBe(owner.id);
+  });
+});
+
+describe("the movements list", () => {
+  it("is empty and balanced before anything happens", async () => {
+    await openTheTill();
+    const res = (await handlers.get("cash:movements")!({}, {})) as {
+      rows: unknown[];
+      inCents: number;
+      outCents: number;
+      netCents: number;
+    };
+    expect(res).toEqual({ rows: [], inCents: 0, outCents: 0, netCents: 0 });
+  });
+
+  it("shows a deposit applied but does not count it as money moving", async () => {
+    await openTheTill();
+    const customer = await handlers.get("customer:upsert")!({}, { name: "Joan", phone: "671220918" });
+    const id = (customer as { id: string }).id;
+    await call("repair:create", { ...intakePayload(2000), customerId: id });
+
+    const res = (await handlers.get("cash:movements")!({}, {})) as {
+      rows: Array<{ reason: string; movesCash: boolean }>;
+      inCents: number;
+    };
+    expect(res.rows.map((r) => r.reason)).toEqual(["repair_deposit"]);
+    expect(res.rows[0]!.movesCash).toBe(true);
+    expect(res.inCents).toBe(2000);
+  });
+
+  it("carries the document so a row can be clicked through", async () => {
+    await openTheTill();
+    await call("used:log", purchasePayload);
+    const res = (await handlers.get("cash:movements")!({}, {})) as {
+      rows: Array<{ documentId: string | null; docNumber: string | null }>;
+    };
+    expect(res.rows[0]!.documentId).not.toBeNull();
+    expect(res.rows[0]!.docNumber).toMatch(/^C-/);
   });
 });

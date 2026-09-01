@@ -163,6 +163,9 @@ import {
   RepairPrintResponseSchema,
   CashCurrentResponseSchema,
   CashOpenRequestSchema,
+  CashManualRequestSchema,
+  CashMovementsRequestSchema,
+  CashMovementsResponseSchema,
   ShiftStateSchema,
   RepairDetailSchema,
   RepairGetRequestSchema,
@@ -237,7 +240,15 @@ import {
   setLineCharge,
   upsertCustomer,
 } from "./repos/repair";
-import { openShift, openShiftTx, requireOpenShift, toShiftState } from "./repos/shift";
+import {
+  movementRows,
+  movementTotals,
+  openShift,
+  openShiftTx,
+  postManualMovement,
+  requireOpenShift,
+  toShiftState,
+} from "./repos/shift";
 import {
   listPrinters,
   peekPurchase,
@@ -1100,6 +1111,34 @@ export function registerIpcHandlers(db: ArkomDb): void {
 
   guarded("cash:open", "cash.open", CashOpenRequestSchema, ShiftStateSchema, (s, input) =>
     openShiftTx(db, s.ctx, input),
+  );
+
+  guarded("cash:movements", "cash.view", CashMovementsRequestSchema, CashMovementsResponseSchema, (s, input) => {
+    const shiftId = input.shiftId ?? openShift(db, s.ctx)?.id ?? null;
+    if (!shiftId) return { rows: [], inCents: 0, outCents: 0, netCents: 0 };
+    const rows = movementRows(db, shiftId);
+    return { rows, ...movementTotals(rows) };
+  });
+
+  /**
+   * Paid in and paid out.
+   *
+   * The permission is chosen per call from the amount, the way
+   * `repair:setLineCharge` chooses its own: below the threshold this is counter
+   * work, above it somebody else has to say yes. Reading the threshold from
+   * settings rather than the payload means a renderer cannot pick its own gate.
+   */
+  const manualPermission = (req: { amountCents: number }): PermissionKey => {
+    const threshold = getSettings(db, tillContext(db).ctx).cashMovementApprovalCents;
+    return req.amountCents > threshold ? "cash.movement_over_threshold" : "cash.movement";
+  };
+
+  guarded("cash:paidIn", manualPermission, CashManualRequestSchema, CashMovementsResponseSchema, (s, input) =>
+    postManualMovement(db, s.ctx, { ...input, direction: "in" }),
+  );
+
+  guarded("cash:paidOut", manualPermission, CashManualRequestSchema, CashMovementsResponseSchema, (s, input) =>
+    postManualMovement(db, s.ctx, { ...input, direction: "out" }),
   );
 }
 

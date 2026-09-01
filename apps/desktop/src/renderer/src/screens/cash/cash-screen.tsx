@@ -10,6 +10,8 @@ import { formatCents } from "@arkom/core";
 import { AccentButton, Chip, SectionLabel, useT } from "@arkom/ui";
 import { useShift } from "../../lib/use-shift";
 import { OpenShiftDialog } from "./open-shift-dialog";
+import { MovementsPanel } from "./movements-panel";
+import { TicketPeekModal } from "../../components/ticket-peek-modal";
 
 function stamp(ms: number): string {
   const d = new Date(ms);
@@ -30,6 +32,7 @@ export function CashScreen() {
   const t = useT();
   const { shift, refresh } = useShift();
   const [opening, setOpening] = useState(false);
+  const [peekDocId, setPeekDocId] = useState<string | null>(null);
 
   /* re-read on every visit: another window, or the last close, may have moved
      on since this component was last mounted */
@@ -64,7 +67,9 @@ export function CashScreen() {
             </div>
           </div>
         ) : (
-          <div className="w-[380px] flex-none rounded-[3px] border border-line-strong bg-card px-3 py-2.5">
+          <>
+          <div className="flex w-[380px] flex-none flex-col gap-3">
+          <div className="rounded-[3px] border border-line-strong bg-card px-3 py-2.5">
             <SectionLabel>{t("cash.section")}</SectionLabel>
             <div className="mt-1.5">
               <Row label={t("cash.float")}>
@@ -85,9 +90,13 @@ export function CashScreen() {
               </div>
             ) : null}
           </div>
+          </div>
+          <MovementsPanel onPeekDocument={setPeekDocId} />
+          </>
         )}
       </div>
 
+      {peekDocId ? <TicketPeekModal docId={peekDocId} onClose={() => setPeekDocId(null)} /> : null}
       {opening ? (
         <OpenShiftDialog
           onCancel={() => setOpening(false)}

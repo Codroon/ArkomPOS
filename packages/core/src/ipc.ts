@@ -96,6 +96,9 @@ export const IPC_CHANNELS = [
   "repair:print",
   "cash:current",
   "cash:open",
+  "cash:movements",
+  "cash:paidIn",
+  "cash:paidOut",
 ] as const;
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 

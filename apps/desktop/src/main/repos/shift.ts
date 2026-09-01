@@ -18,6 +18,7 @@ import {
   assertBreakdownMatches,
   computeShiftTotals,
   mutate,
+  movesDrawer,
   toOplogJson,
   shiftStatus,
   uuidv7,
@@ -314,5 +315,92 @@ export function openShiftTx(
     tx.insert(shifts).values(row).run();
     log({ entity: "shift", entityId: row.id, action: "open", before: null, after: toOplogJson(row) });
     return toShiftState(tx, tx.select().from(shifts).where(eq(shifts.id, row.id)).all()[0]!);
+  });
+}
+
+/* -------------------------------------------------------- movements */
+
+/** Everything the panel shows for one row, including where to click through to. */
+export function movementRows(db: Reader, shiftId: string) {
+  const rows = db
+    .select({
+      m: cashMovements,
+      docNumber: documents.docNumber,
+      userName: schema.users.name,
+    })
+    .from(cashMovements)
+    .leftJoin(documents, eq(documents.id, cashMovements.documentId))
+    .leftJoin(schema.users, eq(schema.users.id, cashMovements.userId))
+    .where(eq(cashMovements.shiftId, shiftId))
+    .orderBy(asc(cashMovements.createdAt))
+    .all();
+
+  return rows.map(({ m, docNumber, userName }) => ({
+    id: m.id,
+    atMs: m.createdAt.getTime(),
+    reason: m.reason,
+    /* false for repair_deposit_applied. The row is shown rather than hidden —
+       a list that silently omits rows teaches people not to trust it — and
+       muted, because it is the one row here that does not move the drawer. */
+    movesCash: movesDrawer(m.reason),
+    amountCents: m.amountCents,
+    concept: m.concept,
+    userName,
+    documentId: m.documentId,
+    docNumber,
+    ticketId: m.ticketId,
+    label: m.concept ?? docNumber ?? "",
+  }));
+}
+
+export function movementTotals(rows: ReadonlyArray<{ amountCents: number; movesCash: boolean }>) {
+  let inCents = 0;
+  let outCents = 0;
+  for (const row of rows) {
+    if (!row.movesCash) continue; // a bookkeeping row is not money in or out
+    if (row.amountCents >= 0) inCents += row.amountCents;
+    else outCents += -row.amountCents;
+  }
+  return { inCents, outCents, netCents: inCents - outCents };
+}
+
+/**
+ * Money in or out of the drawer, typed by a human, with a reason in their words.
+ *
+ * The amount always arrives positive and the DIRECTION comes from the channel:
+ * a cashier typing `-200` into a field labelled *Salida* is a bug waiting to
+ * happen, and a sign the payload controls is a sign the payload can get wrong.
+ */
+export function postManualMovement(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  input: { amountCents: number; concept: string; direction: "in" | "out" },
+) {
+  return mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    const shift = requireOpenShift(tx, ctx);
+    const concept = input.concept.trim();
+    if (!concept) throw appError("VALIDATION", "Indica el concepto.", "concept");
+    if (input.amountCents <= 0) throw appError("VALIDATION", "Importe no válido.", "amountCents");
+
+    const now = new Date();
+    const row = {
+      id: uuidv7(),
+      tenantId: ctx.tenantId,
+      locationId: ctx.locationId,
+      terminalId: ctx.terminalId,
+      amountCents: input.direction === "in" ? input.amountCents : -input.amountCents,
+      reason: input.direction === "in" ? ("paid_in" as const) : ("paid_out" as const),
+      documentId: null,
+      ticketId: null,
+      concept,
+      shiftId: shift.id,
+      userId: ctx.userId ?? null,
+      createdAt: now,
+    };
+    tx.insert(cashMovements).values(row).run();
+    log({ entity: "cash_movement", entityId: row.id, action: "create", before: null, after: toOplogJson(row) });
+
+    const rows = movementRows(tx, shift.id);
+    return { rows, ...movementTotals(rows) };
   });
 }
