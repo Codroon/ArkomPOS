@@ -5,7 +5,8 @@ sale screen, catalog, inventory (+ minimal add-stock), ticket printing, Ajustes-
 arrived in v0.10.0 (ADR-0012) — §3, §4 and §4.1 below describe the guarded write path.
 Used-device purchases and store credit arrived in v0.11.0 (ADR-0013) — §4.2. Repairs arrived
 in v0.12.0 (ADR-0014) — §4.3. Shifts, the drawer ledger and the Z report arrive in v0.13.0
-(ADR-0015) — §4.4. Sync remains *designed* here, built later.
+(ADR-0015) — §4.4. Reports arrive in v0.14.0 (ADR-0016) — §4.5. Sync remains
+*designed* here, built later.
 
 ## 1. Component map
 
@@ -287,6 +288,52 @@ two cannot double-post (ADR-0015 §6).
 of a period and is its natural source; `snapshotVersion` exists so a future reader knows which
 fields it may rely on. Nothing else is designed for it now.
 
+### 4.5 Reports (ADR-0016)
+
+**Read-only, completed documents only, dated by `completed_at`.** No report reads
+a draft or a parked sale, and none of them writes anything — the only write this
+slice adds is the cost snapshot below, on paths that already log.
+
+**Aggregation is SQL in main.** Each channel returns rows already in the shape the
+table renders; the renderer never sums money (§2). Cost-bearing fields are
+**omitted from the response** for a caller without `reports.costs`, never sent for
+the UI to hide.
+
+| Channel | Payload → Result | Notes |
+|---|---|---|
+| `reports:hub` | {} → {sales, repairs, used, valuation, deadStock} | `reports.view`. Five headline aggregates in one call, run on every hub open. Cost-bearing headlines are null without `reports.costs` |
+| `reports:sales` | {from, to, shiftId?, groupBy} → {summary, rows, estimated} | `reports.view`. `groupBy`: day \| group \| product \| user \| method. Cost/margin columns and the `estimated` block only with `reports.costs`. Filtered to one shift, it must equal that shift's Z snapshot |
+| `reports:salesDetail` | {from, to, shiftId?, key, kind} → {rows} | `reports.view`. The drill-down: a day's or a user's tickets, or a product's lines |
+| `reports:repairsOpen` | {status?, technicianId?} → {summary, rows} | `reports.view`. A position — no dates |
+| `reports:repairsClosed` | {from, to, byTechnician} → {summary, rows, notRepaired[]} | **`reports.costs`** — it is a margin report |
+| `reports:used` | {status?, grade?} → {summary, rows, storeCredit} | `reports.costs`. Oldest first |
+| `reports:valuation` | {groupId?} → {totalCents, groups[], products[]} | `reports.costs`. The total must equal the Inventario header to the cent |
+| `reports:deadStock` | {groupId?} → {rows, thresholdDays} | `reports.costs`. Threshold from settings, not from the payload |
+| `reports:export` | {report, filters, suggestedName} → {kind:'saved', path} \| {kind:'cancelled'} | The report's OWN permission. Re-runs the same query rather than serialising the renderer's rows, and writes UTF-8-BOM · `;` · decimal comma · dd/mm/yyyy · CRLF through a save dialog |
+
+**Schema addition** (migration `0009`, additive):
+
+```
+document_lines  +=  cost_cents?   NULL = written before v0.14.0 (ADR-0016 §2)
+
+  ix_doc_status_completed  (status, completed_at)   -- the reports' hot path
+  ix_line_doc               (document_id)            -- line joins per document
+```
+
+`cost_cents` is written at completion from `units.cost_cents` (serialized and
+used), `products.cost_cents × qty` (stocked) or the repair part's own
+`unit_cost_cents` snapshot. **Nullable on purpose:** `NOT NULL DEFAULT 0` would
+report every pre-v0.14.0 sale as pure profit, and nothing is backfilled — a NULL
+reports the product's current cost, flagged `estimated`, and the flag is the
+point.
+
+**New settings key:** `deadStockDays` (default 90).
+**New permissions:** `reports.view` · `reports.costs`, both owner-only, grantable.
+
+**Seam, not built:** margin on **sold** used devices, which needs purchase +
+refurbishment + sale joined across three modules. `cost_cents` on a used unit's
+sale line is the input it will want, and this slice puts it there.
+
 ## 5. Screen ↔ data (Phase 1)
 
 - **Catalog** = `catalog:list` + save form (`catalog:save`). Missing-data chips from NULL columns.
@@ -298,6 +345,8 @@ fields it may rely on. Nothing else is designed for it now.
 - **Caja** = `cash:*` only. The top-bar chip and the Sale screen's inline open both read
   `cash:current`; the X preview and the close call the same core computation, so the number on
   screen and the number on the Z cannot diverge (ADR-0015 §12).
+- **Informes** = `reports:*` only, and read-only. Drill-downs reuse the existing
+  peeks rather than growing report-shaped copies of them.
 - **Reparaciones / Taller** = `repair:*` + `customer:*` + `workshop:board`. The board and the list render DERIVED status (ADR-0014); collection reuses the ordinary document + tender path, so repairs add no second way to take money.
 
 ## 6. Sync (designed now, built Phase 2)
