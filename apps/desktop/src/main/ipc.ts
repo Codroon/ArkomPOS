@@ -175,6 +175,25 @@ import {
   CashGetResponseSchema,
   CashPrintRequestSchema,
   ShiftStateSchema,
+  ReportsHubResponseSchema,
+  ReportsSalesRequestSchema,
+  ReportsSalesResponseSchema,
+  ReportsSalesDetailRequestSchema,
+  ReportsSalesDetailResponseSchema,
+  ReportsRepairsOpenRequestSchema,
+  ReportsRepairsOpenResponseSchema,
+  ReportsRepairsClosedRequestSchema,
+  ReportsRepairsClosedResponseSchema,
+  ReportsUsedRequestSchema,
+  ReportsUsedResponseSchema,
+  ReportsValuationRequestSchema,
+  ReportsValuationResponseSchema,
+  ReportsDeadStockRequestSchema,
+  ReportsDeadStockResponseSchema,
+  ReportsExportRequestSchema,
+  ReportsExportResponseSchema,
+  reportPermission,
+  type ReportId,
   RepairDetailSchema,
   RepairGetRequestSchema,
   RepairAddLineRequestSchema,
@@ -264,6 +283,23 @@ import {
   toShiftState,
   totalsFor,
 } from "./repos/shift";
+import {
+  deadStock,
+  hub as reportsHub,
+  notRepairedInPeriod,
+  repairsClosed,
+  repairsOpen as reportsRepairsOpen,
+  repairsOpenSummary,
+  salesDetail,
+  salesEstimate,
+  salesRows,
+  salesSummary,
+  shiftOptions,
+  storeCreditOutstanding,
+  usedHolding,
+  valuation,
+} from "./repos/reports";
+import { exportReport } from "./reports-export";
 import {
   listPrinters,
   peekPurchase,
@@ -1208,7 +1244,188 @@ export function registerIpcHandlers(db: ArkomDb): void {
     PrintTicketResponseSchema,
     (s, input) => printShiftReport(db, s.ctx, input),
   );
+
+  /* --------------------------------------------------- reports (ADR-0016) */
+
+  /**
+   * Read-only, every one of them.
+   *
+   * `reports.view` is the operational view — what sold, what is on the bench.
+   * `reports.costs` is the shop's buying position and its profit, which is a
+   * different thing to be allowed to know. A caller with only the first receives
+   * responses from which the cost fields are ABSENT, never blanked (§7).
+   */
+  const canCosts = (s: AuthedSession) => s.permissions.includes("reports.costs");
+
+  guarded("reports:hub", "reports.view", z.object({}).default({}), ReportsHubResponseSchema, (s) => {
+    const thresholdDays = getSettings(db, s.ctx).deadStockDays;
+    return { ...reportsHub(db, s.ctx, canCosts(s), thresholdDays), thresholdDays };
+  });
+
+  guarded("reports:sales", "reports.view", ReportsSalesRequestSchema, ReportsSalesResponseSchema, (s, input) => {
+    const withCosts = canCosts(s);
+    const f = { fromMs: input.fromMs, toMs: input.toMs, shiftId: input.shiftId };
+    return {
+      summary: salesSummary(db, s.ctx, f),
+      rows: salesRows(db, s.ctx, { ...f, groupBy: input.groupBy }, withCosts),
+      estimate: withCosts ? salesEstimate(db, s.ctx, f) : null,
+      withCosts,
+      shifts: shiftOptions(db, s.ctx),
+    };
+  });
+
+  guarded(
+    "reports:salesDetail",
+    "reports.view",
+    ReportsSalesDetailRequestSchema,
+    ReportsSalesDetailResponseSchema,
+    (s, input) => ({ rows: salesDetail(db, s.ctx, input) }),
+  );
+
+  guarded(
+    "reports:repairsOpen",
+    "reports.view",
+    ReportsRepairsOpenRequestSchema,
+    ReportsRepairsOpenResponseSchema,
+    (s, input) => {
+      const rows = reportsRepairsOpen(db, s.ctx, input);
+      return {
+        summary: repairsOpenSummary(rows),
+        rows,
+        technicians: listUsers(db, s.ctx)
+          .filter((u) => u.active)
+          .map((u) => ({ id: u.id, name: u.name })),
+      };
+    },
+  );
+
+  guarded(
+    "reports:repairsClosed",
+    "reports.costs",
+    ReportsRepairsClosedRequestSchema,
+    ReportsRepairsClosedResponseSchema,
+    (s, input) => {
+      const tickets = repairsClosed(db, s.ctx, input);
+      const notRepaired = notRepairedInPeriod(db, s.ctx, input);
+      const turnarounds = tickets.map((t) => t.turnaroundDays).filter((d): d is number => d !== null);
+      const summary = {
+        collected: tickets.length,
+        revenueCents: tickets.reduce((sum, t) => sum + t.revenueCents, 0),
+        partsCostCents: tickets.reduce((sum, t) => sum + t.partsCostCents, 0),
+        laborCents: tickets.reduce((sum, t) => sum + t.laborCents, 0),
+        marginCents: tickets.reduce((sum, t) => sum + t.marginCents, 0),
+        averageTurnaroundDays:
+          turnarounds.length > 0
+            ? Math.round((turnarounds.reduce((a, b) => a + b, 0) / turnarounds.length) * 10) / 10
+            : null,
+        notRepaired: notRepaired.reduce((sum, r) => sum + r.count, 0),
+      };
+
+      if (!input.byTechnician) {
+        return {
+          summary,
+          rows: tickets.map((t) => ({
+            key: t.ticketId,
+            ticketId: t.ticketId,
+            docNumber: t.docNumber,
+            label: t.customerName,
+            device: t.device,
+            intakeAtMs: t.intakeAtMs,
+            collectedAtMs: t.collectedAtMs,
+            turnaroundDays: t.turnaroundDays,
+            count: 1,
+            revenueCents: t.revenueCents,
+            partsCostCents: t.partsCostCents,
+            marginCents: t.marginCents,
+            technicianName: t.technicianName,
+          })),
+          notRepaired,
+        };
+      }
+
+      /* grouped in the handler rather than in SQL: the per-ticket rows are
+         already loaded and a shop closes tens of repairs a month, not tens of
+         thousands. A second query would be a second definition of the margin. */
+      const byTech = new Map<string, (typeof tickets)[number][]>();
+      for (const t of tickets) {
+        const key = t.technicianName ?? "";
+        byTech.set(key, [...(byTech.get(key) ?? []), t]);
+      }
+      return {
+        summary,
+        rows: [...byTech.entries()].map(([name, list]) => ({
+          key: name,
+          ticketId: null,
+          docNumber: null,
+          label: name || "Sin asignar",
+          device: "",
+          intakeAtMs: null,
+          collectedAtMs: null,
+          turnaroundDays: null,
+          count: list.length,
+          revenueCents: list.reduce((sum, t) => sum + t.revenueCents, 0),
+          partsCostCents: list.reduce((sum, t) => sum + t.partsCostCents, 0),
+          marginCents: list.reduce((sum, t) => sum + t.marginCents, 0),
+          technicianName: name || null,
+        })),
+        notRepaired,
+      };
+    },
+  );
+
+  guarded("reports:used", "reports.costs", ReportsUsedRequestSchema, ReportsUsedResponseSchema, (s, input) => {
+    const rows = usedHolding(db, s.ctx, input);
+    const all = usedHolding(db, s.ctx, {});
+    const states = ["held", "needs_review", "in_stock"] as const;
+    return {
+      /* the summary describes the WHOLE position, not the filtered slice: a
+         filter narrows the table, it does not change how much is tied up */
+      summary: states.map((state) => {
+        const list = all.filter((r) => r.state === state);
+        return { state, count: list.length, costCents: list.reduce((sum, r) => sum + r.costCents, 0) };
+      }),
+      totalCostCents: all.reduce((sum, r) => sum + r.costCents, 0),
+      storeCredit: storeCreditOutstanding(db, s.ctx),
+      rows,
+    };
+  });
+
+  guarded(
+    "reports:valuation",
+    "reports.costs",
+    ReportsValuationRequestSchema,
+    ReportsValuationResponseSchema,
+    (s, input) => valuation(db, s.ctx, input),
+  );
+
+  guarded(
+    "reports:deadStock",
+    "reports.costs",
+    ReportsDeadStockRequestSchema,
+    ReportsDeadStockResponseSchema,
+    (s, input) => {
+      const thresholdDays = getSettings(db, s.ctx).deadStockDays;
+      const rows = deadStock(db, s.ctx, { ...input, thresholdDays });
+      return { thresholdDays, totalCostCents: rows.reduce((sum, r) => sum + r.costTiedUpCents, 0), rows };
+    },
+  );
+
+  /**
+   * Export.
+   *
+   * The permission is the exported REPORT's own, chosen per call — a cost-bearing
+   * report cannot be exported by somebody who may not see it on screen, and the
+   * Sales export drops its cost columns for a caller without them.
+   */
+  guarded(
+    "reports:export",
+    (req: { report: ReportId }) => reportPermission(req.report),
+    ReportsExportRequestSchema,
+    ReportsExportResponseSchema,
+    (s, input) => exportReport(db, s.ctx, { report: input.report, filters: input.filters }, canCosts(s)),
+  );
 }
+
 
 
 /**

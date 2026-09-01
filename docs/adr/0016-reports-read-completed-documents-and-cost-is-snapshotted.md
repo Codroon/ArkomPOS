@@ -49,16 +49,21 @@ which point the same historical sale silently reports 10 %. Last month's margin
 changes because of something that happened this month. That is precisely the
 failure ADR-0007 rejected for tax, and the answer is the same one.
 
-**Decision: `document_lines.cost_cents`, nullable, additive, written from
+**Decision: `document_lines.unit_cost_cents`, nullable, additive, written from
 v0.14.0 on.**
+
+Per unit, mirroring `unit_price_cents` beside it: a line's cost is
+`unit_cost_cents × qty`, exactly as its revenue is `unit_price_cents × qty`. The
+extended figure would have to be re-derived every time the stepper changes the
+quantity, and recovering a per-unit cost by division is lossy.
 
 Where the figure comes from, at the moment the line is created:
 
 | Line | Cost |
 |---|---|
 | A serialized unit (new or used) | `units.cost_cents` — for a used device that is buy + refurb, already computed at intake (ADR-0013) |
-| A stocked product | `products.cost_cents` × qty, the last known cost |
-| A repair collection's part line | the part's `unit_cost_cents` × qty, itself already a snapshot (ADR-0014) |
+| A stocked product | `products.cost_cents`, the last known cost |
+| A repair collection's part line | the part's own `unit_cost_cents`, itself already a snapshot (ADR-0014) |
 | A repair collection's labour line | zero — the shop's own time is not a cost this till tracks |
 
 **Nullable, and NULL means something.** A `NOT NULL DEFAULT 0` column would make
@@ -196,7 +201,7 @@ scheduled or emailed (Phase 2).
 **Joining live product cost at report time** — rejected in §2. It makes last
 month's margin depend on this month's purchasing.
 
-**Backfilling `cost_cents` from current cost** — rejected in §2. It writes a
+**Backfilling `unit_cost_cents` from current cost** — rejected in §2. It writes a
 guess as though it were a fact and destroys the flag that says so.
 
 **`NOT NULL DEFAULT 0`** — rejected. Reports every historical sale as pure profit.

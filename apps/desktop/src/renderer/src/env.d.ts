@@ -61,6 +61,15 @@ import type {
   CashCloseResponse,
   CashGetResponse,
   ShiftListRow,
+  ReportsHubResponse,
+  ReportsSalesResponse,
+  ReportsSalesDetailResponse,
+  ReportsRepairsOpenResponse,
+  ReportsRepairsClosedResponse,
+  ReportsUsedResponse,
+  ReportsValuationResponse,
+  ReportsDeadStockResponse,
+  ReportsExportResponse,
 } from "@arkom/core";
 
 declare global {
@@ -293,6 +302,32 @@ declare global {
         channel: "cash:print",
         payload: { shiftId?: string; what: "z" | "x"; target?: "auto" | "pdf"; copy?: boolean },
       ): Promise<PrintTicketResponse>;
+
+      /* ---- reports (ADR-0016), every one read-only ---- */
+      invoke(channel: "reports:hub", payload?: Record<string, never>): Promise<ReportsHubResponse>;
+      invoke(
+        channel: "reports:sales",
+        payload: { fromMs: number; toMs: number; shiftId: string | null; groupBy: "day" | "group" | "product" | "user" | "method" },
+      ): Promise<ReportsSalesResponse>;
+      invoke(
+        channel: "reports:salesDetail",
+        payload: { fromMs: number; toMs: number; shiftId: string | null; kind: "day" | "user" | "product"; key: string },
+      ): Promise<ReportsSalesDetailResponse>;
+      invoke(
+        channel: "reports:repairsOpen",
+        payload: { status: string | null; technicianId: string | null },
+      ): Promise<ReportsRepairsOpenResponse>;
+      invoke(
+        channel: "reports:repairsClosed",
+        payload: { fromMs: number; toMs: number; byTechnician: boolean },
+      ): Promise<ReportsRepairsClosedResponse>;
+      invoke(channel: "reports:used", payload: { status: string | null; grade: string | null }): Promise<ReportsUsedResponse>;
+      invoke(channel: "reports:valuation", payload: { groupId: string | null }): Promise<ReportsValuationResponse>;
+      invoke(channel: "reports:deadStock", payload: { groupId: string | null }): Promise<ReportsDeadStockResponse>;
+      invoke(
+        channel: "reports:export",
+        payload: { report: "sales" | "repairsOpen" | "repairsClosed" | "used" | "valuation" | "deadStock"; filters: Record<string, unknown> },
+      ): Promise<ReportsExportResponse>;
       invoke(
         channel: "cash:paidIn",
         payload: { amountCents: number; concept: string },

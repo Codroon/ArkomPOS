@@ -1653,6 +1653,11 @@ export function collect(
         description: line.description,
         qty: 1,
         unitPriceCents: line.chargeCents,
+        /* What the shop spent to earn this line (ADR-0016 §2). A fitted part
+           carries its own cost snapshot from the day it left the shelf
+           (ADR-0014); labour costs this till nothing, because the shop's own
+           time is not something it tracks. */
+        unitCostCents: line.kind === "labor" ? 0 : (line.unitCostCents ?? null),
         // the snapshot: regime and rate travel with the line (ADR-0007)
         taxRegime: "IVA21" as const,
         taxRateBp: TAX_RATE_BP.IVA21,

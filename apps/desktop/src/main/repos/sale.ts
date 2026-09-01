@@ -668,6 +668,14 @@ export function complete(
       }
     }
 
+    /* Cost, snapshotted onto the line (ADR-0016 §2).
+       Taken from the SAME `costCents` the stock movement below is about to
+       record, so a line and its movement can never disagree about what the thing
+       cost — one source, computed once, at the moment of sale. */
+    for (const { line, costCents } of drafts) {
+      tx.update(documentLines).set({ unitCostCents: costCents }).where(eq(documentLines.id, line.id)).run();
+    }
+
     // movements (+ one oplog row each) linked to the document and line
     for (const { draft, line, costCents } of drafts) {
       const movement = {

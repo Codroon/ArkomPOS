@@ -222,6 +222,9 @@ export const documents = sqliteTable("documents", {
 }, (t) => [
   uniqueIndex("ux_doc_series_number").on(t.seriesId, t.number), // gap-free per series
   index("ix_doc_status_created").on(t.status, t.createdAt),
+  /* every report's hot path: completed documents in a window, dated by when the
+     money moved rather than when someone started typing (ADR-0016 §1) */
+  index("ix_doc_status_completed").on(t.status, t.completedAt),
 ]);
 
 export const documentLines = sqliteTable("document_lines", {
@@ -242,10 +245,30 @@ export const documentLines = sqliteTable("document_lines", {
   baseCents: integer("base_cents").notNull(),
   taxCents: integer("tax_cents").notNull(),
   totalCents: integer("total_cents").notNull(),
+  /**
+   * What this line COST the shop, frozen at the moment of sale (ADR-0016 §2).
+   *
+   * The same reasoning ADR-0007 applied to tax. Joining `products.cost_cents` at
+   * report time would make last month's margin move every time the shop receives
+   * a delivery at a different price.
+   *
+   * PER UNIT, mirroring `unit_price_cents` beside it: the line's cost is
+   * `unit_cost_cents × qty`, exactly as its revenue is `unit_price_cents × qty`.
+   * Storing the extended figure instead would have to be re-derived every time
+   * the stepper changes the quantity, and a division is a lossy way to recover a
+   * number that was never lost.
+   *
+   * NULLABLE ON PURPOSE: NULL means "written before v0.14.0", and reports fall
+   * back to the product's current cost flagged as an estimate. `NOT NULL DEFAULT
+   * 0` would report every historical sale as pure profit — a plausible wrong
+   * number, which is worse than an admitted gap. Nothing is backfilled.
+   */
+  unitCostCents: integer("unit_cost_cents"),
   createdAt: ts("created_at").notNull(),
 }, (t) => [
   uniqueIndex("ux_line_doc_no").on(t.documentId, t.lineNo),
   index("ix_line_product").on(t.productId),
+  index("ix_line_doc").on(t.documentId), // the reports join lines per document
 ]);
 
 export const documentTenders = sqliteTable("document_tenders", {

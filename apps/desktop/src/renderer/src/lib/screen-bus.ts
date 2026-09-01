@@ -12,6 +12,7 @@ export type ScreenId =
   | "reparaciones"
   | "taller"
   | "caja"
+  | "informes"
   | "ajustes"
   | "usuarios";
 

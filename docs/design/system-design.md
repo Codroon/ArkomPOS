@@ -314,15 +314,15 @@ the UI to hide.
 **Schema addition** (migration `0009`, additive):
 
 ```
-document_lines  +=  cost_cents?   NULL = written before v0.14.0 (ADR-0016 §2)
+document_lines  +=  unit_cost_cents?   NULL = written before v0.14.0 (ADR-0016 §2)
 
   ix_doc_status_completed  (status, completed_at)   -- the reports' hot path
   ix_line_doc               (document_id)            -- line joins per document
 ```
 
-`cost_cents` is written at completion from `units.cost_cents` (serialized and
-used), `products.cost_cents × qty` (stocked) or the repair part's own
-`unit_cost_cents` snapshot. **Nullable on purpose:** `NOT NULL DEFAULT 0` would
+`unit_cost_cents` is written when the line is created — the same moment price
+and tax are snapshotted — from `units.cost_cents` (serialized and used),
+`products.cost_cents` (stocked) or the repair part's own snapshot. **Nullable on purpose:** `NOT NULL DEFAULT 0` would
 report every pre-v0.14.0 sale as pure profit, and nothing is backfilled — a NULL
 reports the product's current cost, flagged `estimated`, and the flag is the
 point.

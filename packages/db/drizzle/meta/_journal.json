@@ -64,6 +64,13 @@
       "when": 1788285850133,
       "tag": "0008_light_blindfold",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1788291771196,
+      "tag": "0009_brainy_amphibian",
+      "breakpoints": true
     }
   ]
 }

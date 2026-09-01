@@ -207,6 +207,31 @@ export type {
   ReturnDoc,
   ReturnReason,
 } from "./repair-doc";
+export {
+  CSV_BOM,
+  csvMoney,
+  csvNumber,
+  csvDate,
+  csvDateTime,
+  renderCsv,
+  csvFileName,
+} from "./csv";
+export type { CsvColumn, CsvDocument, CsvValue } from "./csv";
+export {
+  DATE_PRESETS,
+  resolvePreset,
+  marginCentsOf,
+  marginPctOf,
+  NO_ESTIMATE,
+  isEstimated,
+  REPORT_IDS,
+  SALES_GROUP_BY,
+  COST_BEARING_REPORTS,
+  reportPermission,
+  totalsAgree,
+  daysBetween,
+} from "./reports";
+export type { DatePreset, DateRange, CostEstimate, ReportId, SalesGroupBy } from "./reports";
 export { opsToText, opBuilder } from "./print-ops";
 export { renderZReport, SHIFT_ES } from "./shift-doc";
 export type { ShiftReportDoc } from "./shift-doc";
@@ -562,6 +587,16 @@ export type {
   CashMovementRow,
   CashMovementsResponse,
   CashGetResponse,
+  ReportsHubResponse,
+  ReportsSalesResponse,
+  ReportsSalesDetailResponse,
+  ReportsRepairsOpenResponse,
+  ReportsRepairsClosedResponse,
+  ReportsUsedResponse,
+  ReportsValuationResponse,
+  ReportsDeadStockResponse,
+  ReportsExportResponse,
+  SalesReportRow,
 } from "./ipc";
 export {
   DepositMethodSchema,
@@ -583,4 +618,25 @@ export {
   CashGetRequestSchema,
   CashGetResponseSchema,
   CashPrintRequestSchema,
+  DatePresetSchema,
+  SalesGroupBySchema,
+  DateRangeSchema,
+  CostEstimateSchema,
+  ReportsHubResponseSchema,
+  ReportsSalesRequestSchema,
+  ReportsSalesResponseSchema,
+  ReportsSalesDetailRequestSchema,
+  ReportsSalesDetailResponseSchema,
+  ReportsRepairsOpenRequestSchema,
+  ReportsRepairsOpenResponseSchema,
+  ReportsRepairsClosedRequestSchema,
+  ReportsRepairsClosedResponseSchema,
+  ReportsUsedRequestSchema,
+  ReportsUsedResponseSchema,
+  ReportsValuationRequestSchema,
+  ReportsValuationResponseSchema,
+  ReportsDeadStockRequestSchema,
+  ReportsDeadStockResponseSchema,
+  ReportsExportRequestSchema,
+  ReportsExportResponseSchema,
 } from "./ipc";

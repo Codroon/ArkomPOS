@@ -104,6 +104,15 @@ export const IPC_CHANNELS = [
   "cash:history",
   "cash:get",
   "cash:print",
+  "reports:hub",
+  "reports:sales",
+  "reports:salesDetail",
+  "reports:repairsOpen",
+  "reports:repairsClosed",
+  "reports:used",
+  "reports:valuation",
+  "reports:deadStock",
+  "reports:export",
 ] as const;
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
@@ -626,6 +635,8 @@ export const SettingsSchema = z.object({
   repairCapEnabled: z.boolean(),
   /** margin the selling-price modal prefills with, in whole percent (ADR-0013) */
   usedMarginPct: z.number().int().min(0).max(500),
+  /** dead stock: no completed sale line in this many days (ADR-0016) */
+  deadStockDays: z.number().int().min(1).max(3650),
   /* ---- cash (ADR-0015). The client's answers about their own drawer, as data. ---- */
   /** prefilled when opening a shift; the shop can still count something else */
   cashDefaultFloatCents: z.number().int().min(0),
@@ -1940,3 +1951,244 @@ export const CashPrintRequestSchema = z.object({
   target: z.enum(["auto", "pdf"]).default("auto"),
   copy: z.boolean().default(false),
 });
+
+/* ============================== reports (ADR-0016) ============================== */
+
+export const DatePresetSchema = z.enum(["today", "yesterday", "week", "month", "lastMonth", "custom"]);
+export const SalesGroupBySchema = z.enum(["day", "group", "product", "user", "method"]);
+
+/** Half-open [from, to) on local day boundaries (ADR-0016 §5). */
+export const DateRangeSchema = z.object({
+  fromMs: z.number().int(),
+  toMs: z.number().int(),
+});
+
+/**
+ * How much of a cost figure was a guess.
+ *
+ * Present on every cost-bearing response, so a margin can never be read — or
+ * exported — without whether it was estimated (ADR-0016 §2).
+ */
+export const CostEstimateSchema = z.object({
+  exactLines: z.number().int(),
+  estimatedLines: z.number().int(),
+});
+
+export const ReportsHubResponseSchema = z.object({
+  salesNetCents: z.number().int(),
+  repairsOpen: z.number().int(),
+  repairsOverdue: z.number().int(),
+  usedUnits: z.number().int().nullable(),
+  usedCostCents: z.number().int().nullable(),
+  valuationCents: z.number().int().nullable(),
+  deadStockCount: z.number().int().nullable(),
+  thresholdDays: z.number().int(),
+});
+export type ReportsHubResponse = z.infer<typeof ReportsHubResponseSchema>;
+
+/* ---- sales ---- */
+
+export const ReportsSalesRequestSchema = DateRangeSchema.extend({
+  shiftId: z.string().nullable().default(null),
+  groupBy: SalesGroupBySchema.default("day"),
+});
+
+export const SalesReportRowSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  count: z.number().int(),
+  qty: z.number().int(),
+  netCents: z.number().int(),
+  taxCents: z.number().int(),
+  grossCents: z.number().int(),
+  /* absent, not null, for a caller without reports.costs */
+  costCents: z.number().int().optional(),
+  marginCents: z.number().int().optional(),
+  marginPct: z.number().nullable().optional(),
+});
+export type SalesReportRow = z.infer<typeof SalesReportRowSchema>;
+
+export const ReportsSalesResponseSchema = z.object({
+  summary: z.object({
+    tickets: z.number().int(),
+    netCents: z.number().int(),
+    taxCents: z.number().int(),
+    grossCents: z.number().int(),
+    averageTicketCents: z.number().int(),
+    usedSalesCents: z.number().int(),
+  }),
+  rows: z.array(SalesReportRowSchema),
+  estimate: CostEstimateSchema.nullable(),
+  withCosts: z.boolean(),
+  shifts: z.array(z.object({ id: z.string(), zDocNumber: z.string().nullable(), atMs: z.number().int() })),
+});
+export type ReportsSalesResponse = z.infer<typeof ReportsSalesResponseSchema>;
+
+export const ReportsSalesDetailRequestSchema = DateRangeSchema.extend({
+  shiftId: z.string().nullable().default(null),
+  kind: z.enum(["day", "user", "product"]),
+  key: z.string(),
+});
+export const ReportsSalesDetailResponseSchema = z.object({
+  rows: z.array(
+    z.object({
+      documentId: z.string(),
+      docNumber: z.string().nullable(),
+      atMs: z.number().int().nullable(),
+      description: z.string(),
+      qty: z.number().int(),
+      totalCents: z.number().int(),
+    }),
+  ),
+});
+export type ReportsSalesDetailResponse = z.infer<typeof ReportsSalesDetailResponseSchema>;
+
+/* ---- repairs ---- */
+
+export const ReportsRepairsOpenRequestSchema = z.object({
+  status: z.string().nullable().default(null),
+  technicianId: z.string().nullable().default(null),
+});
+export const ReportsRepairsOpenResponseSchema = z.object({
+  summary: z.object({
+    open: z.number().int(),
+    overdue: z.number().int(),
+    waitingOnCustomer: z.number().int(),
+    oldest: z.object({ docNumber: z.string().nullable(), days: z.number().int() }).nullable(),
+  }),
+  rows: z.array(
+    z.object({
+      ticketId: z.string(),
+      docNumber: z.string().nullable(),
+      customerName: z.string(),
+      device: z.string(),
+      status: z.string(),
+      daysInStatus: z.number().int(),
+      daysSinceIntake: z.number().int(),
+      technicianName: z.string().nullable(),
+      promisedAtMs: z.number().int().nullable(),
+      promisedHalf: z.string().nullable(),
+      overdue: z.boolean(),
+    }),
+  ),
+  technicians: z.array(z.object({ id: z.string(), name: z.string() })),
+});
+export type ReportsRepairsOpenResponse = z.infer<typeof ReportsRepairsOpenResponseSchema>;
+
+export const ReportsRepairsClosedRequestSchema = DateRangeSchema.extend({
+  byTechnician: z.boolean().default(false),
+});
+export const ReportsRepairsClosedResponseSchema = z.object({
+  summary: z.object({
+    collected: z.number().int(),
+    revenueCents: z.number().int(),
+    partsCostCents: z.number().int(),
+    laborCents: z.number().int(),
+    marginCents: z.number().int(),
+    averageTurnaroundDays: z.number().nullable(),
+    notRepaired: z.number().int(),
+  }),
+  rows: z.array(
+    z.object({
+      key: z.string(),
+      ticketId: z.string().nullable(),
+      docNumber: z.string().nullable(),
+      label: z.string(),
+      device: z.string(),
+      intakeAtMs: z.number().int().nullable(),
+      collectedAtMs: z.number().int().nullable(),
+      turnaroundDays: z.number().int().nullable(),
+      count: z.number().int(),
+      revenueCents: z.number().int(),
+      partsCostCents: z.number().int(),
+      marginCents: z.number().int(),
+      technicianName: z.string().nullable(),
+    }),
+  ),
+  notRepaired: z.array(z.object({ reason: z.string().nullable(), count: z.number().int() })),
+});
+export type ReportsRepairsClosedResponse = z.infer<typeof ReportsRepairsClosedResponseSchema>;
+
+/* ---- used holding ---- */
+
+export const ReportsUsedRequestSchema = z.object({
+  status: z.string().nullable().default(null),
+  grade: z.string().nullable().default(null),
+});
+export const ReportsUsedResponseSchema = z.object({
+  summary: z.array(z.object({ state: z.string(), count: z.number().int(), costCents: z.number().int() })),
+  totalCostCents: z.number().int(),
+  storeCredit: z.object({ count: z.number().int(), totalCents: z.number().int() }),
+  rows: z.array(
+    z.object({
+      purchaseId: z.string(),
+      docNumber: z.string().nullable(),
+      model: z.string(),
+      grade: z.string().nullable(),
+      state: z.string(),
+      costCents: z.number().int(),
+      salePriceCents: z.number().int().nullable(),
+      daysHeld: z.number().int(),
+    }),
+  ),
+});
+export type ReportsUsedResponse = z.infer<typeof ReportsUsedResponseSchema>;
+
+/* ---- valuation ---- */
+
+export const ReportsValuationRequestSchema = z.object({ groupId: z.string().nullable().default(null) });
+export const ReportsValuationResponseSchema = z.object({
+  totalCents: z.number().int(),
+  groups: z.array(
+    z.object({
+      groupId: z.string().nullable(),
+      groupName: z.string(),
+      qty: z.number().int(),
+      valueCents: z.number().int(),
+    }),
+  ),
+  products: z.array(
+    z.object({
+      productId: z.string(),
+      name: z.string(),
+      groupName: z.string(),
+      onHand: z.number().int(),
+      unitCostCents: z.number().int().nullable(),
+      valueCents: z.number().int(),
+    }),
+  ),
+});
+export type ReportsValuationResponse = z.infer<typeof ReportsValuationResponseSchema>;
+
+/* ---- dead stock ---- */
+
+export const ReportsDeadStockRequestSchema = z.object({ groupId: z.string().nullable().default(null) });
+export const ReportsDeadStockResponseSchema = z.object({
+  thresholdDays: z.number().int(),
+  totalCostCents: z.number().int(),
+  rows: z.array(
+    z.object({
+      productId: z.string(),
+      name: z.string(),
+      groupName: z.string(),
+      onHand: z.number().int(),
+      costTiedUpCents: z.number().int(),
+      lastSaleAtMs: z.number().int().nullable(),
+      daysSinceSale: z.number().int().nullable(),
+    }),
+  ),
+});
+export type ReportsDeadStockResponse = z.infer<typeof ReportsDeadStockResponseSchema>;
+
+/* ---- export ---- */
+
+export const ReportsExportRequestSchema = z.object({
+  report: z.enum(["sales", "repairsOpen", "repairsClosed", "used", "valuation", "deadStock"]),
+  /** the SAME filters the screen is showing; the query is re-run, never trusted */
+  filters: z.record(z.string(), z.unknown()).default({}),
+});
+export const ReportsExportResponseSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("saved"), path: z.string(), rows: z.number().int() }),
+  z.object({ kind: z.literal("cancelled") }),
+]);
+export type ReportsExportResponse = z.infer<typeof ReportsExportResponseSchema>;

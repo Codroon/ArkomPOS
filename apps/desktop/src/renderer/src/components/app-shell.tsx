@@ -18,6 +18,7 @@ import { UsedDevicesScreen } from "../screens/used/used-devices-screen";
 import { RepairsScreen } from "../screens/repair/repairs-screen";
 import { WorkshopScreen } from "../screens/repair/workshop-screen";
 import { CashScreen } from "../screens/cash/cash-screen";
+import { ReportsScreen } from "../screens/reports/reports-screen";
 import { ShiftChip } from "../screens/cash/shift-chip";
 import { SettingsScreen } from "../screens/settings/settings-screen";
 import { UsersScreen } from "../screens/users/users-screen";
@@ -37,7 +38,7 @@ const NAV_ITEMS: ReadonlyArray<{ n: string; labelKey: TKey; id?: ScreenId; needs
   { n: "07", labelKey: "nav.taller", id: "taller", needs: "workshop.view" },
   { n: "08", labelKey: "nav.transferencias" },
   { n: "09", labelKey: "nav.caja", id: "caja", needs: "cash.view" },
-  { n: "10", labelKey: "nav.informes" },
+  { n: "10", labelKey: "nav.informes", id: "informes", needs: "reports.view" },
   { n: "11", labelKey: "nav.ajustes", id: "ajustes", needs: "settings.edit" },
   { n: "12", labelKey: "usr.title", id: "usuarios", needs: "users.manage" },
 ];
@@ -227,6 +228,8 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
             <WorkshopScreen key={navTick} />
           ) : screen === "caja" ? (
             <CashScreen key={navTick} />
+          ) : screen === "informes" ? (
+            <ReportsScreen key={navTick} />
           ) : screen === "ajustes" ? (
             <SettingsScreen />
           ) : screen === "usuarios" ? (

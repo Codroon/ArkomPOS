@@ -37,6 +37,8 @@ export const DEFAULT_SETTINGS: Settings = {
   repairDiagnosisFeeCents: 0,
   repairDepositSuggestionCents: 0,
   repairCapEnabled: true,
+  /* how long "no sale" has to last before a product is dead (ADR-0016) */
+  deadStockDays: 90,
   /* the client's answers, landing as data (ADR-0015 §11) */
   cashDefaultFloatCents: 20000, // 200,00 €
   cashVarianceToleranceCents: 300, // 3,00 €
@@ -63,6 +65,7 @@ function decode(key: SettingKey, raw: string): Settings[SettingKey] {
   if (key === "repairDiagnosisFeeCents") return Number.isFinite(Number(raw)) ? Number(raw) : 0;
   if (key === "repairDepositSuggestionCents") return Number.isFinite(Number(raw)) ? Number(raw) : 0;
   if (key === "repairCapEnabled") return raw !== "false";
+  if (key === "deadStockDays") return Number.isFinite(Number(raw)) ? Number(raw) : 90;
   if (key === "cashDefaultFloatCents") return Number.isFinite(Number(raw)) ? Number(raw) : 20000;
   if (key === "cashVarianceToleranceCents") return Number.isFinite(Number(raw)) ? Number(raw) : 300;
   if (key === "cashMovementApprovalCents") return Number.isFinite(Number(raw)) ? Number(raw) : 10000;

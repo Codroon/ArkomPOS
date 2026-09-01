@@ -68,12 +68,13 @@ A parked ticket worth 500 € changes no figure on any screen in this slice.
 **RP2 — Dated by `completed_at`.** A draft started before a period and charged
 inside it belongs to the period it was charged in, and vice versa.
 
-**RP3 — Cost is snapshotted on every new sale line.** `document_lines.cost_cents`
-is written at completion from the unit, the product or the repair part, for
+**RP3 — Cost is snapshotted on every new sale line.**
+`document_lines.unit_cost_cents` is written when the line is created — the same
+moment price and tax are — from the unit, the product or the repair part, for
 ordinary sales, used-device sales and repair collections alike.
 
 **RP4 — Historical rows are estimated, and never silently.** A line with
-`cost_cents IS NULL` reports the product's **current** cost, is flagged in the
+`unit_cost_cents IS NULL` reports the product's **current** cost, is flagged in the
 row, counted in the response, captioned on screen and marked in the CSV.
 
 **RP5 — Aggregation happens in SQL.** No report ships rows for the renderer to

@@ -18,7 +18,7 @@
  */
 
 /** Groups the Usuarios screen renders as sections, in this order. */
-export const PERMISSION_MODULES = ["sale", "catalog", "inventory", "usedDevices", "repair", "workshop", "cash", "admin"] as const;
+export const PERMISSION_MODULES = ["sale", "catalog", "inventory", "usedDevices", "repair", "workshop", "cash", "reports", "admin"] as const;
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
 
 export interface PermissionDef {
@@ -101,6 +101,14 @@ export const PERMISSIONS = [
   { key: "cash.movement", module: "cash", labelEs: "Registrar entradas y salidas de efectivo", approvable: false },
   { key: "cash.movement_over_threshold", module: "cash", labelEs: "Registrar un movimiento de efectivo alto", approvable: true },
   { key: "cash.history", module: "cash", labelEs: "Ver turnos anteriores y reimprimir la Z", approvable: false },
+
+  /* ---- reports (ADR-0016) ----
+     Two keys, because seeing the shop and seeing what it costs are different
+     things to be allowed to know. Neither is approvable: a report is not an
+     action somebody stands over your shoulder to authorise, it is access, and
+     access is granted per person in Usuarios. */
+  { key: "reports.view", module: "reports", labelEs: "Ver informes", approvable: false },
+  { key: "reports.costs", module: "reports", labelEs: "Ver costes y márgenes en informes", approvable: false },
 
   /* ---- admin: owner-only, and not approvable ---- */
   // a cashier does not manage users with the owner leaning over their shoulder;
