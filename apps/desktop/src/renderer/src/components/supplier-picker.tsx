@@ -104,8 +104,12 @@ export function SupplierField({
     }
   };
 
+  /* Self-contained: the link is INSIDE the component's own column, so the field
+     works in a dialog grid as well as in the receiving drawer's flex column. It
+     used to be a sibling pulled up with a negative margin, which only lined up
+     in the one layout it was written for. */
   return (
-    <>
+    <div className="flex flex-col">
       <Field label={creating ? t("entry.newSupplier") : label} required={required} error={failure ?? undefined}>
         {creating ? (
           <div className="flex gap-1.5">
@@ -144,7 +148,7 @@ export function SupplierField({
       </Field>
       <button
         type="button"
-        className="-mt-2 self-start text-[10px] text-muted underline hover:text-ink"
+        className="mt-1 self-start text-[10px] text-muted underline hover:text-ink"
         onClick={() => {
           setCreating((c) => !c);
           setFailure(null);
@@ -152,6 +156,6 @@ export function SupplierField({
       >
         {creating ? t("common.cancel") : t("entry.newSupplier")}
       </button>
-    </>
+    </div>
   );
 }
