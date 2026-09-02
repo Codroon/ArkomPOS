@@ -358,10 +358,13 @@ describe("sending a held device to the shelf", () => {
     expect(stock[0]!.onHand).toBe(1);
   });
 
-  it("clears the review flag: shelving it IS the resolution", async () => {
+  it("clears the review flag once somebody confirms the review", async () => {
     const { purchaseId } = await logPurchase(env.db, ctxOf(), request());
     setNeedsReview(env.db, ctxOf(), purchaseId, true);
-    sendToInventory(env.db, ctxOf(), purchaseId, 12000);
+    /* Shelving used to clear the flag on its own, which made the flag's only
+       consequence its own disappearance. It is now answered, not absorbed
+       (ADR-0013 amendment) — the gate itself is covered below. */
+    sendToInventory(env.db, ctxOf(), purchaseId, 12000, true);
     const detail = await getUsedDevice(env.db, ctxOf(), purchaseId, true);
     expect(detail.needsReview).toBe(false);
     expect(detail.state).toBe("in_stock");
@@ -384,5 +387,64 @@ describe("sending a held device to the shelf", () => {
       env.db.select().from(s.stockMovements).where(eq(s.stockMovements.unitId, unitId)).all();
     expect(movementsFor(held.unitId)).toHaveLength(1);
     expect(movementsFor(untouched.unitId)).toHaveLength(0);
+  });
+});
+
+/* ------------------------------------------------- the review gate */
+
+describe("shelving a device somebody flagged", () => {
+  it("refuses until the flag is answered", async () => {
+    const result = await logPurchase(env.db, ctxOf(), request());
+    setNeedsReview(env.db, ctxOf(), result.purchaseId, true);
+
+    /* the flag used to be cleared silently by shelving, so its only consequence
+       was that it disappeared (ADR-0013 amendment) */
+    expect(
+      await codeOf(async () => sendToInventory(env.db, ctxOf(), result.purchaseId, 10000)),
+    ).toBe("REVIEW_REQUIRED");
+
+    const unit = env.db.select().from(s.units).all()[0]!;
+    expect(unit.status).toBe("held");
+    expect(env.db.select().from(s.stockMovements).all()).toHaveLength(0);
+  });
+
+  it("goes through once confirmed, clears the flag, and records who", async () => {
+    const result = await logPurchase(env.db, ctxOf(), request());
+    setNeedsReview(env.db, ctxOf(), result.purchaseId, true);
+
+    sendToInventory(env.db, ctxOf(), result.purchaseId, 10000, true);
+
+    const purchase = env.db.select().from(s.usedPurchases).all()[0]!;
+    expect(purchase.needsReview).toBe(false);
+    expect(env.db.select().from(s.units).all()[0]!.status).toBe("in_stock");
+
+    const entry = env.db
+      .select()
+      .from(s.oplog)
+      .all()
+      .find((e) => e.action === "review_confirmed")!;
+    expect(entry).toBeDefined();
+    // who decided this was fine is answerable afterwards
+    expect(entry.userId).toBe(owner.id);
+    expect((entry.after as { reviewConfirmedByUserId: string }).reviewConfirmedByUserId).toBe(owner.id);
+  });
+
+  it("sends an unflagged device straight through, with no confirmation entry", async () => {
+    const result = await logPurchase(env.db, ctxOf(), request());
+    sendToInventory(env.db, ctxOf(), result.purchaseId, 10000);
+
+    expect(env.db.select().from(s.units).all()[0]!.status).toBe("in_stock");
+    expect(env.db.select().from(s.oplog).all().some((e) => e.action === "review_confirmed")).toBe(false);
+  });
+
+  it("changes nothing when the confirmation is cancelled", async () => {
+    const result = await logPurchase(env.db, ctxOf(), request());
+    setNeedsReview(env.db, ctxOf(), result.purchaseId, true);
+    await codeOf(async () => sendToInventory(env.db, ctxOf(), result.purchaseId, 10000));
+
+    // cancelling is simply not calling again: the refusal left no trace
+    const purchase = env.db.select().from(s.usedPurchases).all()[0]!;
+    expect(purchase.needsReview).toBe(true);
+    expect(env.db.select().from(s.units).all()[0]!.salePriceCents).toBeNull();
   });
 });

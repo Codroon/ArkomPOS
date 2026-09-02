@@ -761,6 +761,9 @@ export const es = {
   "cash.denom.hint": "Cuenta lo que hay; el total se calcula solo.",
 
 /* ---- Comprar usados (ADR-0013) ---- */
+  "used.review.gateTitle": "Este dispositivo está marcado para revisar",
+  "used.review.gateBody": "Alguien lo marcó para echarle un segundo vistazo. Si ya está revisado, confirma y pasará a inventario; se guardará quién lo confirmó.",
+  "used.review.gateConfirm": "Revisado, enviar a inventario",
   "used.buy.title": "Comprar dispositivo usado",
   "used.buy.provisional": "Nuevo · número al registrar",
   "used.buy.provisionalHint": "El número de compra se asigna al registrar, nunca antes.",

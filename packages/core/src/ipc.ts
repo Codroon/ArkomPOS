@@ -139,6 +139,10 @@ export const ErrorCodeSchema = z.enum([
      open one inline, because blocking a sale to teach someone about process is
      how a till gets bypassed with a paper notebook. */
   "SHIFT_REQUIRED",
+  /* The device is flagged as needing review and nobody has said they looked
+     (ADR-0013 amendment). Like SHIFT_REQUIRED, an invitation rather than a
+     refusal: the UI answers it with a confirmation, not an error. */
+  "REVIEW_REQUIRED",
   "VALIDATION",
 ]);
 export type ErrorCode = z.infer<typeof ErrorCodeSchema>;
@@ -1168,6 +1172,14 @@ export const UsedSetRefurbCostRequestSchema = z.object({
 export const UsedSendToInventoryRequestSchema = z.object({
   purchaseId: z.string(),
   sellPriceCents: z.number().int().min(1),
+  /**
+   * Somebody has looked at the review flag and is shelving it anyway.
+   *
+   * A flagged device refuses with `REVIEW_REQUIRED` until this is true, and the
+   * confirmation is recorded in the same transaction that clears the flag — so
+   * "who decided this was fine" is answerable afterwards (ADR-0013 amendment).
+   */
+  reviewConfirmed: z.boolean().default(false),
 });
 export const UsedSendToInventoryResponseSchema = z.object({
   unitId: z.string(),

@@ -1,6 +1,7 @@
 # ADR-0013: Used-device purchases — one inventory, a purchase document, and credit as a tender
 
 **Status:** Accepted · **Date:** 2026-08-27 · **Deciders:** Zothix (Codroon)
+**Amended:** 2026-09-02 (v0.14.1) — see §A1 and §A2 at the end.
 **Builds on:** [0004](0004-stock-as-insert-only-movement-ledger.md) (movement ledger) ·
 [0007](0007-tax-snapshot-on-lines.md) (REBU) · [0008](0008-document-numbering-per-till-series.md)
 (numbering) · [0012](0012-local-pin-auth-and-permission-registry.md) (permissions).
@@ -265,3 +266,41 @@ break down a total this slice already records — an elaboration, not a correcti
 The police-register export is not built, but §2 fixes its field set now, because the
 expensive part of that feature is not the CSV: it is asking a shop to re-contact sixty
 customers for an ID number nobody captured.
+
+---
+
+## A1. Amendment (v0.14.1) — "needs review" is a gate, not a note
+
+**Was:** sending a flagged device to inventory cleared the flag as a side effect —
+"shelving it IS the resolution".
+
+**Is:** a flagged device refuses with `REVIEW_REQUIRED`, and the UI answers with a
+confirmation naming what was flagged. Confirming clears the flag **and records
+who confirmed**, in the same transaction and the same oplog entry as the shelving
+itself (`used_purchase.review_confirmed`).
+
+The old rule made the flag's only consequence its own disappearance: a device
+somebody marked for a second look could reach the shop floor without anyone
+taking that look, and nothing afterwards could say whether one had happened.
+
+**Deliberately not a hard block.** The person who flags a device and the person
+shelving it are usually the same person ten minutes later, and a block they
+cannot clear teaches them to stop flagging — which loses the signal entirely.
+An unflagged device is untouched and shelves in one click, exactly as before.
+
+## A2. Amendment (v0.14.1) — a used product carries the `used_device` item type
+
+This ADR and core's documentation have described used devices as `used_device`
+products since v0.11.0. The writer said `serialized`, and everything that needed
+to tell a used phone from a new one matched the "(usado)" suffix in the product
+NAME — which the shop can change, at which point a report silently changes its
+mind about what it is counting.
+
+Used products now carry `used_device`. `isSerializedItem()` covers both, so they
+behave identically everywhere it matters — picked by IMEI at the till, valued at
+the unit's own cost, refused as a repair part. The one place the two differ is
+Stock muerto, which is about goods the shop can reorder.
+
+An idempotent startup fix-up re-types existing rows, keyed **structurally** — a
+product is a used product exactly when one of its units came from a purchase —
+rather than on the name it is replacing.

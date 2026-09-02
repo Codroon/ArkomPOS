@@ -759,6 +759,9 @@ export const en: Record<TKey, string> = {
   "cash.denom.hint": "Count what is there; the total works itself out.",
 
 /* ---- Buy used (ADR-0013) ---- */
+  "used.review.gateTitle": "This device is flagged for review",
+  "used.review.gateBody": "Somebody marked it for a second look. If it has been checked, confirm and it goes to inventory; who confirmed it is recorded.",
+  "used.review.gateConfirm": "Reviewed, send to inventory",
   "used.buy.title": "Buy a used device",
   "used.buy.provisional": "New · number assigned on save",
   "used.buy.provisionalHint": "The purchase number is assigned when it is logged, never before.",

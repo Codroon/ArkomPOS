@@ -16,12 +16,14 @@ import {
   DEFAULT_MARGIN_PCT,
   centsToInput,
   formatCents,
+  parseIpcError,
   parseMoneyInput,
   type UsedDeviceDetail,
 } from "@arkom/core";
 import {
   AccentButton,
   Chip,
+  ConfirmDialog,
   GhostButton,
   PrimaryButton,
   SectionLabel,
@@ -125,14 +127,31 @@ export function UsedDeviceDetailPane({
 
   const reprint = (what: "document" | "label") => printer.printPurchase(purchaseId, what, true);
 
-  const shelve = async (sellPriceCents: number) => {
+  /* set when main refuses a flagged device; carries the price already chosen so
+     the cashier is not asked for it twice */
+  const [reviewGate, setReviewGate] = useState<{ sellPriceCents: number } | null>(null);
+
+  /**
+   * Shelve it — and stop first if somebody marked it for a second look.
+   *
+   * The refusal is a typed code rather than a message, so this is a
+   * confirmation rather than an error: the same shape the Sale screen uses for
+   * SHIFT_REQUIRED (ADR-0013 amendment).
+   */
+  const shelve = async (sellPriceCents: number, reviewConfirmed = false) => {
     setBusy(true);
     setError(null);
     try {
-      await window.arkom.invoke("used:sendToInventory", { purchaseId, sellPriceCents });
+      await window.arkom.invoke("used:sendToInventory", { purchaseId, sellPriceCents, reviewConfirmed });
       setPriceModal(false);
+      setReviewGate(null);
       await load();
     } catch (err) {
+      if (parseIpcError(err)?.code === "REVIEW_REQUIRED") {
+        setReviewGate({ sellPriceCents });
+        setPriceModal(false);
+        return;
+      }
       setError(errorMessage(t, err));
     } finally {
       setBusy(false);
@@ -444,6 +463,17 @@ export function UsedDeviceDetailPane({
         </div>
       ) : null}
 
+      {reviewGate ? (
+        <ConfirmDialog
+          open
+          title={t("used.review.gateTitle")}
+          body={t("used.review.gateBody")}
+          confirmLabel={t("used.review.gateConfirm")}
+          cancelLabel={t("common.cancel")}
+          onConfirm={() => void shelve(reviewGate.sellPriceCents, true)}
+          onCancel={() => setReviewGate(null)}
+        />
+      ) : null}
       <PrintToast printer={printer} />
 
       {zoom ? (

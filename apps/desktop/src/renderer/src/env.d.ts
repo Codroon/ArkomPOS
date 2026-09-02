@@ -181,7 +181,7 @@ declare global {
       ): Promise<UsedDeviceDetail>;
       invoke(
         channel: "used:sendToInventory",
-        payload: { purchaseId: string; sellPriceCents: number },
+        payload: { purchaseId: string; sellPriceCents: number; reviewConfirmed?: boolean },
       ): Promise<{ unitId: string; sellPriceCents: number; unitCostCents: number }>;
       invoke(
         channel: "used:findVoucher",

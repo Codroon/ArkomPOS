@@ -907,7 +907,7 @@ export function registerIpcHandlers(db: ArkomDb): void {
     UsedSendToInventoryRequestSchema,
     UsedSendToInventoryResponseSchema,
     async (s, input) => {
-      const result = sendToInventory(db, s.ctx, input.purchaseId, input.sellPriceCents);
+      const result = sendToInventory(db, s.ctx, input.purchaseId, input.sellPriceCents, input.reviewConfirmed);
       try {
         await printPurchase(db, s.ctx, { purchaseId: input.purchaseId, what: "label", target: "auto", copy: false });
       } catch (err) {

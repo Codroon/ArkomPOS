@@ -849,12 +849,27 @@ export function sendToInventory(
   ctx: MutationCtx,
   purchaseId: string,
   sellPriceCents: number,
+  reviewConfirmed = false,
 ): { unitId: string; sellPriceCents: number; unitCostCents: number } {
   const found = loadForEdit(db, ctx, purchaseId);
   if (found.unitStatus !== "held") {
     throw appError("VALIDATION", "Ese dispositivo ya está en inventario.");
   }
   if (!found.unitId) throw appError("VALIDATION", "Esa compra no tiene unidad.");
+
+  /**
+   * The review flag is a gate, not a note.
+   *
+   * Shelving cleared it silently, so a device somebody marked for a second look
+   * could reach the shop floor without anyone taking that look — the flag's only
+   * consequence was that it disappeared. It is deliberately NOT a hard block:
+   * the person who flagged it and the person shelving it are usually the same
+   * person ten minutes later, and a block they cannot clear teaches them to stop
+   * flagging (ADR-0013 amendment).
+   */
+  if (found.purchase.needsReview && !reviewConfirmed) {
+    throw appError("REVIEW_REQUIRED", "Este dispositivo está marcado para revisar.");
+  }
 
   const p = found.purchase;
   const intake = planIntake({
@@ -887,10 +902,20 @@ export function sendToInventory(
 
     for (const movement of intake.movements) postMovement(tx, ctx, log, movement, now, p.documentId);
 
-    tx.update(usedPurchases)
-      .set({ needsReview: false, updatedAt: now })
-      .where(eq(usedPurchases.id, purchaseId))
-      .run();
+    /* Clearing the flag is a decision, and the entry that records the clearing
+       names who made it — same transaction, same oplog entry (ADR-0013). */
+    if (found.purchase.needsReview) {
+      tx.update(usedPurchases).set({ needsReview: false, updatedAt: now }).where(eq(usedPurchases.id, purchaseId)).run();
+      log({
+        entity: "used_purchase",
+        entityId: purchaseId,
+        action: "review_confirmed",
+        before: { needsReview: true },
+        after: { needsReview: false, reviewConfirmedByUserId: ctx.userId ?? null },
+      });
+    } else {
+      tx.update(usedPurchases).set({ updatedAt: now }).where(eq(usedPurchases.id, purchaseId)).run();
+    }
 
     return {
       unitId: found.unitId!,
