@@ -5,8 +5,9 @@
  * *which way* the customer said yes, and *what the part actually cost*.
  */
 import { useEffect, useState } from "react";
-import { centsToInput, formatCents, parseMoneyInput, type InventoryRow, type RepairLineRow } from "@arkom/core";
-import { AccentButton, Field, GhostButton, SearchInput, SelectInput, TextInput, cn, useT } from "@arkom/ui";
+import { centsToInput, formatCents, isSerializedItem, parseMoneyInput, type InventoryRow, type RepairLineRow } from "@arkom/core";
+import { AccentButton, Field, GhostButton, ScanInput, SelectInput, TextInput, cn, useT } from "@arkom/ui";
+import { useScanFlow } from "../../lib/use-scan-flow";
 
 function Modal({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -109,6 +110,31 @@ export function ReceivePartDialog({
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<InventoryRow[]>([]);
   const [product, setProduct] = useState<InventoryRow | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+
+  /* The same pipeline as the ticket's parts picker and the Sale screen: at
+     goods-received the box is in the technician's hand, so scanning it is the
+     natural act and typing the code to click one filtered result is not. */
+  const scan = useScanFlow({
+    onProduct: (found) => {
+      setScanError(null);
+      if (isSerializedItem(found.itemType)) {
+        setScanError(t("rep.part.serialized"));
+        return;
+      }
+      window.arkom
+        .invoke("inventory:list", { search: found.name })
+        .then((all) => {
+          const row = all.find((r) => r.productId === found.productId);
+          if (row) setProduct(row);
+          else setScanError(t("rep.part.none"));
+        })
+        .catch(() => undefined);
+    },
+    onUnit: () => setScanError(t("rep.part.serialized")),
+    onCreateProduct: () => setScanError(t("rep.part.none")),
+    onError: (message) => setScanError(message),
+  });
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -163,10 +189,18 @@ export function ReceivePartDialog({
           </div>
         ) : (
           <>
-            <SearchInput value={query} onChange={(e) => setQuery(e.target.value)} />
+            <ScanInput
+              autoRefocus={false}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onScan={(code) => {
+                setQuery("");
+                scan.resolve(code);
+              }}
+            />
             <div className="mt-1 max-h-[150px] overflow-y-auto rounded-[2px] border border-line">
               {rows.length === 0 ? (
-                <div className="px-2.5 py-2 text-[11px] text-subtle">{t("rep.part.none")}</div>
+                <div className="px-2.5 py-2 text-[11px] text-subtle">{scanError ?? t("rep.part.none")}</div>
               ) : (
                 rows.map((row, i) => (
                   <button
@@ -196,6 +230,7 @@ export function ReceivePartDialog({
         </Field>
       </div>
 
+      {scan.modals}
       <div className="mt-3 flex justify-end gap-2">
         <GhostButton onClick={onCancel}>{t("common.cancel")}</GhostButton>
         <AccentButton

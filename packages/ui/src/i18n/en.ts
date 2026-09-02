@@ -1177,6 +1177,7 @@ export const en: Record<TKey, string> = {
   "rep.part.search": "Search for a part",
   "rep.part.qty": "Quantity",
   "rep.part.stock": "{n} in stock",
+  "rep.part.serialized": "That item is a phone; it cannot be used as a part.",
   "rep.part.none": "No article matches.",
   "rep.order.title": "Part to order",
   "rep.order.description": "Part",

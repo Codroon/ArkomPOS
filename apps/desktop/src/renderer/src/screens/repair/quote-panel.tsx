@@ -12,6 +12,7 @@
  */
 import { useEffect, useState } from "react";
 import {
+  isSerializedItem,
   centsToInput,
   formatCents,
   parseMoneyInput,
@@ -26,13 +27,14 @@ import {
   Field,
   GhostButton,
   PrimaryButton,
-  SearchInput,
+  ScanInput,
   SectionLabel,
   TextInput,
   cn,
   useT,
 } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
+import { useScanFlow } from "../../lib/use-scan-flow";
 
 type Dialog = null | "labor" | "part" | "order";
 
@@ -347,6 +349,36 @@ function PartDialog({
   const [rows, setRows] = useState<InventoryRow[]>([]);
   const [chosen, setChosen] = useState<InventoryRow | null>(null);
   const [qty, setQty] = useState("1");
+  const [scanError, setScanError] = useState<string | null>(null);
+
+  /**
+   * A scanned code picks the part outright.
+   *
+   * The same pipeline the Sale screen and the receiving drawer use, so an
+   * unknown code gets the usual rescue rather than a dead end, and an ambiguous
+   * one gets the usual picker. A serialized product is refused here with the
+   * reason ADR-0014 §3 gives, rather than being silently ignored.
+   */
+  const scan = useScanFlow({
+    onProduct: (product) => {
+      setScanError(null);
+      if (isSerializedItem(product.itemType)) {
+        setScanError(t("rep.part.serialized"));
+        return;
+      }
+      window.arkom
+        .invoke("inventory:list", { search: product.name })
+        .then((all) => {
+          const row = all.find((r) => r.productId === product.productId);
+          if (row) setChosen(row);
+          else setScanError(t("rep.part.none"));
+        })
+        .catch(() => undefined);
+    },
+    onUnit: () => setScanError(t("rep.part.serialized")),
+    onCreateProduct: () => setScanError(t("rep.part.none")),
+    onError: (message) => setScanError(message),
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -357,7 +389,8 @@ function PartDialog({
           if (cancelled) return;
           // serialized articles are refused by main anyway (ADR-0014 §3), so
           // they are not offered here either
-          setRows(all.filter((r) => r.itemType !== "serialized").slice(0, 20));
+          /* a used device is serialized-by-another-name and equally refused */
+          setRows(all.filter((r) => !isSerializedItem(r.itemType)).slice(0, 20));
         })
         .catch(() => setRows([]));
     }, 160);
@@ -380,15 +413,26 @@ function PartDialog({
         </div>
       ) : (
         <>
-          <SearchInput
+          {/* A ScanInput, like the Sale screen's: the technician has the same
+              scanner in their hand and the same box in front of them, and
+              typing a 13-digit barcode to then click the one result it filters
+              to is a step the hardware already does. Typing still searches —
+              Enter is what a scanner sends, so only a scan takes the fast path
+              (foundations, "Global behaviors"). */}
+          <ScanInput
             autoFocus
+            autoRefocus={false}
             value={query}
             placeholder={t("rep.part.search")}
             onChange={(e) => setQuery(e.target.value)}
+            onScan={(code) => {
+              setQuery("");
+              scan.resolve(code);
+            }}
           />
           <div className="mt-2 max-h-[220px] overflow-y-auto rounded-[2px] border border-line">
             {rows.length === 0 ? (
-              <div className="px-2.5 py-2 text-[11px] text-subtle">{t("rep.part.none")}</div>
+              <div className="px-2.5 py-2 text-[11px] text-subtle">{scanError ?? t("rep.part.none")}</div>
             ) : (
               rows.map((row, i) => (
                 <button
@@ -421,6 +465,7 @@ function PartDialog({
           {t("common.add")}
         </AccentButton>
       </div>
+      {scan.modals}
     </Modal>
   );
 }

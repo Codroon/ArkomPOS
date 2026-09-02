@@ -1178,6 +1178,7 @@ export const es = {
   "rep.part.search": "Busca una pieza",
   "rep.part.qty": "Cantidad",
   "rep.part.stock": "{n} en stock",
+  "rep.part.serialized": "Ese artículo es un móvil; no puede usarse como pieza.",
   "rep.part.none": "Ningún artículo coincide.",
   "rep.order.title": "Pieza por pedir",
   "rep.order.description": "Pieza",
