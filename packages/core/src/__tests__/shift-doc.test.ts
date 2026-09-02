@@ -196,9 +196,9 @@ describe("the Z report", () => {
     expect(out).not.toContain("Western");
   });
 
-  it("stamps a reprint COPIA and stays fixed Spanish", () => {
+  it("stamps a reprint COPIA, and leaves the original unstamped", () => {
     expect(text({ isCopy: true })).toContain(SHIFT_ES.copy);
-    expect(text()).toContain("EFECTIVO ESPERADO".toLowerCase() === "" ? "" : SHIFT_ES.expected);
+    expect(text()).not.toContain(SHIFT_ES.copy);
   });
 });
 
@@ -225,5 +225,40 @@ describe("the X preview", () => {
     // it IS the same renderer over the same totals — that is the guarantee
     expect(x()).toContain(SHIFT_ES.sales);
     expect(x()).toContain(SHIFT_ES.tenders);
+  });
+});
+
+/* ------------------------------------------------- both languages */
+
+describe("the same snapshot, in either language", () => {
+  it("renders Spanish or English from identical numbers", () => {
+    const spanish = opsToText(renderZReport(doc(), SHOP, 80, "es"));
+    const english = opsToText(renderZReport(doc(), SHOP, 80, "en"));
+
+    expect(spanish).toContain("INFORME Z");
+    expect(spanish).toContain("Efectivo esperado");
+    expect(english).toContain("Z REPORT");
+    expect(english).toContain("Cash expected");
+    /* the SNAPSHOT stores numbers; the labels are applied at render time, so a Z
+       opened in English is the same Z (ADR-0015 amendment) */
+    expect(english).not.toContain("Efectivo");
+    expect(spanish).not.toContain("Cash expected");
+  });
+
+  it("keeps every figure identical across the two", () => {
+    const money = (text: string) => text.match(/[\d.]+,\d{2} €/g) ?? [];
+    expect(money(opsToText(renderZReport(doc(), SHOP, 80, "en")))).toEqual(
+      money(opsToText(renderZReport(doc(), SHOP, 80, "es"))),
+    );
+  });
+
+  it("says which way a variance went in the reader's language", () => {
+    const short = { countedCashCents: 19540, varianceCents: -460, varianceReason: "Cambio" };
+    expect(opsToText(renderZReport(doc(short), SHOP, 80, "es"))).toContain("FALTAN");
+    expect(opsToText(renderZReport(doc(short), SHOP, 80, "en"))).toContain("SHORT BY");
+  });
+
+  it("defaults to Spanish for a caller that names no language", () => {
+    expect(opsToText(renderZReport(doc(), SHOP))).toContain("INFORME Z");
   });
 });

@@ -339,3 +339,55 @@ day is refused until somebody opens one. That is the feature. Every pre-v0.13.0 
 movement keeps `shift_id = NULL`, meaning "before shifts"; nothing is backfilled, because
 inventing which shift a row from July belonged to would be fiction, and the audit check is
 written to apply only from this version forward.
+
+## A1. Amendment (v0.14.1) — the X and the Z are screens first, paper second
+
+§12 said the X *is* the same computation as the Z, uncommitted. It did not say where either
+one arrives, and v0.13.0 answered that with a printer: pressing **X** printed a strip of
+thermal paper, and **closing a shift printed a Z whether anybody asked for one or not**.
+
+That is wrong in two directions. A shop that wants to look at its own afternoon should not
+have to spend a roll of paper on the question, and a till that prints unasked is a till whose
+staff eventually stop reading what comes out of it — the Z stops being a document and becomes
+noise on the counter. The close is also the worst possible moment for a printer failure: the
+shift *is* closed, the number *is* consumed, and a spooler error at that instant looks to the
+person standing there like the close did not happen.
+
+**Decision.** Both reports open **on screen** as documents, and printing is an action taken on
+the document rather than a side effect of closing.
+
+- **X** — `cash:preview` returns `{ shift, totals }` and the screen renders it. It still writes
+  its oplog entry, because "somebody took an X at 19:40" is exactly the fact that matters when
+  the count comes up short at 20:30. It still consumes no number.
+- **Z** — `cash:close` returns `{ shiftId, zDocNumber }` and the till lands directly on the Z,
+  read from the frozen snapshot via `cash:get`. **Nothing auto-prints.** The same document
+  opens from the shift history, which is what a reprint now is.
+- Actions on either document: **Imprimir** (thermal), **Guardar PDF**, **Cerrar**. After a
+  close, Cerrar is replaced by *Abrir turno* — the shop's actual next move.
+
+**One renderer, three surfaces.** `renderZReport()` remains the single source of the report's
+shape; the screen renders the same figures from the same `ShiftTotals` the printer receives.
+The thermal path and the PDF page are two consumers of one list of `TicketOp`s, which is why
+the screen, the receipt and the page cannot disagree about a number. A second renderer for
+the screen was rejected for exactly that reason.
+
+**COPIA.** The rule is the one every other document in the app already follows: the paper
+pulled at the moment of the event is the original, anything pulled afterwards off a list is
+stamped. Concretely — the Z reached by closing prints an original **once**; a second print of
+that same Z, and every print of a Z reopened from the history, is a **C O P I A**. An X is
+never either: it has no number, so there is nothing to duplicate. The stamp is applied
+identically on thermal and PDF, because both come from the same ops.
+
+**Language.** This reverses ADR-0011's print rule *for this document only*. A customer ticket,
+a purchase document and a repair receipt stay fixed Spanish, because they are the shop
+speaking to somebody outside it and to the tax authority. **A Z is the shop talking to
+itself** — it never leaves the counter and no third party reads it — so it follows the staff
+language toggle, on screen and on paper alike. `renderZReport(doc, shop, paper, locale)` takes
+the locale; `cash:print` carries it. What is stored is unaffected: the snapshot holds numbers,
+and the labels are applied at render time, so a Z read in English is the same Z.
+
+**Consequences.** A shift can now be closed and its Z never printed — that is intended, and
+the document is permanently reachable from the history, so nothing is lost. The close path no
+longer has a printer in it, which removes the failure mode where a spooler error at the worst
+moment reads as a failed close. Anyone who wants paper every night still gets it in one click,
+on the screen that already has their attention.

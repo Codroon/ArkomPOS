@@ -1971,6 +1971,8 @@ export type CashGetResponse = z.infer<typeof CashGetResponseSchema>;
 export const CashPrintRequestSchema = z.object({
   shiftId: z.string().optional(),
   what: z.enum(["z", "x"]),
+  /** the staff language at the moment of printing (ADR-0015 amendment) */
+  locale: z.enum(["es", "en"]).default("es"),
   target: z.enum(["auto", "pdf"]).default("auto"),
   copy: z.boolean().default(false),
 });

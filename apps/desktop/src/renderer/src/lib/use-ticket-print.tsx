@@ -25,7 +25,7 @@ export type PrintJob =
   | { kind: "purchase"; purchaseId: string; what: "document" | "label"; copy: boolean }
   | { kind: "repair"; ticketId: string; what: "intake" | "quote" | "receipt" | "return"; copy: boolean }
   /** no shiftId = the open shift, which is the only one an X can be taken of */
-  | { kind: "shift"; shiftId: string | undefined; what: "z" | "x"; copy: boolean };
+  | { kind: "shift"; shiftId: string | undefined; what: "z" | "x"; copy: boolean; locale?: "es" | "en" };
 
 export interface PrintState {
   busy: boolean;
@@ -100,6 +100,7 @@ export function useTicketPrint() {
                     what: job.what,
                     copy: job.copy,
                     target,
+                    locale: job.locale ?? "es",
                   }),
         );
         if (!alive.current) return;
@@ -152,8 +153,13 @@ export function useTicketPrint() {
   );
   /** The Z of a shift, or the X of the open one. No shiftId = the open shift. */
   const printShift = useCallback(
-    (shiftId: string | undefined, what: "z" | "x", copy = false) =>
-      void run({ kind: "shift", shiftId, what, copy }, "auto"),
+    (
+      shiftId: string | undefined,
+      what: "z" | "x",
+      copy = false,
+      target: "auto" | "pdf" = "auto",
+      locale: "es" | "en" = "es",
+    ) => void run({ kind: "shift", shiftId, what, copy, locale }, target),
     [run],
   );
   const retry = useCallback(() => {

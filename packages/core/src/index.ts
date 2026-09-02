@@ -234,8 +234,8 @@ export {
 } from "./reports";
 export type { DatePreset, DateRange, CostEstimate, ReportId, SalesGroupBy } from "./reports";
 export { opsToText, opBuilder } from "./print-ops";
-export { renderZReport, SHIFT_ES } from "./shift-doc";
-export type { ShiftReportDoc } from "./shift-doc";
+export { renderZReport, SHIFT_ES, SHIFT_EN, shiftLabels } from "./shift-doc";
+export type { ShiftReportDoc, ShiftLabels, ShiftDocLocale } from "./shift-doc";
 export {
   REPAIR_STATUSES,
   REPAIR_LINE_KINDS,

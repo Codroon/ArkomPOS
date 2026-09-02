@@ -227,7 +227,7 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
           ) : screen === "taller" ? (
             <WorkshopScreen key={navTick} />
           ) : screen === "caja" ? (
-            <CashScreen key={navTick} />
+            <CashScreen key={navTick} terminalName={context?.terminal.name ?? t("common.dash")} />
           ) : screen === "informes" ? (
             <ReportsScreen key={navTick} />
           ) : screen === "ajustes" ? (

@@ -5,17 +5,16 @@
  * shift open (the drawer's own record). The movements panel and the close/X
  * panel arrive with their slices; what is here is the shift itself.
  */
-import { useEffect, useState } from "react";
-import { formatCents } from "@arkom/core";
+import { useCallback, useEffect, useState } from "react";
+import { formatCents, type ShiftState, type ShiftTotalsPayload } from "@arkom/core";
 import { AccentButton, ActionRow, Chip, GhostButton, SectionLabel, useT } from "@arkom/ui";
 import { useShift } from "../../lib/use-shift";
 import { useCan } from "../../lib/use-session";
-import { useTicketPrint } from "../../lib/use-ticket-print";
-import { PrintToast } from "../../lib/print-toast";
 import { OpenShiftDialog } from "./open-shift-dialog";
 import { MovementsPanel } from "./movements-panel";
 import { ClosePanel } from "./close-panel";
 import { HistoryModal } from "./history-modal";
+import { ShiftDocument } from "./shift-document";
 import { TicketPeekModal } from "../../components/ticket-peek-modal";
 
 function stamp(ms: number): string {
@@ -33,10 +32,9 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-export function CashScreen() {
+export function CashScreen({ terminalName = "" }: { terminalName?: string }) {
   const t = useT();
   const { shift, refresh } = useShift();
-  const printer = useTicketPrint();
   const can = useCan();
   const [opening, setOpening] = useState(false);
   const [peekDocId, setPeekDocId] = useState<string | null>(null);
@@ -45,12 +43,57 @@ export function CashScreen() {
   const [history, setHistory] = useState(false);
   /* bumped by the movements panel so the close panel re-reads its figures */
   const [movementTick, setMovementTick] = useState(0);
+  /* the Z or X being read on screen; printing is an action on it */
+  const [doc, setDoc] = useState<{ kind: "z" | "x"; shift: ShiftState; totals: ShiftTotalsPayload } | null>(null);
+
+  const openX = useCallback(async () => {
+    try {
+      const res = await window.arkom.invoke("cash:preview", {});
+      setDoc({ kind: "x", shift: res.shift, totals: res.totals });
+    } catch (err) {
+      console.error("cash:preview failed", err);
+    }
+  }, []);
+
+  const openZ = useCallback(async (shiftId: string) => {
+    try {
+      const res = await window.arkom.invoke("cash:get", { shiftId });
+      if (res.totals) setDoc({ kind: "z", shift: res.shift, totals: res.totals });
+    } catch (err) {
+      console.error("cash:get failed", err);
+    }
+  }, []);
 
   /* re-read on every visit: another window, or the last close, may have moved
      on since this component was last mounted */
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  if (doc) {
+    return (
+      <ShiftDocument
+        kind={doc.kind}
+        shift={doc.shift}
+        totals={doc.totals}
+        terminalName={terminalName}
+        onClose={() => setDoc(null)}
+        isOriginal={doc.kind === "z" && closed?.shiftId === doc.shift.id}
+        extraAction={
+          doc.kind === "z" && closed?.shiftId === doc.shift.id ? (
+            <AccentButton
+              onClick={() => {
+                setDoc(null);
+                setOpening(true);
+              }}
+            >
+              {t("cash.close.newShift")}
+            </AccentButton>
+          ) : undefined
+        }
+      />
+    );
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -82,9 +125,7 @@ export function CashScreen() {
               <>
                 <div className="text-[13px] font-bold">{t("cash.close.done", { number: closed.zDocNumber })}</div>
                 <ActionRow className="mt-3.5">
-                  <GhostButton onClick={() => printer.printShift(closed.shiftId, "z", true)}>
-                    {t("cash.close.reprint")}
-                  </GhostButton>
+                  <GhostButton onClick={() => void openZ(closed.shiftId)}>{t("zdoc.zTitle")}</GhostButton>
                   <AccentButton onClick={() => setOpening(true)}>{t("cash.close.newShift")}</AccentButton>
                 </ActionRow>
               </>
@@ -124,9 +165,13 @@ export function CashScreen() {
           </div>
           <ClosePanel
             reloadKey={movementTick}
+            onOpenX={() => void openX()}
             onClosed={async (result) => {
               setClosed(result);
               await refresh();
+              /* land ON the Z, rather than on a toast about a print nobody asked
+                 for (ADR-0015 amendment) */
+              await openZ(result.shiftId);
             }}
           />
           </div>
@@ -135,8 +180,15 @@ export function CashScreen() {
         )}
       </div>
 
-      {history ? <HistoryModal onClose={() => setHistory(false)} /> : null}
-      <PrintToast printer={printer} />
+      {history ? (
+        <HistoryModal
+          onClose={() => setHistory(false)}
+          onOpen={(shiftId) => {
+            setHistory(false);
+            void openZ(shiftId);
+          }}
+        />
+      ) : null}
       {peekDocId ? <TicketPeekModal docId={peekDocId} onClose={() => setPeekDocId(null)} /> : null}
       {opening ? (
         <OpenShiftDialog

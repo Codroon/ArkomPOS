@@ -872,7 +872,7 @@ function logShiftPrint(db: ArkomDb, ctx: MutationCtx, shiftId: string, after: Re
 export async function printShiftReport(
   db: ArkomDb,
   ctx: MutationCtx,
-  req: { shiftId?: string; what: "z" | "x"; target: "auto" | "pdf"; copy: boolean },
+  req: { shiftId?: string; what: "z" | "x"; target: "auto" | "pdf"; copy: boolean; locale?: "es" | "en" },
 ): Promise<PrintTicketResponse> {
   const { users } = schema;
   const settings = getSettings(db, ctx);
@@ -912,7 +912,9 @@ export async function printShiftReport(
     approvedByName: isZ ? name(snapshot!.approvedByUserId) : null,
   };
 
-  const ops = renderZReport(doc, shop, settings.paperWidthMm);
+  /* A Z is the shop talking to itself, so it follows the staff language — unlike
+     a customer document, which stays fixed Spanish (ADR-0015 amendment). */
+  const ops = renderZReport(doc, shop, settings.paperWidthMm, req.locale ?? "es");
   const fileBase = `${doc.zDocNumber ?? "X"}${req.copy ? "-COPIA" : ""}`;
   const what = isZ ? "shift_z" : "shift_x";
 

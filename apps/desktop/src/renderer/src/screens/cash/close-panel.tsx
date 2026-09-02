@@ -48,7 +48,10 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
 export function ClosePanel({
   reloadKey,
   onClosed,
+  onOpenX,
 }: {
+  /** show the X reading as a document */
+  onOpenX: () => void;
   /** bumped whenever a movement lands, so the expected figure is never stale */
   reloadKey: number;
   onClosed: (closed: { shiftId: string; zDocNumber: string }) => void;
@@ -119,9 +122,9 @@ export function ClosePanel({
         },
       );
       setConfirming(false);
-      /* by its ID, not "the open shift": this one has just stopped being open,
-         and asking for the open shift now finds none */
-      printer.printShift(res.shiftId, "z");
+      /* NOTHING is printed here any more. Closing a shift used to fire a thermal
+         print whether anybody wanted paper or not; it now lands on the Z as a
+         document, and printing is a button on it (ADR-0015 amendment). */
       onClosed({ shiftId: res.shiftId, zDocNumber: res.zDocNumber });
     } catch (err) {
       setError(errorMessage(t, err));
@@ -221,7 +224,8 @@ export function ClosePanel({
       </div>
 
       <div className="mt-2 flex justify-end gap-2">
-        <GhostButton onClick={() => printer.printShift(undefined, "x")}>{t("cash.close.printX")}</GhostButton>
+        {/* opens the X as a document; printing is a button on THAT */}
+        <GhostButton onClick={onOpenX}>{t("cash.close.printX")}</GhostButton>
         <AccentButton disabled={!canClose} onClick={() => setConfirming(true)}>
           {t("cash.close.button")}
         </AccentButton>

@@ -302,7 +302,7 @@ declare global {
       invoke(channel: "cash:get", payload: { shiftId: string }): Promise<CashGetResponse>;
       invoke(
         channel: "cash:print",
-        payload: { shiftId?: string; what: "z" | "x"; target?: "auto" | "pdf"; copy?: boolean },
+        payload: { shiftId?: string; what: "z" | "x"; target?: "auto" | "pdf"; copy?: boolean; locale?: "es" | "en" },
       ): Promise<PrintTicketResponse>;
 
       /* ---- reports (ADR-0016), every one read-only ---- */

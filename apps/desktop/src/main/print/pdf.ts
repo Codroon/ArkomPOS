@@ -42,12 +42,19 @@ async function embeddedFontCss(): Promise<string> {
     ["monoBold", "Arkom Mono", 700],
   ];
   for (const [key, family, weight] of specs) {
-    // inlined as data: URIs — the offscreen page has no origin to load from
-    const b64 = (await readFile(join(dir, FONT_FILES[key]))).toString("base64");
-    faces.push(
-      `@font-face{font-family:"${family}";font-weight:${weight};font-style:normal;` +
-        `src:url(data:font/woff2;base64,${b64}) format("woff2");font-display:block}`,
-    );
+    /* inlined as data: URIs — the offscreen page has no origin to load from.
+       A missing face is a cosmetic loss, not a reason to refuse the ticket:
+       the body font stack falls back to a system monospace and every figure
+       still lands where core put it. */
+    try {
+      const b64 = (await readFile(join(dir, FONT_FILES[key]))).toString("base64");
+      faces.push(
+        `@font-face{font-family:"${family}";font-weight:${weight};font-style:normal;` +
+          `src:url(data:font/woff2;base64,${b64}) format("woff2");font-display:block}`,
+      );
+    } catch {
+      /* keep going */
+    }
   }
   return faces.join("\n");
 }
@@ -110,7 +117,9 @@ function opsToHtmlRows(ops: TicketOp[]): string {
   return rows.join("\n");
 }
 
-async function buildHtml(ops: TicketOp[], paperWidthMm: PaperWidthMm): Promise<string> {
+/** Exported so a test can prove the PDF path renders a document without asking
+    Electron for a window — the HTML IS the page. */
+export async function buildHtml(ops: TicketOp[], paperWidthMm: PaperWidthMm): Promise<string> {
   const pageWidthPx = Math.round((paperWidthMm / 25.4) * 96); // mm → px at 96dpi
   const fontSize = paperWidthMm === 58 ? 9.5 : 11;
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><style>

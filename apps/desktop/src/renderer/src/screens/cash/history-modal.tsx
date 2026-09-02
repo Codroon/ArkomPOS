@@ -8,7 +8,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { formatCents, type ShiftListRow } from "@arkom/core";
 import { GhostButton, cn, useT } from "@arkom/ui";
-import { useTicketPrint } from "../../lib/use-ticket-print";
 import { useShift } from "../../lib/use-shift";
 import { errorMessage } from "../../lib/errors";
 
@@ -19,9 +18,8 @@ function stamp(ms: number | null): string {
   return `${p(d.getDate())}/${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-export function HistoryModal({ onClose }: { onClose: () => void }) {
+export function HistoryModal({ onClose, onOpen }: { onClose: () => void; onOpen: (shiftId: string) => void }) {
   const t = useT();
-  const printer = useTicketPrint();
   const [rows, setRows] = useState<ShiftListRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { version: shiftVersion } = useShift();
@@ -96,7 +94,11 @@ export function HistoryModal({ onClose }: { onClose: () => void }) {
                 </tr>
               ) : (
                 (rows ?? []).map((row) => (
-                  <tr key={row.id} className="border-b border-line last:border-b-0">
+                  <tr
+                    key={row.id}
+                    className="cursor-pointer border-b border-line last:border-b-0 hover:bg-hover"
+                    onClick={() => onOpen(row.id)}
+                  >
                     <td className="px-3 py-1.5 font-mono font-medium tabular-nums">{row.zDocNumber ?? "—"}</td>
                     <td className="px-3 py-1.5 font-mono tabular-nums">
                       {stamp(row.openedAtMs)} · {row.openedByName ?? "—"}
@@ -124,10 +126,9 @@ export function HistoryModal({ onClose }: { onClose: () => void }) {
                     </td>
                     <td className="px-3 py-1.5">{row.approvedByName ?? "—"}</td>
                     <td className="px-3 py-1.5 text-right">
-                      {/* renders the STORED snapshot, never a recomputation */}
-                      <GhostButton onClick={() => printer.printShift(row.id, "z", true)}>
-                        {t("cash.close.reprint")}
-                      </GhostButton>
+                      {/* the row opens the stored snapshot as a document;
+                          printing is a button on THAT, and optional */}
+                      <GhostButton onClick={() => onOpen(row.id)}>{t("zdoc.zTitle")}</GhostButton>
                     </td>
                   </tr>
                 ))
