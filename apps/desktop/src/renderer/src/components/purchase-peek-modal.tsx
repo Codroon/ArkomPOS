@@ -20,6 +20,7 @@ import type { UsedPeek } from "@arkom/core";
 import { Chip, GhostButton, MoneyText, SectionLabel, useT, type TKey } from "@arkom/ui";
 import { PrintToast } from "../lib/print-toast";
 import { useTicketPrint } from "../lib/use-ticket-print";
+import { idDocLabel } from "../lib/enum-labels";
 import { errorMessage } from "../lib/errors";
 
 const PAYOUT_KEYS: Record<string, TKey> = {
@@ -146,7 +147,7 @@ export function PurchasePeekModal({
                 <Row label={t("usedDetail.sellerName")} value={peek.seller.name} />
                 <Row
                   label={t("usedDetail.sellerDoc")}
-                  value={`${peek.seller.idType} ${peek.seller.idNumber}`}
+                  value={`${idDocLabel(t, peek.seller.idType)} ${peek.seller.idNumber}`}
                   mono
                 />
                 {peek.seller.phone ? (

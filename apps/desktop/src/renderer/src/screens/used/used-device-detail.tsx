@@ -33,6 +33,7 @@ import {
   useT,
   type TKey,
 } from "@arkom/ui";
+import { idDocLabel } from "../../lib/enum-labels";
 import { errorMessage } from "../../lib/errors";
 import { PrintToast } from "../../lib/print-toast";
 import { useTicketPrint } from "../../lib/use-ticket-print";
@@ -233,7 +234,7 @@ export function UsedDeviceDetailPane({
                 <Row label={t("usedDetail.sellerPhone")} value={device.seller.phone ?? t("common.dash")} mono />
                 <Row
                   label={t("usedDetail.sellerDoc")}
-                  value={`${device.seller.idType} ${device.seller.idNumber}`}
+                  value={`${idDocLabel(t, device.seller.idType)} ${device.seller.idNumber}`}
                   mono
                 />
                 <Row

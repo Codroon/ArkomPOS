@@ -40,6 +40,7 @@ import {
   useT,
   type ScanInputHandle,
 } from "@arkom/ui";
+import { ID_DOC_ORDER, idDocLabel } from "../../lib/enum-labels";
 import { errorMessage } from "../../lib/errors";
 import { PrintToast } from "../../lib/print-toast";
 import { useTicketPrint } from "../../lib/use-ticket-print";
@@ -454,9 +455,11 @@ export function BuyUsedScreen() {
                   value={draft.sellerIdType}
                   onChange={(e) => patch({ sellerIdType: e.target.value as IdDocType })}
                 >
-                  <option value="DNI">DNI</option>
-                  <option value="NIE">NIE</option>
-                  <option value="PASAPORTE">PASAPORTE</option>
+                  {ID_DOC_ORDER.map((id) => (
+                    <option key={id} value={id}>
+                      {idDocLabel(t, id)}
+                    </option>
+                  ))}
                 </SelectInput>
               </Field>
               <Field label={t("used.seller.idNumber")} required>

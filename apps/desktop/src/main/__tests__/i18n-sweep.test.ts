@@ -97,6 +97,28 @@ describe("no hardcoded Spanish in the renderer", () => {
     }
     expect(offenders, `route these through useT():\n${offenders.join("\n")}`).toEqual([]);
   });
+
+  /**
+   * The blind spot the accent rule warns about, closed for one whole class.
+   *
+   * `<option value="PASAPORTE">PASAPORTE</option>` shipped on an English till
+   * directly above a channel dropdown that did it properly. No accent, so the
+   * check above saw nothing — but a label that IS its own stored value is a
+   * token being shown to a person, and that is mechanical to spot.
+   */
+  it("never renders a stored value as its own label", () => {
+    const selfLabelled = /<option value="([^"]+)">\1<\/option>/g;
+    const offenders: string[] = [];
+    for (const root of ROOTS) {
+      for (const file of sources(root)) {
+        const rel = file.slice(REPO.length + 1).replace(/\\/g, "/");
+        code(readFileSync(file, "utf8")).forEach((line, i) => {
+          for (const m of line.matchAll(selfLabelled)) offenders.push(`${rel}:${i + 1}  ${m[1]}`);
+        });
+      }
+    }
+    expect(offenders, `these show a stored token, not a word:\n${offenders.join("\n")}`).toEqual([]);
+  });
 });
 
 describe("typed errors reach the reader in their own language", () => {

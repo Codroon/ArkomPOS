@@ -21,6 +21,7 @@ import {
   useT,
   type TKey,
 } from "@arkom/ui";
+import { notifyMethodLabel } from "../../lib/enum-labels";
 import { errorMessage } from "../../lib/errors";
 import { useTicketPrint } from "../../lib/use-ticket-print";
 import { PrintToast } from "../../lib/print-toast";
@@ -293,7 +294,7 @@ export function RepairDetailPane({
               <ul className="mt-1.5 text-[12px]">
                 {detail.notifications.map((n) => (
                   <li key={n.id} className="flex items-center gap-2 border-b border-line py-1 last:border-b-0">
-                    <span>{n.method}</span>
+                    <span>{notifyMethodLabel(t, n.method)}</span>
                     {n.note ? <span className="text-ink-2">{n.note}</span> : null}
                     <div className="flex-1" />
                     <span className="text-[11px] text-muted">
