@@ -499,7 +499,6 @@ export const es = {
   "groups.duplicate": "Ya existe un grupo con ese nombre.",
   "groups.empty": "Todavía no hay grupos.",
   "groups.noDelete": "Los grupos no se borran. Renómbralos si cambian.",
-  "editor.groupNew": "+ Nuevo grupo…",
   "rep2.noGroup": "Sin grupo",
   "idDoc.DNI": "DNI",
   "idDoc.NIE": "NIE",

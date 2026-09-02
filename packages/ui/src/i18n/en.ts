@@ -497,7 +497,6 @@ export const en: Record<TKey, string> = {
   "groups.duplicate": "A group with that name already exists.",
   "groups.empty": "No groups yet.",
   "groups.noDelete": "Groups are not deleted. Rename them if they change.",
-  "editor.groupNew": "+ New group…",
   "rep2.noGroup": "No group",
   "idDoc.DNI": "DNI",
   "idDoc.NIE": "NIE",

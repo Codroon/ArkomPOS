@@ -513,7 +513,7 @@ function OrderDialog({
           <TextInput mono inputMode="numeric" value={qty} onChange={(e) => setQty(e.target.value)} />
         </Field>
         {/* the same list receiving picks from, and the same way to add to it */}
-        <SupplierField label={t("rep.order.supplier")} value={supplier} onChange={setSupplier} />
+        <SupplierField label="rep.order.supplier" value={supplier} onChange={setSupplier} />
         <Field label={t("rep.order.expected")}>
           <TextInput mono inputMode="decimal" value={expected} onChange={(e) => setExpected(e.target.value)} />
         </Field>

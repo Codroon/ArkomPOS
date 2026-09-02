@@ -11,10 +11,10 @@
  * the LIST and the creation flow — the two screens size the control differently
  * and that is fine.
  */
-import { useEffect, useRef, useState } from "react";
-import { parseIpcError, type EntityRef } from "@arkom/core";
-import { Field, GhostButton, SelectInput, TextInput, useDataLabel, useT } from "@arkom/ui";
-import { errorMessage } from "../lib/errors";
+import { useEffect, useState } from "react";
+import type { EntityRef } from "@arkom/core";
+import type { TKey } from "@arkom/ui";
+import { PickOrCreateField } from "./pick-or-create";
 
 let cache: EntityRef[] | null = null;
 const listeners = new Set<(rows: EntityRef[]) => void>();
@@ -51,111 +51,36 @@ export function noteSupplier(supplier: EntityRef): void {
   for (const fn of listeners) fn(cache);
 }
 
-/**
- * The field: a dropdown, and a way out of it.
- *
- * The shop meets a new supplier at the counter, mid-delivery or mid-quote — not
- * in a settings screen — so creating one happens here, and the row it creates is
- * selected straight away.
- */
+/** The supplier half of {@link PickOrCreateField}: this list, its channel, its words. */
 export function SupplierField({
   value,
   onChange,
   label,
   required = false,
-  placeholder,
 }: {
-  /** `""` = none chosen */
   value: string;
   onChange: (supplierId: string) => void;
-  label: string;
+  label: TKey;
   required?: boolean;
-  placeholder?: string;
 }) {
-  const t = useT();
-  const dataLabel = useDataLabel();
-  const suppliers = useSuppliers();
-
-  const [creating, setCreating] = useState(false);
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (creating) inputRef.current?.focus();
-  }, [creating]);
-
-  const create = async () => {
-    const trimmed = name.trim();
-    if (!trimmed || busy) return;
-    setBusy(true);
-    setFailure(null);
-    try {
-      const created = await window.arkom.invoke("supplier:create", { name: trimmed });
-      noteSupplier(created);
-      onChange(created.id);
-      setCreating(false);
-      setName("");
-    } catch (err) {
-      setFailure(parseIpcError(err)?.code === "DUPLICATE_NAME" ? t("entry.supplierDuplicate") : errorMessage(t, err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  /* Self-contained: the link is INSIDE the component's own column, so the field
-     works in a dialog grid as well as in the receiving drawer's flex column. It
-     used to be a sibling pulled up with a negative margin, which only lined up
-     in the one layout it was written for. */
   return (
-    <div className="flex flex-col">
-      <Field label={creating ? t("entry.newSupplier") : label} required={required} error={failure ?? undefined}>
-        {creating ? (
-          <div className="flex gap-1.5">
-            <TextInput
-              ref={inputRef}
-              requiredStyle={required}
-              maxLength={120}
-              value={name}
-              placeholder={t("entry.newSupplierPlaceholder")}
-              onChange={(e) => {
-                setName(e.target.value);
-                setFailure(null);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  void create();
-                }
-                if (e.key === "Escape") setCreating(false);
-              }}
-            />
-            <GhostButton disabled={!name.trim() || busy} onClick={() => void create()}>
-              {t("common.save")}
-            </GhostButton>
-          </div>
-        ) : (
-          <SelectInput requiredStyle={required} value={value} onChange={(e) => onChange(e.target.value)}>
-            <option value="">{placeholder ?? t("entry.supplierPlaceholder")}</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {dataLabel(s.name)}
-              </option>
-            ))}
-          </SelectInput>
-        )}
-      </Field>
-      <button
-        type="button"
-        className="mt-1 self-start text-[10px] text-muted underline hover:text-ink"
-        onClick={() => {
-          setCreating((c) => !c);
-          setFailure(null);
-        }}
-      >
-        {creating ? t("common.cancel") : t("entry.newSupplier")}
-      </button>
-    </div>
+    <PickOrCreateField
+      items={useSuppliers()}
+      value={value}
+      onChange={onChange}
+      onCreate={async (name) => {
+        const created = await window.arkom.invoke("supplier:create", { name });
+        noteSupplier(created);
+        return created;
+      }}
+      required={required}
+      labels={{
+        field: label,
+        placeholder: "entry.supplierPlaceholder",
+        create: "entry.newSupplier",
+        namePlaceholder: "entry.newSupplierPlaceholder",
+        duplicate: "entry.supplierDuplicate",
+      }}
+    />
   );
 }

@@ -428,7 +428,7 @@ export function EntradaDrawer({
 
           {/* 4 · supplier — the same component the repair part order uses */}
           <SupplierField
-            label={t("entry.supplier")}
+            label="entry.supplier"
             required
             value={supplierId}
             onChange={setSupplierId}
