@@ -18,18 +18,18 @@
  * did not mean to touch. What you see here is what is in the database.
  */
 import { useEffect, useRef, useState } from "react";
-import { parseIpcError, type EntityRef } from "@arkom/core";
-import { AccentButton, GhostButton, TextInput, useDataLabel, useT } from "@arkom/ui";
+import { parseIpcError, type GroupRef } from "@arkom/core";
+import { AccentButton, GhostButton, TextInput, useT } from "@arkom/ui";
 import { errorMessage } from "../lib/errors";
 import { refreshGroups, useGroups } from "./group-picker";
 
 export function GroupsModal({ onClose, canEdit }: { onClose: () => void; canEdit: boolean }) {
   const t = useT();
-  const dataLabel = useDataLabel();
   const groups = useGroups();
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
+  const [nameEn, setNameEn] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -41,13 +41,15 @@ export function GroupsModal({ onClose, canEdit }: { onClose: () => void; canEdit
   const startNew = () => {
     setEditingId(null);
     setName("");
+    setNameEn("");
     setError(null);
     inputRef.current?.focus();
   };
 
-  const startRename = (group: EntityRef) => {
+  const startRename = (group: GroupRef) => {
     setEditingId(group.id);
     setName(group.name);
+    setNameEn(group.nameEn ?? "");
     setError(null);
   };
 
@@ -57,11 +59,13 @@ export function GroupsModal({ onClose, canEdit }: { onClose: () => void; canEdit
     setBusy(true);
     setError(null);
     try {
-      if (editingId) await window.arkom.invoke("catalog:renameGroup", { id: editingId, name: trimmed });
-      else await window.arkom.invoke("catalog:createGroup", { name: trimmed });
+      const en = nameEn.trim() || null;
+      if (editingId) await window.arkom.invoke("catalog:renameGroup", { id: editingId, name: trimmed, nameEn: en });
+      else await window.arkom.invoke("catalog:createGroup", { name: trimmed, nameEn: en });
       await refreshGroups();
       setEditingId(null);
       setName("");
+      setNameEn("");
     } catch (err) {
       /* the duplicate lands under the field, not in a toast: the shop is looking
          at the box it just typed into */
@@ -93,9 +97,7 @@ export function GroupsModal({ onClose, canEdit }: { onClose: () => void; canEdit
               <div key={g.id} className="flex items-center gap-2 border-b border-line px-3.5 py-2">
                 <div className="flex-1 truncate text-[12px]">
                   {g.name}
-                  {dataLabel(g.name) !== g.name ? (
-                    <span className="ml-1.5 text-[11px] text-muted">{dataLabel(g.name)}</span>
-                  ) : null}
+                  {g.nameEn ? <span className="ml-1.5 text-[11px] text-muted">{g.nameEn}</span> : null}
                 </div>
                 {canEdit ? (
                   <GhostButton onClick={() => startRename(g)}>{t("groups.rename")}</GhostButton>
@@ -109,22 +111,44 @@ export function GroupsModal({ onClose, canEdit }: { onClose: () => void; canEdit
           <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.1em] text-muted">
             {editingId ? t("groups.renaming") : t("groups.newGroup")}
           </div>
-          <div className="flex items-center gap-2">
-            <TextInput
-              ref={inputRef}
-              className="flex-1"
-              value={name}
-              maxLength={60}
-              placeholder={t("groups.namePlaceholder")}
-              onChange={(e) => {
-                setName(e.target.value);
-                setError(null);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void submit();
-                if (e.key === "Escape" && editingId) startNew();
-              }}
-            />
+          {/* Two names, because the app cannot invent the second one and the
+              shop can. Leave English blank and the Spanish shows in both. */}
+          <div className="mb-1.5 grid grid-cols-2 gap-2">
+            <div>
+              <div className="mb-0.5 text-[10px] text-muted">{t("groups.nameEs")}</div>
+              <TextInput
+                ref={inputRef}
+                value={name}
+                maxLength={60}
+                placeholder={t("groups.namePlaceholder")}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void submit();
+                  if (e.key === "Escape" && editingId) startNew();
+                }}
+              />
+            </div>
+            <div>
+              <div className="mb-0.5 text-[10px] text-muted">{t("groups.nameEn")}</div>
+              <TextInput
+                value={nameEn}
+                maxLength={60}
+                placeholder={t("groups.nameEnPlaceholder")}
+                onChange={(e) => {
+                  setNameEn(e.target.value);
+                  setError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void submit();
+                  if (e.key === "Escape" && editingId) startNew();
+                }}
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2">
             {editingId ? <GhostButton onClick={startNew}>{t("common.cancel")}</GhostButton> : null}
             <AccentButton disabled={!name.trim() || busy} onClick={() => void submit()}>
               {editingId ? t("common.save") : t("groups.add")}

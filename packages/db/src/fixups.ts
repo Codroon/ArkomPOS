@@ -21,6 +21,8 @@ export interface FixupReport {
   payoutsBackfilled: number;
   /** used products re-typed from `serialized` to `used_device` */
   usedProductsRetyped: number;
+  /** starter groups given the English name the toggle needs */
+  groupEnglishNamesFilled: number;
 }
 
 /**
@@ -123,9 +125,44 @@ export function retypeUsedProducts(db: ArkomDb): number {
   return stale.length;
 }
 
-export function runDataFixups(db: ArkomDb, newId: () => string): FixupReport {
+/**
+ * Give the starter groups their English name.
+ *
+ * A till set up before v0.14.2 has the five under one language only, so the
+ * toggle left them in whichever language the installer picked. Matching runs
+ * both ways because v0.14.1 could seed either. Only rows that have no English
+ * name yet are touched: a shop that has already written one owns it.
+ *
+ * "Usados" is included — the buy screen creates it on the first used device,
+ * and it is the app's word, not the shop's.
+ */
+export function backfillGroupEnglishNames(db: ArkomDb, englishNameFor: (name: string) => string | null): number {
+  const rows = db
+    .select({ id: schema.productGroups.id, name: schema.productGroups.name, nameEn: schema.productGroups.nameEn })
+    .from(schema.productGroups)
+    .all()
+    .filter((g) => g.nameEn === null);
+
+  let filled = 0;
+  for (const g of rows) {
+    const en = englishNameFor(g.name);
+    if (!en || en === g.name) continue;
+    db.update(schema.productGroups).set({ nameEn: en }).where(eq(schema.productGroups.id, g.id)).run();
+    filled += 1;
+  }
+  return filled;
+}
+
+export function runDataFixups(
+  db: ArkomDb,
+  newId: () => string,
+  /* `packages/db` owns tables, `@arkom/core` owns vocabulary: the caller
+     supplies the mapping rather than db reaching across for it. */
+  englishNameFor: (name: string) => string | null = () => null,
+): FixupReport {
   return {
     payoutsBackfilled: backfillUsedPurchasePayouts(db, newId),
     usedProductsRetyped: retypeUsedProducts(db),
+    groupEnglishNamesFilled: backfillGroupEnglishNames(db, englishNameFor),
   };
 }

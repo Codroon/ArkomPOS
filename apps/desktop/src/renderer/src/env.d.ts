@@ -9,6 +9,7 @@ import type {
   ProductCode,
   ScanResolution,
   EntityRef,
+  GroupRef,
   InventoryListRequest,
   InventoryMovementsRequest,
   InventoryMovementsResponse,
@@ -88,9 +89,12 @@ declare global {
         payload: CatalogSaveRequest,
         approval?: { userId: string; pin: string },
       ): Promise<CatalogSaveResponse>;
-      invoke(channel: "catalog:groups", payload?: undefined): Promise<EntityRef[]>;
-      invoke(channel: "catalog:createGroup", payload: { name: string }): Promise<EntityRef>;
-      invoke(channel: "catalog:renameGroup", payload: { id: string; name: string }): Promise<EntityRef>;
+      invoke(channel: "catalog:groups", payload?: undefined): Promise<GroupRef[]>;
+      invoke(channel: "catalog:createGroup", payload: { name: string; nameEn?: string | null }): Promise<GroupRef>;
+      invoke(
+        channel: "catalog:renameGroup",
+        payload: { id: string; name: string; nameEn?: string | null },
+      ): Promise<GroupRef>;
       invoke(channel: "catalog:codes", payload: { productId: string }): Promise<ProductCode[]>;
       invoke(channel: "catalog:addCode", payload: CatalogAddCodeRequest): Promise<CatalogAddCodeResponse>;
       invoke(channel: "catalog:removeCode", payload: { productId: string; codeId: string }): Promise<ProductCode[]>;

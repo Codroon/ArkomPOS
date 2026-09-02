@@ -49,3 +49,38 @@ export function starterGroupNames(locale: SetupLocale): string[] {
 export function groupNameKey(name: string): string {
   return name.trim().replace(/\s+/g, " ").toLocaleLowerCase("es-ES");
 }
+
+/* ------------------------------------------------------------- display */
+
+/** A group as every screen receives it: both names, so the toggle can choose. */
+export interface GroupRef {
+  id: string;
+  name: string;
+  /** null = the shop has not given an English name; the Spanish one is used */
+  nameEn: string | null;
+}
+
+/**
+ * Which of the two names to show.
+ *
+ * Falls back to the Spanish name rather than leaving a blank: a shop that never
+ * fills in the English column still has a working English till, with its own
+ * words on the shelves. That is the common case and it must not look broken.
+ */
+export function groupDisplayName(group: { name: string; nameEn?: string | null }, locale: SetupLocale): string {
+  if (locale !== "en") return group.name;
+  const en = group.nameEn?.trim();
+  return en ? en : group.name;
+}
+
+/**
+ * The English name a STARTER group should have, matched from either language.
+ *
+ * A till upgrading from before this column has the five under whichever
+ * language it was set up in, so the match runs both ways.
+ */
+export function starterEnglishName(name: string): string | null {
+  const key = groupNameKey(name);
+  const hit = STARTER_GROUPS.find((g) => groupNameKey(g.es) === key || groupNameKey(g.en) === key);
+  return hit ? hit.en : null;
+}

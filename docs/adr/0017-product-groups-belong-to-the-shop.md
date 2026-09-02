@@ -122,3 +122,40 @@ name its own shelves without asking anybody. Five stale copies of one list becam
 **Accepted.** No delete, stated above and in the UI. A shop that renames a starter group loses
 its `translateData` mapping and sees its own name in both languages — which is correct, and is
 the whole point of the rule.
+
+## A1. Amendment (v0.14.2) — a group carries both names, because only the shop knows the second
+
+§2 said starter groups are seeded in the setup language and are shop data from that moment,
+never translated. That was half right and it produced a till nobody could explain: five shelves
+changed language with the toggle (they were in a hardcoded es→en map) and every shelf the shop
+added did not. A shop that names one *Used Phones*, watches *Móviles* become *Phones* beside it,
+and sees *Used Phones* stay English in Spanish, concludes the feature is broken. It is right to.
+
+Removing the map made it consistent and made it worse: now nothing translated, and a till set to
+English showed Spanish shelves with no way to change that short of renaming them and losing the
+Spanish.
+
+**The app cannot translate a name the shop typed.** No dictionary exists for *Coche y viaje*,
+and building one means an online service in a till that has to work with the router unplugged,
+returning a word the shop did not choose. That much stands.
+
+**But the shop knows both words.** So `product_groups` gains `name_en`:
+
+- `name` is canonical and Spanish — it holds the unique index and it is what a document carries.
+- `name_en` is optional. Blank means "show the Spanish one", which is what most shops want and
+  must therefore never look like an error.
+- `groupDisplayName(group, locale)` is the only place that chooses, and it falls back rather
+  than blanking.
+- The starter five are seeded with **both**, from `STARTER_GROUPS`, whatever language set the
+  till up — so the toggle works on day one. A fix-up fills `name_en` on existing tills by
+  matching either language, and skips any row that already has one, because a shop that wrote
+  its own English name owns it.
+- The Grupos modal edits both, side by side. The inline "+ New group" in the editor stays one
+  box: the shop is mid-typing an article, and the second name can wait.
+
+This does not reopen "shop data is never translated" — it is still not translated. It is
+**stored twice, by the only party that knows both**, which is the ordinary answer for localized
+user content and the only one that works offline.
+
+Supplier names deliberately do NOT get this: they are company names, and a company is called
+what it is called in every language.

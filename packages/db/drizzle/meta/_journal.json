@@ -85,6 +85,13 @@
       "when": 1788361482369,
       "tag": "0011_certain_chameleon",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1788364822842,
+      "tag": "0012_flowery_daredevil",
+      "breakpoints": true
     }
   ]
 }

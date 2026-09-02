@@ -246,7 +246,13 @@ export const CatalogGetRequestSchema = z.object({ id: z.string() });
 export const CatalogGetResponseSchema = ProductRowSchema;
 
 export const CatalogGroupsRequestSchema = z.object({}).optional();
-export const CatalogGroupsResponseSchema = z.array(EntityRefSchema);
+/** Both names travel: the toggle chooses, the renderer never guesses. */
+export const GroupRefSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  nameEn: z.string().nullable(),
+});
+export const CatalogGroupsResponseSchema = z.array(GroupRefSchema);
 
 /* Groups are the shop's own words for its shelves, so the shop makes them
    (ADR-0017). There is deliberately no delete: a group with products behind it
@@ -254,12 +260,15 @@ export const CatalogGroupsResponseSchema = z.array(EntityRefSchema);
    this phase does not have. */
 export const CatalogGroupCreateRequestSchema = z.object({
   name: z.string().trim().min(1).max(60),
+  /** the same shelf in English, if the shop knows it. Blank = use the Spanish. */
+  nameEn: z.string().trim().max(60).nullish(),
 });
 export const CatalogGroupRenameRequestSchema = z.object({
   id: z.string(),
   name: z.string().trim().min(1).max(60),
+  nameEn: z.string().trim().max(60).nullish(),
 });
-export const CatalogGroupResponseSchema = EntityRefSchema;
+export const CatalogGroupResponseSchema = GroupRefSchema;
 
 /** req 4.1: cost, PVP, IVA and group are REQUIRED on every save (schema-level). */
 export const CatalogSaveRequestSchema = z.object({

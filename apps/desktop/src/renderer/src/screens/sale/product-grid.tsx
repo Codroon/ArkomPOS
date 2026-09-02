@@ -3,8 +3,9 @@
  * SERIE chip on serialized products. Plain scroll (handoff 02 P1 deviation).
  */
 import { useMemo } from "react";
-import { type EntityRef, type ProductRow } from "@arkom/core";
+import { type GroupRef, type ProductRow } from "@arkom/core";
 import { Chip, cn, GhostButton, MoneyText, SectionLabel, useDataLabel, useT } from "@arkom/ui";
+import { useGroupName } from "../../components/group-picker";
 import { navigateTo } from "../../lib/screen-bus";
 
 function Card({
@@ -18,6 +19,7 @@ function Card({
 }) {
   const t = useT();
   const dataLabel = useDataLabel();
+  const groupName = useGroupName();
   return (
     <button
       type="button"
@@ -46,7 +48,7 @@ export function ProductGrid({
   onAdd,
 }: {
   products: ProductRow[];
-  groups: EntityRef[];
+  groups: GroupRef[];
   activeGroup: string; // "" = all
   search: string;
   /** the card that just refused to be added (out of stock) — shakes once */
@@ -55,6 +57,7 @@ export function ProductGrid({
 }) {
   const t = useT();
   const dataLabel = useDataLabel();
+  const groupName = useGroupName();
 
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -90,7 +93,7 @@ export function ProductGrid({
       {sections.map(({ group, items }) => (
         <div key={group.id} className="mb-4">
           <SectionLabel className="mb-1.5">
-            {dataLabel(group.name)} <span className="font-normal text-subtle">({items.length})</span>
+            {groupName(group)} <span className="font-normal text-subtle">({items.length})</span>
           </SectionLabel>
           <div className="grid grid-cols-4 gap-2">
             {items.map((p) => (

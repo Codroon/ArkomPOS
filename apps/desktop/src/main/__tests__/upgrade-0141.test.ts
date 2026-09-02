@@ -105,9 +105,11 @@ function v0140() {
 
   /* groups the old way: they arrived with the demo dataset and were flagged */
   const groupId = uuidv7();
-  db.insert(s.productGroups)
-    .values({ id: groupId, tenantId: ids.tenantId, name: "Móviles", sortOrder: 0, isDemo: true, createdAt: now })
-    .run();
+  /* raw SQL on purpose: the drizzle schema has columns this old table does not,
+     and the point of the rehearsal is to build the table as it WAS */
+  sqlite
+    .prepare("insert into product_groups (id, tenant_id, name, sort_order, is_demo, created_at) values (?,?,?,?,1,?)")
+    .run(groupId, ids.tenantId, "Móviles", 0, now.getTime());
   const productId = uuidv7();
   db.insert(s.products)
     .values({

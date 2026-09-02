@@ -11,10 +11,10 @@
  * Same shape as the technician picker, for the same reason.
  */
 import { useEffect, useState } from "react";
-import type { EntityRef } from "@arkom/core";
-import { useDataLabel } from "@arkom/ui";
+import { groupDisplayName, type GroupRef } from "@arkom/core";
+import { useLocale } from "@arkom/ui";
 
-let cache: EntityRef[] | null = null;
+let cache: GroupRef[] | null = null;
 /**
  * Bumped whenever the list changes.
  *
@@ -25,7 +25,7 @@ let cache: EntityRef[] | null = null;
  * rows depend on this and re-read.
  */
 let version = 0;
-const listeners = new Set<(rows: EntityRef[]) => void>();
+const listeners = new Set<(rows: GroupRef[]) => void>();
 const versionListeners = new Set<(v: number) => void>();
 
 function announce() {
@@ -46,7 +46,7 @@ export function useGroupsVersion(): number {
   return v;
 }
 
-export async function refreshGroups(): Promise<EntityRef[]> {
+export async function refreshGroups(): Promise<GroupRef[]> {
   try {
     cache = await window.arkom.invoke("catalog:groups");
   } catch (err) {
@@ -57,8 +57,8 @@ export async function refreshGroups(): Promise<EntityRef[]> {
   return cache;
 }
 
-export function useGroups(): EntityRef[] {
-  const [rows, setRows] = useState<EntityRef[]>(cache ?? []);
+export function useGroups(): GroupRef[] {
+  const [rows, setRows] = useState<GroupRef[]>(cache ?? []);
   useEffect(() => {
     listeners.add(setRows);
     if (cache === null) void refreshGroups();
@@ -71,7 +71,7 @@ export function useGroups(): EntityRef[] {
 }
 
 /** A group the shop just made is in the list before its screen asks again. */
-export function noteGroup(group: EntityRef): void {
+export function noteGroup(group: GroupRef): void {
   const rest = (cache ?? []).filter((g) => g.id !== group.id);
   cache = [...rest, group];
   announce();
@@ -84,15 +84,21 @@ export function noteGroup(group: EntityRef): void {
  * one is a 6px chip in a toolbar, the other a full field — so what is shared
  * here is the LIST and the labelling, which is the part that was drifting.
  */
+/** The label a group shows: the shop's English name when there is one. */
+export function useGroupName(): (group: GroupRef) => string {
+  const [locale] = useLocale();
+  return (group) => groupDisplayName(group, locale);
+}
+
 export function GroupOptions({ allLabel }: { allLabel?: string }) {
-  const dataLabel = useDataLabel();
+  const label = useGroupName();
   const groups = useGroups();
   return (
     <>
       {allLabel !== undefined ? <option value="">{allLabel}</option> : null}
       {groups.map((g) => (
         <option key={g.id} value={g.id}>
-          {dataLabel(g.name)}
+          {label(g)}
         </option>
       ))}
     </>

@@ -1,0 +1,1 @@
+ALTER TABLE `product_groups` ADD `name_en` text;

@@ -9,6 +9,7 @@ import {
   assertTypeChangeAllowed,
   generateInternalEan13,
   groupNameKey,
+  type GroupRef,
   isLowStock,
   isMissingData,
   isUsedProductName,
@@ -65,9 +66,9 @@ function selectRows(db: Reader, ctx: MutationCtx, extra?: SQL): ProductRow[] {
   return rows as ProductRow[];
 }
 
-export function listGroups(db: ArkomDb, ctx: MutationCtx): { id: string; name: string }[] {
+export function listGroups(db: ArkomDb, ctx: MutationCtx): GroupRef[] {
   return db
-    .select({ id: productGroups.id, name: productGroups.name })
+    .select({ id: productGroups.id, name: productGroups.name, nameEn: productGroups.nameEn })
     .from(productGroups)
     .where(eq(productGroups.tenantId, ctx.tenantId))
     .orderBy(asc(productGroups.sortOrder))
@@ -93,7 +94,11 @@ function findByName(tx: DbTx, ctx: MutationCtx, name: string, exceptId?: string)
     .find((g) => groupNameKey(g.name) === key && g.id !== exceptId);
 }
 
-export function createGroup(db: ArkomDb, ctx: MutationCtx, input: { name: string }): { id: string; name: string } {
+export function createGroup(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  input: { name: string; nameEn?: string | null },
+): GroupRef {
   return mutate(makeMutateRunner(db), ctx, (tx, log) => {
     const name = input.name.trim().replace(/\s+/g, " ");
     const clash = findByName(tx, ctx, name);
@@ -112,21 +117,22 @@ export function createGroup(db: ArkomDb, ctx: MutationCtx, input: { name: string
       id: uuidv7(),
       tenantId: ctx.tenantId,
       name,
+      nameEn: input.nameEn?.trim() || null,
       sortOrder: last + 1,
       isDemo: false,
       createdAt: new Date(),
     };
     tx.insert(productGroups).values(row).run();
     log({ entity: "product_group", entityId: row.id, action: "create", before: null, after: toOplogJson(row) });
-    return { id: row.id, name: row.name };
+    return { id: row.id, name: row.name, nameEn: row.nameEn };
   });
 }
 
 export function renameGroup(
   db: ArkomDb,
   ctx: MutationCtx,
-  input: { id: string; name: string },
-): { id: string; name: string } {
+  input: { id: string; name: string; nameEn?: string | null },
+): GroupRef {
   return mutate(makeMutateRunner(db), ctx, (tx, log) => {
     const name = input.name.trim().replace(/\s+/g, " ");
     const existing = tx
@@ -139,17 +145,18 @@ export function renameGroup(
     const clash = findByName(tx, ctx, name, input.id);
     if (clash) throw appError("DUPLICATE_NAME", `Ya existe un grupo llamado "${clash.name}".`, "name");
 
-    tx.update(productGroups).set({ name }).where(eq(productGroups.id, input.id)).run();
+    const nameEn = input.nameEn === undefined ? existing.nameEn : input.nameEn?.trim() || null;
+    tx.update(productGroups).set({ name, nameEn }).where(eq(productGroups.id, input.id)).run();
     /* every product points at the ID, so the rename reaches the catalog list,
        the inventory filter and both reports without touching another row */
     log({
       entity: "product_group",
       entityId: input.id,
       action: "update",
-      before: { name: existing.name },
-      after: { name },
+      before: { name: existing.name, nameEn: existing.nameEn },
+      after: { name, nameEn },
     });
-    return { id: input.id, name };
+    return { id: input.id, name, nameEn };
   });
 }
 

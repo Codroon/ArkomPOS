@@ -109,10 +109,13 @@ export function seedStarterGroups(
 ): Map<string, string> {
   const byKey = new Map<string, string>();
   STARTER_GROUPS.forEach((spec, i) => {
+    /* BOTH names, so the toggle works on day one whichever language the shop
+       was set up in. `name` is the canonical Spanish one (ADR-0017). */
     const group = {
       id: uuidv7(),
       tenantId,
-      name: locale === "en" ? spec.en : spec.es,
+      name: spec.es,
+      nameEn: spec.en,
       sortOrder: i,
       isDemo: false,
       createdAt: now,

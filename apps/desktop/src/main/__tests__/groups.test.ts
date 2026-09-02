@@ -17,7 +17,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { openDb, runMigrations, schema as s } from "@arkom/db";
-import { STARTER_GROUPS, groupNameKey, parseIpcError, uuidv7 } from "@arkom/core";
+import { STARTER_GROUPS, groupDisplayName, groupNameKey, parseIpcError, uuidv7 } from "@arkom/core";
 import { handlers } from "./electron-stub";
 import { registerIpcHandlers, registeredChannels } from "../ipc";
 import { endSession, startSession } from "../auth/session";
@@ -88,10 +88,37 @@ describe("a fresh install", () => {
     expect(groupRows().every((g) => g.isDemo === false)).toBe(true);
   });
 
-  it("writes them in the language the till was set up in", () => {
-    expect(groupRows()[0]!.name).toBe("Móviles");
+  it("writes BOTH names, so the toggle works whichever language set it up", () => {
+    /* the app cannot translate a name the shop typed, but it CAN carry two —
+       and for the five it hands over on day one it knows both (ADR-0017 §2) */
+    expect(groupRows()[0]).toMatchObject({ name: "Móviles", nameEn: "Phones" });
     boot({ locale: "en" });
-    expect(groupRows()[0]!.name).toBe("Phones");
+    expect(groupRows()[0]).toMatchObject({ name: "Móviles", nameEn: "Phones" });
+  });
+
+  it("shows the English name only where there is one", () => {
+    const [mobiles] = groupRows();
+    expect(groupDisplayName(mobiles!, "es")).toBe("Móviles");
+    expect(groupDisplayName(mobiles!, "en")).toBe("Phones");
+
+    /* a shelf the shop named itself, with no English given: its word stands in
+       both languages rather than the field going blank */
+    const own = { name: "Coche y viaje", nameEn: null };
+    expect(groupDisplayName(own, "es")).toBe("Coche y viaje");
+    expect(groupDisplayName(own, "en")).toBe("Coche y viaje");
+  });
+
+  it("keeps the second name the shop gives it", async () => {
+    const created = await call<{ id: string; name: string; nameEn: string | null }>("catalog:createGroup", {
+      name: "Coche y viaje",
+      nameEn: "Car & travel",
+    });
+    expect(created.nameEn).toBe("Car & travel");
+    expect(groupDisplayName(created, "en")).toBe("Car & travel");
+
+    await call("catalog:renameGroup", { id: created.id, name: "Coche y viaje", nameEn: "Car and travel" });
+    const after = groupRows().find((g) => g.id === created.id)!;
+    expect(after.nameEn).toBe("Car and travel");
   });
 
   it("keeps them in the order the list was written in", () => {

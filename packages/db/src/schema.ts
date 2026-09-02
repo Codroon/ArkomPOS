@@ -73,7 +73,21 @@ export const terminals = sqliteTable("terminals", {
 export const productGroups = sqliteTable("product_groups", {
   id: text("id").primaryKey(),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
-  name: text("name").notNull(), // Moviles, Protector, Cargador y Cable, Auriculares, Memoria y Ordenador
+  /**
+   * The Spanish name, and the canonical one: it is what the unique index holds
+   * and what a printed document would carry.
+   */
+  name: text("name").notNull(),
+  /**
+   * The same shelf in English, when the shop has given one.
+   *
+   * The app cannot translate a name the shop typed — no dictionary exists for
+   * "Coche y viaje" and guessing would need a network call in an offline till.
+   * But the shop knows both words, so it can say them, and the toggle then
+   * works on group names the way it works on everything else. Null = show the
+   * Spanish name in both languages, which is what most shops will want.
+   */
+  nameEn: text("name_en"),
   sortOrder: integer("sort_order").notNull().default(0),
   /* sample data from first-run "Load demo data", removable until real selling
      starts. Only the three tables that OWN demo rows carry the flag — units,

@@ -19,7 +19,7 @@ import {
   uuidv7,
 } from "@arkom/core";
 import { cn, GhostButton, ScanInput, Toast, useDataLabel, useT, type ScanInputHandle } from "@arkom/ui";
-import { useGroups } from "../../components/group-picker";
+import { useGroupName, useGroups } from "../../components/group-picker";
 import { errorMessage } from "../../lib/errors";
 import { refreshShift } from "../../lib/use-shift";
 import { OpenShiftDialog } from "../cash/open-shift-dialog";
@@ -38,6 +38,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
   const t = useT();
   const groups = useGroups();
   const dataLabel = useDataLabel();
+  const groupName = useGroupName();
   const scanRef = useRef<ScanInputHandle>(null);
 
   const [sale, setSale] = useState<SaleState | null>(null);
@@ -487,7 +488,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
                     : "border-line-strong bg-card text-ink-2 hover:border-muted",
                 )}
               >
-                {dataLabel(group.name)}
+                {groupName(group)}
               </button>
             ))}
           </div>
