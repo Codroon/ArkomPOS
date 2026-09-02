@@ -6,7 +6,7 @@
  * it stops being a way to navigate and becomes a maze. Same rule, same reason,
  * as Dispositivos usados.
  */
-import { TechnicianPicker, UNASSIGNED } from "../../components/technician-picker";
+import { TechnicianPicker } from "../../components/technician-picker";
 import { useCallback, useEffect, useState } from "react";
 import { REPAIR_STATUSES, type RepairListRow, type RepairStatus } from "@arkom/core";
 import { Chip, ScanInput, SelectInput, Switch, cn, useT } from "@arkom/ui";
@@ -99,12 +99,12 @@ export function RepairList({
           <TechnicianPicker
             mode="filter"
             className="w-[190px]"
-            value={filters.unassignedOnly ? UNASSIGNED : (filters.technicianId ?? "")}
+            value={filters.technicianId ?? ""}
             onChange={(next) =>
               setFilters((f) => ({
                 ...f,
-                technicianId: next === "" || next === UNASSIGNED ? null : next,
-                unassignedOnly: next === UNASSIGNED,
+                technicianId: next || null,
+                unassignedOnly: false,
               }))
             }
           />

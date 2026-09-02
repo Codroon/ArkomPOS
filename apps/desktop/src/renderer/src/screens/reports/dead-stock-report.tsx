@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReportsDeadStockResponse } from "@arkom/core";
 import { SelectInput, useDataLabel, useT } from "@arkom/ui";
-import { useGroups } from "../../components/group-picker";
+import { GroupOptions } from "../../components/group-picker";
 import type { ReportFilters } from "./reports-screen";
 import { EmptyReport, Figure, FilterBar, ReportShell, SummaryStrip, dayStamp, money } from "./report-shell";
 
@@ -26,7 +26,6 @@ export function DeadStockReport({
 }) {
   const t = useT();
   const dataLabel = useDataLabel();
-  const groups = useGroups();
   const [data, setData] = useState<ReportsDeadStockResponse | null>(null);
 
   const query = useMemo(() => ({ groupId: filters.deadGroupId }), [filters.deadGroupId]);
@@ -55,13 +54,8 @@ export function DeadStockReport({
           value={filters.deadGroupId ?? ""}
           onChange={(e) => patch({ deadGroupId: e.target.value || null })}
         >
-          <option value="">{t("rep2.val.allGroups")}</option>
-          {groups.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
-            </option>
-          ))}
-        </SelectInput>
+          <GroupOptions allLabel={t("rep2.val.allGroups")} />
+                </SelectInput>
       </FilterBar>
 
       <SummaryStrip>

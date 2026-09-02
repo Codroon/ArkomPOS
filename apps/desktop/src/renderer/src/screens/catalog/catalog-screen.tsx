@@ -5,8 +5,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseIpcError, type CatalogListRequest, type ProductRow } from "@arkom/core";
-import { cn, ConfirmDialog, GhostButton, PrimaryButton, SearchInput, useDataLabel, useT } from "@arkom/ui";
-import { useGroups } from "../../components/group-picker";
+import { cn, ConfirmDialog, GhostButton, PrimaryButton, SearchInput, useT } from "@arkom/ui";
+import { GroupOptions } from "../../components/group-picker";
 import { GroupsModal } from "../../components/groups-modal";
 import { useCan } from "../../lib/use-session";
 import { consumeCatalogPrefill } from "../../lib/screen-bus";
@@ -62,10 +62,8 @@ function FilterChip({
 export function CatalogScreen() {
   const t = useT();
   const can = useCan();
-  const groups = useGroups();
   const [managingGroups, setManagingGroups] = useState(false);
   const approval = useApprovalFlow();
-  const dataLabel = useDataLabel();
   const [rows, setRows] = useState<ProductRow[]>([]);
   const [searchText, setSearchText] = useState("");
   const [search, setSearch] = useState(""); // debounced, ≥2 chars
@@ -250,13 +248,8 @@ export function CatalogScreen() {
           onChange={(e) => setFilters((f) => ({ ...f, groupId: e.target.value }))}
           className="h-6 rounded-[3px] border border-line-strong bg-card px-1.5 text-[11px] text-ink-2 outline-none"
         >
-          <option value="">{t("catalog.filter.groupAll")}</option>
-          {groups.map((g) => (
-            <option key={g.id} value={g.id}>
-              {dataLabel(g.name)}
-            </option>
-          ))}
-        </select>
+          <GroupOptions allLabel={t("catalog.filter.groupAll")} />
+                </select>
         <select
           value={filters.itemType}
           onChange={(e) => setFilters((f) => ({ ...f, itemType: e.target.value as Filters["itemType"] }))}

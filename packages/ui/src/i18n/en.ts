@@ -39,6 +39,7 @@ export const en: Record<TKey, string> = {
   "common.no": "No",
   "common.retry": "Try again",
   "tech.all": "All technicians",
+  "tech.select": "— Select technician —",
   "tech.unassigned": "Unassigned",
   "tech.label": "Technician",
   "tech.change": "Change technician",

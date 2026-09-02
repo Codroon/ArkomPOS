@@ -41,11 +41,16 @@ export function useTechnicians(): TechnicianRef[] {
   return rows;
 }
 
-export const UNASSIGNED = "unassigned";
-
 /**
- * @param mode `filter` adds "todos"; `assign` does not — assigning to
- * "everyone" is not a thing, and a picker that offers it invites the question.
+ * One empty option, worded for what the screen is doing.
+ *
+ * A filter's blank means "every technician"; an intake's blank means "nobody has
+ * been given this yet". They are different sentences about the same absence, so
+ * the picker says which one it is rather than making the reader work it out.
+ *
+ * There is deliberately no "Unassigned" CHOICE. On an intake it read as a
+ * technician you could pick, which is not a thing; on a filter it was a state
+ * masquerading as a person in a list of people.
  */
 export function TechnicianPicker({
   value,
@@ -54,12 +59,7 @@ export function TechnicianPicker({
   className,
   disabled,
 }: {
-  /**
-   * Raw, so the three states stay distinguishable: `""` is no filter,
-   * `UNASSIGNED` is the tickets nobody has taken, an id is a person. Collapsing
-   * the first two into `null` is how a filter for "unassigned" quietly becomes
-   * a filter for "everything".
-   */
+  /** `""` is the empty option — every technician, or nobody yet. */
   value: string;
   onChange: (next: string) => void;
   mode: "filter" | "assign";
@@ -76,8 +76,7 @@ export function TechnicianPicker({
       value={value}
       onChange={(e) => onChange(e.target.value)}
     >
-      {mode === "filter" ? <option value="">{t("tech.all")}</option> : null}
-      <option value={UNASSIGNED}>{t("tech.unassigned")}</option>
+      <option value="">{mode === "filter" ? t("tech.all") : t("tech.select")}</option>
       {technicians.map((u) => (
         <option key={u.id} value={u.id}>
           {u.name}

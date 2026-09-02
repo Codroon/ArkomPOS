@@ -45,7 +45,7 @@ import { useTicketPrint } from "../../lib/use-ticket-print";
 import { PhotoSlotTile, useHasCamera } from "../used/photo-slots";
 import { slotKind, type DraftPhoto, type PhotoSlot } from "../used/model";
 import { CustomerPicker } from "./customer-picker";
-import { TechnicianPicker, UNASSIGNED } from "../../components/technician-picker";
+import { TechnicianPicker } from "../../components/technician-picker";
 
 /** No seller-ID slot here: the device's owner is a customer, not a seller. */
 const REPAIR_PHOTO_SLOTS = ["front", "back", "extra1", "extra2"] as const;
@@ -82,7 +82,7 @@ const emptyDraft = (): IntakeDraft => ({
   photos: {},
   promisedDate: "",
   promisedHalf: "",
-  technicianId: UNASSIGNED,
+  technicianId: "",
   deposit: "",
   depositMethod: "cash",
   cap: "",
@@ -189,7 +189,7 @@ export function RepairIntakeScreen({ onDone }: { onDone: (ticketId: string | nul
         depositCents,
         depositMethod: draft.depositMethod,
         authorizedCapCents: capCents,
-        assignedUserId: draft.technicianId === UNASSIGNED ? null : draft.technicianId,
+        assignedUserId: draft.technicianId || null,
       });
       setCreated(result);
       /* The ticket exists by now; the receipt is a separate, retryable act

@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatCents, type ReportsValuationResponse } from "@arkom/core";
 import { SectionLabel, SelectInput, useDataLabel, useT } from "@arkom/ui";
-import { useGroups } from "../../components/group-picker";
+import { GroupOptions } from "../../components/group-picker";
 import type { ReportFilters } from "./reports-screen";
 import { EmptyReport, FilterBar, ReportShell, money } from "./report-shell";
 
@@ -23,7 +23,6 @@ export function ValuationReport({
 }) {
   const t = useT();
   const dataLabel = useDataLabel();
-  const groups = useGroups();
   const [data, setData] = useState<ReportsValuationResponse | null>(null);
 
   const query = useMemo(() => ({ groupId: filters.valuationGroupId }), [filters.valuationGroupId]);
@@ -52,13 +51,8 @@ export function ValuationReport({
           value={filters.valuationGroupId ?? ""}
           onChange={(e) => patch({ valuationGroupId: e.target.value || null })}
         >
-          <option value="">{t("rep2.val.allGroups")}</option>
-          {groups.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
-            </option>
-          ))}
-        </SelectInput>
+          <GroupOptions allLabel={t("rep2.val.allGroups")} />
+                </SelectInput>
       </FilterBar>
 
       {/* one figure, the largest on any report screen, because it is the whole

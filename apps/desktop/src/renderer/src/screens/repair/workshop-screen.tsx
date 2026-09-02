@@ -13,7 +13,7 @@
  * which means opening the dialog the action needs. Until every one of those
  * dialogs exists, a card opens its ficha rather than pretending to move.
  */
-import { TechnicianPicker, UNASSIGNED } from "../../components/technician-picker";
+import { TechnicianPicker } from "../../components/technician-picker";
 import { useCallback, useEffect, useState } from "react";
 import { REPAIR_STATUSES, type RepairStatus, type WorkshopBoard } from "@arkom/core";
 import { SelectInput, Switch, cn, useT } from "@arkom/ui";
@@ -49,8 +49,8 @@ export function WorkshopScreen() {
     try {
       setBoard(
         await window.arkom.invoke("workshop:board", {
-          technicianId: technicianId === UNASSIGNED || technicianId === "" ? null : technicianId,
-          unassignedOnly: technicianId === UNASSIGNED,
+          technicianId: technicianId || null,
+          unassignedOnly: false,
         }),
       );
       setError(null);

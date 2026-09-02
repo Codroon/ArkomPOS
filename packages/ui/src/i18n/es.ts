@@ -41,6 +41,7 @@ export const es = {
   "common.no": "No",
   "common.retry": "Reintentar",
   "tech.all": "Todos los técnicos",
+  "tech.select": "— Selecciona técnico —",
   "tech.unassigned": "Sin asignar",
   "tech.label": "Técnico",
   "tech.change": "Cambiar técnico",

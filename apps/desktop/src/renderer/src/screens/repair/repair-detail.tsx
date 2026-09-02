@@ -24,7 +24,7 @@ import {
 import { errorMessage } from "../../lib/errors";
 import { useTicketPrint } from "../../lib/use-ticket-print";
 import { PrintToast } from "../../lib/print-toast";
-import { TechnicianPicker, UNASSIGNED, useTechnicians } from "../../components/technician-picker";
+import { TechnicianPicker, useTechnicians } from "../../components/technician-picker";
 import { OverdueChip, StatusChip, STATUS_KEYS, formatDateTime, formatPromised } from "./status-chip";
 import { QuotePanel } from "./quote-panel";
 import { ApprovalDialog, ReceivePartDialog } from "./repair-dialogs";
@@ -493,7 +493,7 @@ export function RepairDetailPane({
             <div className="px-3.5 py-3">
               <TechnicianPicker
                 mode="assign"
-                value={assignChoice || (detail?.assignedUserId ?? UNASSIGNED)}
+                value={assignChoice || (detail?.assignedUserId ?? "")}
                 onChange={setAssignChoice}
               />
             </div>
@@ -501,8 +501,7 @@ export function RepairDetailPane({
               <GhostButton onClick={() => setAssigning(false)}>{t("common.cancel")}</GhostButton>
               <AccentButton
                 onClick={() => {
-                  const choice = assignChoice || (detail?.assignedUserId ?? UNASSIGNED);
-                  const userId = choice === UNASSIGNED ? null : choice;
+                  const userId = (assignChoice || detail?.assignedUserId) ?? null;
                   void window.arkom
                     .invoke("repair:assign", { ticketId, userId })
                     .then((next) => {

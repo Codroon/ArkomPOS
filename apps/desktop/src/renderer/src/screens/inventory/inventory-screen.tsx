@@ -8,8 +8,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isLowStock, type InventoryRow } from "@arkom/core";
-import { cn, GhostButton, MoneyText, PrimaryButton, SearchInput, Toast, useDataLabel, useT } from "@arkom/ui";
-import { useGroups } from "../../components/group-picker";
+import { cn, GhostButton, MoneyText, PrimaryButton, SearchInput, Toast, useT } from "@arkom/ui";
+import { GroupOptions } from "../../components/group-picker";
 import { openCatalogWithBarcode } from "../../lib/screen-bus";
 import { EntradaDrawer } from "./entrada-drawer";
 import { InventoryTable } from "./inventory-table";
@@ -23,8 +23,6 @@ interface Filters {
 
 export function InventoryScreen() {
   const t = useT();
-  const groups = useGroups();
-  const dataLabel = useDataLabel();
   const [allRows, setAllRows] = useState<InventoryRow[] | null>(null); // null = loading
   const [searchText, setSearchText] = useState("");
   const [filters, setFilters] = useState<Filters>({ groupId: "", itemType: "", lowStockOnly: false });
@@ -131,13 +129,8 @@ export function InventoryScreen() {
           onChange={(e) => setFilters((f) => ({ ...f, groupId: e.target.value }))}
           className="h-6 rounded-[3px] border border-line-strong bg-card px-1.5 text-[11px] text-ink-2 outline-none"
         >
-          <option value="">{t("catalog.filter.groupAll")}</option>
-          {groups.map((g) => (
-            <option key={g.id} value={g.id}>
-              {dataLabel(g.name)}
-            </option>
-          ))}
-        </select>
+          <GroupOptions allLabel={t("catalog.filter.groupAll")} />
+                </select>
         <select
           value={filters.itemType}
           onChange={(e) => setFilters((f) => ({ ...f, itemType: e.target.value as Filters["itemType"] }))}
