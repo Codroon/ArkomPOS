@@ -10,7 +10,6 @@ import {
   parseIpcError,
   availableForSale,
   type CompletedSale,
-  type EntityRef,
   type ProductRow,
   type SaleAddLineResponse,
   type SaleLineRow,
@@ -20,6 +19,7 @@ import {
   uuidv7,
 } from "@arkom/core";
 import { cn, GhostButton, ScanInput, Toast, useDataLabel, useT, type ScanInputHandle } from "@arkom/ui";
+import { useGroups } from "../../components/group-picker";
 import { errorMessage } from "../../lib/errors";
 import { refreshShift } from "../../lib/use-shift";
 import { OpenShiftDialog } from "../cash/open-shift-dialog";
@@ -36,6 +36,7 @@ import { OverrideModal, ParkModal, ParkedPopover, UnitPickModal, type UnitPickSt
 
 export function SaleScreen({ terminalName }: { terminalName: string }) {
   const t = useT();
+  const groups = useGroups();
   const dataLabel = useDataLabel();
   const scanRef = useRef<ScanInputHandle>(null);
 
@@ -44,7 +45,6 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
   saleRef.current = sale; // scan callbacks must see the live draft, not a stale closure
   const [completed, setCompleted] = useState<CompletedSale | null>(null);
   const [products, setProducts] = useState<ProductRow[]>([]);
-  const [groups, setGroups] = useState<EntityRef[]>([]);
   const [activeGroup, setActiveGroup] = useState("");
   const [searchText, setSearchText] = useState("");
   const [noMatch, setNoMatch] = useState<string | null>(null);
@@ -109,7 +109,6 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
   // boot: restore the terminal's live draft (power-cut behavior) + catalog + parked
   useEffect(() => {
     refreshProducts();
-    window.arkom.invoke("catalog:groups").then(setGroups).catch((err) => console.error(err));
     window.arkom
       .invoke("sale:current")
       .then(setSale)

@@ -4,8 +4,11 @@
  * list table + 380px editor. Dirty guard on row switch ("¿Descartar cambios?").
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { parseIpcError, type CatalogListRequest, type EntityRef, type ProductRow } from "@arkom/core";
+import { parseIpcError, type CatalogListRequest, type ProductRow } from "@arkom/core";
 import { cn, ConfirmDialog, GhostButton, PrimaryButton, SearchInput, useDataLabel, useT } from "@arkom/ui";
+import { useGroups } from "../../components/group-picker";
+import { GroupsModal } from "../../components/groups-modal";
+import { useCan } from "../../lib/use-session";
 import { consumeCatalogPrefill } from "../../lib/screen-bus";
 import { useApprovalFlow } from "../../lib/use-approval";
 import { CatalogEditor } from "./catalog-editor";
@@ -58,10 +61,12 @@ function FilterChip({
 
 export function CatalogScreen() {
   const t = useT();
+  const can = useCan();
+  const groups = useGroups();
+  const [managingGroups, setManagingGroups] = useState(false);
   const approval = useApprovalFlow();
   const dataLabel = useDataLabel();
   const [rows, setRows] = useState<ProductRow[]>([]);
-  const [groups, setGroups] = useState<EntityRef[]>([]);
   const [searchText, setSearchText] = useState("");
   const [search, setSearch] = useState(""); // debounced, ≥2 chars
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
@@ -101,10 +106,6 @@ export function CatalogScreen() {
   }, [refresh]);
 
   useEffect(() => {
-    window.arkom
-      .invoke("catalog:groups")
-      .then(setGroups)
-      .catch((err) => console.error("catalog:groups failed", err));
     // scan-miss handoff: entrada's "Crear artículo" arrives with the code prefilled
     const prefill = consumeCatalogPrefill();
     if (prefill) openDraft({ ...emptyDraft(), barcode: prefill });
@@ -237,6 +238,8 @@ export function CatalogScreen() {
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
         />
+        {/* the shop's own shelves, next to the list they organise (ADR-0017) */}
+        <GhostButton onClick={() => setManagingGroups(true)}>{t("groups.manage")}</GhostButton>
         <PrimaryButton onClick={onNew}>{t("catalog.new")}</PrimaryButton>
       </div>
 
@@ -318,7 +321,6 @@ export function CatalogScreen() {
           <CatalogEditor
             draft={draft}
             errors={visibleErrors}
-            groups={groups}
             canSave={dirty && valid}
             saving={saving}
             generalError={resolveErrorText(t, generalError ?? undefined) ?? null}
@@ -361,6 +363,9 @@ export function CatalogScreen() {
         }}
         onCancel={() => setBarcodeWarning(null)}
       />
+      {managingGroups ? (
+        <GroupsModal canEdit={can("catalog.edit")} onClose={() => setManagingGroups(false)} />
+      ) : null}
       {approval.modal}
     </div>
   );

@@ -19,8 +19,10 @@ import {
   mutate,
   toOplogJson,
   uuidv7,
+  STARTER_GROUPS,
   type LogFn,
   type MutationCtx,
+  type SetupLocale,
 } from "@arkom/core";
 import { schema as s, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner } from "../mutate-runner";
@@ -86,6 +88,42 @@ export function isSetupNeeded(db: ArkomDb): boolean {
   return db.select({ id: s.tenants.id }).from(s.tenants).limit(1).all().length === 0;
 }
 
+/**
+ * The five groups every fresh install starts with — ADR-0017.
+ *
+ * They are `is_demo = false` on purpose. A shop that loads the demo dataset and
+ * later clears it keeps its shelves; before v0.14.1 the groups went with the
+ * demo products, and since a product cannot be saved without one, clearing the
+ * demo left a catalog nobody could add to.
+ *
+ * Returned by key so the demo dataset can find them without matching on a name
+ * that depends on the setup language.
+ */
+export function seedStarterGroups(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tx: any,
+  log: LogFn,
+  tenantId: string,
+  locale: SetupLocale,
+  now: Date,
+): Map<string, string> {
+  const byKey = new Map<string, string>();
+  STARTER_GROUPS.forEach((spec, i) => {
+    const group = {
+      id: uuidv7(),
+      tenantId,
+      name: locale === "en" ? spec.en : spec.es,
+      sortOrder: i,
+      isDemo: false,
+      createdAt: now,
+    };
+    tx.insert(s.productGroups).values(group).run();
+    log({ entity: "product_group", entityId: group.id, action: "create", before: null, after: toOplogJson(group) });
+    byKey.set(spec.key, group.id);
+  });
+  return byKey;
+}
+
 export interface FirstRunInput {
   shopLegalName: string;
   shopNif: string;
@@ -94,6 +132,8 @@ export interface FirstRunInput {
   terminalName: string;
   seriesPrefix: string;
   loadDemo: boolean;
+  /** decides the starter group names, and nothing else */
+  locale?: SetupLocale;
 }
 
 export interface FirstRunResult {
@@ -147,8 +187,12 @@ export function completeFirstRun(db: ArkomDb, input: FirstRunInput): FirstRunRes
       log({ entity: "setting", entityId: key, action: "create", before: null, after: { key, value } });
     }
 
+    /* before the demo data, and whether or not it comes: an empty till still
+       needs somewhere to put its first product (ADR-0017) */
+    const groups = seedStarterGroups(tx, log, ids.tenantId, input.locale ?? "es", now);
+
     const demo = input.loadDemo
-      ? insertDemoData(tx, log, ids, now)
+      ? insertDemoData(tx, log, ids, now, groups)
       : { productCount: 0, unitCount: 0 };
 
     return { tenantId: ids.tenantId, demoProducts: demo.productCount, demoUnits: demo.unitCount };
@@ -262,10 +306,25 @@ export function removeDemoData(db: ArkomDb, ctx: MutationCtx): DemoRemoval {
       log({ entity: "product", entityId: productId, action: "delete", before: { isDemo: true }, after: null });
     }
 
-    for (const table of [
-      { t: s.productGroups, entity: "product_group", key: "groups" as const },
-      { t: s.suppliers, entity: "supplier", key: "suppliers" as const },
-    ]) {
+    /* Groups are ADOPTED, not deleted (ADR-0017).
+       On a v0.14.1 install they are already the shop's — is_demo = false — so
+       this finds nothing. On a till set up before that, the five groups came in
+       with the demo dataset, and deleting them here left a catalog with no
+       shelf to put a product on and no way in the app to make one. Clearing the
+       flag turns them into what they should always have been. */
+    const adopted = tx.select().from(s.productGroups).where(eq(s.productGroups.isDemo, true)).all();
+    for (const row of adopted as { id: string }[]) {
+      log({
+        entity: "product_group",
+        entityId: row.id,
+        action: "update",
+        before: { isDemo: true },
+        after: { isDemo: false },
+      });
+    }
+    tx.update(s.productGroups).set({ isDemo: false }).where(eq(s.productGroups.isDemo, true)).run();
+
+    for (const table of [{ t: s.suppliers, entity: "supplier", key: "suppliers" as const }]) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rows = tx.select().from(table.t as any).where(eq((table.t as any).isDemo, true)).all();
       for (const row of rows as { id: string }[]) {

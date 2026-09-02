@@ -58,6 +58,8 @@ business rows + `product_stock` cache + `oplog` entry → typed result back.
 | `catalog:list` | filters{search?, groupId?, itemType?, lowStockOnly?, missingDataOnly?} → ProductRow[] | flags derived from NULLs (req 3.3) |
 | `catalog:get` | {id} → ProductDetail | |
 | `catalog:groups` | {} → {id, name}[] | editor group select; venta group grid reuses it |
+| `catalog:createGroup` | {name} → {id, name} | ADR-0017; `catalog.create`; DUPLICATE_NAME on a clash |
+| `catalog:renameGroup` | {id, name} → {id, name} | ADR-0017; `catalog.edit`; no propagation needed |
 | `catalog:save` | ProductInput{…, confirmed?} → {kind:'saved', product} \| {kind:'barcodeWarning', code, conflicts[]} | full req-4 validation; barcode auto-gen if blank; duplicate **name** → typed error; duplicate **barcode** → warning payload, re-sent with `confirmed:true` (PRD 4.4 amended) |
 | `catalog:codes` | {productId} → ProductCode[] | additional scannable codes on a product |
 | `catalog:addCode` | {productId, code, confirmed?} → {kind:'added', codes[]} \| {kind:'sharedWarning', code, conflicts[]} | attaching a code already on other products warns first; oplog `product_code.create` |

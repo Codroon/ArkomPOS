@@ -627,10 +627,10 @@ export function valuation(db: Reader, ctx: MutationCtx, f: { groupId?: string | 
   const withStock = rows.filter((r) => r.onHand > 0 || r.valueCents > 0);
   const totalCents = withStock.reduce((sum, r) => sum + r.valueCents, 0);
 
-  const groups = new Map<string, { groupId: string | null; groupName: string; qty: number; valueCents: number }>();
+  const groups = new Map<string, { groupId: string | null; groupName: string | null; qty: number; valueCents: number }>();
   for (const r of withStock) {
     const key = r.groupId ?? "";
-    const entry = groups.get(key) ?? { groupId: r.groupId, groupName: r.groupName ?? "Sin grupo", qty: 0, valueCents: 0 };
+    const entry = groups.get(key) ?? { groupId: r.groupId, groupName: r.groupName, qty: 0, valueCents: 0 };
     entry.qty += r.onHand;
     entry.valueCents += r.valueCents;
     groups.set(key, entry);
@@ -642,7 +642,7 @@ export function valuation(db: Reader, ctx: MutationCtx, f: { groupId?: string | 
     products: withStock.map((r) => ({
       productId: r.productId,
       name: r.name,
-      groupName: r.groupName ?? "Sin grupo",
+      groupName: r.groupName,
       onHand: r.onHand,
       /* serialized rows show no single unit cost, because they have none */
       unitCostCents: isSerializedItem(r.itemType) ? null : r.unitCostCents,
@@ -656,7 +656,8 @@ export function valuation(db: Reader, ctx: MutationCtx, f: { groupId?: string | 
 export interface DeadStockRow {
   productId: string;
   name: string;
-  groupName: string;
+  /** null = the product has no group. The reader words that, not this. */
+  groupName: string | null;
   onHand: number;
   costTiedUpCents: number;
   lastSaleAtMs: number | null;
@@ -713,7 +714,7 @@ export function deadStock(
     .map<DeadStockRow>((r) => ({
       productId: r.productId,
       name: r.name,
-      groupName: r.groupName ?? "Sin grupo",
+      groupName: r.groupName,
       onHand: r.onHand,
       costTiedUpCents: r.valueCents,
       lastSaleAtMs: r.lastSale,

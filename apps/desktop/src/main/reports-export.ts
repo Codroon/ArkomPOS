@@ -219,7 +219,7 @@ function buildCsv(
         text: renderCsv({
           columns: [
             { header: "Artículo", cell: (r) => r.name },
-            { header: "Grupo", cell: (r) => r.groupName },
+            { header: "Grupo", cell: (r) => r.groupName ?? "Sin grupo" },
             { header: "Existencias", cell: (r) => r.onHand },
             { header: "Coste unitario", cell: (r) => csvMoney(r.unitCostCents) },
             { header: "Valor", cell: (r) => csvMoney(r.valueCents) },
@@ -243,7 +243,7 @@ function buildCsv(
         text: renderCsv({
           columns: [
             { header: "Artículo", cell: (r) => r.name },
-            { header: "Grupo", cell: (r) => r.groupName },
+            { header: "Grupo", cell: (r) => r.groupName ?? "Sin grupo" },
             { header: "Existencias", cell: (r) => r.onHand },
             { header: "Coste inmovilizado", cell: (r) => csvMoney(r.costTiedUpCents) },
             { header: "Última venta", cell: (r) => (r.lastSaleAtMs === null ? "nunca" : csvDate(r.lastSaleAtMs)) },

@@ -7,8 +7,9 @@
  * core helpers at P1 catalog scale (the §4 server filters remain for Venta).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { isLowStock, type EntityRef, type InventoryRow } from "@arkom/core";
+import { isLowStock, type InventoryRow } from "@arkom/core";
 import { cn, GhostButton, MoneyText, PrimaryButton, SearchInput, Toast, useDataLabel, useT } from "@arkom/ui";
+import { useGroups } from "../../components/group-picker";
 import { openCatalogWithBarcode } from "../../lib/screen-bus";
 import { EntradaDrawer } from "./entrada-drawer";
 import { InventoryTable } from "./inventory-table";
@@ -22,9 +23,9 @@ interface Filters {
 
 export function InventoryScreen() {
   const t = useT();
+  const groups = useGroups();
   const dataLabel = useDataLabel();
   const [allRows, setAllRows] = useState<InventoryRow[] | null>(null); // null = loading
-  const [groups, setGroups] = useState<EntityRef[]>([]);
   const [searchText, setSearchText] = useState("");
   const [filters, setFilters] = useState<Filters>({ groupId: "", itemType: "", lowStockOnly: false });
   const [drawerProduct, setDrawerProduct] = useState<InventoryRow | null>(null);
@@ -40,10 +41,6 @@ export function InventoryScreen() {
 
   useEffect(() => {
     refresh().catch((err) => console.error("inventory:list failed", err));
-    window.arkom
-      .invoke("catalog:groups")
-      .then(setGroups)
-      .catch((err) => console.error("catalog:groups failed", err));
   }, [refresh]);
 
   // F6 opens receiving from anywhere on the screen

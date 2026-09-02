@@ -18,7 +18,7 @@
  */
 import { useCallback, useMemo, useState } from "react";
 import { SetupCompleteResponseSchema } from "@arkom/core";
-import { AccentButton, Field, LocaleToggle, TextInput, useT, type TFn } from "@arkom/ui";
+import { AccentButton, Field, LocaleToggle, TextInput, useLocale, useT, type TFn } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
 
 const PREFIX_OK = /^[A-Za-z0-9-]+$/;
@@ -83,6 +83,7 @@ function DataChoice({
 
 export function FirstRunDialog({ onDone }: { onDone: () => void }) {
   const t = useT();
+  const [locale] = useLocale();
   const [draft, setDraft] = useState<Draft>(() => initialDraft(t));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +120,9 @@ export function FirstRunDialog({ onDone }: { onDone: () => void }) {
           ticketFooter: draft.ticketFooter.trim(),
           terminalName: draft.terminalName.trim(),
           seriesPrefix: draft.seriesPrefix.trim(),
+          /* the starter groups are written in the language the shop is reading
+             right now, and are shop data from then on (ADR-0017) */
+          locale,
         }),
       );
       onDone();

@@ -11,7 +11,6 @@ import {
   marginCents,
   marginPct,
   parseMoneyInput,
-  type EntityRef,
 } from "@arkom/core";
 import {
   Field,
@@ -27,10 +26,11 @@ import {
   useT,
   type SegmentOption,
 } from "@arkom/ui";
-import { useCallback, useEffect, useState } from "react";
-import type { ProductCode } from "@arkom/core";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { parseIpcError, type ProductCode } from "@arkom/core";
 import { ConfirmDialog } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
+import { noteGroup, refreshGroups, useGroups } from "../../components/group-picker";
 import { resolveErrorText, type Draft, type DraftErrors } from "./model";
 
 /**
@@ -152,7 +152,6 @@ function ExtraCodesField({ productId, productName }: { productId: string | null;
 export function CatalogEditor({
   draft,
   errors,
-  groups,
   canSave,
   saving,
   generalError,
@@ -162,7 +161,6 @@ export function CatalogEditor({
 }: {
   draft: Draft | null;
   errors: DraftErrors;
-  groups: EntityRef[];
   canSave: boolean; // dirty ∧ valid (handoff: Guardar disabled otherwise)
   saving: boolean;
   generalError: string | null;
@@ -254,16 +252,11 @@ export function CatalogEditor({
         {/* keyed: switching products must reset the field's own state */}
         <ExtraCodesField key={draft.id ?? "new"} productId={draft.id} productName={draft.name} />
 
-        <Field label={t("editor.group")} required error={err("groupId")}>
-          <SelectInput requiredStyle value={draft.groupId} onChange={(e) => onPatch({ groupId: e.target.value })}>
-            <option value="">{t("editor.groupPlaceholder")}</option>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {dataLabel(g.name)}
-              </option>
-            ))}
-          </SelectInput>
-        </Field>
+        <GroupField
+          value={draft.groupId}
+          error={err("groupId")}
+          onChange={(groupId) => onPatch({ groupId })}
+        />
 
         <div className="grid grid-cols-3 gap-2">
           <Field label={t("editor.cost")} required error={err("costCents")}>
@@ -377,3 +370,109 @@ export function CatalogEditor({
     </div>
   );
 }
+
+/**
+ * The group field, with a way out of the dead end.
+ *
+ * A group is required to save, and until v0.14.1 the only groups that existed
+ * came with the demo dataset — so a shop that started empty reached this field,
+ * found it empty, and had nowhere to go. Picking "+ Nuevo grupo…" turns the
+ * select into a name box; the duplicate comes back under the field, because
+ * that is where the shop is looking (ADR-0017).
+ */
+function GroupField({
+  value,
+  error,
+  onChange,
+}: {
+  value: string;
+  error?: string;
+  onChange: (groupId: string) => void;
+}) {
+  const t = useT();
+  const dataLabel = useDataLabel();
+  const groups = useGroups();
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (creating) inputRef.current?.focus();
+  }, [creating]);
+
+  const create = async () => {
+    const trimmed = name.trim();
+    if (!trimmed || busy) return;
+    setBusy(true);
+    setFailure(null);
+    try {
+      const group = await window.arkom.invoke("catalog:createGroup", { name: trimmed });
+      noteGroup(group);
+      void refreshGroups();
+      // the point of creating it here: the product being edited lands in it
+      onChange(group.id);
+      setCreating(false);
+      setName("");
+    } catch (e) {
+      setFailure(parseIpcError(e)?.code === "DUPLICATE_NAME" ? t("groups.duplicate") : errorMessage(t, e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (creating) {
+    return (
+      <Field label={t("groups.newGroup")} required error={failure ?? undefined}>
+        <div className="flex items-center gap-2">
+          <TextInput
+            ref={inputRef}
+            className="flex-1"
+            maxLength={60}
+            value={name}
+            placeholder={t("groups.namePlaceholder")}
+            onChange={(e) => {
+              setName(e.target.value);
+              setFailure(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void create();
+              }
+              if (e.key === "Escape") setCreating(false);
+            }}
+          />
+          <GhostButton onClick={() => setCreating(false)}>{t("common.cancel")}</GhostButton>
+          <GhostButton disabled={!name.trim() || busy} onClick={() => void create()}>
+            {t("groups.add")}
+          </GhostButton>
+        </div>
+      </Field>
+    );
+  }
+
+  return (
+    <Field label={t("editor.group")} required error={error}>
+      <SelectInput
+        requiredStyle
+        value={value}
+        onChange={(e) => {
+          if (e.target.value === NEW_GROUP) setCreating(true);
+          else onChange(e.target.value);
+        }}
+      >
+        <option value="">{t("editor.groupPlaceholder")}</option>
+        {groups.map((g) => (
+          <option key={g.id} value={g.id}>
+            {dataLabel(g.name)}
+          </option>
+        ))}
+        <option value={NEW_GROUP}>{t("editor.groupNew")}</option>
+      </SelectInput>
+    </Field>
+  );
+}
+
+const NEW_GROUP = "__new__";

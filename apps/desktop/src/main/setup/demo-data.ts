@@ -17,6 +17,7 @@ import { schema as s } from "@arkom/db";
 
 type ProductSpec = {
   name: string;
+  /** a STARTER_GROUPS key, not a name — the name depends on the setup language */
   group: string;
   itemType?: "stocked" | "serialized";
   costCents: number | null;
@@ -28,8 +29,6 @@ type ProductSpec = {
   openingQty?: number; // stocked only
 };
 
-const GROUPS = ["Móviles", "Protectores", "Cargadores y Cables", "Auriculares", "Memoria y Ordenador"] as const;
-
 const SUPPLIERS = ["Distribuidora Madrid Móvil", "TecnoImport Levante"] as const;
 
 // ~29 products across the groups (4 serialized phone models incl. example units w/ IMEIs).
@@ -37,42 +36,42 @@ const SUPPLIERS = ["Distribuidora Madrid Móvil", "TecnoImport Levante"] as cons
 // have something to show: one without barcode, one without cost/tax.
 const PRODUCTS: ProductSpec[] = [
   // Móviles — serialized (2 example units each, seeded below)
-  { name: "Samsung Galaxy A16 128GB Negro", group: "Móviles", itemType: "serialized", costCents: 13500, priceCents: 18900, reorderPoint: 2, lowStockThreshold: 1 },
-  { name: "Xiaomi Redmi Note 13 256GB Azul", group: "Móviles", itemType: "serialized", costCents: 16500, priceCents: 22900, reorderPoint: 2, lowStockThreshold: 1 },
-  { name: "Apple iPhone 13 128GB Medianoche", group: "Móviles", itemType: "serialized", costCents: 28900, priceCents: 38900, reorderPoint: 1, lowStockThreshold: 1 },
+  { name: "Samsung Galaxy A16 128GB Negro", group: "mobiles", itemType: "serialized", costCents: 13500, priceCents: 18900, reorderPoint: 2, lowStockThreshold: 1 },
+  { name: "Xiaomi Redmi Note 13 256GB Azul", group: "mobiles", itemType: "serialized", costCents: 16500, priceCents: 22900, reorderPoint: 2, lowStockThreshold: 1 },
+  { name: "Apple iPhone 13 128GB Medianoche", group: "mobiles", itemType: "serialized", costCents: 28900, priceCents: 38900, reorderPoint: 1, lowStockThreshold: 1 },
   // the phone the manual walkthrough receives and sells: real-looking box EAN, 5 units in stock
-  { name: "Apple iPhone 17 Pro Max 256GB Negro", group: "Móviles", itemType: "serialized", costCents: 119900, priceCents: 149900, barcode: "0194253172567", reorderPoint: 2, lowStockThreshold: 1 },
+  { name: "Apple iPhone 17 Pro Max 256GB Negro", group: "mobiles", itemType: "serialized", costCents: 119900, priceCents: 149900, barcode: "0194253172567", reorderPoint: 2, lowStockThreshold: 1 },
   // Protectores
-  { name: "Protector cristal templado iPhone 13", group: "Protectores", costCents: 180, priceCents: 990, openingQty: 24, reorderPoint: 6, lowStockThreshold: 3 },
-  { name: "Protector cristal templado iPhone 15", group: "Protectores", costCents: 200, priceCents: 1090, openingQty: 18, reorderPoint: 6, lowStockThreshold: 3 },
-  { name: "Protector cristal templado Galaxy A16", group: "Protectores", costCents: 170, priceCents: 990, openingQty: 20, reorderPoint: 6, lowStockThreshold: 3 },
-  { name: "Protector cristal templado Redmi Note 13", group: "Protectores", costCents: 170, priceCents: 990, openingQty: 15, reorderPoint: 6, lowStockThreshold: 3 },
-  { name: "Funda transparente iPhone 13", group: "Protectores", costCents: 250, priceCents: 1290, openingQty: 12, reorderPoint: 4, lowStockThreshold: 2 },
-  { name: "Funda silicona Galaxy A16", group: "Protectores", costCents: 280, priceCents: 1290, openingQty: 10, reorderPoint: 4, lowStockThreshold: 2 },
-  { name: "Funda libro Galaxy A16", group: "Protectores", costCents: 320, priceCents: 1490, openingQty: 5, reorderPoint: 3, lowStockThreshold: 2, barcode: null },
+  { name: "Protector cristal templado iPhone 13", group: "protectors", costCents: 180, priceCents: 990, openingQty: 24, reorderPoint: 6, lowStockThreshold: 3 },
+  { name: "Protector cristal templado iPhone 15", group: "protectors", costCents: 200, priceCents: 1090, openingQty: 18, reorderPoint: 6, lowStockThreshold: 3 },
+  { name: "Protector cristal templado Galaxy A16", group: "protectors", costCents: 170, priceCents: 990, openingQty: 20, reorderPoint: 6, lowStockThreshold: 3 },
+  { name: "Protector cristal templado Redmi Note 13", group: "protectors", costCents: 170, priceCents: 990, openingQty: 15, reorderPoint: 6, lowStockThreshold: 3 },
+  { name: "Funda transparente iPhone 13", group: "protectors", costCents: 250, priceCents: 1290, openingQty: 12, reorderPoint: 4, lowStockThreshold: 2 },
+  { name: "Funda silicona Galaxy A16", group: "protectors", costCents: 280, priceCents: 1290, openingQty: 10, reorderPoint: 4, lowStockThreshold: 2 },
+  { name: "Funda libro Galaxy A16", group: "protectors", costCents: 320, priceCents: 1490, openingQty: 5, reorderPoint: 3, lowStockThreshold: 2, barcode: null },
   // sibling accessories: each has its OWN box code, and the walkthrough gives them
   // a shared one on purpose — this is the everyday case the picker exists for
-  { name: "Protector iPhone 15 Pro Max", group: "Protectores", costCents: 500, priceCents: 1490, barcode: "8412345001567", openingQty: 12, reorderPoint: 4, lowStockThreshold: 2 },
-  { name: "Protector iPhone 16 Pro Max", group: "Protectores", costCents: 550, priceCents: 1590, barcode: "8412345001635", openingQty: 9, reorderPoint: 4, lowStockThreshold: 2 },
+  { name: "Protector iPhone 15 Pro Max", group: "protectors", costCents: 500, priceCents: 1490, barcode: "8412345001567", openingQty: 12, reorderPoint: 4, lowStockThreshold: 2 },
+  { name: "Protector iPhone 16 Pro Max", group: "protectors", costCents: 550, priceCents: 1590, barcode: "8412345001635", openingQty: 9, reorderPoint: 4, lowStockThreshold: 2 },
   // Cargadores y Cables
-  { name: "Cargador 20W USB-C", group: "Cargadores y Cables", costCents: 480, priceCents: 1490, openingQty: 16, reorderPoint: 5, lowStockThreshold: 3 },
-  { name: "Cargador 30W USB-C GaN", group: "Cargadores y Cables", costCents: 750, priceCents: 1990, openingQty: 8, reorderPoint: 4, lowStockThreshold: 2 },
-  { name: "Cable USB-C a USB-C 1m", group: "Cargadores y Cables", costCents: 210, priceCents: 890, openingQty: 30, reorderPoint: 8, lowStockThreshold: 4 },
-  { name: "Cable Lightning 1m", group: "Cargadores y Cables", costCents: 260, priceCents: 990, openingQty: 22, reorderPoint: 8, lowStockThreshold: 4 },
-  { name: "Cable micro-USB 1m", group: "Cargadores y Cables", costCents: 120, priceCents: 590, openingQty: 14, reorderPoint: 5, lowStockThreshold: 3 },
-  { name: "Cargador coche dual USB 24W", group: "Cargadores y Cables", costCents: 390, priceCents: 1290, openingQty: 9, reorderPoint: 3, lowStockThreshold: 2 },
-  { name: "Base carga inalámbrica 15W", group: "Cargadores y Cables", costCents: 620, priceCents: 1890, openingQty: 6, reorderPoint: 2, lowStockThreshold: 1 },
+  { name: "Cargador 20W USB-C", group: "charging", costCents: 480, priceCents: 1490, openingQty: 16, reorderPoint: 5, lowStockThreshold: 3 },
+  { name: "Cargador 30W USB-C GaN", group: "charging", costCents: 750, priceCents: 1990, openingQty: 8, reorderPoint: 4, lowStockThreshold: 2 },
+  { name: "Cable USB-C a USB-C 1m", group: "charging", costCents: 210, priceCents: 890, openingQty: 30, reorderPoint: 8, lowStockThreshold: 4 },
+  { name: "Cable Lightning 1m", group: "charging", costCents: 260, priceCents: 990, openingQty: 22, reorderPoint: 8, lowStockThreshold: 4 },
+  { name: "Cable micro-USB 1m", group: "charging", costCents: 120, priceCents: 590, openingQty: 14, reorderPoint: 5, lowStockThreshold: 3 },
+  { name: "Cargador coche dual USB 24W", group: "charging", costCents: 390, priceCents: 1290, openingQty: 9, reorderPoint: 3, lowStockThreshold: 2 },
+  { name: "Base carga inalámbrica 15W", group: "charging", costCents: 620, priceCents: 1890, openingQty: 6, reorderPoint: 2, lowStockThreshold: 1 },
   // Auriculares
-  { name: "Auriculares TWS Bluetooth 5.3", group: "Auriculares", costCents: 850, priceCents: 2490, openingQty: 12, reorderPoint: 4, lowStockThreshold: 2 },
-  { name: "Auriculares cable jack 3.5mm", group: "Auriculares", costCents: 220, priceCents: 890, openingQty: 20, reorderPoint: 6, lowStockThreshold: 3 },
-  { name: "Auriculares diadema Bluetooth", group: "Auriculares", costCents: 1400, priceCents: 3490, openingQty: 5, reorderPoint: 2, lowStockThreshold: 1 },
-  { name: "Manos libres USB-C", group: "Auriculares", costCents: 300, priceCents: 1190, openingQty: 10, reorderPoint: 4, lowStockThreshold: 2 },
+  { name: "Auriculares TWS Bluetooth 5.3", group: "audio", costCents: 850, priceCents: 2490, openingQty: 12, reorderPoint: 4, lowStockThreshold: 2 },
+  { name: "Auriculares cable jack 3.5mm", group: "audio", costCents: 220, priceCents: 890, openingQty: 20, reorderPoint: 6, lowStockThreshold: 3 },
+  { name: "Auriculares diadema Bluetooth", group: "audio", costCents: 1400, priceCents: 3490, openingQty: 5, reorderPoint: 2, lowStockThreshold: 1 },
+  { name: "Manos libres USB-C", group: "audio", costCents: 300, priceCents: 1190, openingQty: 10, reorderPoint: 4, lowStockThreshold: 2 },
   // Memoria y Ordenador
-  { name: "Tarjeta microSD 64GB", group: "Memoria y Ordenador", costCents: 420, priceCents: 1190, openingQty: 15, reorderPoint: 5, lowStockThreshold: 3 },
-  { name: "Tarjeta microSD 128GB", group: "Memoria y Ordenador", costCents: 780, priceCents: 1890, openingQty: 10, reorderPoint: 4, lowStockThreshold: 2 },
-  { name: "Pendrive USB 3.0 64GB", group: "Memoria y Ordenador", costCents: 380, priceCents: 1090, openingQty: 12, reorderPoint: 4, lowStockThreshold: 2 },
-  { name: "Ratón inalámbrico", group: "Memoria y Ordenador", costCents: 520, priceCents: 1490, openingQty: 7, reorderPoint: 3, lowStockThreshold: 2 },
-  { name: "Hub USB-C 4 puertos", group: "Memoria y Ordenador", costCents: null, priceCents: 2190, taxed: false, reorderPoint: 2, lowStockThreshold: 1 },
+  { name: "Tarjeta microSD 64GB", group: "computing", costCents: 420, priceCents: 1190, openingQty: 15, reorderPoint: 5, lowStockThreshold: 3 },
+  { name: "Tarjeta microSD 128GB", group: "computing", costCents: 780, priceCents: 1890, openingQty: 10, reorderPoint: 4, lowStockThreshold: 2 },
+  { name: "Pendrive USB 3.0 64GB", group: "computing", costCents: 380, priceCents: 1090, openingQty: 12, reorderPoint: 4, lowStockThreshold: 2 },
+  { name: "Ratón inalámbrico", group: "computing", costCents: 520, priceCents: 1490, openingQty: 7, reorderPoint: 3, lowStockThreshold: 2 },
+  { name: "Hub USB-C 4 puertos", group: "computing", costCents: null, priceCents: 2190, taxed: false, reorderPoint: 2, lowStockThreshold: 1 },
 ];
 
 // example units per serialized model (name → 14-digit IMEI bases; Luhn digit appended)
@@ -110,19 +109,21 @@ export function insertDemoData(
   log: LogFn,
   { tenantId, locationId, terminalId }: DemoIds,
   now: Date,
+  /* the starter groups, keyed — since v0.14.1 the demo dataset FILLS shelves
+     rather than building them, so clearing the demo leaves the shop's groups
+     standing (ADR-0017) */
+  starterGroups: Map<string, string>,
 ): { productCount: number; unitCount: number } {
   const logCreate = (entity: string, entityId: string, after: Record<string, unknown>) => {
     log({ entity, entityId, action: "create", before: null, after: toOplogJson(after) });
   };
   let unitCount = 0;
 
-    const groupIds = new Map<string, string>();
-    GROUPS.forEach((name, i) => {
-      const group = { id: uuidv7(), tenantId, name, sortOrder: i, isDemo: true, createdAt: now };
-      tx.insert(s.productGroups).values(group).run();
-      logCreate("product_group", group.id, group);
-      groupIds.set(name, group.id);
-    });
+    const groupOf = (key: string): string => {
+      const id = starterGroups.get(key);
+      if (!id) throw new Error(`demo data expects the starter group "${key}"`);
+      return id;
+    };
 
     const supplierIds: string[] = [];
     for (const name of SUPPLIERS) {
@@ -147,7 +148,7 @@ export function insertDemoData(
         tenantId,
         name: spec.name,
         barcode,
-        groupId: groupIds.get(spec.group)!,
+        groupId: groupOf(spec.group),
         itemType: (spec.itemType ?? "stocked") as "stocked" | "serialized",
         costCents: spec.costCents,
         priceCents: spec.priceCents,

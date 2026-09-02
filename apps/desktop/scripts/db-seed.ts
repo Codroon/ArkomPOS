@@ -14,7 +14,7 @@
 import { mutate, uuidv7, type MutationCtx } from "@arkom/core";
 import { schema as s, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner } from "../src/main/mutate-runner";
-import { createShop, insertDemoData, SETUP_DONE_KEY } from "../src/main/setup";
+import { createShop, insertDemoData, seedStarterGroups, SETUP_DONE_KEY } from "../src/main/setup";
 import { createUser } from "../src/main/auth/users";
 
 /** Ajustes defaults for a dev database: printer off, shop data still owed. */
@@ -54,7 +54,10 @@ export function seed(db: ArkomDb): { seeded: boolean; message: string } {
       log({ entity: "setting", entityId: key, action: "create", before: null, after: { key, value } });
     }
 
-    return insertDemoData(tx, log, ids, now);
+    /* same path first run takes: the shop's shelves, then the demo rows on
+       them (ADR-0017) */
+    const groups = seedStarterGroups(tx, log, ids.tenantId, "es", now);
+    return insertDemoData(tx, log, ids, now, groups);
   });
 
   /* DEV USERS — never in a client build.

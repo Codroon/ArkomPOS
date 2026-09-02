@@ -13,6 +13,8 @@ export const IPC_CHANNELS = [
   "catalog:get",
   "catalog:save",
   "catalog:groups",
+  "catalog:createGroup",
+  "catalog:renameGroup",
   "catalog:codes",
   "catalog:addCode",
   "catalog:removeCode",
@@ -245,6 +247,19 @@ export const CatalogGetResponseSchema = ProductRowSchema;
 
 export const CatalogGroupsRequestSchema = z.object({}).optional();
 export const CatalogGroupsResponseSchema = z.array(EntityRefSchema);
+
+/* Groups are the shop's own words for its shelves, so the shop makes them
+   (ADR-0017). There is deliberately no delete: a group with products behind it
+   cannot go without deciding where they land, and that decision needs a screen
+   this phase does not have. */
+export const CatalogGroupCreateRequestSchema = z.object({
+  name: z.string().trim().min(1).max(60),
+});
+export const CatalogGroupRenameRequestSchema = z.object({
+  id: z.string(),
+  name: z.string().trim().min(1).max(60),
+});
+export const CatalogGroupResponseSchema = EntityRefSchema;
 
 /** req 4.1: cost, PVP, IVA and group are REQUIRED on every save (schema-level). */
 export const CatalogSaveRequestSchema = z.object({
@@ -758,6 +773,10 @@ export const SetupCompleteRequestSchema = z.object({
     .max(10)
     .regex(/^[A-Za-z0-9-]+$/, "Solo letras, números y guiones."),
   loadDemo: z.boolean(),
+  /* the language the shop is being set up in. It decides the starter group
+     names and nothing else — they are shop data from that moment on
+     (ADR-0017). Optional so an older renderer still completes setup. */
+  locale: z.enum(["es", "en"]).optional(),
 });
 export const SetupCompleteResponseSchema = z.object({
   tenantId: z.string(),
@@ -2169,7 +2188,7 @@ export const ReportsValuationResponseSchema = z.object({
   groups: z.array(
     z.object({
       groupId: z.string().nullable(),
-      groupName: z.string(),
+      groupName: z.string().nullable(), // null = no group; the READER words that (ADR-0011)
       qty: z.number().int(),
       valueCents: z.number().int(),
     }),
@@ -2178,7 +2197,7 @@ export const ReportsValuationResponseSchema = z.object({
     z.object({
       productId: z.string(),
       name: z.string(),
-      groupName: z.string(),
+      groupName: z.string().nullable(), // null = no group; the READER words that (ADR-0011)
       onHand: z.number().int(),
       unitCostCents: z.number().int().nullable(),
       valueCents: z.number().int(),
@@ -2197,7 +2216,7 @@ export const ReportsDeadStockResponseSchema = z.object({
     z.object({
       productId: z.string(),
       name: z.string(),
-      groupName: z.string(),
+      groupName: z.string().nullable(), // null = no group; the READER words that (ADR-0011)
       onHand: z.number().int(),
       costTiedUpCents: z.number().int(),
       lastSaleAtMs: z.number().int().nullable(),

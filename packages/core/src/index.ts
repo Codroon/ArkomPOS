@@ -233,6 +233,8 @@ export {
   daysBetween,
 } from "./reports";
 export type { DatePreset, DateRange, CostEstimate, ReportId, SalesGroupBy } from "./reports";
+export { STARTER_GROUPS, starterGroupNames, groupNameKey } from "./groups";
+export type { StarterGroup, SetupLocale } from "./groups";
 export { opsToText, opBuilder } from "./print-ops";
 export { renderZReport, SHIFT_ES, SHIFT_EN, shiftLabels } from "./shift-doc";
 export type { ShiftReportDoc, ShiftLabels, ShiftDocLocale } from "./shift-doc";
@@ -305,6 +307,9 @@ export {
   CatalogSaveRequestSchema,
   CatalogSaveResponseSchema,
   CatalogGroupsRequestSchema,
+  CatalogGroupCreateRequestSchema,
+  CatalogGroupRenameRequestSchema,
+  CatalogGroupResponseSchema,
   CatalogGroupsResponseSchema,
   ProductRefSchema,
   ProductCodeSchema,

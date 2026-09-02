@@ -8,6 +8,7 @@ import {
   appError,
   assertTypeChangeAllowed,
   generateInternalEan13,
+  groupNameKey,
   isLowStock,
   isMissingData,
   isUsedProductName,
@@ -71,6 +72,85 @@ export function listGroups(db: ArkomDb, ctx: MutationCtx): { id: string; name: s
     .where(eq(productGroups.tenantId, ctx.tenantId))
     .orderBy(asc(productGroups.sortOrder))
     .all();
+}
+
+/**
+ * Create a group, or rename one — ADR-0017.
+ *
+ * The unique index on (tenant, name) is the real guarantee; this check exists
+ * so the shop gets DUPLICATE_NAME with the offending name rather than a
+ * constraint violation, and so "Fundas" collides with "fundas " the way a
+ * person expects it to. Accents are NOT collapsed: "Móviles" and "Moviles" are
+ * different words and refusing the second would be wrong.
+ */
+function findByName(tx: DbTx, ctx: MutationCtx, name: string, exceptId?: string) {
+  const key = groupNameKey(name);
+  return tx
+    .select({ id: productGroups.id, name: productGroups.name })
+    .from(productGroups)
+    .where(eq(productGroups.tenantId, ctx.tenantId))
+    .all()
+    .find((g) => groupNameKey(g.name) === key && g.id !== exceptId);
+}
+
+export function createGroup(db: ArkomDb, ctx: MutationCtx, input: { name: string }): { id: string; name: string } {
+  return mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    const name = input.name.trim().replace(/\s+/g, " ");
+    const clash = findByName(tx, ctx, name);
+    if (clash) throw appError("DUPLICATE_NAME", `Ya existe un grupo llamado "${clash.name}".`, "name");
+
+    /* new groups go to the end. The starter five carry 0–4, so a shop's own
+       group never lands in the middle of a list it did not choose the order of */
+    const last = tx
+      .select({ sortOrder: productGroups.sortOrder })
+      .from(productGroups)
+      .where(eq(productGroups.tenantId, ctx.tenantId))
+      .all()
+      .reduce((max, g) => Math.max(max, g.sortOrder), -1);
+
+    const row = {
+      id: uuidv7(),
+      tenantId: ctx.tenantId,
+      name,
+      sortOrder: last + 1,
+      isDemo: false,
+      createdAt: new Date(),
+    };
+    tx.insert(productGroups).values(row).run();
+    log({ entity: "product_group", entityId: row.id, action: "create", before: null, after: toOplogJson(row) });
+    return { id: row.id, name: row.name };
+  });
+}
+
+export function renameGroup(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  input: { id: string; name: string },
+): { id: string; name: string } {
+  return mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    const name = input.name.trim().replace(/\s+/g, " ");
+    const existing = tx
+      .select()
+      .from(productGroups)
+      .where(and(eq(productGroups.tenantId, ctx.tenantId), eq(productGroups.id, input.id)))
+      .all()[0];
+    if (!existing) throw appError("VALIDATION", "Ese grupo no existe.", "id");
+
+    const clash = findByName(tx, ctx, name, input.id);
+    if (clash) throw appError("DUPLICATE_NAME", `Ya existe un grupo llamado "${clash.name}".`, "name");
+
+    tx.update(productGroups).set({ name }).where(eq(productGroups.id, input.id)).run();
+    /* every product points at the ID, so the rename reaches the catalog list,
+       the inventory filter and both reports without touching another row */
+    log({
+      entity: "product_group",
+      entityId: input.id,
+      action: "update",
+      before: { name: existing.name },
+      after: { name },
+    });
+    return { id: input.id, name };
+  });
 }
 
 export function listProducts(db: ArkomDb, ctx: MutationCtx, filters: CatalogListRequest): ProductRow[] {

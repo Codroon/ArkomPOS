@@ -42,6 +42,9 @@ import {
   CatalogGroupsResponseSchema,
   CatalogCodesRequestSchema,
   CatalogCodesResponseSchema,
+  CatalogGroupCreateRequestSchema,
+  CatalogGroupRenameRequestSchema,
+  CatalogGroupResponseSchema,
   CatalogAddCodeRequestSchema,
   CatalogAddCodeResponseSchema,
   CatalogRemoveCodeRequestSchema,
@@ -227,7 +230,17 @@ import {
 } from "@arkom/core";
 import type { ArkomDb } from "@arkom/db";
 import { resetTillContext, tillContext } from "./context";
-import { addCode, getProduct, listCodes, listGroups, listProducts, removeCode, saveProduct } from "./repos/catalog";
+import {
+  addCode,
+  createGroup,
+  getProduct,
+  listCodes,
+  listGroups,
+  listProducts,
+  removeCode,
+  renameGroup,
+  saveProduct,
+} from "./repos/catalog";
 import { resolveScanCode } from "./repos/scan";
 import { addStock, listInventory, listMovements } from "./repos/inventory";
 import { createSupplier, listSuppliers } from "./repos/suppliers";
@@ -661,6 +674,25 @@ export function registerIpcHandlers(db: ArkomDb): void {
   );
   guarded("catalog:codes", "catalog.view", CatalogCodesRequestSchema, CatalogCodesResponseSchema, (s, { productId }) =>
     listCodes(db, s.ctx, productId),
+  );
+
+  /* Groups (ADR-0017). Behind the permissions that already govern the catalog:
+     somebody trusted to create an article is trusted to name the shelf it goes
+     on, and a new permission for five rows would be ceremony. There is no
+     delete channel — see the ADR. */
+  guarded(
+    "catalog:createGroup",
+    "catalog.create",
+    CatalogGroupCreateRequestSchema,
+    CatalogGroupResponseSchema,
+    (s, input) => createGroup(db, s.ctx, input),
+  );
+  guarded(
+    "catalog:renameGroup",
+    "catalog.edit",
+    CatalogGroupRenameRequestSchema,
+    CatalogGroupResponseSchema,
+    (s, input) => renameGroup(db, s.ctx, input),
   );
   // creating and editing are different permissions, and this one channel does both
   guarded(

@@ -6,8 +6,9 @@
  * disagree, one of them is lying and the shop cannot tell which.
  */
 import { useEffect, useMemo, useState } from "react";
-import { formatCents, type EntityRef, type ReportsValuationResponse } from "@arkom/core";
-import { SectionLabel, SelectInput, useT } from "@arkom/ui";
+import { formatCents, type ReportsValuationResponse } from "@arkom/core";
+import { SectionLabel, SelectInput, useDataLabel, useT } from "@arkom/ui";
+import { useGroups } from "../../components/group-picker";
 import type { ReportFilters } from "./reports-screen";
 import { EmptyReport, FilterBar, ReportShell, money } from "./report-shell";
 
@@ -21,8 +22,9 @@ export function ValuationReport({
   onBack: () => void;
 }) {
   const t = useT();
+  const dataLabel = useDataLabel();
+  const groups = useGroups();
   const [data, setData] = useState<ReportsValuationResponse | null>(null);
-  const [groups, setGroups] = useState<EntityRef[]>([]);
 
   const query = useMemo(() => ({ groupId: filters.valuationGroupId }), [filters.valuationGroupId]);
 
@@ -34,10 +36,6 @@ export function ValuationReport({
   }, [query]);
 
   useEffect(() => {
-    window.arkom
-      .invoke("catalog:groups")
-      .then(setGroups)
-      .catch((err) => console.error("catalog:groups failed", err));
   }, []);
 
   return (
@@ -89,7 +87,7 @@ export function ValuationReport({
               <tbody>
                 {(data?.groups ?? []).map((g) => (
                   <tr key={g.groupId ?? "—"} className="border-b border-line last:border-b-0">
-                    <td className="px-3 py-1.5">{g.groupName}</td>
+                    <td className="px-3 py-1.5">{g.groupName ? dataLabel(g.groupName) : t("rep2.noGroup")}</td>
                     <td className="px-3 py-1.5 text-right font-mono tabular-nums">{g.qty}</td>
                     <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums">{money(g.valueCents)}</td>
                   </tr>
@@ -114,7 +112,7 @@ export function ValuationReport({
                 {(data?.products ?? []).map((p) => (
                   <tr key={p.productId} className="border-b border-line last:border-b-0">
                     <td className="px-3 py-1.5">{p.name}</td>
-                    <td className="px-3 py-1.5 text-muted">{p.groupName}</td>
+                    <td className="px-3 py-1.5 text-muted">{p.groupName ? dataLabel(p.groupName) : t("rep2.noGroup")}</td>
                     <td className="px-3 py-1.5 text-right font-mono tabular-nums">{p.onHand}</td>
                     {/* serialized rows show no single unit cost, because they
                         have none: five identical phones bought at three prices */}

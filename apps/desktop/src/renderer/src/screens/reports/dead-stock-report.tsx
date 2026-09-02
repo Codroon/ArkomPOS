@@ -9,8 +9,9 @@
  * better than the one the shop agreed on.
  */
 import { useEffect, useMemo, useState } from "react";
-import type { EntityRef, ReportsDeadStockResponse } from "@arkom/core";
-import { SelectInput, useT } from "@arkom/ui";
+import type { ReportsDeadStockResponse } from "@arkom/core";
+import { SelectInput, useDataLabel, useT } from "@arkom/ui";
+import { useGroups } from "../../components/group-picker";
 import type { ReportFilters } from "./reports-screen";
 import { EmptyReport, Figure, FilterBar, ReportShell, SummaryStrip, dayStamp, money } from "./report-shell";
 
@@ -24,8 +25,9 @@ export function DeadStockReport({
   onBack: () => void;
 }) {
   const t = useT();
+  const dataLabel = useDataLabel();
+  const groups = useGroups();
   const [data, setData] = useState<ReportsDeadStockResponse | null>(null);
-  const [groups, setGroups] = useState<EntityRef[]>([]);
 
   const query = useMemo(() => ({ groupId: filters.deadGroupId }), [filters.deadGroupId]);
 
@@ -37,10 +39,6 @@ export function DeadStockReport({
   }, [query]);
 
   useEffect(() => {
-    window.arkom
-      .invoke("catalog:groups")
-      .then(setGroups)
-      .catch((err) => console.error("catalog:groups failed", err));
   }, []);
 
   return (
@@ -90,7 +88,7 @@ export function DeadStockReport({
               {(data?.rows ?? []).map((r) => (
                 <tr key={r.productId} className="border-b border-line last:border-b-0">
                   <td className="px-3 py-1.5">{r.name}</td>
-                  <td className="px-3 py-1.5 text-muted">{r.groupName}</td>
+                  <td className="px-3 py-1.5 text-muted">{r.groupName ? dataLabel(r.groupName) : t("rep2.noGroup")}</td>
                   <td className="px-3 py-1.5 text-right font-mono tabular-nums">{r.onHand}</td>
                   <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums">
                     {money(r.costTiedUpCents)}
