@@ -35,6 +35,7 @@ import {
 } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
 import { useScanFlow } from "../../lib/use-scan-flow";
+import { SupplierField } from "../../components/supplier-picker";
 
 type Dialog = null | "labor" | "part" | "order";
 
@@ -126,10 +127,16 @@ export function QuotePanel({
                     {line.kind === "inventory_part" ? (
                       <div className="text-[10px] text-subtle">{t("rep.quote.consumed")}</div>
                     ) : null}
-                    {onOrder && line.expectedCostCents !== null ? (
+                    {/* either fact is worth showing on its own: an ordered part
+                        with a supplier and no estimate still answers "who is it
+                        coming from?", which used to hide behind the cost */}
+                    {onOrder && (line.expectedCostCents !== null || line.supplierText) ? (
                       <div className="text-[10px] text-subtle">
-                        {t("rep.quote.expected")} {formatCents(line.expectedCostCents)}
-                        {line.supplierText ? ` · ${line.supplierText}` : ""}
+                        {line.expectedCostCents !== null
+                          ? `${t("rep.quote.expected")} ${formatCents(line.expectedCostCents)}`
+                          : ""}
+                        {line.expectedCostCents !== null && line.supplierText ? " · " : ""}
+                        {line.supplierText ?? ""}
                       </div>
                     ) : null}
                   </td>
@@ -480,7 +487,7 @@ function OrderDialog({
   onConfirm: (input: {
     description: string;
     qty: number;
-    supplierText: string | null;
+    supplierId: string | null;
     expectedCostCents: number | null;
     chargeCents: number;
   }) => void;
@@ -505,9 +512,10 @@ function OrderDialog({
         <Field label={t("rep.part.qty")}>
           <TextInput mono inputMode="numeric" value={qty} onChange={(e) => setQty(e.target.value)} />
         </Field>
-        <Field label={t("rep.order.supplier")}>
-          <TextInput value={supplier} onChange={(e) => setSupplier(e.target.value)} />
-        </Field>
+        {/* the same list receiving picks from, and the same way to add to it */}
+        <div className="flex flex-col">
+          <SupplierField label={t("rep.order.supplier")} value={supplier} onChange={setSupplier} />
+        </div>
         <Field label={t("rep.order.expected")}>
           <TextInput mono inputMode="decimal" value={expected} onChange={(e) => setExpected(e.target.value)} />
         </Field>
@@ -523,7 +531,7 @@ function OrderDialog({
             onConfirm({
               description: description.trim(),
               qty: n,
-              supplierText: supplier.trim() || null,
+              supplierId: supplier || null,
               expectedCostCents: parseMoneyInput(expected),
               chargeCents: cents!,
             })

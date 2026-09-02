@@ -742,10 +742,10 @@ export function registerIpcHandlers(db: ArkomDb): void {
   guarded("stock:add", "inventory.receive", StockAddRequestSchema, StockAddResponseSchema, (s, input) =>
     addStock(db, s.ctx, input),
   );
-  guarded("supplier:list", "inventory.receive", SupplierListRequestSchema, SupplierListResponseSchema, (s) =>
+  guarded("supplier:list", "supplier.manage", SupplierListRequestSchema, SupplierListResponseSchema, (s) =>
     listSuppliers(db, s.ctx),
   );
-  guarded("supplier:create", "inventory.receive", SupplierCreateRequestSchema, SupplierCreateResponseSchema, (s, { name }) =>
+  guarded("supplier:create", "supplier.manage", SupplierCreateRequestSchema, SupplierCreateResponseSchema, (s, { name }) =>
     createSupplier(db, s.ctx, name),
   );
 

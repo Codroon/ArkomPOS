@@ -37,6 +37,7 @@ import {
   type TKey,
 } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
+import { SupplierField } from "../../components/supplier-picker";
 import { useScanFlow } from "../../lib/use-scan-flow";
 
 interface StagedLine {
@@ -79,19 +80,11 @@ export function EntradaDrawer({
   const [notice, setNotice] = useState<string | null>(null);
 
   const [staged, setStaged] = useState<StagedLine[]>([]);
-  const [suppliers, setSuppliers] = useState<EntityRef[]>([]);
   const [supplierId, setSupplierId] = useState("");
-  const [newSupplierMode, setNewSupplierMode] = useState(false);
-  const [newSupplierName, setNewSupplierName] = useState("");
-  const [supplierError, setSupplierError] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    window.arkom
-      .invoke("supplier:list")
-      .then(setSuppliers)
-      .catch((err) => console.error("supplier:list failed", err));
     setTimeout(() => scanRef.current?.focus(), 0);
   }, []);
 
@@ -227,24 +220,6 @@ export function EntradaDrawer({
     setImeis([]);
     setImeiInput("");
     scanRef.current?.focus(); // straight back to scanning the next box
-  };
-
-  const createSupplier = () => {
-    const name = newSupplierName.trim();
-    if (!name) return;
-    setSupplierError(null);
-    window.arkom
-      .invoke("supplier:create", { name })
-      .then((created) => {
-        setSuppliers((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, "es")));
-        setSupplierId(created.id);
-        setNewSupplierMode(false);
-        setNewSupplierName("");
-      })
-      .catch((err) => {
-        const ipc = parseIpcError(err);
-        setSupplierError(ipc ? (ipc.code === "DUPLICATE_NAME" ? t("err.duplicateName") : ipc.message) : String(err));
-      });
   };
 
   const totalCents = staged.reduce((a, l) => a + l.qty * l.unitCostCents, 0);
@@ -451,46 +426,13 @@ export function EntradaDrawer({
             </div>
           ) : null}
 
-          {/* 4 · supplier */}
-          <Field label={t("entry.supplier")} required error={supplierError}>
-            {newSupplierMode ? (
-              <div className="flex gap-1.5">
-                <TextInput
-                  requiredStyle
-                  autoFocus
-                  value={newSupplierName}
-                  onChange={(e) => setNewSupplierName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      createSupplier();
-                    }
-                  }}
-                  placeholder={t("entry.newSupplierPlaceholder")}
-                />
-                <GhostButton onClick={createSupplier}>{t("common.save")}</GhostButton>
-              </div>
-            ) : (
-              <SelectInput requiredStyle value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-                <option value="">{t("entry.supplierPlaceholder")}</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {dataLabel(s.name)}
-                  </option>
-                ))}
-              </SelectInput>
-            )}
-          </Field>
-          <button
-            type="button"
-            className="-mt-2 self-start text-[10px] text-muted underline hover:text-ink"
-            onClick={() => {
-              setNewSupplierMode((m) => !m);
-              setSupplierError(null);
-            }}
-          >
-            {newSupplierMode ? t("common.cancel") : t("entry.newSupplier")}
-          </button>
+          {/* 4 · supplier — the same component the repair part order uses */}
+          <SupplierField
+            label={t("entry.supplier")}
+            required
+            value={supplierId}
+            onChange={setSupplierId}
+          />
 
           {/* 5 · add to the list */}
           <GhostButton className="h-8 w-full" disabled={!canStage} onClick={stageLine}>

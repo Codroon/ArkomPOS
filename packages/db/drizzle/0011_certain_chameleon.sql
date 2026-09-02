@@ -1,0 +1,1 @@
+ALTER TABLE `repair_lines` ADD `supplier_id` text REFERENCES suppliers(id);

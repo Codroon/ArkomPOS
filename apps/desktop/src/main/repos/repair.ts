@@ -70,6 +70,7 @@ const {
   repairNotifications,
   repairPhotos,
   repairTickets,
+  suppliers,
   documentLines,
   documentTenders,
   users,
@@ -532,12 +533,17 @@ export function getDetail(db: Reader, ctx: MutationCtx, ticketId: string, now: D
   if (!row) throw appError("VALIDATION", "Esa ficha no existe.");
   const t = row.ticket;
 
+  /* the supplier is JOINED, not stored on the line: renaming one reaches every
+     part it ever supplied, the same way renaming a group reaches every product
+     (ADR-0017 §5). `supplier_text` is what a pre-v0.14.2 row typed. */
   const lines = db
-    .select()
+    .select({ line: repairLines, supplierName: suppliers.name })
     .from(repairLines)
+    .leftJoin(suppliers, eq(suppliers.id, repairLines.supplierId))
     .where(eq(repairLines.ticketId, ticketId))
     .orderBy(asc(repairLines.createdAt))
-    .all();
+    .all()
+    .map((r) => ({ ...r.line, supplierText: r.supplierName ?? r.line.supplierText }));
 
   const approvals = db
     .select({ approval: repairApprovals, userName: users.name })
@@ -635,6 +641,7 @@ export function getDetail(db: Reader, ctx: MutationCtx, ticketId: string, now: D
       qty: l.qty,
       unitCostCents: l.unitCostCents,
       chargeCents: l.chargeCents,
+      supplierId: l.supplierId,
       supplierText: l.supplierText,
       expectedCostCents: l.expectedCostCents,
       orderedAt: l.orderedAt?.getTime() ?? null,
@@ -775,6 +782,7 @@ export function addLine(
         // hour is not stock, and pretending it is would corrupt every margin
         unitCostCents: null,
         chargeCents: input.chargeCents,
+        supplierId: null,
         supplierText: null,
         expectedCostCents: null,
         orderedAt: null,
@@ -796,6 +804,7 @@ export function addLine(
            a delivery lands, and this ticket's margin must not move with it. */
         unitCostCents: product.costCents ?? 0,
         chargeCents: input.chargeCents ?? (product.priceCents ?? 0) * input.qty,
+        supplierId: null,
         supplierText: null,
         expectedCostCents: null,
         orderedAt: null,
@@ -816,7 +825,8 @@ export function addLine(
         // guess and is kept apart from the snapshot for exactly that reason
         unitCostCents: null,
         chargeCents: input.chargeCents,
-        supplierText: input.supplierText ?? null,
+        supplierId: input.supplierId ?? null,
+        supplierText: null,
         expectedCostCents: input.expectedCostCents ?? null,
         orderedAt: now,
         receivedAt: null,
@@ -1094,11 +1104,13 @@ export function partsToOrder(db: ArkomDb, ctx: MutationCtx, now: Date = new Date
       ticket: repairTickets,
       docNumber: documents.docNumber,
       customerName: customers.name,
+      supplierName: suppliers.name,
     })
     .from(repairLines)
     .innerJoin(repairTickets, eq(repairTickets.id, repairLines.ticketId))
     .innerJoin(documents, eq(documents.id, repairTickets.documentId))
     .innerJoin(customers, eq(customers.id, repairTickets.customerId))
+    .leftJoin(suppliers, eq(suppliers.id, repairLines.supplierId))
     .where(
       and(
         eq(repairLines.tenantId, ctx.tenantId),
@@ -1120,7 +1132,8 @@ export function partsToOrder(db: ArkomDb, ctx: MutationCtx, now: Date = new Date
     deviceDescription: r.ticket.deviceDescription,
     description: r.line.description,
     qty: r.line.qty,
-    supplierText: r.line.supplierText,
+    supplierId: r.line.supplierId,
+    supplierText: r.supplierName ?? r.line.supplierText,
     expectedCostCents: r.line.expectedCostCents,
     orderedAt: r.line.orderedAt?.getTime() ?? null,
     promisedAt: r.ticket.promisedDate?.getTime() ?? null,

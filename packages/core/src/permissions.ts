@@ -51,6 +51,13 @@ export const PERMISSIONS = [
   { key: "inventory.receive", module: "inventory", labelEs: "Registrar entradas de stock", approvable: false },
   // registered before its screen exists: the key is the contract, the UI arrives later
   { key: "inventory.adjust", module: "inventory", labelEs: "Ajustar stock", approvable: true },
+  /* Seeing the supplier list and adding a name to it.
+     Deliberately NOT `inventory.receive`: a technician ordering a part needs to
+     say who it is coming from, and receiving stock is withheld from them for a
+     reason that has nothing to do with knowing the shop's suppliers
+     (ADR-0012 §"what a technician may do"). Low stakes both ways — a supplier
+     is a name on a list until a delivery or a part order references it. */
+  { key: "supplier.manage", module: "inventory", labelEs: "Ver y añadir proveedores", approvable: false },
 
   /* ---- used devices (ADR-0013) ----
      Buying is counter work, so the cashier holds most of these by default. The
@@ -166,6 +173,7 @@ export const CASHIER_DEFAULTS: readonly PermissionKey[] = [
   "catalog.attach_code",
   "inventory.view",
   "inventory.receive",
+  "supplier.manage",
   /* the client asked for the whole buy-and-shelve flow at the counter, so
      sending to inventory is a cashier default and not an approval */
   "usedDevices.create",
@@ -210,6 +218,7 @@ export const CASHIER_DEFAULTS: readonly PermissionKey[] = [
 export const TECHNICIAN_DEFAULTS: readonly PermissionKey[] = [
   "catalog.view",
   "inventory.view",
+  "supplier.manage",
   "repair.view",
   "repair.create",
   "repair.edit",

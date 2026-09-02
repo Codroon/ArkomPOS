@@ -15,6 +15,7 @@ import { and, eq } from "drizzle-orm";
 import { openDb, runMigrations, schema as s } from "@arkom/db";
 import { AppError, parseIpcError, uuidv7, type RepairCreateRequest } from "@arkom/core";
 import { handlers } from "./electron-stub";
+import { createSupplier } from "../repos/suppliers";
 import { registerIpcHandlers, registeredChannels } from "../ipc";
 import { endSession, startSession } from "../auth/session";
 import { resetTillContext } from "../context";
@@ -132,6 +133,8 @@ beforeEach(async () => {
 
   screenId = makeProduct("Pantalla iPhone 11", { costCents: 4200, priceCents: 8900, onHand: 5 });
   phoneId = makeProduct("iPhone 11 64GB", { costCents: 20000, priceCents: 30000, onHand: 1, serialized: true });
+
+  movilexId = createSupplier(env.db, ctxOf(), "Movilex").id;
 });
 
 const codeOf = async (fn: () => unknown): Promise<string> => {
@@ -150,13 +153,17 @@ const labor = (chargeCents: number) =>
 const fitScreen = (qty = 1) =>
   addLine(env.db, ctxOf(), { kind: "inventory_part", ticketId, productId: screenId, qty });
 
+/* Since v0.14.2 a part names a supplier ROW rather than carrying its name, so
+   the fixture creates one. `movilexId` is set in beforeEach. */
+let movilexId: string;
+
 const orderPart = (over: Record<string, unknown> = {}) =>
   addLine(env.db, ctxOf(), {
     kind: "part_on_order",
     ticketId,
     description: "Batería iPhone 11",
     qty: 1,
-    supplierText: "Movilex",
+    supplierId: movilexId,
     expectedCostCents: 1800,
     chargeCents: 4500,
     ...over,
@@ -604,6 +611,22 @@ describe("parts to order", () => {
       daysWaiting: 0,
     });
     expect(rows[0]!.docNumber).toBe("R-000001");
+  });
+
+  it("reports the supplier's CURRENT name, because nothing copied it", () => {
+    orderPart();
+    expect(partsToOrder(env.db, ctxOf())[0]!.supplierText).toBe("Movilex");
+
+    /* the shop fixes a typo, or the wholesaler rebrands. Every part it ever
+       supplied says the new name, because the line holds an id (ADR-0017 §5
+       applied to suppliers) */
+    env.db.update(s.suppliers).set({ name: "Movilex Distribución" }).where(eq(s.suppliers.id, movilexId)).run();
+    expect(partsToOrder(env.db, ctxOf())[0]!.supplierText).toBe("Movilex Distribución");
+  });
+
+  it("leaves a part with no supplier saying nothing rather than guessing", () => {
+    orderPart({ supplierId: null });
+    expect(partsToOrder(env.db, ctxOf())[0]!.supplierText).toBeNull();
   });
 
   it("drops a line once it arrives", () => {

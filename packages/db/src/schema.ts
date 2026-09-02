@@ -605,6 +605,13 @@ export const repairLines = sqliteTable("repair_lines", {
   chargeCents: integer("charge_cents").notNull().default(0),
 
   /* ---- part_on_order only ---- */
+  /**
+   * Who it was ordered from. Since v0.14.2 this is a row in `suppliers`, chosen
+   * from the same list receiving uses, so renaming a supplier reaches every
+   * part it ever supplied — nothing copies the name.
+   */
+  supplierId: text("supplier_id").references(() => suppliers.id),
+  /** Pre-v0.14.2 free text. Read as a fallback, never written. */
   supplierText: text("supplier_text"),
   expectedCostCents: integer("expected_cost_cents"),
   orderedAt: ts("ordered_at"),

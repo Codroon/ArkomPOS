@@ -1426,6 +1426,8 @@ export const RepairLineRowSchema = z.object({
   /** snapshot from when the part was taken; the charge moves, this does not */
   unitCostCents: z.number().int().nullable(),
   chargeCents: z.number().int(),
+  supplierId: z.string().nullable(),
+  /** display only: the supplier's current name, or a pre-v0.14.2 row's free text */
   supplierText: z.string().nullable(),
   expectedCostCents: z.number().int().nullable(),
   orderedAt: z.number().int().nullable(),
@@ -1568,7 +1570,9 @@ export const RepairAddLineRequestSchema = z.discriminatedUnion("kind", [
     ticketId: z.string(),
     description: z.string().trim().min(1).max(200),
     qty: z.number().int().min(1).max(99),
-    supplierText: z.string().trim().max(120).nullish(),
+    /* a row in `suppliers`, chosen from the same list receiving uses. Nothing
+       copies the name, so renaming a supplier reaches every part it supplied. */
+    supplierId: z.string().nullish(),
     expectedCostCents: z.number().int().min(0).nullish(),
     chargeCents: z.number().int().min(0),
   }),
@@ -1618,6 +1622,8 @@ export const OrderedPartRowSchema = z.object({
   deviceDescription: z.string(),
   description: z.string(),
   qty: z.number().int(),
+  supplierId: z.string().nullable(),
+  /** display only: the supplier's current name, or a pre-v0.14.2 row's free text */
   supplierText: z.string().nullable(),
   expectedCostCents: z.number().int().nullable(),
   orderedAt: z.number().int().nullable(),

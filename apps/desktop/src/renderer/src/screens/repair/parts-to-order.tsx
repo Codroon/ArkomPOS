@@ -116,6 +116,7 @@ export function PartsToOrder({
               qty: receiving.qty,
               unitCostCents: null,
               chargeCents: 0,
+              supplierId: receiving.supplierId,
               supplierText: receiving.supplierText,
               expectedCostCents: receiving.expectedCostCents,
               orderedAt: receiving.orderedAt,
