@@ -283,7 +283,7 @@ export function RepairsReport({
                 <thead className="sticky top-0 bg-surface-2 text-[10px] font-bold uppercase tracking-[0.1em] text-muted">
                   <tr>
                     <th className="px-3 py-1.5 text-left font-bold">
-                      {filters.repairsByTechnician ? t("rep2.repairs.tech") : "Nº"}
+                      {filters.repairsByTechnician ? t("rep2.repairs.tech") : t("common.number")}
                     </th>
                     {!filters.repairsByTechnician ? (
                       <>

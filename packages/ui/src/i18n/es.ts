@@ -484,10 +484,18 @@ export const es = {
   "usr.selectHint": "Selecciona un usuario o crea uno nuevo.",
 
   /* typed errors */
+  "setup.defaultFooter": "Precios claros. Sin letra pequeña.",
+  "setup.defaultTerminal": "Caja 1",
+  "common.number": "Nº",
   "err.authRequired": "Inicia sesión para continuar.",
   "err.permissionDenied": "No tienes permiso para hacer esto.",
   "err.weakPin": "Ese PIN es demasiado fácil de adivinar.",
   "err.lastOwner": "Debe quedar al menos un responsable activo.",
+  "err.approvalRequired": "Esta acción necesita el PIN de un responsable.",
+  "err.invalidPin": "PIN incorrecto.",
+  "err.userLocked": "Demasiados intentos. Espera un momento.",
+  "err.shiftRequired": "No hay ningún turno abierto en esta caja.",
+  "err.reviewRequired": "Este dispositivo está marcado para revisar.",
 
   /* roles and permissions — the registry holds keys, the dictionary holds words */
   "role.owner": "Responsable",

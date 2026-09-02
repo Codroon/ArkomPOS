@@ -482,10 +482,18 @@ export const en: Record<TKey, string> = {
   "usr.selectHint": "Select a user, or create a new one.",
 
   /* typed errors */
+  "setup.defaultFooter": "Clear prices. No small print.",
+  "setup.defaultTerminal": "Till 1",
+  "common.number": "No.",
   "err.authRequired": "Sign in to continue.",
   "err.permissionDenied": "You do not have permission to do this.",
   "err.weakPin": "That PIN is too easy to guess.",
   "err.lastOwner": "At least one active owner must remain.",
+  "err.approvalRequired": "This action needs a manager's PIN.",
+  "err.invalidPin": "Wrong PIN.",
+  "err.userLocked": "Too many attempts. Wait a moment.",
+  "err.shiftRequired": "No shift is open on this till.",
+  "err.reviewRequired": "This device is flagged for review.",
 
   /* roles and permissions */
   "role.owner": "Owner",

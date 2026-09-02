@@ -18,7 +18,7 @@
  */
 import { useCallback, useMemo, useState } from "react";
 import { SetupCompleteResponseSchema } from "@arkom/core";
-import { AccentButton, Field, LocaleToggle, TextInput, useT } from "@arkom/ui";
+import { AccentButton, Field, LocaleToggle, TextInput, useT, type TFn } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
 
 const PREFIX_OK = /^[A-Za-z0-9-]+$/;
@@ -33,16 +33,22 @@ interface Draft {
   loadDemo: boolean;
 }
 
-const INITIAL: Draft = {
+/**
+ * The prefills. These become shop DATA the moment the shop presses save, so
+ * they are never translated afterwards — but the blank form is chrome, and a
+ * till being set up in English should not offer a Spanish default to type over
+ * (ADR-0011).
+ */
+const initialDraft = (t: TFn): Draft => ({
   shopLegalName: "",
   shopNif: "",
   shopAddress: "",
   // the default the brand ships with; the shop can make it their own
-  ticketFooter: "Precios claros. Sin letra pequeña.",
-  terminalName: "Caja 1",
+  ticketFooter: t("setup.defaultFooter"),
+  terminalName: t("setup.defaultTerminal"),
   seriesPrefix: "T1-",
   loadDemo: true,
-};
+});
 
 /** One of the two big choices at the bottom — a card, not a radio button. */
 function DataChoice({
@@ -77,7 +83,7 @@ function DataChoice({
 
 export function FirstRunDialog({ onDone }: { onDone: () => void }) {
   const t = useT();
-  const [draft, setDraft] = useState<Draft>(INITIAL);
+  const [draft, setDraft] = useState<Draft>(() => initialDraft(t));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
