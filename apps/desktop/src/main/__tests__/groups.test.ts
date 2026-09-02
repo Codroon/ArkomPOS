@@ -122,7 +122,7 @@ describe("a fresh install", () => {
   });
 
   it("keeps them in the order the list was written in", () => {
-    expect(groupRows().map((g) => g.sortOrder)).toEqual([0, 1, 2, 3, 4]);
+    expect(groupRows().map((g) => g.sortOrder)).toEqual(STARTER_GROUPS.map((_, i) => i));
   });
 
   it("logs each one, like every other write", () => {

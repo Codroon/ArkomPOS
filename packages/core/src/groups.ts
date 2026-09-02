@@ -26,9 +26,23 @@ export interface StarterGroup {
 export const STARTER_GROUPS: readonly StarterGroup[] = [
   { key: "mobiles", es: "Móviles", en: "Phones" },
   { key: "protectors", es: "Protectores", en: "Protectors" },
+  { key: "cases", es: "Fundas y carcasas", en: "Cases and covers" },
   { key: "charging", es: "Cargadores y Cables", en: "Chargers & Cables" },
+  { key: "powerbanks", es: "Baterías externas", en: "Power banks" },
   { key: "audio", es: "Auriculares", en: "Headphones" },
+  { key: "speakers", es: "Altavoces", en: "Speakers" },
+  { key: "wearables", es: "Relojes y wearables", en: "Smart watches and wearables" },
   { key: "computing", es: "Memoria y Ordenador", en: "Memory & Computing" },
+  { key: "photovideo", es: "Accesorios de foto y vídeo", en: "Photo and video accessories" },
+  { key: "spares", es: "Repuestos", en: "Repair parts" },
+  /**
+   * Where the buy screen files a second-hand device.
+   *
+   * It is seeded like the rest since v0.14.2 rather than appearing out of
+   * nowhere on the first purchase — and because that code finds it BY NAME, a
+   * shelf that exists from day one is a shelf it cannot fail to find.
+   */
+  { key: "used", es: "Usados", en: "Used" },
 ] as const;
 
 export type SetupLocale = "es" | "en";
