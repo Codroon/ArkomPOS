@@ -1,24 +1,21 @@
 /**
  * Grupos — the shop names its own shelves (ADR-0017).
  *
- * Two things happen here and nothing else: create one, rename one. There is no
- * delete, and deliberately no affordance hinting at one — a group with fifty
- * products behind it cannot go without somebody deciding where those products
- * land, and that decision needs a screen this phase does not have. A button
- * that refuses half the time is worse than no button.
+ * One thing happens here: a new group. There is no rename and no delete, and
+ * deliberately no affordance hinting at either.
  *
- * A rename needs no propagation: every product points at the group's id, so the
- * catalog list, the inventory filter and both stock reports read the new name
- * the next time they ask.
+ * Rename was built and then removed. It worked, but a name that products,
+ * filters and two reports all read is not a field to edit casually, and every
+ * way of presenting it was wrong in a different way: offering the display label
+ * meant editing a word that is not in the database, and offering the stored one
+ * meant handing a Spanish box to a shop reading English. Adding a group is the
+ * thing that was actually asked for, and it has no such tail.
  *
- * It shows the STORED name, not the display label. Everywhere else, a seeded
- * group written as "Usados" reads "Used" on an English till (`translateData`) —
- * but this is the screen where you edit the row, and listing one word while
- * putting a different one in the edit box is how a shop renames something it
- * did not mean to touch. What you see here is what is in the database.
+ * A shelf whose name is wrong gets a new shelf. Moving the products onto it
+ * needs a screen this phase does not have — the same seam delete has.
  */
 import { useEffect, useRef, useState } from "react";
-import { parseIpcError, type GroupRef } from "@arkom/core";
+import { parseIpcError } from "@arkom/core";
 import { AccentButton, GhostButton, TextInput, useT } from "@arkom/ui";
 import { errorMessage } from "../lib/errors";
 import { refreshGroups, useGroups } from "./group-picker";
@@ -27,7 +24,6 @@ export function GroupsModal({ onClose, canEdit }: { onClose: () => void; canEdit
   const t = useT();
   const groups = useGroups();
 
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [nameEn, setNameEn] = useState("");
   const [busy, setBusy] = useState(false);
@@ -36,22 +32,7 @@ export function GroupsModal({ onClose, canEdit }: { onClose: () => void; canEdit
 
   useEffect(() => {
     inputRef.current?.focus();
-  }, [editingId]);
-
-  const startNew = () => {
-    setEditingId(null);
-    setName("");
-    setNameEn("");
-    setError(null);
-    inputRef.current?.focus();
-  };
-
-  const startRename = (group: GroupRef) => {
-    setEditingId(group.id);
-    setName(group.name);
-    setNameEn(group.nameEn ?? "");
-    setError(null);
-  };
+  }, []);
 
   const submit = async () => {
     const trimmed = name.trim();
@@ -59,19 +40,15 @@ export function GroupsModal({ onClose, canEdit }: { onClose: () => void; canEdit
     setBusy(true);
     setError(null);
     try {
-      const en = nameEn.trim() || null;
-      if (editingId) await window.arkom.invoke("catalog:renameGroup", { id: editingId, name: trimmed, nameEn: en });
-      else await window.arkom.invoke("catalog:createGroup", { name: trimmed, nameEn: en });
+      await window.arkom.invoke("catalog:createGroup", { name: trimmed, nameEn: nameEn.trim() || null });
       await refreshGroups();
-      setEditingId(null);
       setName("");
       setNameEn("");
+      inputRef.current?.focus();
     } catch (err) {
       /* the duplicate lands under the field, not in a toast: the shop is looking
          at the box it just typed into */
-      setError(
-        parseIpcError(err)?.code === "DUPLICATE_NAME" ? t("groups.duplicate") : errorMessage(t, err),
-      );
+      setError(parseIpcError(err)?.code === "DUPLICATE_NAME" ? t("groups.duplicate") : errorMessage(t, err));
     } finally {
       setBusy(false);
     }
@@ -80,7 +57,7 @@ export function GroupsModal({ onClose, canEdit }: { onClose: () => void; canEdit
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-inverse/40" onClick={onClose}>
       <div
-        className="max-h-[80vh] w-[420px] overflow-hidden rounded-[3px] border border-line-strong bg-card shadow-lg"
+        className="max-h-[80vh] w-[460px] overflow-hidden rounded-[3px] border border-line-strong bg-card shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center border-b border-line px-3.5 py-2.5">
@@ -94,70 +71,61 @@ export function GroupsModal({ onClose, canEdit }: { onClose: () => void; canEdit
             <div className="px-3.5 py-6 text-center text-[12px] text-muted">{t("groups.empty")}</div>
           ) : (
             groups.map((g) => (
-              <div key={g.id} className="flex items-center gap-2 border-b border-line px-3.5 py-2">
-                <div className="flex-1 truncate text-[12px]">
-                  {g.name}
-                  {g.nameEn ? <span className="ml-1.5 text-[11px] text-muted">{g.nameEn}</span> : null}
-                </div>
-                {canEdit ? (
-                  <GhostButton onClick={() => startRename(g)}>{t("groups.rename")}</GhostButton>
-                ) : null}
+              <div key={g.id} className="flex items-baseline gap-2 border-b border-line px-3.5 py-2">
+                <div className="flex-1 truncate text-[12px]">{g.name}</div>
+                {/* the English name, so the shop can see which shelves have one */}
+                <div className="w-[45%] truncate text-[11px] text-muted">{g.nameEn ?? t("common.dash")}</div>
               </div>
             ))
           )}
         </div>
 
-        <div className="border-t border-line-strong px-3.5 py-2.5">
-          <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.1em] text-muted">
-            {editingId ? t("groups.renaming") : t("groups.newGroup")}
-          </div>
-          {/* Two names, because the app cannot invent the second one and the
-              shop can. Leave English blank and the Spanish shows in both. */}
-          <div className="mb-1.5 grid grid-cols-2 gap-2">
-            <div>
-              <div className="mb-0.5 text-[10px] text-muted">{t("groups.nameEs")}</div>
-              <TextInput
-                ref={inputRef}
-                value={name}
-                maxLength={60}
-                placeholder={t("groups.namePlaceholder")}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  setError(null);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void submit();
-                  if (e.key === "Escape" && editingId) startNew();
-                }}
-              />
+        {canEdit ? (
+          <div className="border-t border-line-strong px-3.5 py-2.5">
+            <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.1em] text-muted">
+              {t("groups.newGroup")}
             </div>
-            <div>
-              <div className="mb-0.5 text-[10px] text-muted">{t("groups.nameEn")}</div>
-              <TextInput
-                value={nameEn}
-                maxLength={60}
-                placeholder={t("groups.nameEnPlaceholder")}
-                onChange={(e) => {
-                  setNameEn(e.target.value);
-                  setError(null);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void submit();
-                  if (e.key === "Escape" && editingId) startNew();
-                }}
-              />
+            {/* Two names, because the app cannot invent the second one and the
+                shop can. Leave English blank and the Spanish shows in both. */}
+            <div className="mb-1.5 grid grid-cols-2 gap-2">
+              <div>
+                <div className="mb-0.5 text-[10px] text-muted">{t("groups.nameEs")}</div>
+                <TextInput
+                  ref={inputRef}
+                  value={name}
+                  maxLength={60}
+                  placeholder={t("groups.namePlaceholder")}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setError(null);
+                  }}
+                  onKeyDown={(e) => e.key === "Enter" && void submit()}
+                />
+              </div>
+              <div>
+                <div className="mb-0.5 text-[10px] text-muted">{t("groups.nameEn")}</div>
+                <TextInput
+                  value={nameEn}
+                  maxLength={60}
+                  placeholder={t("groups.nameEnPlaceholder")}
+                  onChange={(e) => {
+                    setNameEn(e.target.value);
+                    setError(null);
+                  }}
+                  onKeyDown={(e) => e.key === "Enter" && void submit()}
+                />
+              </div>
             </div>
+            <div className="flex items-center justify-end gap-2">
+              <AccentButton disabled={!name.trim() || busy} onClick={() => void submit()}>
+                {t("groups.add")}
+              </AccentButton>
+            </div>
+            {error ? <div className="mt-1 text-[11px] font-bold text-danger-ink">{error}</div> : null}
+            {/* the seam, said out loud rather than left to be discovered */}
+            <div className="mt-2 text-[10px] text-muted">{t("groups.noEdit")}</div>
           </div>
-          <div className="flex items-center justify-end gap-2">
-            {editingId ? <GhostButton onClick={startNew}>{t("common.cancel")}</GhostButton> : null}
-            <AccentButton disabled={!name.trim() || busy} onClick={() => void submit()}>
-              {editingId ? t("common.save") : t("groups.add")}
-            </AccentButton>
-          </div>
-          {error ? <div className="mt-1 text-[11px] font-bold text-danger-ink">{error}</div> : null}
-          {/* the seam, said out loud rather than left to be discovered */}
-          <div className="mt-2 text-[10px] text-muted">{t("groups.noDelete")}</div>
-        </div>
+        ) : null}
       </div>
     </div>
   );

@@ -187,7 +187,11 @@ export function listProducts(db: ArkomDb, ctx: MutationCtx, filters: CatalogList
   /* Second-hand products are bookkeeping the buy screen creates, not stock the
      owner maintains, so the management list leaves them out unless asked. The
      Sale screen asks. */
-  if (!f.includeUsed) rows = rows.filter((r) => r.itemType !== "used_device");
+  /* Second-hand products are bookkeeping the buy screen creates, so the default
+     management list leaves them out. But once the shop has picked a GROUP it is
+     asking what is on that shelf, and answering "nothing" about a shelf it can
+     see in the dropdown is not an answer (ADR-0013 §"the catalog list"). */
+  if (!f.includeUsed && !f.groupId) rows = rows.filter((r) => r.itemType !== "used_device");
   if (f.lowStockOnly) rows = rows.filter((r) => isLowStock(r));
   if (f.missingDataOnly) rows = rows.filter((r) => isMissingData(r));
   return rows;

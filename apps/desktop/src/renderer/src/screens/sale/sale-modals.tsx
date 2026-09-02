@@ -4,7 +4,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { centsToInput, formatCents, parseMoneyInput, type SaleLineRow } from "@arkom/core";
-import { Chip, Field, GhostButton, MoneyText, PrimaryButton, SearchInput, TextInput, useT } from "@arkom/ui";
+import { Chip, Field, GhostButton, MoneyText, PrimaryButton, SearchInput, TextInput, useT, useDataLabel } from "@arkom/ui";
 
 function ModalShell({ children, onClose, width = 380 }: { children: React.ReactNode; onClose: () => void; width?: number }) {
   useEffect(() => {
@@ -54,6 +54,7 @@ export function UnitPickModal({
   onClose: () => void;
 }) {
   const t = useT();
+  const dataLabel = useDataLabel();
   const [filter, setFilter] = useState("");
   const visible = useMemo(
     () => pick.units.filter((u) => u.imei.includes(filter.trim())),
@@ -67,7 +68,7 @@ export function UnitPickModal({
 
   return (
     <ModalShell onClose={onClose}>
-      <div className="mb-2 text-[13px] font-bold">{t("pick.title", { name: pick.productName })}</div>
+      <div className="mb-2 text-[13px] font-bold">{t("pick.title", { name: dataLabel(pick.productName) })}</div>
       <SearchInput
         autoFocus
         placeholder={t("pick.filterPlaceholder")}
