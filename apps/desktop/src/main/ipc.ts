@@ -376,12 +376,31 @@ export interface AuthedSession extends Session {
 /** The approver's credentials, sent alongside the payload on a retry. */
 const ApprovalSchema = z.object({ userId: z.string(), pin: z.string() });
 
+/**
+ * Zod issues the shop can do nothing about.
+ *
+ * A wrong type or an unexpected key means the RENDERER sent the wrong shape —
+ * a bug in our code, not a mistake somebody made at the counter. Passing Zod's
+ * own sentence through put "Invalid input: expected string, received null" in
+ * front of a shopkeeper trying to add a technician: English, about types, and
+ * useless to them. Those go to the console, where they belong, and the counter
+ * gets one plain sentence.
+ *
+ * Everything else — a refine, a regex, a min — carries a message somebody wrote
+ * on purpose, and that is the message the shop should read.
+ */
+const STRUCTURAL = new Set(["invalid_type", "unrecognized_keys", "invalid_union", "invalid_key", "invalid_element"]);
+
 function asBridgeError(err: unknown): Error {
   if (err instanceof AppError) return toBridgeError(err);
   if (err instanceof ZodError) {
     const issue = err.issues[0];
     const field = issue && issue.path.length > 0 ? issue.path.join(".") : undefined;
-    return toBridgeError(appError("VALIDATION", issue?.message ?? "Datos no válidos.", field));
+    if (!issue || STRUCTURAL.has(issue.code)) {
+      console.error("[ipc] payload failed its schema:", JSON.stringify(err.issues));
+      return toBridgeError(appError("VALIDATION", "Datos no válidos.", field));
+    }
+    return toBridgeError(appError("VALIDATION", issue.message, field));
   }
   console.error("[ipc] unexpected error:", err);
   return err instanceof Error ? err : new Error(String(err));

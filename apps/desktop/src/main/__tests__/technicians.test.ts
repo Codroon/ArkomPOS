@@ -51,6 +51,16 @@ async function call(channel: string, payload?: unknown): Promise<string> {
 const get = async <T,>(channel: string, payload?: unknown): Promise<T> =>
   (await handlers.get(channel)!({}, payload)) as T;
 
+/** The sentence the SHOP reads, not the code behind it. */
+async function message(channel: string, payload?: unknown): Promise<string> {
+  try {
+    await handlers.get(channel)!({}, payload);
+    return "OK";
+  } catch (err) {
+    return parseIpcError(err)?.message ?? String(err);
+  }
+}
+
 beforeEach(() => {
   handlers.clear();
   endSession();
@@ -66,6 +76,43 @@ beforeEach(() => {
 /* ------------------------------------------------------- creating */
 
 describe("creating a technician", () => {
+  /* THROUGH THE CHANNEL, not the repo function.
+     v0.14.1 shipped with `pin: PinSchema` still on the request while the repo
+     happily took null, so the Usuarios dialog was refused by Zod before it
+     reached any of the logic below — and every test here passed, because they
+     all called createUser() directly. A boundary you never cross in a test is a
+     boundary you have not tested. */
+  it("is accepted over IPC with no PIN in the payload", async () => {
+    expect(await call("users:create", { name: "Marta", role: "technician", pin: null })).toBe("OK");
+    expect(await call("users:create", { name: "Luis", role: "technician" })).toBe("OK");
+
+    const rows = env.db.select().from(s.users).all().filter((u) => u.role === "technician");
+    expect(rows.map((u) => u.name).sort()).toEqual(["Luis", "Marta", "Nuria"]);
+    expect(rows.every((u) => u.pinHash === null)).toBe(true);
+  });
+
+  it("refuses a PIN-less cashier or owner at the contract, not just in the repo", async () => {
+    expect(await call("users:create", { name: "Nadie", role: "cashier", pin: null })).toBe("VALIDATION");
+    expect(await call("users:create", { name: "Nadie", role: "owner" })).toBe("VALIDATION");
+  });
+
+  it("still refuses a malformed PIN for somebody who does sign in", async () => {
+    expect(await call("users:create", { name: "Nadie", role: "cashier", pin: "12" })).toBe("VALIDATION");
+  });
+
+  it("never puts Zod's own words in front of the shop", async () => {
+    /* what shipped: "Invalid input: expected string, received null" on the Add
+       a technician dialog. A wrong TYPE is our bug, so it goes to the console
+       and the counter reads one plain sentence. */
+    const structural = await message("users:create", { name: "Nadie", role: "cashier", pin: 1234 });
+    expect(structural).toBe("Datos no válidos.");
+    expect(structural).not.toMatch(/expected|received|Invalid input/i);
+
+    // a rule somebody wrote on purpose still speaks for itself
+    expect(await message("users:create", { name: "Nadie", role: "cashier", pin: "12" })).toMatch(/PIN/);
+    expect(await message("users:create", { name: "Nadie", role: "cashier", pin: null })).toMatch(/PIN/);
+  });
+
   it("stores no PIN at all", () => {
     const row = env.db.select().from(s.users).where(eq(s.users.id, tech.id)).all()[0]!;
     expect(row.role).toBe("technician");

@@ -920,12 +920,26 @@ export type TechnicianRef = z.infer<typeof UsersTechniciansResponseSchema>[numbe
 export const UsersListRequestSchema = z.object({}).optional();
 export const UsersListResponseSchema = z.array(UserRowSchema);
 
-export const UsersCreateRequestSchema = z.object({
-  name: z.string().trim().min(1).max(80),
-  role: RoleSchema,
-  pin: PinSchema,
-  overrides: z.record(z.string(), z.boolean()).default({}),
-});
+/**
+ * A PIN is required, EXCEPT for a technician — who is a name a repair can be
+ * assigned to, not somebody who signs in (ADR-0012 amendment).
+ *
+ * The rule lives on the schema rather than only in `createUser`, because the
+ * contract is what the renderer codes against: with `pin: PinSchema` the
+ * technician dialog could not send `null` at all, and the refusal arrived as a
+ * raw Zod sentence about types instead of anything a shop could act on.
+ */
+export const UsersCreateRequestSchema = z
+  .object({
+    name: z.string().trim().min(1).max(80),
+    role: RoleSchema,
+    pin: PinSchema.nullish(),
+    overrides: z.record(z.string(), z.boolean()).default({}),
+  })
+  .refine((u) => u.role === "technician" || (u.pin !== null && u.pin !== undefined), {
+    message: "Hace falta un PIN para quien vaya a iniciar sesión.",
+    path: ["pin"],
+  });
 /** A new owner gets a recovery code, shown exactly once (ADR-0012 §8). */
 export const UsersCreateResponseSchema = z.object({
   user: UserRowSchema,
