@@ -17,7 +17,7 @@ import {
   type RepairLineRow,
   type TenderDraft,
 } from "@arkom/core";
-import { AccentButton, Field, GhostButton, TextInput, cn, useT, type TKey } from "@arkom/ui";
+import { AccentButton, Field, GhostButton, TextInput, cn, useT, type TKey, useDataLabel } from "@arkom/ui";
 
 function Modal({ title, wide, children }: { title: string; wide?: boolean; children: React.ReactNode }) {
   return (
@@ -125,6 +125,7 @@ export function CollectDialog({
   onConfirm: (tenders: TenderDraft[]) => void;
 }) {
   const t = useT();
+  const dataLabel = useDataLabel();
   const [entries, setEntries] = useState<Entry[]>([]);
   const [busy, setBusy] = useState(false);
 
@@ -157,7 +158,7 @@ export function CollectDialog({
           <div key={line.id} className="flex justify-between border-b border-line py-1">
             <span>
               {line.qty > 1 ? `${line.qty} × ` : ""}
-              {line.description}
+              {dataLabel(line.description)}
             </span>
             <span className="font-mono tabular-nums">{formatCents(line.chargeCents)}</span>
           </div>
@@ -303,6 +304,7 @@ export function NotRepairedDialog({
   }) => void;
 }) {
   const t = useT();
+  const dataLabel = useDataLabel();
   const [reason, setReason] = useState<"customer_declined" | "unrepairable" | "abandoned">("customer_declined");
   const [resolutions, setResolutions] = useState<Record<string, "return" | "charge">>({});
   const [depositAction, setDepositAction] = useState<"refund" | "apply_fee">("refund");
@@ -347,7 +349,7 @@ export function NotRepairedDialog({
             <div key={line.id} className="mt-1.5 flex items-center gap-2 rounded-[2px] border border-line px-2 py-1.5">
               <span className="min-w-0 flex-1 truncate text-[12px]">
                 {line.qty > 1 ? `${line.qty} × ` : ""}
-                {line.description}
+                {dataLabel(line.description)}
               </span>
               <span className="font-mono text-[11px] tabular-nums text-muted">{formatCents(line.chargeCents)}</span>
               <div className="flex overflow-hidden rounded-[3px] border border-line-strong">

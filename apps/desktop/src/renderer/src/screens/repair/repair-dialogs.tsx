@@ -6,7 +6,7 @@
  */
 import { useEffect, useState } from "react";
 import { centsToInput, formatCents, isSerializedItem, parseMoneyInput, type InventoryRow, type RepairLineRow } from "@arkom/core";
-import { AccentButton, Field, GhostButton, ScanInput, SelectInput, TextInput, cn, useT } from "@arkom/ui";
+import { AccentButton, Field, GhostButton, ScanInput, SelectInput, TextInput, cn, useT, useDataLabel } from "@arkom/ui";
 import { useScanFlow } from "../../lib/use-scan-flow";
 
 function Modal({ title, children }: { title: string; children: React.ReactNode }) {
@@ -102,6 +102,7 @@ export function ReceivePartDialog({
   onConfirm: (input: { lineId: string; unitCostCents: number; qty: number; productId: string | null }) => void;
 }) {
   const t = useT();
+  const dataLabel = useDataLabel();
   const [lineId, setLineId] = useState(lines[0]?.id ?? "");
   const line = lines.find((l) => l.id === lineId) ?? lines[0] ?? null;
 
@@ -172,13 +173,13 @@ export function ReceivePartDialog({
           <SelectInput value={lineId} onChange={(e) => setLineId(e.target.value)}>
             {lines.map((l) => (
               <option key={l.id} value={l.id}>
-                {l.description}
+                {dataLabel(l.description)}
               </option>
             ))}
           </SelectInput>
         </Field>
       ) : (
-        <div className="text-[12px] font-semibold">{line.description}</div>
+        <div className="text-[12px] font-semibold">{dataLabel(line.description)}</div>
       )}
 
       <Field className="mt-2" label={t("rep.parts.product")} hint={t("rep.parts.productHint")} required>

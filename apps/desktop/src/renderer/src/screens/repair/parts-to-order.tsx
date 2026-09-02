@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { formatCents, type OrderedPartRow } from "@arkom/core";
-import { GhostButton, useT } from "@arkom/ui";
+import { GhostButton, useT, useDataLabel } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
 import { ReceivePartDialog } from "./repair-dialogs";
 import { OverdueChip, formatDate } from "./status-chip";
@@ -23,6 +23,7 @@ export function PartsToOrder({
   refreshKey: number;
 }) {
   const t = useT();
+  const dataLabel = useDataLabel();
   const [rows, setRows] = useState<OrderedPartRow[] | null>(null);
   const [receiving, setReceiving] = useState<OrderedPartRow | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +72,7 @@ export function PartsToOrder({
                 <tr key={row.lineId} className="border-b border-line hover:bg-hover">
                   <td className="px-4 py-1.5">
                     {row.qty > 1 ? `${row.qty} × ` : ""}
-                    {row.description}
+                    {dataLabel(row.description)}
                     <div className="text-[10px] text-subtle">{row.deviceDescription}</div>
                   </td>
                   <td className="px-2 py-1.5">

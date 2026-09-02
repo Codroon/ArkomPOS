@@ -83,14 +83,28 @@ const USED_SUFFIX = /\s\(usado\)$/;
 /**
  * A data row's display name.
  *
- * Anything the shop typed shows exactly as typed — a product called "Funda
- * azul" is not translated, because it is their word for their thing. Two kinds
- * of name are exceptions, and both are exceptions for the same reason: the APP
- * wrote them, in Spanish, on a till that may be running in English.
+ * **The shop's words are the shop's words.** A product called "Funda azul", a
+ * group called "Used Phones", a customer, a supplier — all show exactly as
+ * typed, in both languages. There is no dictionary for arbitrary text and there
+ * cannot be one: translating it would need an online service in a till that has
+ * to work with the router unplugged, and it would return a word the shop did
+ * not choose.
  *
- *   - the demo dataset, mapped name by name below;
+ * Two exceptions, and both for the same reason — the APP wrote the words, not
+ * the shop:
+ *
+ *   - the demo dataset's product and supplier names, mapped below. They exist so
+ *     a walkthrough reads in the language it is given, and they vanish the first
+ *     time the shop clears the demo data.
  *   - the "(usado)" suffix the buy screen appends to every second-hand product
  *     it creates (ADR-0013). The model is the shop's; the marker is ours.
+ *
+ * GROUP names are deliberately NOT here any more. Five of them were, which made
+ * the till translate some group names and not others with no visible rule — a
+ * shop that names a shelf "Used Phones" and sees it stay English next to a
+ * "Móviles" that turns into "Phones" concludes, reasonably, that something is
+ * broken. A group is a shelf the shop named, including the five it was handed
+ * on day one.
  */
 export function translateData(locale: Locale, name: string): string {
   if (locale !== "en") return name;

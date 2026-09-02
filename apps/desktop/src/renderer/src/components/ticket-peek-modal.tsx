@@ -8,7 +8,7 @@
  */
 import { useEffect, useState } from "react";
 import type { TicketPeek } from "@arkom/core";
-import { GhostButton, MoneyText, SectionLabel, useT, type TKey } from "@arkom/ui";
+import { GhostButton, MoneyText, SectionLabel, useT, type TKey, useDataLabel } from "@arkom/ui";
 import { useTicketPrint } from "../lib/use-ticket-print";
 import { PrintToast } from "../lib/print-toast";
 
@@ -27,6 +27,7 @@ function formatDate(ms: number): string {
 
 export function TicketPeekModal({ docId, onClose }: { docId: string; onClose: () => void }) {
   const t = useT();
+  const dataLabel = useDataLabel();
   const [peek, setPeek] = useState<TicketPeek | null>(null);
   const printer = useTicketPrint();
 
@@ -67,7 +68,7 @@ export function TicketPeekModal({ docId, onClose }: { docId: string; onClose: ()
               {peek.lines.map((line, i) => (
                 <div key={i} className="flex items-baseline gap-2 border-b border-line py-1.5 text-[12px]">
                   <div className="min-w-0 flex-1">
-                    <div className="truncate">{line.description}</div>
+                    <div className="truncate">{dataLabel(line.description)}</div>
                     <div className="font-mono font-medium text-[10px] tabular-nums text-subtle">
                       {line.imei ? `IMEI ${line.imei} · ` : ""}
                       {line.qty} × <MoneyText cents={line.unitPriceCents} />

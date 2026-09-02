@@ -31,8 +31,7 @@ import {
   SectionLabel,
   TextInput,
   cn,
-  useT,
-} from "@arkom/ui";
+  useT, useDataLabel } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
 import { useScanFlow } from "../../lib/use-scan-flow";
 import { SupplierField } from "../../components/supplier-picker";
@@ -57,6 +56,7 @@ export function QuotePanel({
   readOnly: boolean;
 }) {
   const t = useT();
+  const dataLabel = useDataLabel();
   const [dialog, setDialog] = useState<Dialog>(null);
   const [removing, setRemoving] = useState<RepairLineRow | null>(null);
   const [editing, setEditing] = useState<{ line: RepairLineRow; value: string; reason: string } | null>(null);
@@ -120,7 +120,7 @@ export function QuotePanel({
                     <div className="flex items-center gap-1.5">
                       <span>
                         {line.qty > 1 ? `${line.qty} × ` : ""}
-                        {line.description}
+                        {dataLabel(line.description)}
                       </span>
                       {onOrder ? <Chip variant="warning">{t("rep.quote.ordered")}</Chip> : null}
                     </div>
@@ -562,11 +562,12 @@ function ChargeDialog({
   onConfirm: () => void;
 }) {
   const t = useT();
+  const dataLabel = useDataLabel();
   const cents = parseMoneyInput(value);
   const valid = cents !== null && (!needsReason || reason.trim() !== "");
 
   return (
-    <Modal title={line.description}>
+    <Modal title={dataLabel(line.description)}>
       <Field label={t("rep.quote.charge")} required>
         <TextInput mono autoFocus inputMode="decimal" value={value} onChange={(e) => onChange({ value: e.target.value })} />
       </Field>

@@ -1357,14 +1357,9 @@ export const en: Record<TKey, string> = {
  * the whole screen during walkthroughs.
  */
 export const enDataLabels: Record<string, string> = {
-  "Móviles": "Phones",
-  "Protectores": "Protectors",
-  "Cargadores y Cables": "Chargers & Cables",
-  "Auriculares": "Headphones",
-  "Memoria y Ordenador": "Memory & Computing",
-  /* Not demo data: the buy screen creates this group the first time a used
-     device is bought, so it is Spanish on every till including English ones. */
-  Usados: "Used",
+  /* Demo-dataset SUPPLIERS only. Group names used to be here and are not any
+     more: see translateData — a group is a shelf the shop named, and half the
+     shelves changing language is worse than none of them doing it. */
   "Distribuidora Madrid Móvil": "Madrid Mobile Distributors",
   "TecnoImport Levante": "TecnoImport Levante",
 };

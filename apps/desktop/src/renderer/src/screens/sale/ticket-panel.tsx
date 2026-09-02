@@ -5,7 +5,7 @@
  */
 import { useState } from "react";
 import { formatCents, type SaleLineRow, type SaleState } from "@arkom/core";
-import { Chip, cn, MoneyText, useT } from "@arkom/ui";
+import { Chip, cn, MoneyText, useT, useDataLabel } from "@arkom/ui";
 
 function LineRow({
   line,
@@ -21,6 +21,7 @@ function LineRow({
   onRemove: (line: SaleLineRow) => void;
 }) {
   const t = useT();
+  const dataLabel = useDataLabel();
   const [menuOpen, setMenuOpen] = useState(false);
   const serialized = line.lineType === "serialized_unit";
 
@@ -35,7 +36,7 @@ function LineRow({
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <div className="text-[12px] leading-snug">
-            {line.description}
+            {dataLabel(line.description)}
             {serialized ? <Chip className="ml-1.5">{t("chip.serie")}</Chip> : null}
             {line.priceOverridden ? (
               <Chip variant="info" className="ml-1.5">

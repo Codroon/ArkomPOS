@@ -11,9 +11,16 @@ import { describe, expect, it } from "vitest";
 import { translateData } from "@arkom/ui";
 
 describe("names the app wrote itself", () => {
-  it("translates the group the buy screen creates", () => {
-    expect(translateData("en", "Usados")).toBe("Used");
-    expect(translateData("es", "Usados")).toBe("Usados");
+  it("leaves GROUP names exactly as the shop has them", () => {
+    /* Five group names used to be translated, which meant a till translated
+       some shelves and not others with no visible rule: a shop that names one
+       "Used Phones" and watches "Móviles" become "Phones" beside it concludes
+       something is broken. A group is a shelf the shop named — including the
+       five it was handed on day one. */
+    for (const name of ["Usados", "Móviles", "Protectores", "Used Phones", "Laptops"]) {
+      expect(translateData("en", name)).toBe(name);
+      expect(translateData("es", name)).toBe(name);
+    }
   });
 
   it("translates the used marker while leaving the model alone", () => {
