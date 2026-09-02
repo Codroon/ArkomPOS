@@ -225,7 +225,7 @@ export function ClosePanel({
 
       <div className="mt-2 flex justify-end gap-2">
         {/* opens the X as a document; printing is a button on THAT */}
-        <GhostButton onClick={onOpenX}>{t("cash.close.printX")}</GhostButton>
+        <GhostButton onClick={onOpenX}>{t("cash.close.openX")}</GhostButton>
         <AccentButton disabled={!canClose} onClick={() => setConfirming(true)}>
           {t("cash.close.button")}
         </AccentButton>

@@ -768,7 +768,7 @@ export const es = {
 
   /* close, X and Z */
   "cash.close.section": "Cierre",
-  "cash.close.preview": "PREVIEW",
+  "cash.close.preview": "PROVISIONAL",
   "cash.close.expected": "Efectivo esperado",
   "cash.close.counted": "Efectivo contado",
   "cash.close.variance": "Descuadre",
@@ -780,10 +780,10 @@ export const es = {
   "cash.close.parked": "{n} tickets aparcados. No impiden el cierre.",
   "cash.close.parkedOne": "1 ticket aparcado. No impide el cierre.",
   "cash.close.button": "Cerrar turno",
-  "cash.close.confirm": "Cerrar e imprimir Z",
+  "cash.close.confirm": "Cerrar el turno",
   "cash.close.title": "Cerrar turno",
   "cash.close.detail": "Ver detalle Z",
-  "cash.close.printX": "Imprimir X",
+  "cash.close.openX": "Ver la X",
   "cash.close.done": "Turno {number} cerrado",
   "cash.close.reprint": "Reimprimir Z",
   "cash.close.newShift": "Abrir nuevo turno",

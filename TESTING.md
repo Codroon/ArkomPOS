@@ -973,14 +973,28 @@ Try **Salida** again with `150`.
 
 ### (d) The X, before committing to anything
 
-Look at the **CIERRE** panel on the left, marked **PREVIEW**.
+Look at the **CIERRE** panel on the left, marked **PROVISIONAL**.
 
 - ✅ **Efectivo esperado** is float + the cash part of your sale + 20,00 −
   200,00. Check it by hand.
 - ✅ Open **Ver detalle Z**: base, IVA, total, and a line per payment method.
-- ✅ **Imprimir X** saves a PDF headed **VISTA X (PROVISIONAL)** with **PREVIEW**
-  where the number goes and a closing line *No es un cierre. No consume número.*
-- ✅ Nothing was written: the panel still says PREVIEW and no Z number exists.
+
+Press **Ver la X**.
+
+- ✅ Since v0.14.1 the X opens **on screen** as a document, headed **Vista X ·
+  PROVISIONAL**, with a closing line *No es un cierre. No consume número.*
+  Nothing was printed, and no paper was spent to answer the question.
+- ✅ Its actions are **Imprimir · Guardar PDF · Cerrar**. Press **Guardar PDF**:
+  a file called `X.pdf` appears, with the same figures.
+- ✅ Nothing was written: the panel still says PROVISIONAL and no Z number
+  exists.
+
+Toggle the header to **EN** while the X is open.
+
+- ✅ The whole document re-reads in English — *X reading*, *Cash expected*,
+  *Not a close. Consumes no number.* — and **every figure is identical**. A Z is
+  the shop talking to itself, so it follows the staff language; a customer
+  ticket does not (ADR-0015 A1). Toggle back to **ES** before continuing.
 
 ### (e) Counting, and a difference you have to explain
 
@@ -997,13 +1011,19 @@ Type `Se dio mal el cambio por la tarde` and press **Cerrar turno**.
 - ✅ A confirmation showing expected, counted, variance and your reason — not a
   second form. You do not type the count twice.
 
-Press **Cerrar e imprimir Z**. As a cashier you would be asked for an owner's
+Press **Cerrar el turno**. As a cashier you would be asked for an owner's
 PIN here; as Ahmer you are not.
 
 ### (f) The Z
 
-- ✅ The panel becomes **Turno Z1-000001 cerrado** with **Reimprimir Z** and
-  **Abrir nuevo turno**.
+- ✅ You land **directly on the Z document**, headed **Informe Z · Z1-000001**.
+  Nothing printed — check the `tickets` folder if you like; there is no new PDF.
+  Since v0.14.1 the paper is a choice, taken on the screen that already has
+  your attention (ADR-0015 A1).
+- ✅ The primary action is **Abrir nuevo turno**, which is the shop's actual
+  next move.
+- ✅ Press **Guardar PDF** twice. The first file is `Z1-000001.pdf`; the second
+  is `Z1-000001-COPIA.pdf`. The original is spent by the first print.
 - ✅ Open the PDF. Check, in order: the Z number and the till · who opened and
   who closed · **DOCUMENTOS** with a count and a first→last number per series ·
   **VENTAS** with base and IVA 21% · **COBROS**, one line per method, whose
@@ -1026,7 +1046,9 @@ Now try to sell something.
 Press **Historial** in the Caja header (owner only).
 
 - ✅ One row: Z1-000001, both names, expected, counted, descuadre, approver.
-- ✅ **Reimprimir Z** produces the same figures stamped **C O P I A**.
+- ✅ Click the row: the same Z opens on screen. **Guardar PDF** here produces
+  `Z1-000001-COPIA.pdf` — a Z reopened from the history is **always** a copy,
+  however many times you ask.
 
 The proof that matters is in the tests: the reprint renders the frozen snapshot,
 so deleting every tender from that shift afterwards does not change one number on
@@ -1178,7 +1200,82 @@ Now take **Ver informes** away as well.
 
 ---
 
-## 16. Final check
+## 16. Grupos, técnicos y el idioma (v0.14.1)
+
+Four checks that cut across screens. Each one is a **pattern**: if it holds on
+one screen and not another, it has failed.
+
+### (a) The shop names its own shelves
+
+**02 · Catálogo** → **Grupos** (next to *+ Nuevo artículo*).
+
+- ✅ The five starter groups, each with **Renombrar**. No delete button, and a
+  line saying so: *Los grupos no se borran.*
+- ✅ Type `Coche y viaje` in **Nuevo grupo** and press **Crear**. It appears in
+  the list **and** in the *Grupo: todos* filter behind the modal, immediately.
+- ✅ Type `  COCHE Y VIAJE ` and press **Crear** again. Refused **under the
+  field**, not in a toast: *Ya existe un grupo con ese nombre.* Spacing and
+  capitals do not make a new group.
+- ✅ Type `Moviles` (no accent) and press **Crear**. **Accepted** — those are
+  different words, and refusing it would be wrong.
+
+Now press **Renombrar** on your new group, change it, and save.
+
+- ✅ The catalog filter behind the modal already shows the new name.
+- ✅ **03 · Inventario** and **01 · Venta** show it too, without a restart. One
+  list, one fetch (ADR-0017 §6).
+- ✅ **10 · Informes → Valoración** and **Stock muerto** group by the new name.
+
+### (b) The dead end that used to exist
+
+**02 · Catálogo → + Nuevo artículo**. Open the **Grupo** dropdown.
+
+- ✅ The last option is **+ Nuevo grupo…**. Pick it: the field becomes a name
+  box with **Crear** beside it.
+- ✅ Create one. The field returns to a dropdown **with your new group already
+  selected** — the article you are typing lands in it.
+- ✅ A duplicate name here shows the same error, under the same field.
+
+The point of this: a shop that chose *Empezar vacío* at first run used to reach
+this field, find it empty, and have no way forward.
+
+### (c) Técnicos are names, not logins
+
+**12 · Usuarios** → create a user with the **Técnico** role.
+
+- ✅ No PIN is asked for, and none can be set at creation.
+- ✅ Sign out. The technician **is not on the login screen**.
+- ✅ **06 · Reparaciones**, **07 · Taller**, the ficha's *Cambiar técnico*, and
+  **Informes → Reparaciones** all offer that name — the same list in all four.
+- ✅ Assign a repair to them while signed in as Ahmer, then look at the ficha's
+  history: the action is recorded against **Ahmer**, not the technician. A
+  technician is assigned work; they never act.
+- ✅ Back in Usuarios, give them a PIN. They now appear on the login screen like
+  anyone else — that is the second-shop path, and it is the same rule.
+
+### (d) The language really is a toggle
+
+Set the header to **EN** and walk the app.
+
+- ✅ Every screen, dialog, chip, empty state and toast is in English —
+  especially **Comprar usados**, **Reparaciones**, **Caja** and **Informes**.
+- ✅ Provoke an error: try to save a product with a name another already has.
+  The message is in English (`err.duplicateName`), not Spanish.
+- ✅ Try an action a cashier needs approval for while signed in as one: the
+  invitation is in English too.
+- ✅ Product, group and customer names stay exactly as the shop typed them.
+  **They are not translated**, and after the first rename a group is the shop's
+  own word (ADR-0017 §2).
+- ✅ Print a customer ticket while in English. **The ticket is still Spanish** —
+  a customer document and a tax record do not follow a staff toggle. Only the Z
+  and the X do.
+
+One string that slips through is a bug, not a preference: `pnpm test` fails on
+any Spanish letter inside a renderer string literal.
+
+---
+
+## 17. Final check
 ```bash
 pnpm db:audit --verify
 ```

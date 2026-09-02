@@ -10,7 +10,7 @@ shop's data lives in one SQLite file on the counter PC.
 
 ---
 
-## Current state — v0.14.0
+## Current state — v0.14.1
 
 Phase 1 is complete and packaged. Verified on a clean Windows machine end to
 end, with one exception noted below.
@@ -20,7 +20,7 @@ end, with one exception noted below.
 | Area | What works |
 |---|---|
 | **Sale** | Scan or tap, mixed tickets, serialized units picked by IMEI, price override with reason, park/resume, split tender (cash · card · Bizum · transfer), change, gap-free per-till numbering |
-| **Catalog** | Products, groups, multiple scannable codes per product, incomplete-data flags, deactivate |
+| **Catalog** | Products, groups the shop creates and renames itself, multiple scannable codes per product, incomplete-data flags, deactivate |
 | **Inventory** | Insert-only stock ledger, receiving drawer with per-IMEI entry, movement history, low-stock and reorder points |
 | **Tickets** | ESC/POS over the Windows RAW spooler, branded PDF fallback, reprints stamped COPIA, cash-drawer pulse |
 | **Ajustes** | Printer, paper width, command set, the shop's legal block, demo-data removal, backups |
@@ -32,7 +32,7 @@ end, with one exception noted below.
 | **Store credit** | Paying a seller in credit issues a voucher; it pays for a later sale as a tender, redeemed inside that sale's transaction so it cannot be spent twice |
 | **Repairs** | Intake with damage marks, photos and a signed deposit receipt; quote with per-line margin; approval bound to an amount; parts from stock or on order with goods-received; a workshop board; collection onto a normal fiscal ticket with the deposit applied as a tender; and closing a ticket unrepaired with every consumed part resolved first |
 | **Reports** | Five reports on the data the till already holds — sales and tax by day, group, item, user or payment method with margin; repairs open and closed with turnaround; used devices held with cost tied up; inventory valuation that equals the Inventario header to the cent; and dead stock. Every one exports a CSV a Spanish Excel opens on a double-click |
-| **Cash** | A shift per till with a counted float, one expected-cash figure derived from the tenders and the drawer ledger, an X preview that is exactly what a close would freeze, cash paid in and out with approval over a threshold, and a close that freezes an immutable numbered Z with the variance, its reason and its approver |
+| **Cash** | A shift per till with a counted float, one expected-cash figure derived from the tenders and the drawer ledger, an X preview that is exactly what a close would freeze, cash paid in and out with approval over a threshold, and a close that freezes an immutable numbered Z with the variance, its reason and its approver. Both reports open on screen in the staff language; printing them is a choice, and the second copy of a Z is stamped |
 
 ### Not built yet
 
