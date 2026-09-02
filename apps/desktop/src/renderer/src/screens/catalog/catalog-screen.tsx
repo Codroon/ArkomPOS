@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseIpcError, type CatalogListRequest, type ProductRow } from "@arkom/core";
 import { cn, ConfirmDialog, GhostButton, PrimaryButton, SearchInput, useT } from "@arkom/ui";
-import { GroupOptions } from "../../components/group-picker";
+import { GroupOptions, useGroupsVersion } from "../../components/group-picker";
 import { GroupsModal } from "../../components/groups-modal";
 import { useCan } from "../../lib/use-session";
 import { consumeCatalogPrefill } from "../../lib/screen-bus";
@@ -62,6 +62,8 @@ function FilterChip({
 export function CatalogScreen() {
   const t = useT();
   const can = useCan();
+  /* the Grupo column comes from the row's own join, so a rename must re-read */
+  const groupsVersion = useGroupsVersion();
   const [managingGroups, setManagingGroups] = useState(false);
   const approval = useApprovalFlow();
   const [rows, setRows] = useState<ProductRow[]>([]);
@@ -101,7 +103,7 @@ export function CatalogScreen() {
 
   useEffect(() => {
     refresh().catch((err) => console.error("catalog:list failed", err));
-  }, [refresh]);
+  }, [refresh, groupsVersion]);
 
   useEffect(() => {
     // scan-miss handoff: entrada's "Crear artículo" arrives with the code prefilled

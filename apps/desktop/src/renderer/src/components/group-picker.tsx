@@ -15,7 +15,36 @@ import type { EntityRef } from "@arkom/core";
 import { useDataLabel } from "@arkom/ui";
 
 let cache: EntityRef[] | null = null;
+/**
+ * Bumped whenever the list changes.
+ *
+ * A rename reaches every DROPDOWN for free, because they read the cache. It does
+ * not reach a TABLE, whose rows carry a `groupName` that came from their own
+ * query — so the Catálogo and Inventario columns kept the old word while the
+ * Sale chips right next to them showed the new one. Screens that hold joined
+ * rows depend on this and re-read.
+ */
+let version = 0;
 const listeners = new Set<(rows: EntityRef[]) => void>();
+const versionListeners = new Set<(v: number) => void>();
+
+function announce() {
+  version += 1;
+  for (const fn of listeners) fn(cache ?? []);
+  for (const fn of versionListeners) fn(version);
+}
+
+/** Changes on every create and rename. Put it in a refresh effect's deps. */
+export function useGroupsVersion(): number {
+  const [v, setV] = useState(version);
+  useEffect(() => {
+    versionListeners.add(setV);
+    return () => {
+      versionListeners.delete(setV);
+    };
+  }, []);
+  return v;
+}
 
 export async function refreshGroups(): Promise<EntityRef[]> {
   try {
@@ -24,7 +53,7 @@ export async function refreshGroups(): Promise<EntityRef[]> {
     console.error("catalog:groups failed", err);
     cache = cache ?? [];
   }
-  for (const fn of listeners) fn(cache);
+  announce();
   return cache;
 }
 
@@ -45,7 +74,7 @@ export function useGroups(): EntityRef[] {
 export function noteGroup(group: EntityRef): void {
   const rest = (cache ?? []).filter((g) => g.id !== group.id);
   cache = [...rest, group];
-  for (const fn of listeners) fn(cache);
+  announce();
 }
 
 /**

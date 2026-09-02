@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isLowStock, type InventoryRow } from "@arkom/core";
 import { cn, GhostButton, MoneyText, PrimaryButton, SearchInput, Toast, useT } from "@arkom/ui";
-import { GroupOptions } from "../../components/group-picker";
+import { GroupOptions, useGroupsVersion } from "../../components/group-picker";
 import { openCatalogWithBarcode } from "../../lib/screen-bus";
 import { EntradaDrawer } from "./entrada-drawer";
 import { InventoryTable } from "./inventory-table";
@@ -33,13 +33,15 @@ export function InventoryScreen() {
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /* same reason as Catálogo: the Grupo column is joined into the row */
+  const groupsVersion = useGroupsVersion();
   const refresh = useCallback(async () => {
     setAllRows(await window.arkom.invoke("inventory:list"));
   }, []);
 
   useEffect(() => {
     refresh().catch((err) => console.error("inventory:list failed", err));
-  }, [refresh]);
+  }, [refresh, groupsVersion]);
 
   // F6 opens receiving from anywhere on the screen
   useEffect(() => {

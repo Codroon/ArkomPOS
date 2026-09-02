@@ -10,6 +10,12 @@
  * A rename needs no propagation: every product points at the group's id, so the
  * catalog list, the inventory filter and both stock reports read the new name
  * the next time they ask.
+ *
+ * It shows the STORED name, not the display label. Everywhere else, a seeded
+ * group written as "Usados" reads "Used" on an English till (`translateData`) —
+ * but this is the screen where you edit the row, and listing one word while
+ * putting a different one in the edit box is how a shop renames something it
+ * did not mean to touch. What you see here is what is in the database.
  */
 import { useEffect, useRef, useState } from "react";
 import { parseIpcError, type EntityRef } from "@arkom/core";
@@ -85,7 +91,12 @@ export function GroupsModal({ onClose, canEdit }: { onClose: () => void; canEdit
           ) : (
             groups.map((g) => (
               <div key={g.id} className="flex items-center gap-2 border-b border-line px-3.5 py-2">
-                <div className="flex-1 truncate text-[12px]">{dataLabel(g.name)}</div>
+                <div className="flex-1 truncate text-[12px]">
+                  {g.name}
+                  {dataLabel(g.name) !== g.name ? (
+                    <span className="ml-1.5 text-[11px] text-muted">{dataLabel(g.name)}</span>
+                  ) : null}
+                </div>
                 {canEdit ? (
                   <GhostButton onClick={() => startRename(g)}>{t("groups.rename")}</GhostButton>
                 ) : null}
