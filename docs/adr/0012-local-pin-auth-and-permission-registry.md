@@ -1,6 +1,7 @@
 # ADR-0012: Local PIN authentication, session in main, permissions as a registry
 
 **Status:** Accepted · **Date:** 2026-08-25 · **Deciders:** Zothix (Codroon)
+**Amended:** 2026-09-02 (v0.14.1) — see §A1.
 **Supersedes the deferral in** [ADR-0010](0010-auth-deferred-nullable-actor-columns.md) — that ADR's
 nullable actor columns are exactly what this one fills in. It is not otherwise changed.
 
@@ -263,3 +264,28 @@ later would mean editing every guarded handler in the app.
   alongside the PIN keypad, and `authorized_by_user_id` then points at a cloud-linked user
   (§1's link, not merge). It requires connectivity, so it can only ever be an addition to
   the PIN path, never a replacement.
+
+---
+
+## A1. Amendment (v0.14.1) — a user may hold no PIN, and then cannot sign in
+
+`users.pin_hash` becomes **nullable**, by a proper SQLite column rebuild that
+preserves every existing row.
+
+A shop has one login and three people at the bench. A technician is a **name a
+repair is assigned to**, not somebody who signs in: created from Usuarios with
+nothing but a name, no PIN, no role question. `verifyUserPin` refuses a row whose
+`pin_hash` is NULL with the same error an unknown user gets, and `auth:users`
+returns only rows that hold one — **filtered in main**, so a renderer that asked
+anyway would still be refused at the second gate. The list not offering the tile
+is a courtesy; the refusal is the control, which is the rule this ADR already
+states for permissions.
+
+**Setting a PIN later turns them into an ordinary login user**, with no other
+change. That falls out of the rule rather than being built: the login list is
+"has a PIN", so giving somebody one is the whole of it. It is the path a second
+shop will take, and it is already tested.
+
+**Roles are unchanged and so is attribution.** A technician never acts — they are
+assigned — so every recorded action keeps the logged-in user, exactly as §5 says.
+Assigning work to somebody is not that somebody doing something.

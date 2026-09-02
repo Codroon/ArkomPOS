@@ -61,6 +61,7 @@ export const IPC_CHANNELS = [
   "users:create",
   "users:update",
   "users:resetPin",
+  "users:technicians",
   "used:checkImei",
   "used:log",
   "used:print",
@@ -892,6 +893,10 @@ export const UserRowSchema = z.object({
   lockedUntilMs: z.number().int().nullable(),
 });
 export type UserRow = z.infer<typeof UserRowSchema>;
+
+/** Names a repair can be assigned to — technicians only (ADR-0014 amendment). */
+export const UsersTechniciansResponseSchema = z.array(z.object({ id: z.string(), name: z.string() }));
+export type TechnicianRef = z.infer<typeof UsersTechniciansResponseSchema>[number];
 
 export const UsersListRequestSchema = z.object({}).optional();
 export const UsersListResponseSchema = z.array(UserRowSchema);

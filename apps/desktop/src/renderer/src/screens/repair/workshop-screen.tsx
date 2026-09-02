@@ -13,6 +13,7 @@
  * which means opening the dialog the action needs. Until every one of those
  * dialogs exists, a card opens its ficha rather than pretending to move.
  */
+import { TechnicianPicker, UNASSIGNED } from "../../components/technician-picker";
 import { useCallback, useEffect, useState } from "react";
 import { REPAIR_STATUSES, type RepairStatus, type WorkshopBoard } from "@arkom/core";
 import { SelectInput, Switch, cn, useT } from "@arkom/ui";
@@ -48,8 +49,8 @@ export function WorkshopScreen() {
     try {
       setBoard(
         await window.arkom.invoke("workshop:board", {
-          technicianId: technicianId === "none" || technicianId === "" ? null : technicianId,
-          unassignedOnly: technicianId === "none",
+          technicianId: technicianId === UNASSIGNED || technicianId === "" ? null : technicianId,
+          unassignedOnly: technicianId === UNASSIGNED,
         }),
       );
       setError(null);
@@ -75,15 +76,11 @@ export function WorkshopScreen() {
         </div>
         <div className="flex-1" />
         <div className="w-[190px]">
-          <SelectInput value={technicianId} onChange={(e) => setTechnicianId(e.target.value)}>
-            <option value="">{t("rep.list.technician")}</option>
-            <option value="none">{t("rep.list.unassigned")}</option>
-            {staff.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </SelectInput>
+          <TechnicianPicker
+            mode="filter"
+            value={technicianId}
+            onChange={setTechnicianId}
+          />
         </div>
         <Switch label={t("rep.board.showClosed")} checked={showClosed} onChange={setShowClosed} />
       </div>

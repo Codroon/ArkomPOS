@@ -411,6 +411,7 @@ export {
   AuthPrintRecoveryRequestSchema,
   AuthPrintRecoveryResponseSchema,
   UserRowSchema,
+  UsersTechniciansResponseSchema,
   UsersListRequestSchema,
   UsersListResponseSchema,
   UsersCreateRequestSchema,
@@ -598,6 +599,7 @@ export type {
   ReportsDeadStockResponse,
   ReportsExportResponse,
   SalesReportRow,
+  TechnicianRef,
 } from "./ipc";
 export {
   DepositMethodSchema,

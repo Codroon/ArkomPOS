@@ -9,9 +9,9 @@
  * Two deliberate absences:
  *   - no ticket number until save, for the reason ADR-0008 gives everywhere
  *     else: gap-free numbering means allocating inside the transaction.
- *   - no technician selector yet. Assignment needs a list of staff, and the
- *     channel that returns one is owner-only today; it arrives with the
- *     workshop board in a later slice.
+ *   - the technician IS selectable here since v0.14.1: `users:technicians` is
+ *     readable by anybody who can see a repair, and the counter usually knows
+ *     who is taking the device before the board does.
  */
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -45,6 +45,7 @@ import { useTicketPrint } from "../../lib/use-ticket-print";
 import { PhotoSlotTile, useHasCamera } from "../used/photo-slots";
 import { slotKind, type DraftPhoto, type PhotoSlot } from "../used/model";
 import { CustomerPicker } from "./customer-picker";
+import { TechnicianPicker, UNASSIGNED } from "../../components/technician-picker";
 
 /** No seller-ID slot here: the device's owner is a customer, not a seller. */
 const REPAIR_PHOTO_SLOTS = ["front", "back", "extra1", "extra2"] as const;
@@ -63,6 +64,7 @@ interface IntakeDraft {
   photos: Partial<Record<PhotoSlot, DraftPhoto>>;
   promisedDate: string;
   promisedHalf: "morning" | "afternoon" | "";
+  technicianId: string;
   deposit: string;
   depositMethod: DepositMethod;
   cap: string;
@@ -80,6 +82,7 @@ const emptyDraft = (): IntakeDraft => ({
   photos: {},
   promisedDate: "",
   promisedHalf: "",
+  technicianId: UNASSIGNED,
   deposit: "",
   depositMethod: "cash",
   cap: "",
@@ -186,7 +189,7 @@ export function RepairIntakeScreen({ onDone }: { onDone: (ticketId: string | nul
         depositCents,
         depositMethod: draft.depositMethod,
         authorizedCapCents: capCents,
-        assignedUserId: null,
+        assignedUserId: draft.technicianId === UNASSIGNED ? null : draft.technicianId,
       });
       setCreated(result);
       /* The ticket exists by now; the receipt is a separate, retryable act
@@ -422,6 +425,14 @@ export function RepairIntakeScreen({ onDone }: { onDone: (ticketId: string | nul
                   ))}
                 </div>
               </div>
+            </Field>
+
+            <Field className="mt-2" label={t("tech.label")}>
+              <TechnicianPicker
+                mode="assign"
+                value={draft.technicianId}
+                onChange={(next) => patch({ technicianId: next })}
+              />
             </Field>
 
             <Field className="mt-2" label={t("rep.agreement.deposit")} hint={t("rep.agreement.depositHint")}>

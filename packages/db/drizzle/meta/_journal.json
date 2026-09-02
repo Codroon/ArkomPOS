@@ -71,6 +71,13 @@
       "when": 1788291771196,
       "tag": "0009_brainy_amphibian",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1788350653724,
+      "tag": "0010_clumsy_dust",
+      "breakpoints": true
     }
   ]
 }

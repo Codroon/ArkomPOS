@@ -40,6 +40,16 @@ export const es = {
   "common.yes": "Sí",
   "common.no": "No",
   "common.retry": "Reintentar",
+  "tech.all": "Todos los técnicos",
+  "tech.unassigned": "Sin asignar",
+  "tech.label": "Técnico",
+  "tech.change": "Cambiar técnico",
+  "tech.assign": "Asignar",
+  "tech.addTitle": "Añadir técnico",
+  "tech.addName": "Nombre",
+  "tech.addHint": "Un técnico es un nombre al que asignar reparaciones. No tiene PIN y no puede iniciar sesión.",
+  "tech.add": "Añadir técnico",
+  "tech.noPin": "Sin PIN · no inicia sesión",
   "common.dash": "—",
 
   /* chips */

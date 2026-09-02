@@ -22,7 +22,6 @@ export function RepairsScreen() {
   const can = useCan();
   const [tab, setTab] = useState<Tab>("tickets");
   const [view, setView] = useState<View>({ kind: "list" });
-  const [staff, setStaff] = useState<Array<{ id: string; name: string }>>([]);
   /* bumped by anything that changes a ticket, so the list behind the ficha is
      never stale when you come back to it */
   const [refreshKey, setRefreshKey] = useState(0);
@@ -30,15 +29,6 @@ export function RepairsScreen() {
 
   const bump = useCallback(() => setRefreshKey((n) => n + 1), []);
 
-  useEffect(() => {
-    /* Who can be assigned. `auth:users` is the open login roster — names and
-       roles, never hashes — which is exactly what a technician picker needs and
-       is readable without users.manage. */
-    window.arkom
-      .invoke("auth:users")
-      .then((users) => setStaff(users.map((u) => ({ id: u.id, name: u.name }))))
-      .catch(() => setStaff([]));
-  }, []);
 
   /* arriving from a Documento link in Inventario */
   useEffect(() => {
@@ -64,7 +54,6 @@ export function RepairsScreen() {
     return (
       <RepairDetailPane
         ticketId={view.ticketId}
-        technicians={staff}
         onBack={() => setView({ kind: "list" })}
         onChanged={bump}
       />
@@ -111,7 +100,6 @@ export function RepairsScreen() {
 
       {tab === "tickets" ? (
         <RepairList
-          technicians={staff}
           refreshKey={refreshKey}
           onOpen={(ticketId) => setView({ kind: "detail", ticketId })}
         />

@@ -125,6 +125,7 @@ import {
   AuthRecoverResponseSchema,
   AuthPrintRecoveryRequestSchema,
   AuthPrintRecoveryResponseSchema,
+  UsersTechniciansResponseSchema,
   UsersListRequestSchema,
   UsersListResponseSchema,
   UsersCreateRequestSchema,
@@ -339,6 +340,8 @@ import {
   updateUser,
   userCan,
   verifyUserPin,
+  listTechnicians,
+  listLoginUsers,
 } from "./auth/users";
 import {
   endSession,
@@ -584,8 +587,11 @@ export function registerIpcHandlers(db: ArkomDb): void {
   });
 
   open("auth:users", AuthUsersRequestSchema, AuthUsersResponseSchema, () => {
-    // only active users, and only what a tile needs — no hashes, no overrides
-    return listUsers(db, tillContext(db).ctx, true).map((u) => ({
+    /* Only users who can actually sign in: active, AND holding a PIN. A
+       technician has no PIN and never appears here — filtered in MAIN, so a
+       renderer that asked anyway would still get nothing, and `verifyUserPin`
+       refuses the row a second time (ADR-0012 amendment). */
+    return listLoginUsers(db, tillContext(db).ctx).map((u) => ({
       id: u.id,
       name: u.name,
       role: u.role,
@@ -776,6 +782,10 @@ export function registerIpcHandlers(db: ArkomDb): void {
   }));
 
   /* ---- users administration ---- */
+
+  guarded("users:technicians", "repair.view", z.object({}).default({}), UsersTechniciansResponseSchema, (s) =>
+    listTechnicians(db, s.ctx),
+  );
 
   guarded("users:list", "users.manage", UsersListRequestSchema, UsersListResponseSchema, (s) =>
     listUsers(db, s.ctx).map(toUserRow),

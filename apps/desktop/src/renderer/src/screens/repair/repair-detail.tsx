@@ -24,6 +24,7 @@ import {
 import { errorMessage } from "../../lib/errors";
 import { useTicketPrint } from "../../lib/use-ticket-print";
 import { PrintToast } from "../../lib/print-toast";
+import { TechnicianPicker, UNASSIGNED, useTechnicians } from "../../components/technician-picker";
 import { OverdueChip, StatusChip, STATUS_KEYS, formatDateTime, formatPromised } from "./status-chip";
 import { QuotePanel } from "./quote-panel";
 import { ApprovalDialog, ReceivePartDialog } from "./repair-dialogs";
@@ -62,12 +63,10 @@ export function RepairDetailPane({
   ticketId,
   onBack,
   onChanged,
-  technicians,
 }: {
   ticketId: string;
   onBack: () => void;
   onChanged: () => void;
-  technicians: Array<{ id: string; name: string }>;
 }) {
   const t = useT();
   const printer = useTicketPrint();
@@ -77,6 +76,11 @@ export function RepairDetailPane({
   const [dialog, setDialog] = useState<null | "approve" | "receive" | "collect" | "notify" | "close">(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /* the assignment dialog: opened deliberately, never a stray click on a select */
+  const [assigning, setAssigning] = useState(false);
+  const [assignChoice, setAssignChoice] = useState<string>("");
+  const technicians = useTechnicians();
+  const assignedName = technicians.find((u) => u.id === detail?.assignedUserId)?.name ?? null;
 
   const load = useCallback(async () => {
     try {
@@ -306,25 +310,18 @@ export function RepairDetailPane({
         <div className="flex w-[320px] flex-none flex-col gap-3">
           <section className="rounded-[3px] border border-line-strong bg-card px-3 py-2.5">
             <SectionLabel>{t("rep.detail.management")}</SectionLabel>
-            <div className="mt-2">
-              <SelectInput
-                value={detail.assignedUserId ?? ""}
-                disabled={closed}
-                onChange={(e) => {
-                  const userId = e.target.value || null;
-                  void window.arkom
-                    .invoke("repair:assign", { ticketId, userId })
-                    .then(apply)
-                    .catch((err) => setError(errorMessage(t, err)));
-                }}
-              >
-                <option value="">{t("rep.assign.none")}</option>
-                {technicians.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </SelectInput>
+            {/* A VALUE, not a dropdown. An unset select reads as "nobody has
+                decided yet" whether or not that is true, and it invited a change
+                by accident; assignment is now a fact you read, and changing it
+                is a thing you choose to do (ADR-0014 amendment). */}
+            <div className="mt-2 flex items-baseline gap-2">
+              <div className="text-[11px] text-muted">{t("tech.label")}</div>
+              <div className="flex-1 text-[12px] font-medium">
+                {assignedName ?? <span className="italic text-subtle">{t("tech.unassigned")}</span>}
+              </div>
+              {!closed ? (
+                <GhostButton onClick={() => setAssigning(true)}>{t("tech.change")}</GhostButton>
+              ) : null}
             </div>
             <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[12px]">
               <Row label={t("rep.detail.received")} value={formatDateTime(detail.createdAt)} />
@@ -489,6 +486,39 @@ export function RepairDetailPane({
         />
       ) : null}
 
+      {assigning ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-inverse/40">
+          <div className="w-[380px] rounded-[3px] border border-line-strong bg-card shadow-lg">
+            <div className="border-b border-line px-3.5 py-2.5 text-[13px] font-bold">{t("tech.change")}</div>
+            <div className="px-3.5 py-3">
+              <TechnicianPicker
+                mode="assign"
+                value={assignChoice || (detail?.assignedUserId ?? UNASSIGNED)}
+                onChange={setAssignChoice}
+              />
+            </div>
+            <div className="flex justify-end gap-2 border-t border-line px-3.5 py-2.5">
+              <GhostButton onClick={() => setAssigning(false)}>{t("common.cancel")}</GhostButton>
+              <AccentButton
+                onClick={() => {
+                  const choice = assignChoice || (detail?.assignedUserId ?? UNASSIGNED);
+                  const userId = choice === UNASSIGNED ? null : choice;
+                  void window.arkom
+                    .invoke("repair:assign", { ticketId, userId })
+                    .then((next) => {
+                      apply(next);
+                      setAssigning(false);
+                      setAssignChoice("");
+                    })
+                    .catch((err) => setError(errorMessage(t, err)));
+                }}
+              >
+                {t("tech.assign")}
+              </AccentButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <PrintToast printer={printer} />
     </div>
   );

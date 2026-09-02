@@ -20,6 +20,7 @@ import {
 import { SelectInput, Switch, TextInput, cn, useT, type TKey } from "@arkom/ui";
 import { STATUS_KEYS, StatusChip } from "../repair/status-chip";
 import { openRepairTicket } from "../../lib/screen-bus";
+import { TechnicianPicker } from "../../components/technician-picker";
 import type { ReportFilters } from "./reports-screen";
 import {
   EmptyReport,
@@ -141,19 +142,12 @@ export function RepairsReport({
                 </option>
               ))}
             </SelectInput>
-            <SelectInput
+            <TechnicianPicker
+              mode="filter"
               className="w-[190px]"
               value={filters.repairsTechnicianId ?? ""}
-              onChange={(e) => patch({ repairsTechnicianId: e.target.value || null })}
-            >
-              <option value="">{t("rep2.repairs.allTech")}</option>
-              <option value="unassigned">{t("rep2.repairs.unassigned")}</option>
-              {(open?.technicians ?? []).map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
-            </SelectInput>
+              onChange={(next) => patch({ repairsTechnicianId: next === "" ? null : next })}
+            />
           </>
         ) : (
           <>

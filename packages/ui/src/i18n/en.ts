@@ -38,6 +38,16 @@ export const en: Record<TKey, string> = {
   "common.yes": "Yes",
   "common.no": "No",
   "common.retry": "Try again",
+  "tech.all": "All technicians",
+  "tech.unassigned": "Unassigned",
+  "tech.label": "Technician",
+  "tech.change": "Change technician",
+  "tech.assign": "Assign",
+  "tech.addTitle": "Add a technician",
+  "tech.addName": "Name",
+  "tech.addHint": "A technician is a name to assign repairs to. They have no PIN and cannot sign in.",
+  "tech.add": "Add technician",
+  "tech.noPin": "No PIN · cannot sign in",
   "common.dash": "—",
 
   /* chips */

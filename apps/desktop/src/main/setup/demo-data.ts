@@ -234,5 +234,29 @@ export function insertDemoData(
     });
 
 
+  /* One technician, so the pickers have somebody in them on a fresh install and
+     the walkthrough can assign a repair without a detour through Usuarios. A
+     NAME, not an account: no PIN, and therefore no way to sign in. */
+  const technicianRow = {
+    id: uuidv7(),
+    tenantId,
+    locationId,
+    terminalId,
+    name: "Nuria S.",
+    role: "technician",
+    pinHash: null,
+    permissionOverrides: {},
+    active: true,
+    failedAttempts: 0,
+    lockedUntil: null,
+    recoveryCodeHash: null,
+    lastLoginAt: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  tx.insert(s.users).values(technicianRow).run();
+  const { pinHash: _tp, recoveryCodeHash: _tr, ...safeTechnician } = technicianRow;
+  logCreate("user", technicianRow.id, safeTechnician);
+
   return { productCount: PRODUCTS.length, unitCount };
 }

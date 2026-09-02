@@ -55,6 +55,7 @@ import type {
   UsedDeviceDetail,
   VoucherRow,
   UsedPeek,
+  TechnicianRef,
   ShiftState,
   CashMovementsResponse,
   CashPreviewResponse,
@@ -196,9 +197,10 @@ declare global {
         payload: { purchaseId?: string; documentId?: string },
       ): Promise<UsedPeek>;
       invoke(channel: "users:list", payload?: undefined): Promise<UserRow[]>;
+      invoke(channel: "users:technicians", payload?: Record<string, never>): Promise<TechnicianRef[]>;
       invoke(
         channel: "users:create",
-        payload: { name: string; role: string; pin: string; overrides?: Record<string, boolean> },
+        payload: { name: string; role: string; pin?: string | null; overrides?: Record<string, boolean> },
       ): Promise<{ user: UserRow; recoveryCode: string | null }>;
       invoke(
         channel: "users:update",

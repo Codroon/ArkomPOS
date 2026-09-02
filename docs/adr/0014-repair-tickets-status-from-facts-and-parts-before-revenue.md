@@ -1,6 +1,7 @@
 # ADR-0014: Repair tickets — status entailed by facts, parts before revenue
 
 **Status:** Accepted · **Date:** 2026-08-31 · **Deciders:** Zothix (Codroon)
+**Amended:** 2026-09-02 (v0.14.1) — see §A1.
 **Builds on:** [0004](0004-stock-as-insert-only-movement-ledger.md) (movement ledger) ·
 [0007](0007-tax-snapshot-on-lines.md) (tax snapshot) ·
 [0008](0008-document-numbering-per-till-series.md) (numbering) ·
@@ -352,3 +353,30 @@ in it.
 parts. Supplier records — the ordered-part line carries free text. Any notification that
 leaves the till: the notified log is shaped so a Phase 2 cloud job can send from it, and
 sends nothing today.
+
+---
+
+## A1. Amendment (v0.14.1) — one technician picker, fed by one list
+
+Five screens chose a technician from five copies of the same dropdown, each fed
+by `auth:users` — which is the LOGIN list. It offered the owner and every cashier
+as people to assign a repair to, and once technicians stopped holding PINs
+(ADR-0012 §A1) it would have offered nobody at all.
+
+**`users:technicians`** returns active Technician-role users, names and ids and
+nothing else, readable by anybody holding `repair.view` — because a picker is not
+user administration, and `users:list` stays owner-only since it carries more.
+
+**One `TechnicianPicker` component** is used everywhere: repair intake, the
+ticket page, the repairs list filter, the workshop board filter, and the reports
+open-repairs filter. A filter offers *todos* and *sin asignar*; an assignment
+offers only the second, because assigning work to "everyone" is not a thing.
+
+**The ticket page shows the assignment as a value**, with a Cambiar técnico
+button beside it. An unset `<select>` reads as "nobody has decided yet" whether
+or not that is true, and it changes on a stray click; assignment is a fact you
+read, and changing it is a thing you choose to do.
+
+**Attribution is untouched.** The oplog keeps the logged-in user for every
+action, including the assignment itself — a test asserts a cashier assigning a
+ticket to a technician records the cashier.

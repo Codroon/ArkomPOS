@@ -36,6 +36,7 @@ import {
   useT,
 } from "@arkom/ui";
 import { errorMessage, ipcOf } from "../../lib/errors";
+import { refreshTechnicians } from "../../components/technician-picker";
 import { useSession } from "../../lib/use-session";
 import { RecoveryCodeStep } from "../auth/recovery-code-step";
 
@@ -84,6 +85,11 @@ export function UsersScreen() {
   const { session } = useSession();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
+  /* the technician dialog: a name and nothing else */
+  const [techDraft, setTechDraft] = useState<string | null>(null);
+  const [techError, setTechError] = useState<string | null>(null);
+
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; tone: "neutral" | "danger" } | null>(null);
@@ -102,6 +108,21 @@ export function UsersScreen() {
       console.error("users:list failed", err);
     }
   }, []);
+
+  /** Create a Technician-role user with no PIN — they never sign in. */
+  const addTechnician = async () => {
+    const name = (techDraft ?? "").trim();
+    if (!name) return;
+    setTechError(null);
+    try {
+      await window.arkom.invoke("users:create", { name, role: "technician", pin: null });
+      setTechDraft(null);
+      await refreshTechnicians();
+      await refresh();
+    } catch (err) {
+      setTechError(errorMessage(t, err));
+    }
+  };
 
   useEffect(() => {
     void refresh();
@@ -179,10 +200,41 @@ export function UsersScreen() {
 
   return (
     <>
+      {techDraft !== null ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-inverse/40">
+          <div className="w-[400px] rounded-[3px] border border-line-strong bg-card shadow-lg">
+            <div className="border-b border-line px-3.5 py-2.5 text-[13px] font-bold">{t("tech.addTitle")}</div>
+            <div className="px-3.5 py-3">
+              <Field label={t("tech.addName")} hint={t("tech.addHint")} error={techError}>
+                <TextInput
+                  autoFocus
+                  value={techDraft}
+                  onChange={(e) => setTechDraft(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && void addTechnician()}
+                />
+              </Field>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-line px-3.5 py-2.5">
+              <GhostButton onClick={() => { setTechDraft(null); setTechError(null); }}>
+                {t("common.cancel")}
+              </GhostButton>
+              <AccentButton disabled={techDraft.trim() === ""} onClick={() => void addTechnician()}>
+                {t("tech.add")}
+              </AccentButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex flex-none items-baseline gap-2 border-b border-line-strong bg-surface-2 px-4 py-2.5">
         <h1 className="text-[15px] font-semibold">{t("usr.title")}</h1>
         <span className="text-[11px] text-muted">{t("usr.subtitle")}</span>
         <div className="flex-1" />
+        {/* A technician is a NAME, not an account: no PIN, no role picker,
+            nothing else to decide. Putting them through the full user form
+            would ask an owner four questions with one right answer each
+            (ADR-0012 amendment). */}
+        <GhostButton onClick={() => setTechDraft("")}>{t("tech.add")}</GhostButton>
         <PrimaryButton onClick={() => setDraft(blank())}>{t("usr.new")}</PrimaryButton>
       </div>
 

@@ -339,7 +339,16 @@ export const users = sqliteTable("users", {
   terminalId: text("terminal_id").notNull().references(() => terminals.id),
   name: text("name").notNull(),
   role: text("role").notNull(),                    // "owner" | "cashier" | … (Zod, not CHECK)
-  pinHash: text("pin_hash").notNull(),             // self-describing: scrypt$… or $argon2id$…
+  /**
+   * Self-describing hash: `scrypt$…` or `$argon2id$…`.
+   *
+   * NULLABLE since v0.14.1. A technician is a name a repair can be assigned to,
+   * not somebody who signs in: they have no PIN, and **a row with no PIN can
+   * never log in** — the login list is filtered in main, not merely hidden in
+   * the renderer. Giving one a PIN later turns them into an ordinary login user
+   * with no other change, which is the shop-#2 path (ADR-0012 amendment).
+   */
+  pinHash: text("pin_hash"),
   /** JSON map of permission key → boolean, layered over the role's defaults. */
   permissionOverrides: text("permission_overrides", { mode: "json" }),
   active: integer("active", { mode: "boolean" }).notNull().default(true),

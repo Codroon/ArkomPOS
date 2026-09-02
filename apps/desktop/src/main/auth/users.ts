@@ -100,7 +100,10 @@ export function verifyUserPin(
   reason: "login" | "unlock" | "approval" | "recover" | "pin_change",
 ): PinCheck {
   const user = findUser(db, ctx, userId);
-  if (!user || !user.active) {
+  /* No PIN set means no way in — the same refusal an inactive or unknown user
+     gets, decided HERE rather than by the login screen not offering the tile
+     (ADR-0012 amendment). */
+  if (!user || !user.active || user.pinHash === null) {
     // deliberately the same error an inactive user gets: the login screen only
     // lists active users, so anything else is a caller that should not be here
     throw appError("INVALID_PIN", "PIN incorrecto.");
@@ -205,7 +208,8 @@ function assertPinAcceptable(pin: string): void {
 export interface CreateUserInput {
   name: string;
   role: string;
-  pin: string;
+  /** null = a technician, who never signs in (ADR-0012 amendment) */
+  pin?: string | null;
   overrides?: Record<string, boolean>;
 }
 
@@ -219,7 +223,19 @@ export function createUser(
   input: CreateUserInput,
 ): { user: UserRow; recoveryCode: string | null } {
   if (!isRole(input.role)) throw appError("VALIDATION", "Rol no válido.", "role");
-  assertPinAcceptable(input.pin);
+  /**
+   * A technician may be created with no PIN at all.
+   *
+   * They are a name a repair is assigned to, not somebody who signs in — the
+   * shop has one login and three people at the bench (ADR-0012 amendment). A
+   * row with no PIN can never log in: `verifyUserPin` refuses it and the login
+   * list does not contain it, both in main.
+   */
+  const pinless = input.pin === null || input.pin === undefined;
+  if (pinless && input.role !== "technician") {
+    throw appError("VALIDATION", "Solo un técnico puede no tener PIN.", "pin");
+  }
+  if (!pinless) assertPinAcceptable(input.pin!);
 
   const clash = listUsers(db, ctx).find((u) => u.name.toLowerCase() === input.name.trim().toLowerCase());
   if (clash) throw appError("DUPLICATE_NAME", "Ya hay un usuario con ese nombre.", "name");
@@ -235,7 +251,7 @@ export function createUser(
       terminalId: ctx.terminalId,
       name: input.name.trim(),
       role: input.role,
-      pinHash: hashPin(input.pin),
+      pinHash: pinless ? null : hashPin(input.pin!),
       permissionOverrides: input.overrides ?? {},
       active: true,
       failedAttempts: 0,
@@ -408,3 +424,23 @@ export function userCan(user: UserRecord, key: PermissionKey): boolean {
 }
 
 export { effectiveOverrides };
+
+/**
+ * The names a repair can be assigned to.
+ *
+ * Technicians only, active only — a cashier and an owner never appear in a
+ * technician picker, whatever they can otherwise do. Names and ids and nothing
+ * else, so any screen that assigns or filters work can read it (ADR-0014
+ * amendment).
+ */
+export function listTechnicians(db: ArkomDb, ctx: MutationCtx): Array<{ id: string; name: string }> {
+  return listUsers(db, ctx, true)
+    .filter((u) => u.role === "technician")
+    .map((u) => ({ id: u.id, name: u.name }))
+    .sort((a, b) => a.name.localeCompare(b.name, "es"));
+}
+
+/** Users who can actually sign in: active, and holding a PIN. */
+export function listLoginUsers(db: ArkomDb, ctx: MutationCtx): UserRecord[] {
+  return listUsers(db, ctx, true).filter((u) => u.pinHash !== null);
+}

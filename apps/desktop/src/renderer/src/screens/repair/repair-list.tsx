@@ -6,6 +6,7 @@
  * it stops being a way to navigate and becomes a maze. Same rule, same reason,
  * as Dispositivos usados.
  */
+import { TechnicianPicker, UNASSIGNED } from "../../components/technician-picker";
 import { useCallback, useEffect, useState } from "react";
 import { REPAIR_STATUSES, type RepairListRow, type RepairStatus } from "@arkom/core";
 import { Chip, ScanInput, SelectInput, Switch, cn, useT } from "@arkom/ui";
@@ -30,11 +31,9 @@ export const emptyFilters = (): ListFilters => ({
 
 export function RepairList({
   onOpen,
-  technicians,
   refreshKey,
 }: {
   onOpen: (ticketId: string) => void;
-  technicians: Array<{ id: string; name: string }>;
   refreshKey: number;
 }) {
   const t = useT();
@@ -97,25 +96,18 @@ export function RepairList({
       {/* second row: technician + overdue + search */}
       <div className="flex flex-none items-center gap-3 border-b border-line bg-surface px-4 py-2">
         <div className="w-[190px]">
-          <SelectInput
-            value={filters.unassignedOnly ? "none" : (filters.technicianId ?? "")}
-            onChange={(e) =>
+          <TechnicianPicker
+            mode="filter"
+            className="w-[190px]"
+            value={filters.unassignedOnly ? UNASSIGNED : (filters.technicianId ?? "")}
+            onChange={(next) =>
               setFilters((f) => ({
                 ...f,
-                unassignedOnly: e.target.value === "none",
-                technicianId: e.target.value === "none" || e.target.value === "" ? null : e.target.value,
+                technicianId: next === "" || next === UNASSIGNED ? null : next,
+                unassignedOnly: next === UNASSIGNED,
               }))
             }
-          >
-            <option value="">{t("rep.list.technician")}</option>
-            {/* "nobody has picked this up" is information, so it is a choice */}
-            <option value="none">{t("rep.list.unassigned")}</option>
-            {technicians.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </SelectInput>
+          />
         </div>
         <Switch
           label={t("rep.list.onlyOverdue")}
