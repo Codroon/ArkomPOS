@@ -21,8 +21,8 @@ import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, sql } from "dr
 import type { ArkomDb } from "@arkom/db";
 import * as schema from "@arkom/db/schema";
 import {
+  isSerializedItem,
   daysBetween,
-  isUsedProductName,
   marginCentsOf,
   marginPctOf,
   repairStatus,
@@ -51,14 +51,22 @@ const {
 type Reader = Pick<ArkomDb, "select">;
 
 /**
- * The cost of one line, in cents, as SQL.
+ * The cost of one line, in cents, as SQL — **snapshotted lines only**.
  *
- * `unit_cost_cents × qty` when the line carries a snapshot; the product's
- * current cost × qty when it does not. The COALESCE is the estimate, and
- * `estimatedLines` below counts exactly how often it fired.
+ * A line written before v0.14.0 carries no cost, and the report no longer
+ * substitutes the product's current cost into the arithmetic. Mixing a real
+ * figure with a guess produces a third thing that is neither, and a margin
+ * column the shop cannot act on is worse than an empty one: it invites a
+ * decision about pricing from a number that is partly about last week's
+ * purchase invoice.
+ *
+ * So a row containing ANY unsnapshotted line reports `—` for cost, margin and
+ * margin %, and contributes nothing to the totals. The caption says how many.
  */
 const lineCostSql = sql<number>`
-  coalesce(${documentLines.unitCostCents}, ${products.costCents}, 0) * ${documentLines.qty}
+  case when ${documentLines.unitCostCents} is not null
+    then ${documentLines.unitCostCents} * ${documentLines.qty}
+    else 0 end
 `;
 
 /** How many of the lines in scope had to guess. */
@@ -147,9 +155,10 @@ export interface SalesRow {
   netCents: number;
   taxCents: number;
   grossCents: number;
-  /** present only with reports.costs */
-  costCents?: number;
-  marginCents?: number;
+  /** present only with reports.costs; null when the row contains a pre-v0.14.0 line */
+  estimated?: boolean;
+  costCents?: number | null;
+  marginCents?: number | null;
   marginPct?: number | null;
 }
 
@@ -223,6 +232,7 @@ export function salesRows(db: Reader, ctx: MutationCtx, f: SalesFilters, withCos
       taxCents: sql<number>`coalesce(sum(${documentLines.taxCents}), 0)`,
       grossCents: sql<number>`coalesce(sum(${documentLines.totalCents}), 0)`,
       costCents: sql<number>`coalesce(sum(${lineCostSql}), 0)`,
+      estimatedLines: sql<number>`coalesce(sum(case when ${documentLines.unitCostCents} is null then 1 else 0 end), 0)`,
     })
     .from(documentLines)
     .innerJoin(documents, eq(documents.id, documentLines.documentId))
@@ -238,8 +248,14 @@ export function salesRows(db: Reader, ctx: MutationCtx, f: SalesFilters, withCos
     /* omitted, not blanked: a caller without the permission receives a row that
        has no cost field at all (ADR-0016 §7) */
     if (!withCosts) return base;
+    /* one unsnapshotted line makes the whole row's cost unknowable, so it says
+       so rather than reporting a figure that is part guess (ADR-0016 §2) */
+    if (r.estimatedLines > 0) {
+      return { ...base, estimated: true, costCents: null, marginCents: null, marginPct: null };
+    }
     return {
       ...base,
+      estimated: false,
       costCents: r.costCents,
       marginCents: marginCentsOf(r.grossCents, r.costCents),
       marginPct: marginPctOf(r.grossCents, r.costCents),
@@ -629,7 +645,7 @@ export function valuation(db: Reader, ctx: MutationCtx, f: { groupId?: string | 
       groupName: r.groupName ?? "Sin grupo",
       onHand: r.onHand,
       /* serialized rows show no single unit cost, because they have none */
-      unitCostCents: r.itemType === "serialized" ? null : r.unitCostCents,
+      unitCostCents: isSerializedItem(r.itemType) ? null : r.unitCostCents,
       valueCents: r.valueCents,
     })),
   };
@@ -689,7 +705,10 @@ export function deadStock(
 
   return rows
     .filter((r) => r.onHand > 0)
-    .filter((r) => !isUsedProductName(r.name))
+    /* keyed on the ITEM TYPE, never on the name: a shop can rename a product,
+       and a report that changes its mind because somebody fixed a typo is not a
+       report (ADR-0013 amendment) */
+    .filter((r) => r.itemType !== "used_device")
     .filter((r) => r.lastSale === null || r.lastSale <= cutoff)
     .map<DeadStockRow>((r) => ({
       productId: r.productId,

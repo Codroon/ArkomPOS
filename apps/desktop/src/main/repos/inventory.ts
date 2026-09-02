@@ -5,6 +5,7 @@
  */
 import { and, asc, desc, eq, like, lt, or, sql, type SQL } from "drizzle-orm";
 import {
+  isSerializedItem,
   appError,
   applyMovements,
   buildMovement,
@@ -171,7 +172,7 @@ export function addStock(db: ArkomDb, ctx: MutationCtx, input: StockAddRequest):
         throw appError("VALIDATION", "Artículo inactivo; no puede recibir stock.", "barcode");
       }
 
-      if (product.itemType === "serialized") {
+      if (isSerializedItem(product.itemType)) {
         if (entry.expectedQty == null) {
           throw appError("VALIDATION", "Los artículos serializados necesitan un IMEI por unidad.", "imeis");
         }

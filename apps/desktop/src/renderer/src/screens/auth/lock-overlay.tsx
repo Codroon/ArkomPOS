@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SessionInfoSchema, type SessionInfo } from "@arkom/core";
 import { Keypad, useRoleLabel, useT } from "@arkom/ui";
+import { refreshShift } from "../../lib/use-shift";
 import { ipcOf } from "../../lib/errors";
 import { formatCountdown } from "./login-screen";
 import { useCountdown } from "./auth-chrome";
@@ -47,6 +48,11 @@ export function LockOverlay({ session, onSwitchUser }: { session: SessionInfo; o
     setError(null);
     try {
       SessionInfoSchema.parse(await window.arkom.invoke("auth:unlock", { pin }));
+      /* Everything derived from the shift was unreadable while locked, so it is
+         re-read here rather than left stale — a screen that was open behind the
+         overlay fills itself in instead of showing whatever it managed to fetch
+         before the lock, or nothing at all. */
+      void refreshShift();
       // the session and the open cart survive; the shell reappears as it was
     } catch (err) {
       const ipc = ipcOf(err);

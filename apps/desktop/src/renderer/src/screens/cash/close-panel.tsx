@@ -23,6 +23,7 @@ import { errorMessage } from "../../lib/errors";
 import { useApprovalFlow } from "../../lib/use-approval";
 import { useTicketPrint } from "../../lib/use-ticket-print";
 import { DenominationDialog } from "./denomination-dialog";
+import { useShift } from "../../lib/use-shift";
 
 /** The Z prints Spanish always; the screen follows the staff toggle (ADR-0011). */
 const METHOD_KEYS: Record<string, TKey> = {
@@ -55,6 +56,7 @@ export function ClosePanel({
   const t = useT();
   const approval = useApprovalFlow();
   const printer = useTicketPrint();
+  const { version: shiftVersion } = useShift();
 
   const [totals, setTotals] = useState<ShiftTotalsPayload | null>(null);
   const [counted, setCounted] = useState("");
@@ -76,12 +78,13 @@ export function ClosePanel({
       .catch((err) => console.error("cash:preview failed", err));
   }, []);
 
-  /* Re-read when a movement lands. A cashier who pays 50 € out and then counts
-     against a figure computed before it would come up exactly 50 € over — the
-     kind of "discrepancy" that teaches people the tolerance is noise. */
+  /* Re-read when a movement lands, AND whenever the shift itself is re-read.
+     A cashier who pays 50 € out and then counts against a figure computed
+     before it would come up exactly 50 € over — the kind of "discrepancy" that
+     teaches people the tolerance is noise. */
   useEffect(() => {
     load();
-  }, [load, reloadKey]);
+  }, [load, reloadKey, shiftVersion]);
 
   useEffect(() => {
     window.arkom

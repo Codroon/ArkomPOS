@@ -32,6 +32,7 @@ import {
   Field,
   GhostButton,
   SectionLabel,
+  ActionRow,
   Switch,
   TextInput,
   cn,
@@ -498,7 +499,7 @@ export function RepairIntakeScreen({ onDone }: { onDone: (ticketId: string | nul
                   {t("rep.createdDeposit", { amount: formatCents(created.depositCents) })}
                 </div>
               ) : null}
-              <div className="mt-2.5 flex gap-2">
+              <ActionRow className="mt-2.5">
                 <GhostButton className="flex-1" onClick={() => printer.printRepair(created.ticketId, "intake", true)}>
                   {t("rep.printIntake")}
                 </GhostButton>
@@ -509,7 +510,7 @@ export function RepairIntakeScreen({ onDone }: { onDone: (ticketId: string | nul
                 <GhostButton className="flex-1" onClick={() => onDone(created.ticketId)}>
                   {t("rep.openTicket")}
                 </GhostButton>
-              </div>
+              </ActionRow>
             </div>
           ) : (
             <div className="w-[340px] rounded-[3px] border border-line-strong bg-surface-2 px-3 py-2.5">

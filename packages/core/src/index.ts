@@ -146,6 +146,7 @@ export {
   DEFAULT_MARGIN_PCT,
   usedProductName,
   isUsedProductName,
+  isSerializedItem,
   evaluateGate,
   assertGatePassed,
   unitCostCents,

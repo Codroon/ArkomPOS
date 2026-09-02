@@ -39,6 +39,7 @@ export const es = {
   "common.clear": "Limpiar",
   "common.yes": "Sí",
   "common.no": "No",
+  "common.retry": "Reintentar",
   "common.dash": "—",
 
   /* chips */

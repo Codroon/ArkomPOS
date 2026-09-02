@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { and, eq } from "drizzle-orm";
 import { openDb, runMigrations, schema as s } from "@arkom/db";
-import { AppError, imeiWithCheckDigit, parseIpcError, uuidv7, type UsedLogRequest } from "@arkom/core";
+import { AppError, imeiWithCheckDigit, isSerializedItem, parseIpcError, uuidv7, type UsedLogRequest } from "@arkom/core";
 import { handlers } from "./electron-stub";
 import { registerIpcHandlers } from "../ipc";
 import { endSession, startSession } from "../auth/session";
@@ -240,11 +240,15 @@ describe("the catalogue product", () => {
     expect(second.productId).not.toBe(first.productId);
   });
 
-  it("is marked used, serialized, and on the REBU margin scheme", async () => {
+  it("carries the used_device item type and the REBU margin scheme", async () => {
     await logPurchase(env.db, ctxOf(), request());
     const product = env.db.select().from(s.products).all()[0]!;
     expect(product.name).toBe("Apple iPhone SE 2020 64GB Blanco (usado)");
-    expect(product.itemType).toBe("serialized");
+    /* the type ADR-0013 always described. It behaves as serialized everywhere
+       — picked by IMEI, valued per unit, refused as a repair part — and differs
+       only where a report must tell a phone from a phone case */
+    expect(product.itemType).toBe("used_device");
+    expect(isSerializedItem(product.itemType)).toBe(true);
     expect(product.taxRegime).toBe("REBU");
   });
 });

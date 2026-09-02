@@ -25,6 +25,7 @@ import {
   type UsedLogResponse,
 } from "@arkom/core";
 import {
+  ActionRow,
   AccentButton,
   Chip,
   Field,
@@ -505,7 +506,7 @@ export function BuyUsedScreen() {
                   {t("used.logged.voucher", { amount: formatCents(buyPriceCents(draft) ?? 0) })}
                 </div>
               ) : null}
-              <div className="mt-2.5 flex gap-2">
+              <ActionRow className="mt-2.5">
                 <GhostButton className="flex-1" onClick={() => reprint("document")}>
                   {t("used.logged.printAgain")}
                 </GhostButton>
@@ -533,7 +534,7 @@ export function BuyUsedScreen() {
                     {t("used.logged.newPurchase")}
                   </AccentButton>
                 )}
-              </div>
+              </ActionRow>
               {logged.voucherId ? (
                 <button
                   type="button"

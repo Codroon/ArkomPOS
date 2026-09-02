@@ -5,10 +5,12 @@
  * cannot be reopened, edited or deleted (ADR-0015 §8). A miscount found tomorrow
  * is a movement in tomorrow's shift, not a correction to yesterday's Z.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { formatCents, type ShiftListRow } from "@arkom/core";
 import { GhostButton, cn, useT } from "@arkom/ui";
 import { useTicketPrint } from "../../lib/use-ticket-print";
+import { useShift } from "../../lib/use-shift";
+import { errorMessage } from "../../lib/errors";
 
 function stamp(ms: number | null): string {
   if (ms === null) return "—";
@@ -21,13 +23,34 @@ export function HistoryModal({ onClose }: { onClose: () => void }) {
   const t = useT();
   const printer = useTicketPrint();
   const [rows, setRows] = useState<ShiftListRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const { version: shiftVersion } = useShift();
 
-  useEffect(() => {
+  /**
+   * Load, and say so when it fails.
+   *
+   * The first version fetched once on mount and rendered an empty table if the
+   * call threw — which is what a locked session does. "No shifts" and "we could
+   * not ask" look identical and mean opposite things, so the failure now says
+   * so and offers the retry.
+   *
+   * It also re-reads on `shiftVersion`, which changes when the session unlocks
+   * and the shift is re-read: a modal opened while locked fills itself in
+   * afterwards instead of sitting empty until somebody closes and reopens it.
+   */
+  const load = useCallback(() => {
+    setError(null);
     window.arkom
       .invoke("cash:history", { limit: 50 })
       .then((res) => setRows(res.rows.filter((row) => row.closedAtMs !== null)))
-      .catch((err) => console.error("cash:history failed", err));
-  }, []);
+      .catch((err) => {
+        console.error("cash:history failed", err);
+        setRows(null);
+        setError(errorMessage(t, err));
+      });
+  }, [t]);
+
+  useEffect(() => load(), [load, shiftVersion]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-inverse/40" onClick={onClose}>
@@ -56,7 +79,16 @@ export function HistoryModal({ onClose }: { onClose: () => void }) {
               </tr>
             </thead>
             <tbody>
-              {rows !== null && rows.length === 0 ? (
+              {error !== null ? (
+                <tr>
+                  <td colSpan={8} className="px-3 py-8 text-center">
+                    <div className="text-[12px] text-danger-ink">{error}</div>
+                    <GhostButton className="mt-2" onClick={load}>
+                      {t("common.retry")}
+                    </GhostButton>
+                  </td>
+                </tr>
+              ) : rows !== null && rows.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-3 py-8 text-center text-[12px] text-muted">
                     {t("cash.history.empty")}

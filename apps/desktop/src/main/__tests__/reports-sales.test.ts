@@ -198,7 +198,7 @@ const window = () => {
 
 type SalesRes = {
   summary: { tickets: number; netCents: number; taxCents: number; grossCents: number; averageTicketCents: number; usedSalesCents: number };
-  rows: Array<{ key: string; label: string; count: number; qty: number; netCents: number; taxCents: number; grossCents: number; costCents?: number; marginCents?: number; marginPct?: number | null }>;
+  rows: Array<{ key: string; label: string; count: number; qty: number; netCents: number; taxCents: number; grossCents: number; estimated?: boolean; costCents?: number | null; marginCents?: number | null; marginPct?: number | null }>;
   estimate: { exactLines: number; estimatedLines: number } | null;
   withCosts: boolean;
 };
@@ -331,13 +331,32 @@ describe("cost and margin", () => {
     expect(res.rows[0]!.costCents).toBe(400);
   });
 
-  it("falls back to the current cost for a pre-v0.14.0 line, and says so", async () => {
+  it("says it does not know, rather than guessing, for a pre-v0.14.0 line", async () => {
     sale({ completedAt: TODAY(), lines: [{ productId: productA, qty: 1, unitPriceCents: 1000, unitCostCents: null }] });
 
     const res = await sales({ groupBy: "product" });
-    expect(res.rows[0]!.costCents).toBe(400); // the product's current cost
+    const row = res.rows[0]!;
+    /* a dash, not the product's current cost: mixing a real figure with a guess
+       produces a third thing that is neither, and margins get acted on */
+    expect(row.estimated).toBe(true);
+    expect(row.costCents).toBeNull();
+    expect(row.marginCents).toBeNull();
+    expect(row.marginPct).toBeNull();
     // and never silently: the count is on the response, the caption on screen
     expect(res.estimate).toEqual({ exactLines: 0, estimatedLines: 1 });
+  });
+
+  it("excludes an estimated row from the figures rather than polluting them", async () => {
+    sale({ completedAt: TODAY(), lines: [{ productId: productA, qty: 1, unitPriceCents: 1000, unitCostCents: 400 }] });
+    sale({ completedAt: TODAY(), lines: [{ productId: productB, qty: 1, unitPriceCents: 2000, unitCostCents: null }] });
+
+    const res = await sales({ groupBy: "product" });
+    const known = res.rows.find((r) => r.estimated === false)!;
+    const unknown = res.rows.find((r) => r.estimated === true)!;
+    expect(known.costCents).toBe(400);
+    expect(unknown.costCents).toBeNull();
+    // the revenue is still counted; only the cost side declines to answer
+    expect(unknown.grossCents).toBe(2000);
   });
 
   it("counts exactly which lines were guessed in a mixed report", async () => {

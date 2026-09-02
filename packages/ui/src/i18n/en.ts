@@ -37,6 +37,7 @@ export const en: Record<TKey, string> = {
   "common.clear": "Clear",
   "common.yes": "Yes",
   "common.no": "No",
+  "common.retry": "Try again",
   "common.dash": "—",
 
   /* chips */

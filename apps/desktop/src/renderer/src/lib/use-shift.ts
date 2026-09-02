@@ -11,6 +11,15 @@ import type { ShiftState } from "@arkom/core";
 
 let current: ShiftState | null = null;
 let loaded = false;
+/**
+ * Bumped by every refresh.
+ *
+ * Anything showing a figure DERIVED from the shift — expected cash, the Z
+ * figures, the movement totals — depends on this, so opening or closing a shift
+ * cannot leave a stale number on screen. Counting against a figure computed
+ * before the drawer changed is how a shift comes up exactly wrong.
+ */
+let version = 0;
 const listeners = new Set<() => void>();
 
 function emit() {
@@ -31,26 +40,40 @@ export async function refreshShift(): Promise<ShiftState | null> {
     console.error("cash:current failed", err);
   }
   loaded = true;
+  version += 1;
   emit();
   return current;
 }
 
-const getSnapshot = () => current;
+/* one object per version, so useSyncExternalStore sees a stable reference
+   between refreshes and a new one after each */
+let snapshot: { shift: ShiftState | null; version: number } = { shift: null, version: 0 };
+const getSnapshot = () => {
+  if (snapshot.shift !== current || snapshot.version !== version) snapshot = { shift: current, version };
+  return snapshot;
+};
 
-export function useShift(): { shift: ShiftState | null; loaded: boolean; refresh: () => Promise<ShiftState | null> } {
-  const shift = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+export function useShift(): {
+  shift: ShiftState | null;
+  loaded: boolean;
+  /** changes whenever the shift is re-read — a dependency for derived figures */
+  version: number;
+  refresh: () => Promise<ShiftState | null>;
+} {
+  const { shift, version: v } = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   useEffect(() => {
     if (!loaded) void refreshShift();
   }, []);
 
   const refresh = useCallback(() => refreshShift(), []);
-  return { shift, loaded, refresh };
+  return { shift, loaded, version: v, refresh };
 }
 
 /** Forget what we knew — used when the session ends, so the next user re-reads. */
 export function resetShift(): void {
   current = null;
   loaded = false;
+  version += 1;
   emit();
 }

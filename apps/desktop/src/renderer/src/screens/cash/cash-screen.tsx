@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from "react";
 import { formatCents } from "@arkom/core";
-import { AccentButton, Chip, GhostButton, SectionLabel, useT } from "@arkom/ui";
+import { AccentButton, ActionRow, Chip, GhostButton, SectionLabel, useT } from "@arkom/ui";
 import { useShift } from "../../lib/use-shift";
 import { useCan } from "../../lib/use-session";
 import { useTicketPrint } from "../../lib/use-ticket-print";
@@ -81,12 +81,12 @@ export function CashScreen() {
                  produced — the shape the intake and purchase screens use */
               <>
                 <div className="text-[13px] font-bold">{t("cash.close.done", { number: closed.zDocNumber })}</div>
-                <div className="mt-3.5 flex justify-center gap-2">
+                <ActionRow className="mt-3.5">
                   <GhostButton onClick={() => printer.printShift(closed.shiftId, "z", true)}>
                     {t("cash.close.reprint")}
                   </GhostButton>
                   <AccentButton onClick={() => setOpening(true)}>{t("cash.close.newShift")}</AccentButton>
-                </div>
+                </ActionRow>
               </>
             ) : (
               <>

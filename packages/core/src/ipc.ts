@@ -181,7 +181,13 @@ export type MetaContextResponse = z.infer<typeof MetaContextResponseSchema>;
 /* ---- catalog:* — §4 rows 1–3 ---- */
 
 /** Item types selectable in Phase 1 (the schema enum keeps the full domain). */
+/**
+ * What the catalogue EDITOR can set. `used_device` is deliberately absent: a
+ * used product is created by buying a phone, never by typing one in.
+ */
 export const CatalogItemTypeSchema = z.enum(["stocked", "serialized"]);
+/** What a catalogue row may CARRY, which includes rows the editor cannot make. */
+export const ProductItemTypeSchema = z.enum(["stocked", "serialized", "used_device"]);
 export type CatalogItemType = z.infer<typeof CatalogItemTypeSchema>;
 
 /** Tax regimes offered in Phase 1 (ADR-0007: IVA21 only; others visible-disabled). */
@@ -241,7 +247,7 @@ export const CatalogSaveRequestSchema = z.object({
   name: z.string().trim().min(1).max(200),
   barcode: z.string().trim().max(64).nullish(), // blank → core auto-EAN (req 4.2)
   groupId: z.string().min(1),
-  itemType: CatalogItemTypeSchema,
+  itemType: ProductItemTypeSchema,
   costCents: z.number().int().min(0),
   priceCents: z.number().int().min(0),
   taxRegime: TaxRegimeP1Schema,
@@ -2001,9 +2007,11 @@ export const SalesReportRowSchema = z.object({
   netCents: z.number().int(),
   taxCents: z.number().int(),
   grossCents: z.number().int(),
-  /* absent, not null, for a caller without reports.costs */
-  costCents: z.number().int().optional(),
-  marginCents: z.number().int().optional(),
+  /* absent for a caller without reports.costs; NULL when the row contains a
+     line written before v0.14.0, whose cost the till never recorded */
+  estimated: z.boolean().optional(),
+  costCents: z.number().int().nullable().optional(),
+  marginCents: z.number().int().nullable().optional(),
   marginPct: z.number().nullable().optional(),
 });
 export type SalesReportRow = z.infer<typeof SalesReportRowSchema>;

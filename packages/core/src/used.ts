@@ -65,6 +65,20 @@ export function usedProductName(device: DeviceIdentity): string {
 }
 
 /** True for a catalogue name this module generated — used to hide it from Catálogo. */
+/**
+ * Item types that are tracked piece by piece.
+ *
+ * A used device is a `used_device` product (which is what core has claimed since
+ * v0.11.0, even while the writer said `serialized`), and behaves exactly like a
+ * serialized one everywhere it matters: it is picked by IMEI at the till, valued
+ * at its unit's own cost, and refused as a repair part. The ONE place the two
+ * differ is Stock muerto, which is about goods the shop can reorder.
+ */
+export function isSerializedItem(itemType: string): boolean {
+  return itemType === "serialized" || itemType === "used_device";
+}
+
+/** @deprecated Prefer the item type — a shop can rename a product. */
 export function isUsedProductName(name: string): boolean {
   return name.trimEnd().endsWith("(usado)");
 }

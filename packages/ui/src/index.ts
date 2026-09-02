@@ -26,6 +26,7 @@ export { SearchInput } from "./components/search-input";
 export { ScanInput } from "./components/scan-input";
 export type { ScanInputHandle } from "./components/scan-input";
 export { Toast } from "./components/toast";
+export { ActionRow } from "./components/action-row";
 export { ConfirmDialog } from "./components/confirm-dialog";
 export { Keypad, PIN_MIN, PIN_MAX } from "./components/keypad";
 export { LocaleToggle } from "./components/locale-toggle";

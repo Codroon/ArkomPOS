@@ -1,6 +1,6 @@
 # ADR-0016: Reports read completed documents, and cost is snapshotted at sale
 
-**Status:** Proposed · **Date:** 2026-09-02 · **Deciders:** Zothix (Codroon)
+**Status:** Accepted · **Date:** 2026-09-02 · **Amended:** 2026-09-02 (v0.14.1) · **Deciders:** Zothix (Codroon)
 **Extends ADR-0007** — the same reasoning, applied to cost instead of tax.
 
 ## Context
@@ -74,11 +74,17 @@ till recorded cost", and the report says so:
 > **Historical rows report the product's current cost, explicitly flagged as
 > estimated. Never silently.**
 
-Every cost-bearing report carries an estimated count and marks the rows it
-applies to. A margin figure computed partly from estimates is still the best
-answer available, and the shop is entitled to know which part of it is a guess.
-Backfilling would be worse than either: it would write today's cost into
-yesterday's line and destroy the distinction the flag exists to preserve.
+**Amended v0.14.1 — they report nothing at all instead.** A row containing any
+unsnapshotted line shows `—` for cost, margin and margin %, and contributes to
+no total. The original rule produced a figure that was part measurement and part
+guess, and margin figures get acted on: a shop repricing a line because it shows
+−66,9 % would be reacting to last week's purchase invoice, not to the sale. The
+count is still on the response and the caption still names it, so the gap is
+visible rather than silent — which was always the point. Revenue is unaffected;
+only the cost side declines to answer.
+
+Backfilling remains wrong for the same reason it always was: it would write
+today's cost into yesterday's line and destroy the distinction entirely.
 
 ## 3. Aggregation is SQL in main, and the renderer receives shaped rows
 

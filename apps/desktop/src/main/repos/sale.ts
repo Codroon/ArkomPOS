@@ -9,6 +9,7 @@
  */
 import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
 import {
+  isSerializedItem,
   appError,
   applyMovements,
   allocateNumber,
@@ -229,7 +230,7 @@ export function addLine(db: ArkomDb, ctx: MutationCtx, req: SaleAddLineRequest):
       .all()[0];
     if (product) {
       const sellable = assertSellable(product);
-      if (sellable.itemType === "serialized") {
+      if (isSerializedItem(sellable.itemType)) {
         // handoff 01: scanning/tapping a serialized product opens the unit-pick modal
         const options = db
           .select({

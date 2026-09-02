@@ -19,6 +19,8 @@ import * as schema from "./schema";
 export interface FixupReport {
   /** used-device cash payouts written into the cash ledger */
   payoutsBackfilled: number;
+  /** used products re-typed from `serialized` to `used_device` */
+  usedProductsRetyped: number;
 }
 
 /**
@@ -90,6 +92,40 @@ export function backfillUsedPurchasePayouts(db: ArkomDb, newId: () => string): n
  * earlier one that succeeded — the next startup would simply redo what is still
  * missing.
  */
+/**
+ * Give used products the item type they were always supposed to have.
+ *
+ * ADR-0013 and core's own documentation say a used device is a `used_device`
+ * product; the writer said `serialized`, and Stock muerto had to exclude them by
+ * matching the "(usado)" suffix in the NAME — which a shop can change, at which
+ * point a report silently changes its mind.
+ *
+ * Keyed structurally, never on the name: a product is a used product exactly
+ * when one of its units came from a purchase. Idempotent, like every fix-up
+ * here — it looks for its own absence rather than tracking whether it has run.
+ */
+export function retypeUsedProducts(db: ArkomDb): number {
+  const { products, units } = schema;
+  const stale = db
+    .select({ id: products.id })
+    .from(products)
+    .where(
+      and(
+        eq(products.itemType, "serialized"),
+        sql`exists (select 1 from ${units} u where u.product_id = ${products.id} and u.purchase_id is not null)`,
+      ),
+    )
+    .all();
+
+  for (const row of stale) {
+    db.update(products).set({ itemType: "used_device" }).where(eq(products.id, row.id)).run();
+  }
+  return stale.length;
+}
+
 export function runDataFixups(db: ArkomDb, newId: () => string): FixupReport {
-  return { payoutsBackfilled: backfillUsedPurchasePayouts(db, newId) };
+  return {
+    payoutsBackfilled: backfillUsedPurchasePayouts(db, newId),
+    usedProductsRetyped: retypeUsedProducts(db),
+  };
 }

@@ -14,6 +14,7 @@ import { formatCents, type CashMovementRow, type CashMovementsResponse } from "@
 import { Chip, GhostButton, SectionLabel, cn, useT, type TKey } from "@arkom/ui";
 import { useCan } from "../../lib/use-session";
 import { ManualMovementDialog } from "./manual-movement-dialog";
+import { useShift } from "../../lib/use-shift";
 
 const REASON_KEYS: Record<string, TKey> = {
   repair_deposit: "cash.reason.repair_deposit",
@@ -38,6 +39,7 @@ export function MovementsPanel({
 }) {
   const t = useT();
   const can = useCan();
+  const { version: shiftVersion } = useShift();
   const [data, setData] = useState<CashMovementsResponse>({ rows: [], inCents: 0, outCents: 0, netCents: 0 });
   const [dialog, setDialog] = useState<"in" | "out" | null>(null);
 
@@ -48,7 +50,8 @@ export function MovementsPanel({
       .catch((err) => console.error("cash:movements failed", err));
   }, []);
 
-  useEffect(() => load(), [load]);
+  /* the shift changing re-reads the ledger too: the rows belong to a shift */
+  useEffect(() => load(), [load, shiftVersion]);
 
   const showAppliedNote = data.rows.some((row) => !row.movesCash);
 

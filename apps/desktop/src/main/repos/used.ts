@@ -238,7 +238,12 @@ function findOrCreateUsedProduct(
     tenantId: ctx.tenantId,
     groupId: group.id,
     name,
-    itemType: "serialized" as const,
+    /* `used_device`, which is what ADR-0013 and core's own docs have always
+       said. It behaves as serialized everywhere (isSerializedItem) and differs
+       in exactly one place: Stock muerto, which is about goods the shop can
+       reorder — and it is now keyed on this rather than on the product's name,
+       which a shop can change (ADR-0013 amendment). */
+    itemType: "used_device" as const,
     priceCents: 0, // the unit carries the price; a used product has no list price
     /* REBU: the margin scheme for second-hand goods bought from private
        individuals. Snapshotted onto the sale line by ADR-0007's existing

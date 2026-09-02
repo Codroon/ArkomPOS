@@ -9,6 +9,7 @@
  */
 import { and, asc, desc, eq, inArray, isNull, like, or, sql } from "drizzle-orm";
 import {
+  isSerializedItem,
   allocateNumber,
   appError,
   assertAction,
@@ -737,7 +738,7 @@ function sellablePart(tx: DbTx, ctx: MutationCtx, productId: string) {
      Fitting one to a repair would need a unit chosen and its identity carried
      onto the ticket, and no shop does that with the part — they sell the phone
      instead (ADR-0014 §3). */
-  if (product.itemType === "serialized") {
+  if (isSerializedItem(product.itemType)) {
     throw appError("VALIDATION", "Los artículos serializados no se montan como pieza.", "productId");
   }
   return product;
