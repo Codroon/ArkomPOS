@@ -10,7 +10,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { formatCents, parseMoneyInput, type CashMovementsResponse } from "@arkom/core";
-import { AccentButton, Field, GhostButton, TextInput, useT } from "@arkom/ui";
+import { AccentButton, Field, GhostButton, TextInput, useFieldError, useT } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
 import { useApprovalFlow } from "../../lib/use-approval";
 
@@ -30,7 +30,8 @@ export function ManualMovementDialog({
   const [presets, setPresets] = useState<string[]>([]);
   const [threshold, setThreshold] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  /* keyed on both fields: correcting either makes a standing refusal stale */
+  const error = useFieldError(`${amount}|${concept}`);
 
   useEffect(() => {
     window.arkom
@@ -49,7 +50,7 @@ export function ManualMovementDialog({
   const submit = async () => {
     if (!valid || busy) return;
     setBusy(true);
-    setError(null);
+    error.clear();
     try {
       const payload = { amountCents: cents, concept: concept.trim() };
       const details = [
@@ -69,7 +70,7 @@ export function ManualMovementDialog({
       );
       onDone(next);
     } catch (err) {
-      setError(errorMessage(t, err));
+      error.fail(errorMessage(t, err));
       setBusy(false);
     }
   };
@@ -93,7 +94,7 @@ export function ManualMovementDialog({
               />
             </Field>
 
-            <Field label={t("cash.mov.conceptLabel")} error={error}>
+            <Field label={t("cash.mov.conceptLabel")} error={error.error}>
               <TextInput
                 placeholder={t("cash.mov.conceptPlaceholder")}
                 value={concept}

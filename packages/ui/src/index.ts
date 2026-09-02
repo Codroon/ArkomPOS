@@ -30,3 +30,5 @@ export { ActionRow } from "./components/action-row";
 export { ConfirmDialog } from "./components/confirm-dialog";
 export { Keypad, PIN_MIN, PIN_MAX } from "./components/keypad";
 export { LocaleToggle } from "./components/locale-toggle";
+export { useFieldError, errorFor } from "./hooks/use-field-error";
+export type { FieldError, HeldError } from "./hooks/use-field-error";

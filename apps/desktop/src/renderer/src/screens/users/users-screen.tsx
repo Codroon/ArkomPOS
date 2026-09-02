@@ -34,6 +34,7 @@ import {
   usePermissionLabel,
   useRoleLabel,
   useT,
+  useFieldError,
 } from "@arkom/ui";
 import { errorMessage, ipcOf } from "../../lib/errors";
 import { refreshTechnicians } from "../../components/technician-picker";
@@ -87,7 +88,9 @@ export function UsersScreen() {
   const [draft, setDraft] = useState<Draft | null>(null);
   /* the technician dialog: a name and nothing else */
   const [techDraft, setTechDraft] = useState<string | null>(null);
-  const [techError, setTechError] = useState<string | null>(null);
+  /* keyed on the name, so a refusal about "Nuria" vanishes the moment the shop
+     types something else — it is not about that name any more */
+  const techError = useFieldError(techDraft ?? "");
 
 
   const [saving, setSaving] = useState(false);
@@ -113,14 +116,14 @@ export function UsersScreen() {
   const addTechnician = async () => {
     const name = (techDraft ?? "").trim();
     if (!name) return;
-    setTechError(null);
+    techError.clear();
     try {
       await window.arkom.invoke("users:create", { name, role: "technician", pin: null });
       setTechDraft(null);
       await refreshTechnicians();
       await refresh();
     } catch (err) {
-      setTechError(errorMessage(t, err));
+      techError.fail(errorMessage(t, err));
     }
   };
 
@@ -205,7 +208,7 @@ export function UsersScreen() {
           <div className="w-[400px] rounded-[3px] border border-line-strong bg-card shadow-lg">
             <div className="border-b border-line px-3.5 py-2.5 text-[13px] font-bold">{t("tech.addTitle")}</div>
             <div className="px-3.5 py-3">
-              <Field label={t("tech.addName")} hint={t("tech.addHint")} error={techError}>
+              <Field label={t("tech.addName")} hint={t("tech.addHint")} error={techError.error}>
                 <TextInput
                   autoFocus
                   value={techDraft}
@@ -215,7 +218,7 @@ export function UsersScreen() {
               </Field>
             </div>
             <div className="flex justify-end gap-2 border-t border-line px-3.5 py-2.5">
-              <GhostButton onClick={() => { setTechDraft(null); setTechError(null); }}>
+              <GhostButton onClick={() => { setTechDraft(null); techError.clear(); }}>
                 {t("common.cancel")}
               </GhostButton>
               <AccentButton disabled={techDraft.trim() === ""} onClick={() => void addTechnician()}>

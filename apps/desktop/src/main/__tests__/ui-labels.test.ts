@@ -15,6 +15,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { PERMISSIONS, PERMISSION_MODULES, ROLES } from "@arkom/core";
+import { errorFor } from "@arkom/ui";
 import { es } from "@arkom/ui/i18n/es";
 import { en } from "@arkom/ui/i18n/en";
 
@@ -74,5 +75,49 @@ describe("the two dictionaries differ where they should", () => {
     for (const p of PERMISSIONS) {
       expect((es as Record<string, string>)[`perm.${p.key}`], p.key).toBe(p.labelEs);
     }
+  });
+});
+
+/**
+ * An inline error outliving its input.
+ *
+ * "Add a technician" shipped a refusal that stayed under the field while the
+ * shop typed a perfectly good name over the one it complained about — a fixed
+ * problem still looking broken. Four dialogs had the same shape, all of them
+ * relying on somebody remembering `setError(null)` in an `onChange`.
+ *
+ * The rule replaced that with something nobody has to remember: the message
+ * carries the input it was about, and rendering compares.
+ */
+describe("an error is about the input that caused it", () => {
+  const held = { message: "Ya existe un usuario con ese nombre.", key: "Nuria" };
+
+  it("shows while the input still is what it was refused for", () => {
+    expect(errorFor(held, "Nuria")).toBe(held.message);
+  });
+
+  it("disappears the moment the input changes", () => {
+    expect(errorFor(held, "Nuria S")).toBeNull();
+    expect(errorFor(held, "Nur")).toBeNull();
+    expect(errorFor(held, "")).toBeNull();
+  });
+
+  it("comes back if the shop types its way to the same value again", () => {
+    /* the refusal is still TRUE of that name — hiding it would be a different
+       lie from the one this fixes */
+    expect(errorFor(held, "Nuria")).toBe(held.message);
+  });
+
+  it("shows nothing when nothing has been refused", () => {
+    expect(errorFor(null, "Nuria")).toBeNull();
+    expect(errorFor(null, "")).toBeNull();
+  });
+
+  it("treats a multi-field key as one question", () => {
+    // a dialog joins its fields: editing either makes a standing message stale
+    const both = { message: "Importe no válido.", key: "12,00|Compra de agua" };
+    expect(errorFor(both, "12,00|Compra de agua")).toBe(both.message);
+    expect(errorFor(both, "13,00|Compra de agua")).toBeNull();
+    expect(errorFor(both, "12,00|Compra de café")).toBeNull();
   });
 });

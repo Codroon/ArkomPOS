@@ -8,7 +8,7 @@
  */
 import { useEffect, useState } from "react";
 import { centsToInput, formatCents, parseMoneyInput, type Breakdown } from "@arkom/core";
-import { AccentButton, Field, GhostButton, TextInput, useT } from "@arkom/ui";
+import { AccentButton, Field, GhostButton, TextInput, useFieldError, useT } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
 import { DenominationDialog } from "./denomination-dialog";
 
@@ -26,7 +26,8 @@ export function OpenShiftDialog({
   const [breakdown, setBreakdown] = useState<Breakdown | null>(null);
   const [counting, setCounting] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  /* keyed on the float, so re-counting clears a refusal about the old figure */
+  const error = useFieldError(amount);
 
   /* the shop's usual float, prefilled — a setting, so the client's answer is
      data rather than a number in the source */
@@ -43,12 +44,12 @@ export function OpenShiftDialog({
   const submit = async () => {
     if (!valid || busy) return;
     setBusy(true);
-    setError(null);
+    error.clear();
     try {
       await window.arkom.invoke("cash:open", { floatCents: cents, breakdown });
       await onOpened();
     } catch (err) {
-      setError(errorMessage(t, err));
+      error.fail(errorMessage(t, err));
       setBusy(false);
     }
   };
@@ -74,7 +75,7 @@ export function OpenShiftDialog({
         <div className="px-3.5 py-3">
           {preamble ? <div className="mb-2.5 text-[11px] leading-snug text-ink-2">{preamble}</div> : null}
 
-          <Field label={t("cash.float")} hint={t("cash.floatHint")} error={error}>
+          <Field label={t("cash.float")} hint={t("cash.floatHint")} error={error.error}>
             <div className="flex items-center gap-2">
               <TextInput
                 mono
