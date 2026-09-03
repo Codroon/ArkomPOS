@@ -682,7 +682,12 @@ export const SupplierCreateResponseSchema = EntityRefSchema;
 export const PaperWidthSchema = z.union([z.literal(80), z.literal(58)]);
 
 /** The command sets node-thermal-printer speaks. Epson is the CT-S310S's mode. */
-export const CommandSetSchema = z.enum(["epson", "star", "tanca", "daruma", "brother"]);
+/* Two, because two is what the shop can answer. Every receipt printer this till
+   is likely to meet speaks ESC/POS (Epson's dialect, which Citizen implements);
+   Star is the one common exception. Offering five made the owner pick between
+   names they have no way to check, and a wrong pick prints gibberish (v0.18.1).
+   A database that still holds one of the old values reads back as `epson`. */
+export const CommandSetSchema = z.enum(["epson", "star"]);
 
 /**
  * Everything Ajustes stores. Persisted as a KV table, but it crosses the bridge

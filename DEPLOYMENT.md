@@ -142,10 +142,15 @@ itself.
 3. **Load the paper roll** — 80 mm, printed side facing the head. Close the lid
    until it clicks.
 4. In Arkom POS, open **11 Ajustes → Impresión**:
-   - **Impresora**: pick the Citizen from the dropdown.
+   - **Impresora**: the Citizen should already be picked — the list puts real
+     printers first and hides OneNote, Print to PDF and the fax queue behind
+     **Ver todas las impresoras**, and when exactly one queue looks like a
+     receipt printer the till preselects it. It is a suggestion until you print:
+     nothing is saved by looking at it.
    - **Ancho del papel**: **80 mm**.
-   - **Juego de comandos**: **Epson** (the CT-S310S speaks ESC/POS).
-5. Press **Imprimir prueba**.
+   - **Juego de comandos**: **Epson (ESC/POS)** — the CT-S310S speaks it, and so
+     does almost everything else. Star is the other option, for Star printers.
+5. Press **Imprimir prueba**. This is what confirms the suggestion and saves it.
 
 **What should happen:** a short sample ticket prints and the paper is cut. It
 uses no ticket number and leaves no sale in the books — it is safe to press as

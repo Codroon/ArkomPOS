@@ -72,6 +72,9 @@ type SettingKey = keyof Settings;
 /** Values live as strings; these two put the non-string fields back together. */
 function decode(key: SettingKey, raw: string): Settings[SettingKey] {
   if (key === "paperWidthMm") return Number(raw) === 58 ? 58 : 80;
+  /* v0.18.1 dropped tanca/daruma/brother. A till that stored one reads back as
+     epson rather than as an invalid value the screen would have to explain. */
+  if (key === "commandSet") return raw === "star" ? "star" : "epson";
   if (key === "backupLastAtMs") return Number(raw) || 0;
   // 0 is a real answer here ("never lock"), so it must survive the ?? fallback
   if (key === "idleLockMinutes") return Number.isFinite(Number(raw)) ? Number(raw) : 5;

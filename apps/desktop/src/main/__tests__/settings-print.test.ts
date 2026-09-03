@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { openDb, runMigrations, schema as s } from "@arkom/db";
-import { opsToText, renderTicket, shopHeaderLines, uuidv7 } from "@arkom/core";
+import { opsToText, parseIpcError, renderTicket, shopHeaderLines, uuidv7 } from "@arkom/core";
 import { handlers, setNextSavePath } from "./electron-stub";
 import { registerIpcHandlers } from "../ipc";
 import { endSession, startSession } from "../auth/session";
@@ -422,6 +422,50 @@ describe("the document peek", () => {
 });
 
 /* ---------------------------------- 7 · upgrading a populated database -- */
+
+/* ------------------------------------ the printing card (v0.18.1) */
+
+describe("the printer the till prints on", () => {
+  it("reads a retired command set as Epson, rather than as a value nothing understands", () => {
+    /* v0.18.1 dropped tanca/daruma/brother from the picker. A till that stored
+       one keeps working: every receipt printer this app is likely to meet
+       speaks ESC/POS, so the fallback is the honest one. */
+    env.db
+      .insert(s.settings)
+      .values({ tenantId: env.ctx.tenantId, key: "commandSet", value: "tanca", updatedAt: new Date() })
+      .run();
+    expect(getSettings(env.db, ctxOf()).commandSet).toBe("epson");
+  });
+
+  it("keeps Star, which is the one exception worth offering", () => {
+    saveSettings(env.db, ctxOf(), { commandSet: "star" });
+    expect(getSettings(env.db, ctxOf()).commandSet).toBe("star");
+  });
+
+  it("refuses to store a command set the picker no longer offers", async () => {
+    const before = getSettings(env.db, ctxOf()).commandSet;
+    try {
+      await call("settings:save", { commandSet: "daruma" });
+      throw new Error("expected a refusal");
+    } catch (err) {
+      expect(parseIpcError(err)?.code).toBe("VALIDATION");
+    }
+    expect(getSettings(env.db, ctxOf()).commandSet).toBe(before);
+  });
+
+  it("refuses a test print when no printer is configured", async () => {
+    /* the button is disabled in Ajustes; this is the same rule in main. A PDF
+       of a sample ticket answers no question anybody asked. */
+    expect(getSettings(env.db, ctxOf()).printerName).toBe("");
+    try {
+      await call("print:test", { target: "auto" });
+      throw new Error("expected a refusal");
+    } catch (err) {
+      expect(parseIpcError(err)?.code).toBe("PRINTER_REQUIRED");
+    }
+    expect(env.db.select().from(s.oplog).all().filter((e) => e.action === "test")).toEqual([]);
+  });
+});
 
 describe("upgrading a v0.16.1 till", () => {
   it("needs no migration, because settings are rows and not columns", () => {

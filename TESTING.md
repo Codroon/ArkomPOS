@@ -364,21 +364,35 @@ blue is only ever the fill behind a button.
 
 You have no thermal printer yet, and that is fine — this whole section runs
 without one. The paper path gets its real test at the shop, on the Citizen.
-What you are checking here is that the till behaves properly when printing
-**fails**, because that is the case that must never cost you a sale.
+What you are checking here is the two things that must never cost you a sale:
+that the till **refuses to sell** when no printer is set up at all, and that it
+**still sells** when a printer is set up and the printing itself fails.
 
-### (a) Turn the printer off
+### (a) With no printer configured, the till will not charge
 
-Go to **11 Ajustes**. Under **Impresión**, set **Impresora** to
-**Sin impresora**. Leave the paper at **80 mm** and the command set at
-**Epson**. It saves as you go — there is no Save button and nothing to forget.
+Go to **11 Ajustes**. Under **Impresión**, **Impresora** should read
+**Sin configurar**. Leave the paper at **80 mm** and the command set at
+**Epson (ESC/POS)**. It saves as you go — there is no Save button and nothing to
+forget.
 
-While you are there, look at **Datos de la tienda** below. All three fields say
-`PENDIENTE`. That is on purpose: your shop's real registered name, NIF and
-address still have to come from you, and until they do, every ticket prints the
-word PENDIENTE where they belong so nobody can ship this by accident.
+Now go to **01 Venta**, put an item on the ticket, take **Efectivo** and press
+**Cobrar**. Nothing is sold, and a message says:
 
-### (b) Sell something
+> **No hay impresora configurada. Ve a Ajustes → Impresora y elige una antes de cobrar.**
+
+The ticket stays open exactly as it was. That is deliberate: a till that takes
+money it cannot hand a ticket for leaves an argument for later, and this is the
+one state where refusing is kinder than selling.
+
+While you are there, look at **Datos de la tienda** below. The fields are empty
+until you fill them in — your shop's registered name, NIF and address have to
+come from you, and a blank line simply does not print.
+
+### (b) Give it a printer, and sell something
+
+Back in **11 Ajustes → Impresión**, press **Ver todas las impresoras** and pick
+any queue Windows offers (OneNote or the fax queue will do — the point is that
+it is not a real receipt printer). The till now sells.
 
 Go to **01 Venta**, put two or three items on a ticket — include a phone, so
 there is an IMEI on the paper — take **Efectivo**, and press **Cobrar**.
@@ -398,18 +412,18 @@ would lose the only way to recover the ticket.
 
 ### (c) Save it as a PDF instead
 
-Click **Guardar PDF**. The message turns dark and tells you where the file went:
+Click **Guardar PDF**. The message tells you the file name and gives you
+**Abrir** and **Ver carpeta**. Nothing is filed per sale: this PDF is written
+only because you asked for one, into a temporary folder that is emptied every
+time the app starts. To keep a copy, open the sale from **13 Documentos** and
+use **Guardar PDF…**, which asks you where to put it.
 
-```
-Ticket guardado en C:\Users\<tú>\AppData\Roaming\@arkom\desktop\tickets\T1-00000X.pdf
-```
-
-Open that file. Check it against what you sold:
+Open the file. Check it against what you sold:
 
 | On the PDF | Should be |
 |---|---|
 | Top | **ARKOM** in the heavy brand type, on a blue line. It is the only blue on the page. |
-| Under it | The three `PENDIENTE` lines — your shop data, still owed. |
+| Under it | Your shop's letterhead — blank until you fill it in under **Datos de la tienda**. |
 | Ticket number + date | Matches what the till showed. |
 | Each item | Name, then `qty × price`, then the line total on the right. |
 | The phone's line | Its **IMEI**, printed underneath the name. |

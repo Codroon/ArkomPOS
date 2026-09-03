@@ -316,6 +316,8 @@ export {
   assertTypeChangeAllowed,
 } from "./catalog";
 export type { MissingField } from "./catalog";
+export { classifyPrinters, isVirtualQueue, looksLikeReceiptPrinter } from "./printers";
+export type { PrinterChoices, PrinterLike } from "./printers";
 export {
   IPC_CHANNELS,
   ErrorCodeSchema,

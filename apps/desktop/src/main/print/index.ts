@@ -226,6 +226,13 @@ export async function printTest(
   target: "auto" | "pdf",
 ): Promise<PrintTicketResponse> {
   const settings = getSettings(db, ctx);
+  /* "Imprimir prueba" answers one question — does the machine on the counter
+     print what this till sends? — and there is nothing to answer with when no
+     printer is configured. The button is disabled in Ajustes; this is the same
+     rule in main, where it cannot be forgotten (v0.18.1). */
+  if (target !== "pdf" && !settings.printerName) {
+    throw appError("PRINTER_REQUIRED", "No hay impresora configurada. Elige una en Ajustes.");
+  }
   const sample: TicketDoc = {
     docNumber: "PRUEBA",
     completedAtMs: Date.now(),

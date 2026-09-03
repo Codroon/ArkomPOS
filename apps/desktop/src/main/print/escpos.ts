@@ -12,12 +12,12 @@
 import { ThermalPrinter, PrinterTypes, CharacterSet } from "node-thermal-printer";
 import { COLUMNS_BY_PAPER, type PaperWidthMm, type TicketOp } from "@arkom/core";
 
+/* Two command sets (v0.18.1). Anything else — including the values a v0.18.0
+   database may still hold — falls through to Epson, which is what a receipt
+   printer that speaks anything speaks. */
 const TYPES: Record<string, PrinterTypes> = {
   epson: PrinterTypes.EPSON,
   star: PrinterTypes.STAR,
-  tanca: PrinterTypes.TANCA,
-  daruma: PrinterTypes.DARUMA,
-  brother: PrinterTypes.BROTHER,
 };
 
 export function encodeEscPos(ops: TicketOp[], commandSet: string, paperWidthMm: PaperWidthMm): Buffer {

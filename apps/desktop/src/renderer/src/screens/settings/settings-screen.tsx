@@ -10,9 +10,10 @@
  * Brand: the screen's single blue element is "Imprimir prueba" — the only
  * action here that does anything to the world.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   centsToInput,
+  classifyPrinters,
   parseMoneyInput,
   SettingsSchema,
   PrintPrintersResponseSchema,
@@ -25,6 +26,7 @@ import {
 } from "@arkom/core";
 import {
   AccentButton,
+  Chip,
   ConfirmDialog,
   Field,
   GhostButton,
@@ -48,6 +50,7 @@ export function SettingsScreen() {
   const t = useT();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [printers, setPrinters] = useState<PrinterInfo[]>([]);
+  const [showAllPrinters, setShowAllPrinters] = useState(false);
   const [testing, setTesting] = useState(false);
   const [demo, setDemo] = useState<DemoStatus | null>(null);
   const [series, setSeries] = useState<{
@@ -104,6 +107,27 @@ export function SettingsScreen() {
     [say, t],
   );
 
+  /* What the picker offers, and in what order (v0.18.1). The file writers —
+     OneNote, Print to PDF, a fax modem — are real queues the OS lists, and a
+     ticket sent to one of them stops the counter with a save dialog, so they
+     wait behind a toggle. */
+  const choices = useMemo(() => classifyPrinters(printers), [printers]);
+  const suggestion = settings?.printerName ? null : choices.suggestion;
+  /* Configured, and Windows no longer lists it: the cable, or a driver that was
+     reinstalled. Said out loud rather than silently reset — the shop should
+     know what the ticket is pointed at — and charging carries on, because a
+     printer that fails is the paper path's problem, not the counter's. */
+  const printerMissing =
+    !!settings?.printerName && printers.length > 0 && !printers.some((p) => p.name === settings.printerName);
+  /* Whatever is configured is ALWAYS in the list, even a file writer the toggle
+     would otherwise hide: a picker that reads "Sin configurar" while a printer
+     is configured tells the shop the opposite of the truth. */
+  const hiddenConfigured =
+    settings?.printerName && !printerMissing && !choices.physical.some((p) => p.name === settings.printerName)
+      ? choices.virtual.find((p) => p.name === settings.printerName)
+      : undefined;
+  const testablePrinter = !!settings?.printerName || !!suggestion;
+
   const testPrint = useCallback(
     async (target: "auto" | "pdf") => {
       setTesting(true);
@@ -118,6 +142,16 @@ export function SettingsScreen() {
     },
     [say, t],
   );
+
+  /**
+   * "Imprimir prueba", which is also how a suggested printer becomes the
+   * configured one: the owner sees paper come out of the machine before the
+   * till believes in it (v0.18.1).
+   */
+  const confirmWithTestPrint = useCallback(async () => {
+    if (suggestion) await save({ printerName: suggestion.name });
+    await testPrint("auto");
+  }, [suggestion, save, testPrint]);
 
   /** Hand the tickets folder to the OS file manager. */
 
@@ -167,23 +201,62 @@ export function SettingsScreen() {
           {/* ---------------- printing ---------------- */}
           <SettingsCard title={t("set.printingSection")}>
 
-            <Field label={t("set.printer")} hint={settings.printerName ? null : t("set.printerHint")}>
-              <SelectInput
-                value={settings.printerName}
-                onChange={(e) => void save({ printerName: e.target.value })}
-              >
-                <option value="">{t("set.printerNone")}</option>
-                {/* a printer configured but since removed still shows, so the
-                    owner can see what the ticket is pointed at */}
-                {settings.printerName && !printers.some((p) => p.name === settings.printerName) ? (
-                  <option value={settings.printerName}>{settings.printerName}</option>
-                ) : null}
-                {printers.map((p) => (
-                  <option key={p.name} value={p.name}>
-                    {p.displayName}
-                  </option>
-                ))}
-              </SelectInput>
+            <Field
+              label={t("set.printer")}
+              hint={
+                printerMissing
+                  ? t("set.printerMissingHint")
+                  : settings.printerName
+                    ? null
+                    : suggestion
+                      ? t("set.printerSuggested")
+                      : t("set.printerHint")
+              }
+            >
+              <div className="flex items-center gap-1.5">
+                <SelectInput
+                  className="min-w-0 flex-1"
+                  /* with nothing configured the picker opens on the one queue
+                     that looks like a receipt printer — a suggestion, not a
+                     decision: it is saved when the owner picks it or runs the
+                     test print (v0.18.1) */
+                  value={settings.printerName || suggestion?.name || ""}
+                  onChange={(e) => void save({ printerName: e.target.value })}
+                >
+                  <option value="">{t("set.printerNone")}</option>
+                  {/* a printer configured but since removed still shows, so the
+                      owner can see what the ticket is pointed at */}
+                  {printerMissing ? <option value={settings.printerName}>{settings.printerName}</option> : null}
+                  {hiddenConfigured && !showAllPrinters ? (
+                    <option value={hiddenConfigured.name}>{hiddenConfigured.displayName}</option>
+                  ) : null}
+                  {choices.physical.map((p) => (
+                    <option key={p.name} value={p.name}>
+                      {p.displayName}
+                    </option>
+                  ))}
+                  {/* the file writers: a ticket sent to one of these pops a save
+                      dialog at the counter, so they are out of the way until
+                      somebody asks for them */}
+                  {showAllPrinters
+                    ? choices.virtual.map((p) => (
+                        <option key={p.name} value={p.name}>
+                          {p.displayName}
+                        </option>
+                      ))
+                    : null}
+                </SelectInput>
+                {printerMissing ? <Chip variant="warning">{t("set.printerMissing")}</Chip> : null}
+              </div>
+              {choices.virtual.length > 0 && !showAllPrinters ? (
+                <button
+                  type="button"
+                  className="mt-1 self-start text-[11px] font-bold text-accent-ink underline underline-offset-2"
+                  onClick={() => setShowAllPrinters(true)}
+                >
+                  {t("set.printerShowAll")}
+                </button>
+              ) : null}
             </Field>
 
             <Field label={t("set.paperWidth")}>
@@ -198,25 +271,29 @@ export function SettingsScreen() {
             </Field>
 
             <Field label={t("set.commandSet")}>
+              {/* two, because two is what the shop can answer: every receipt
+                  printer this till is likely to meet speaks ESC/POS, and Star is
+                  the common exception (v0.18.1) */}
               <SelectInput
                 value={settings.commandSet}
                 onChange={(e) => void save({ commandSet: e.target.value as Settings["commandSet"] })}
               >
-                {(["epson", "star", "tanca", "daruma", "brother"] as const).map((c) => (
-                  <option key={c} value={c}>
-                    {c[0]!.toUpperCase() + c.slice(1)}
-                  </option>
-                ))}
+                <option value="epson">{t("set.commandSetEpson")}</option>
+                <option value="star">{t("set.commandSetStar")}</option>
               </SelectInput>
             </Field>
 
-            <div className="flex items-center gap-2 pt-1">
-              <AccentButton disabled={testing} onClick={() => void testPrint("auto")}>
-                {testing ? t("set.testPrinting") : t("set.testPrint")}
-              </AccentButton>
-              <GhostButton disabled={testing} onClick={() => void testPrint("pdf")}>
-                {t("set.testSavePdf")}
-              </GhostButton>
+            <div className="flex flex-col gap-1 pt-1">
+              <div className="flex items-center gap-2">
+                {/* the one test worth having, and it needs a printer: a PDF of a
+                    sample ticket answers no question anybody asked (v0.18.1) */}
+                <AccentButton disabled={testing || !testablePrinter} onClick={() => void confirmWithTestPrint()}>
+                  {testing ? t("set.testPrinting") : t("set.testPrint")}
+                </AccentButton>
+              </div>
+              {testablePrinter ? null : (
+                <div className="text-[11px] leading-snug text-subtle">{t("set.testPrintNeedsPrinter")}</div>
+              )}
             </div>
             {/* Hardware the till can actually ask a question of. There is no
                 card-terminal row: we do not integrate the terminal, and a green
