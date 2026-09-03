@@ -285,3 +285,79 @@ describe("clearing the demo data", () => {
     expect(groupRows()).toHaveLength(STARTER_GROUPS.length);
   });
 });
+
+/* ------------------------------- both names, on every row that carries one */
+
+describe("a shelf's name in an English till", () => {
+  /**
+   * The bug this pins (v0.18.1): the Sale grid read the shared cache and showed
+   * "Chargers & Cables", while the catalogue table, the editor's dropdown, the
+   * valuation and the dead-stock report read a SQL join that sent one string —
+   * the canonical Spanish name — so the same shelf had two names on two screens
+   * of the same English till.
+   *
+   * Main sends both names now, everywhere a group name travels, and the
+   * renderer picks. Asserted on the CHANNELS, because that is the seam.
+   */
+  it("travels with every row a screen or a report is built from", async () => {
+    const chargers = groupRows().find((g) => g.nameEn === "Chargers & Cables")!;
+    expect(chargers.name).toBe("Cargadores y Cables");
+
+    const now = new Date();
+    const productId = uuidv7();
+    db.insert(s.products)
+      .values({
+        id: productId,
+        tenantId: ctx.tenantId,
+        name: "Cable USB-C 1m",
+        groupId: chargers.id,
+        itemType: "stocked",
+        costCents: 300,
+        priceCents: 890,
+        taxRegime: "IVA21",
+        taxRateBp: 2100,
+        active: true,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    db.insert(s.productStock)
+      .values({ productId, locationId: ctx.locationId, onHand: 4, updatedAt: now })
+      .run();
+
+    const catalog = await call<Array<{ groupName: string | null; groupNameEn: string | null }>>("catalog:list", {});
+    expect(catalog[0]).toMatchObject({ groupName: "Cargadores y Cables", groupNameEn: "Chargers & Cables" });
+
+    const inventory = await call<Array<{ groupName: string | null; groupNameEn: string | null }>>("inventory:list", {});
+    expect(inventory[0]).toMatchObject({ groupName: "Cargadores y Cables", groupNameEn: "Chargers & Cables" });
+
+    const valuation = await call<{
+      groups: Array<{ groupName: string | null; groupNameEn: string | null }>;
+      products: Array<{ groupName: string | null; groupNameEn: string | null }>;
+    }>("reports:valuation", { groupId: null });
+    expect(valuation.groups[0]).toMatchObject({ groupName: "Cargadores y Cables", groupNameEn: "Chargers & Cables" });
+    expect(valuation.products[0]).toMatchObject({ groupNameEn: "Chargers & Cables" });
+
+    const dead = await call<{ rows: Array<{ groupName: string | null; groupNameEn: string | null }> }>(
+      "reports:deadStock",
+      { groupId: null },
+    );
+    expect(dead.rows[0]).toMatchObject({ groupName: "Cargadores y Cables", groupNameEn: "Chargers & Cables" });
+
+    // and the picker's own list, which was already bilingual, still is
+    const groups = await call<Array<{ name: string; nameEn: string | null }>>("catalog:groups", {});
+    expect(groups.find((g) => g.id === chargers.id) ?? groups[0]).toBeTruthy();
+    expect(groups.some((g) => g.nameEn === "Chargers & Cables")).toBe(true);
+  });
+
+  it("keeps the shop's OWN group in one language, because that is all it has", async () => {
+    /* a group the shop invents has no English name, and inventing one for it
+       would be the app putting words in the shop's mouth (ADR-0017) */
+    const made = await call<{ id: string; name: string; nameEn: string | null }>("catalog:createGroup", {
+      name: "Vitrina del escaparate",
+    });
+    expect(made.nameEn).toBeNull();
+    const groups = await call<Array<{ id: string; nameEn: string | null }>>("catalog:groups", {});
+    expect(groups.find((g) => g.id === made.id)?.nameEn).toBeNull();
+  });
+});

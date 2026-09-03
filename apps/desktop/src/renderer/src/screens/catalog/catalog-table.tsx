@@ -5,6 +5,7 @@
  */
 import { missingFields, type MissingField, type ProductRow } from "@arkom/core";
 import { Chip, cn, MoneyText, useDataLabel, useT, type TFn, type TKey } from "@arkom/ui";
+import { useGroupLabel } from "../../components/group-picker";
 
 export type SortKey = "name" | "priceCents" | "onHand";
 export interface Sort {
@@ -79,6 +80,7 @@ export function CatalogTable({
   onSort: (key: SortKey) => void;
 }) {
   const t = useT();
+  const groupLabel = useGroupLabel();
   const dataLabel = useDataLabel();
   return (
     <table className="w-full border-collapse text-[12px]">
@@ -117,7 +119,7 @@ export function CatalogTable({
                 {!row.active ? <Chip className="ml-1.5">{t("chip.inactive")}</Chip> : null}
               </td>
               <td className="px-3 py-1.5 text-muted">
-                {missing.has("group") ? <MissingCell t={t} /> : dataLabel(row.groupName ?? "")}
+                {missing.has("group") ? <MissingCell t={t} /> : (groupLabel(row) ?? "")}
               </td>
               <td className="px-3 py-1.5">
                 <Chip>{typeKey ? t(typeKey) : row.itemType.toUpperCase()}</Chip>

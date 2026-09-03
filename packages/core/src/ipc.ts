@@ -265,6 +265,8 @@ export const ProductRowSchema = z.object({
   barcode: z.string().nullable(),
   groupId: z.string().nullable(),
   groupName: z.string().nullable(),
+  /** the shop's English name for the group, when it has one (ADR-0017 A1) */
+  groupNameEn: z.string().nullable().default(null),
   itemType: z.string(),
   costCents: z.number().int().nullable(),
   priceCents: z.number().int().nullable(),
@@ -444,6 +446,8 @@ export const InventoryRowSchema = z.object({
   barcode: z.string().nullable(),
   groupId: z.string().nullable(),
   groupName: z.string().nullable(),
+  /** the shop's English name for the group, when it has one (ADR-0017 A1) */
+  groupNameEn: z.string().nullable().default(null),
   itemType: z.string(),
   onHand: z.number().int(),
   reorderPoint: z.number().int(),
@@ -2215,6 +2219,8 @@ export const ReportsSalesRequestSchema = DateRangeSchema.extend({
 export const SalesReportRowSchema = z.object({
   key: z.string(),
   label: z.string(),
+  /** grouped by group: the shop's English name for it, when it has one */
+  labelEn: z.string().nullable().default(null),
   count: z.number().int(),
   qty: z.number().int(),
   netCents: z.number().int(),
@@ -2367,6 +2373,7 @@ export const ReportsValuationResponseSchema = z.object({
     z.object({
       groupId: z.string().nullable(),
       groupName: z.string().nullable(), // null = no group; the READER words that (ADR-0011)
+      groupNameEn: z.string().nullable().default(null),
       qty: z.number().int(),
       valueCents: z.number().int(),
     }),
@@ -2376,6 +2383,7 @@ export const ReportsValuationResponseSchema = z.object({
       productId: z.string(),
       name: z.string(),
       groupName: z.string().nullable(), // null = no group; the READER words that (ADR-0011)
+      groupNameEn: z.string().nullable().default(null),
       onHand: z.number().int(),
       unitCostCents: z.number().int().nullable(),
       valueCents: z.number().int(),
@@ -2395,6 +2403,7 @@ export const ReportsDeadStockResponseSchema = z.object({
       productId: z.string(),
       name: z.string(),
       groupName: z.string().nullable(), // null = no group; the READER words that (ADR-0011)
+      groupNameEn: z.string().nullable().default(null),
       onHand: z.number().int(),
       costTiedUpCents: z.number().int(),
       lastSaleAtMs: z.number().int().nullable(),

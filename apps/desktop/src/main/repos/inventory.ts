@@ -55,6 +55,7 @@ export function listInventory(db: ArkomDb, ctx: MutationCtx, filters: InventoryL
       barcode: products.barcode,
       groupId: products.groupId,
       groupName: productGroups.name,
+      groupNameEn: productGroups.nameEn,
       itemType: products.itemType,
       onHand: sql<number>`coalesce(${productStock.onHand}, 0)`,
       reorderPoint: products.reorderPoint,

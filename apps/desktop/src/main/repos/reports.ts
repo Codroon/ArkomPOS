@@ -234,11 +234,16 @@ export function salesRows(db: Reader, ctx: MutationCtx, f: SalesFilters, withCos
   const label = byProduct
     ? sql<string>`${documentLines.description}`
     : sql<string>`coalesce(${productGroups.name}, ${REPAIR_GROUP_LABEL})`;
+  /* the same row in the shop's other language. A product description is the
+     shop's own words and has only one; a GROUP has two, and the English till
+     must not print Spanish shelves (ADR-0017 A1). */
+  const labelEn = byProduct ? sql<string | null>`null` : sql<string | null>`${productGroups.nameEn}`;
 
   const rows = db
     .select({
       key,
       label: sql<string>`min(${label})`,
+      labelEn: sql<string | null>`min(${labelEn})`,
       count: sql<number>`count(distinct ${documentLines.documentId})`,
       qty: sql<number>`coalesce(sum(${documentLines.qty}), 0)`,
       netCents: sql<number>`coalesce(sum(${documentLines.baseCents}), 0)`,
@@ -257,7 +262,16 @@ export function salesRows(db: Reader, ctx: MutationCtx, f: SalesFilters, withCos
     .all();
 
   return rows.map((r) => {
-    const base = { key: r.key, label: r.label, count: r.count, qty: r.qty, netCents: r.netCents, taxCents: r.taxCents, grossCents: r.grossCents };
+    const base = {
+      key: r.key,
+      label: r.label,
+      labelEn: r.labelEn,
+      count: r.count,
+      qty: r.qty,
+      netCents: r.netCents,
+      taxCents: r.taxCents,
+      grossCents: r.grossCents,
+    };
     /* omitted, not blanked: a caller without the permission receives a row that
        has no cost field at all (ADR-0016 §7) */
     if (!withCosts) return base;
@@ -625,6 +639,7 @@ export function valuation(db: Reader, ctx: MutationCtx, f: { groupId?: string | 
       name: products.name,
       groupId: products.groupId,
       groupName: productGroups.name,
+      groupNameEn: productGroups.nameEn,
       itemType: products.itemType,
       onHand: sql<number>`coalesce(${productStock.onHand}, 0)`,
       unitCostCents: products.costCents,
@@ -640,10 +655,19 @@ export function valuation(db: Reader, ctx: MutationCtx, f: { groupId?: string | 
   const withStock = rows.filter((r) => r.onHand > 0 || r.valueCents > 0);
   const totalCents = withStock.reduce((sum, r) => sum + r.valueCents, 0);
 
-  const groups = new Map<string, { groupId: string | null; groupName: string | null; qty: number; valueCents: number }>();
+  const groups = new Map<
+    string,
+    { groupId: string | null; groupName: string | null; groupNameEn: string | null; qty: number; valueCents: number }
+  >();
   for (const r of withStock) {
     const key = r.groupId ?? "";
-    const entry = groups.get(key) ?? { groupId: r.groupId, groupName: r.groupName, qty: 0, valueCents: 0 };
+    const entry = groups.get(key) ?? {
+      groupId: r.groupId,
+      groupName: r.groupName,
+      groupNameEn: r.groupNameEn,
+      qty: 0,
+      valueCents: 0,
+    };
     entry.qty += r.onHand;
     entry.valueCents += r.valueCents;
     groups.set(key, entry);
@@ -656,6 +680,7 @@ export function valuation(db: Reader, ctx: MutationCtx, f: { groupId?: string | 
       productId: r.productId,
       name: r.name,
       groupName: r.groupName,
+      groupNameEn: r.groupNameEn,
       onHand: r.onHand,
       /* serialized rows show no single unit cost, because they have none */
       unitCostCents: isSerializedItem(r.itemType) ? null : r.unitCostCents,
@@ -671,6 +696,7 @@ export interface DeadStockRow {
   name: string;
   /** null = the product has no group. The reader words that, not this. */
   groupName: string | null;
+  groupNameEn: string | null;
   onHand: number;
   costTiedUpCents: number;
   lastSaleAtMs: number | null;
@@ -702,6 +728,7 @@ export function deadStock(
       productId: products.id,
       name: products.name,
       groupName: productGroups.name,
+      groupNameEn: productGroups.nameEn,
       itemType: products.itemType,
       onHand: sql<number>`coalesce(${productStock.onHand}, 0)`,
       valueCents: valuationSql,
@@ -728,6 +755,7 @@ export function deadStock(
       productId: r.productId,
       name: r.name,
       groupName: r.groupName,
+      groupNameEn: r.groupNameEn,
       onHand: r.onHand,
       costTiedUpCents: r.valueCents,
       lastSaleAtMs: r.lastSale,

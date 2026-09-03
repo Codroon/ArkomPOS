@@ -47,6 +47,7 @@ function selectRows(db: Reader, ctx: MutationCtx, extra?: SQL): ProductRow[] {
       barcode: products.barcode,
       groupId: products.groupId,
       groupName: productGroups.name,
+      groupNameEn: productGroups.nameEn,
       itemType: products.itemType,
       costCents: products.costCents,
       priceCents: products.priceCents,

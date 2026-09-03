@@ -18,6 +18,7 @@ import {
 import { GhostButton, SelectInput, TextInput, cn, useT, type TKey } from "@arkom/ui";
 import { TicketPeekModal } from "../../components/ticket-peek-modal";
 import type { ReportFilters } from "./reports-screen";
+import { useGroupLabel } from "../../components/group-picker";
 import {
   EmptyReport,
   EstimateCaption,
@@ -68,6 +69,7 @@ export function SalesReport({
   onBack: () => void;
 }) {
   const t = useT();
+  const groupLabel = useGroupLabel();
   const [data, setData] = useState<ReportsSalesResponse | null>(null);
   const [detail, setDetail] = useState<{ label: string; rows: ReportsSalesDetailResponse["rows"] } | null>(null);
   const [peekDocId, setPeekDocId] = useState<string | null>(null);
@@ -227,7 +229,12 @@ export function SalesReport({
               {(data?.rows ?? []).map((row) => {
                 const drillable = filters.salesGroupBy === "day" || filters.salesGroupBy === "user" || filters.salesGroupBy === "product";
                 const label =
-                  filters.salesGroupBy === "method" ? t(METHOD_LABELS[row.label] ?? "common.dash") : row.label;
+                  filters.salesGroupBy === "method"
+                    ? t(METHOD_LABELS[row.label] ?? "common.dash")
+                    : filters.salesGroupBy === "group"
+                      ? /* a shelf has two names; a product description has one */
+                        (groupLabel({ groupName: row.label, groupNameEn: row.labelEn }) ?? row.label)
+                      : row.label;
                 return (
                   <tr
                     key={row.key}

@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatCents, type ReportsValuationResponse } from "@arkom/core";
 import { SectionLabel, SelectInput, useDataLabel, useT } from "@arkom/ui";
-import { GroupOptions } from "../../components/group-picker";
+import { useGroupLabel, GroupOptions } from "../../components/group-picker";
 import type { ReportFilters } from "./reports-screen";
 import { EmptyReport, FilterBar, ReportShell, money } from "./report-shell";
 
@@ -22,6 +22,7 @@ export function ValuationReport({
   onBack: () => void;
 }) {
   const t = useT();
+  const groupLabel = useGroupLabel();
   const dataLabel = useDataLabel();
   const [data, setData] = useState<ReportsValuationResponse | null>(null);
 
@@ -81,7 +82,7 @@ export function ValuationReport({
               <tbody>
                 {(data?.groups ?? []).map((g) => (
                   <tr key={g.groupId ?? "—"} className="border-b border-line last:border-b-0">
-                    <td className="px-3 py-1.5">{g.groupName ? dataLabel(g.groupName) : t("rep2.noGroup")}</td>
+                    <td className="px-3 py-1.5">{groupLabel(g) ?? t("rep2.noGroup")}</td>
                     <td className="px-3 py-1.5 text-right font-mono tabular-nums">{g.qty}</td>
                     <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums">{money(g.valueCents)}</td>
                   </tr>
@@ -106,7 +107,7 @@ export function ValuationReport({
                 {(data?.products ?? []).map((p) => (
                   <tr key={p.productId} className="border-b border-line last:border-b-0">
                     <td className="px-3 py-1.5">{p.name}</td>
-                    <td className="px-3 py-1.5 text-muted">{p.groupName ? dataLabel(p.groupName) : t("rep2.noGroup")}</td>
+                    <td className="px-3 py-1.5 text-muted">{groupLabel(p) ?? t("rep2.noGroup")}</td>
                     <td className="px-3 py-1.5 text-right font-mono tabular-nums">{p.onHand}</td>
                     {/* serialized rows show no single unit cost, because they
                         have none: five identical phones bought at three prices */}

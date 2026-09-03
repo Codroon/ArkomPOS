@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReportsDeadStockResponse } from "@arkom/core";
 import { SelectInput, useDataLabel, useT } from "@arkom/ui";
-import { GroupOptions } from "../../components/group-picker";
+import { useGroupLabel, GroupOptions } from "../../components/group-picker";
 import type { ReportFilters } from "./reports-screen";
 import { EmptyReport, Figure, FilterBar, ReportShell, SummaryStrip, dayStamp, money } from "./report-shell";
 
@@ -25,6 +25,7 @@ export function DeadStockReport({
   onBack: () => void;
 }) {
   const t = useT();
+  const groupLabel = useGroupLabel();
   const dataLabel = useDataLabel();
   const [data, setData] = useState<ReportsDeadStockResponse | null>(null);
 
@@ -82,7 +83,7 @@ export function DeadStockReport({
               {(data?.rows ?? []).map((r) => (
                 <tr key={r.productId} className="border-b border-line last:border-b-0">
                   <td className="px-3 py-1.5">{r.name}</td>
-                  <td className="px-3 py-1.5 text-muted">{r.groupName ? dataLabel(r.groupName) : t("rep2.noGroup")}</td>
+                  <td className="px-3 py-1.5 text-muted">{groupLabel(r) ?? t("rep2.noGroup")}</td>
                   <td className="px-3 py-1.5 text-right font-mono tabular-nums">{r.onHand}</td>
                   <td className="px-3 py-1.5 text-right font-mono font-bold tabular-nums">
                     {money(r.costTiedUpCents)}

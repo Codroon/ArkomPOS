@@ -19,6 +19,7 @@ import { useEffect, useRef, useState } from "react";
 import { parseIpcError, type EntityRef } from "@arkom/core";
 import { Field, GhostButton, SelectInput, TextInput, useDataLabel, useT, type TKey } from "@arkom/ui";
 import { errorMessage } from "../lib/errors";
+import { useGroupLabel } from "./group-picker";
 
 export interface PickOrCreateLabels {
   /** the field's own label, e.g. "Grupo" */
@@ -42,7 +43,8 @@ export function PickOrCreateField({
   error,
   required = false,
 }: {
-  items: EntityRef[];
+  /** a group also carries the shop's English name for it (ADR-0017 A1) */
+  items: Array<EntityRef & { nameEn?: string | null }>;
   /** `""` = nothing chosen */
   value: string;
   onChange: (id: string) => void;
@@ -54,6 +56,7 @@ export function PickOrCreateField({
   required?: boolean;
 }) {
   const t = useT();
+  const label = useGroupLabel();
   const dataLabel = useDataLabel();
 
   const [creating, setCreating] = useState(false);
@@ -122,7 +125,7 @@ export function PickOrCreateField({
             <option value="">{t(labels.placeholder)}</option>
             {items.map((item) => (
               <option key={item.id} value={item.id}>
-                {dataLabel(item.name)}
+                {item.nameEn === undefined ? dataLabel(item.name) : label({ groupName: item.name, groupNameEn: item.nameEn })}
               </option>
             ))}
           </SelectInput>

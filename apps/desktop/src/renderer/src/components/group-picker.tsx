@@ -90,6 +90,25 @@ export function useGroupName(): (group: GroupRef) => string {
   return (group) => groupDisplayName(group, locale);
 }
 
+/**
+ * The label for a group that came attached to a ROW — a catalogue line, a
+ * valuation total, a dead-stock item — rather than from the cache.
+ *
+ * Those rows are shaped by a SQL join, and until v0.18.1 the join sent one
+ * string: the canonical Spanish name. So an English till showed English shelves
+ * in the Sale grid (which reads the cache) and Spanish ones in the catalogue
+ * table, the reports and the editor's dropdown right beside it. Main sends both
+ * names now, and this is the one place that chooses between them.
+ */
+export function useGroupLabel(): (row: { groupName?: string | null; groupNameEn?: string | null }) => string | null {
+  const [locale] = useLocale();
+  return (row) => {
+    const es = row.groupName?.trim();
+    if (!es) return null; // no group: the READER words that (ADR-0011)
+    return groupDisplayName({ name: es, nameEn: row.groupNameEn ?? null }, locale);
+  };
+}
+
 export function GroupOptions({ allLabel }: { allLabel?: string }) {
   const label = useGroupName();
   const groups = useGroups();
