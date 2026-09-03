@@ -388,19 +388,55 @@ export function createRefund(db: ArkomDb, ctx: MutationCtx, req: RefundCreateReq
   });
 }
 
-/** Ticket numbers a refund can be started from — used by the search box. */
-export function findRefundableByNumber(db: ArkomDb, ctx: MutationCtx, docNumber: string): string | null {
-  const row = db
+/**
+ * Find a ticket by what somebody typed or scanned.
+ *
+ * Three shapes reach this, and all three are the same question:
+ *
+ *   - `T1-000482` — scanned off the receipt's own barcode, or typed in full
+ *   - `t1-482`    — typed by somebody who knows the prefix but not the padding
+ *   - `482`       — typed by somebody reading the number off the top of the roll
+ *
+ * The bare number is matched on `documents.number` rather than by rebuilding a
+ * string, because the padding and the prefix belong to the SERIES and a till
+ * with two of them would otherwise find the wrong ticket.
+ *
+ * Deliberately unbounded by date or shift: the customer standing at the counter
+ * with a receipt from three weeks ago is exactly who this is for.
+ */
+export function findTicketByNumber(db: ArkomDb, ctx: MutationCtx, input: string): string | null {
+  const raw = input.trim().toUpperCase();
+  if (!raw) return null;
+
+  const base = [
+    eq(documents.tenantId, ctx.tenantId),
+    eq(documents.status, "completed"),
+    /* what a refund can be started from. A `purchase` is money going out and a
+       `repair` is custody with a zero total. */
+    inArray(documents.docType, ["ticket", "invoice"]),
+  ];
+
+  const exact = db
     .select({ id: documents.id })
     .from(documents)
-    .where(
-      and(
-        eq(documents.tenantId, ctx.tenantId),
-        eq(documents.docNumber, docNumber.trim().toUpperCase()),
-        eq(documents.status, "completed"),
-        inArray(documents.docType, ["ticket", "invoice"]),
-      ),
-    )
+    .where(and(...base, eq(documents.docNumber, raw)))
     .all()[0];
-  return row?.id ?? null;
+  if (exact) return exact.id;
+
+  /* digits only, wherever they sit: "482", "T1-482" and "T1-000482" are one
+     ticket to the person holding the receipt */
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return null;
+  const n = Number(digits);
+  if (!Number.isSafeInteger(n) || n <= 0) return null;
+
+  const rows = db
+    .select({ id: documents.id, docNumber: documents.docNumber })
+    .from(documents)
+    .where(and(...base, eq(documents.number, n)))
+    .all();
+  if (rows.length === 1) return rows[0]!.id;
+  /* more than one series holds that number: only an exact docNumber can say
+     which, so ask rather than guess */
+  return null;
 }

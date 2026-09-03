@@ -58,6 +58,8 @@ import {
   TransferBulkVerifyResponseSchema,
   TransferEditMtcnRequestSchema,
   TransferRowSchema,
+  SaleFindTicketRequestSchema,
+  SaleFindTicketResponseSchema,
   RefundPeekRequestSchema,
   RefundPeekResponseSchema,
   RefundCreateRequestSchema,
@@ -259,7 +261,7 @@ import {
   logSend,
   setVerification,
 } from "./repos/transfer";
-import { createRefund, peekRefundable } from "./repos/refund";
+import { createRefund, findTicketByNumber, peekRefundable } from "./repos/refund";
 import {
   addCode,
   createGroup,
@@ -1345,6 +1347,11 @@ export function registerIpcHandlers(db: ArkomDb): void {
 
   /* ---------------------------------------------- refunds (ADR-0019) --- */
 
+  /* Any completed ticket, whatever day or shift it belongs to: the customer at
+     the counter with a three-week-old receipt is who this exists for. */
+  guarded("sale:findTicket", "sale.create", SaleFindTicketRequestSchema, SaleFindTicketResponseSchema, (s, { query }) => ({
+    docId: findTicketByNumber(db, s.ctx, query),
+  }));
   guarded("refund:peek", "sale.create", RefundPeekRequestSchema, RefundPeekResponseSchema, (s, { documentId }) =>
     peekRefundable(db, s.ctx, documentId),
   );

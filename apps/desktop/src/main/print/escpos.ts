@@ -34,6 +34,15 @@ export function encodeEscPos(ops: TicketOp[], commandSet: string, paperWidthMm: 
 
   for (const op of ops) {
     switch (op.op) {
+      case "barcode": {
+        printer.alignCenter();
+        /* type 73 is CODE128 in ESC/POS. hriPos 2 prints the human-readable
+           text UNDER the bars, which is what makes a torn receipt still usable
+           by somebody typing it in (ADR-0019). */
+        printer.printBarcode(op.data, 73, { hriPos: 2, hriFont: 0, width: 2, height: 60 });
+        printer.alignLeft();
+        break;
+      }
       case "text": {
         if (op.align === "center") printer.alignCenter();
         else if (op.align === "right") printer.alignRight();

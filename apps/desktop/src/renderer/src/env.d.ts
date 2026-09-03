@@ -97,6 +97,7 @@ declare global {
       invoke(channel: "transfer:verify", payload: { id: string; state: string; note?: string | null }): Promise<TransferRow>;
       invoke(channel: "transfer:bulkVerify", payload: { ids: string[] }): Promise<{ verified: number }>;
       invoke(channel: "transfer:editMtcn", payload: { id: string; mtcn: string }): Promise<TransferRow>;
+      invoke(channel: "sale:findTicket", payload: { query: string }): Promise<{ docId: string | null }>;
       invoke(channel: "refund:peek", payload: { documentId: string }): Promise<RefundPeekResponse>;
       invoke(
         channel: "refund:create",

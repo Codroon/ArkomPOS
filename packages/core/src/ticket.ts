@@ -244,6 +244,11 @@ export function renderTicket(doc: TicketDoc, shop: ShopProfile, width: PaperWidt
   /* ---- footer ---- */
   text(shop.footerLine || TICKET_ES.defaultFooter, { align: "center" });
   text(TICKET_ES.thanks, { align: "center" });
+  feed(1);
+  /* The number, as bars. A customer coming back tomorrow hands over the
+     receipt and the counter scans it — no reading "T1-000482" off a crumpled
+     till roll and typing it into a box (ADR-0019). */
+  ops.push({ op: "barcode", data: doc.docNumber, caption: doc.docNumber });
   feed(2);
   ops.push({ op: "cut" });
 

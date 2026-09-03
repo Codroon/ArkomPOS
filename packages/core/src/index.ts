@@ -351,6 +351,8 @@ export {
   VerificationStateSchema,
   RefundMethodSchema,
   RefundableLineSchema,
+  SaleFindTicketRequestSchema,
+  SaleFindTicketResponseSchema,
   RefundPeekRequestSchema,
   RefundPeekResponseSchema,
   RefundCreateRequestSchema,

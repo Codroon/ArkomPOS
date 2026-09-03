@@ -75,6 +75,15 @@ function opsToHtmlRows(ops: TicketOp[]): string {
   for (const [i, op] of ops.entries()) {
     if (op.op === "feed" && i > lastText) continue;
     switch (op.op) {
+      case "barcode": {
+        /* No bars on the PDF, and that is a decision rather than an omission.
+           The PDF exists for when there is no printer, so it is read on a
+           screen or emailed — where a picture of Code128 is scanned by nobody,
+           and drawing one properly means shipping the encoding tables. The
+           number is what a person needs, and it is right here. */
+        rows.push(`<div class="row a-center b">${escapeHtml(op.caption)}</div>`);
+        break;
+      }
       case "rule":
         rows.push(`<hr class="rule">`);
         break;

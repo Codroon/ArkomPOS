@@ -21,6 +21,7 @@ export const IPC_CHANNELS = [
   "transfer:verify",
   "transfer:bulkVerify",
   "transfer:editMtcn",
+  "sale:findTicket",
   "refund:peek",
   "refund:create",
   "catalog:createGroup",
@@ -2527,4 +2528,11 @@ export const TransferEditMtcnRequestSchema = z.object({
     .trim()
     .transform((v) => v.replace(/[\s-]/g, ""))
     .refine((v) => /^\d{10}$/.test(v), "El MTCN son 10 dígitos."),
+});
+
+/** Find a completed ticket from what was typed or scanned (ADR-0019). */
+export const SaleFindTicketRequestSchema = z.object({ query: z.string().trim().min(1).max(40) });
+export const SaleFindTicketResponseSchema = z.object({
+  /** null = nothing matched, which the screen says rather than opening a blank */
+  docId: z.string().nullable(),
 });

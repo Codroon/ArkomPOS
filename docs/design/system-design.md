@@ -66,6 +66,7 @@ business rows + `product_stock` cache + `oplog` entry → typed result back.
 | `transfer:verify` | {id, state, note?} → row | ADR-0019; `transfers.verify`; a flag needs a note |
 | `transfer:bulkVerify` | {ids} → {verified} | IDs only, never a filter; skips flagged rows |
 | `transfer:editMtcn` | {id, mtcn} → row | `transfers.editMtcn`; uniqueness re-checked |
+| `sale:findTicket` | {query} → {docId\|null} | ADR-0019 A1; full number, prefixed or bare digits; any age or shift |
 | `refund:peek` | {documentId} → lines + what is left | `sale.create` |
 | `refund:create` | {documentId, reason, method, lines} → {docNumber, …} | ADR-0019; `sale.refund`, APPROVABLE; shift required |
 | `supplier:list` · `supplier:create` | — | `supplier.manage`, not `inventory.receive`: a technician orders parts but may not receive stock |

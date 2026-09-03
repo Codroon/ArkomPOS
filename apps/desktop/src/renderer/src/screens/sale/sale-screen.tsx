@@ -19,6 +19,7 @@ import {
   uuidv7,
 } from "@arkom/core";
 import { cn, GhostButton, ScanInput, Toast, useDataLabel, useT, type ScanInputHandle } from "@arkom/ui";
+import { TicketPeekModal } from "../../components/ticket-peek-modal";
 import { useGroupName, useGroups } from "../../components/group-picker";
 import { errorMessage } from "../../lib/errors";
 import { refreshShift } from "../../lib/use-shift";
@@ -40,6 +41,34 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
   const dataLabel = useDataLabel();
   const groupName = useGroupName();
   const scanRef = useRef<ScanInputHandle>(null);
+  const [peekDocId, setPeekDocId] = useState<string | null>(null);
+  const [ticketQuery, setTicketQuery] = useState("");
+  const [ticketMiss, setTicketMiss] = useState<string | null>(null);
+
+  /**
+   * Open any completed ticket, however old.
+   *
+   * Whatever comes back opens the ordinary document peek — which is where
+   * Refund lives. There is no refund screen, because a refund is a thing you do
+   * to a ticket you are looking at (ADR-0019).
+   */
+  const findTicket = async (raw: string) => {
+    const query = raw.trim();
+    if (!query) return;
+    try {
+      const res = await window.arkom.invoke("sale:findTicket", { query });
+      if (!res.docId) {
+        setTicketMiss(query);
+        return;
+      }
+      setTicketQuery("");
+      setTicketMiss(null);
+      setPeekDocId(res.docId);
+    } catch (err) {
+      console.error("sale:findTicket failed", err);
+      setTicketMiss(query);
+    }
+  };
 
   const [sale, setSale] = useState<SaleState | null>(null);
   const saleRef = useRef<SaleState | null>(null);
@@ -442,6 +471,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
         <div className="font-mono font-medium text-[10px] text-subtle">{t("sale.kbdHints")}</div>
       </div>
       {parkedOpen ? <ParkedPopover parked={parkedList} onResume={onResume} onClose={() => setParkedOpen(false)} /> : null}
+      {peekDocId ? <TicketPeekModal docId={peekDocId} onClose={() => setPeekDocId(null)} /> : null}
 
       <div className="flex min-h-0 flex-1">
         {/* left: find products */}
@@ -460,6 +490,30 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
             />
             {/* the rescue modal carries both ways out; this is the trace it leaves behind */}
             {noMatch ? <div className="mt-1 text-[11px] text-ink-2">{t("sale.noMatch", { code: noMatch })}</div> : null}
+          </div>
+
+          {/* Find a ticket the customer is holding. Its own box rather than a
+              mode on the product search: a cashier scanning a receipt and a
+              cashier scanning a barcode want different things to happen, and
+              guessing which from the digits is how the wrong one happens. */}
+          <div className="flex flex-none items-center gap-2 border-b border-line bg-surface-2 px-4 py-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted">{t("sale.findTicket")}</span>
+            <ScanInput
+              className="h-6 w-[220px] text-[11px]"
+              value={ticketQuery}
+              placeholder={t("sale.findTicketPlaceholder")}
+              onChange={(e) => {
+                setTicketQuery(e.target.value);
+                setTicketMiss(null);
+              }}
+              onScan={(code) => void findTicket(code)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void findTicket(ticketQuery);
+              }}
+            />
+            {ticketMiss ? (
+              <span className="text-[11px] text-danger-ink">{t("sale.findTicketMiss", { code: ticketMiss })}</span>
+            ) : null}
           </div>
 
           {/* group chips */}

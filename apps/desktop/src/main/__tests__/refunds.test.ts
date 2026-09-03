@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { and, eq } from "drizzle-orm";
 import { openDb, runMigrations, schema as s } from "@arkom/db";
-import { opsToText, parseIpcError, renderZReport, uuidv7, type ShiftTotals } from "@arkom/core";
+import { opsToText, parseIpcError, renderTicket, renderZReport, uuidv7, type ShiftTotals } from "@arkom/core";
 import { handlers } from "./electron-stub";
 import { registerIpcHandlers } from "../ipc";
 import { endSession, startSession } from "../auth/session";
@@ -569,5 +569,72 @@ describe("the reports", () => {
     const after = await call<{ totalCents: number }>("reports:valuation", {});
     // two cables at 3,00 cost are back on the shelf and worth counting again
     expect(after.totalCents).toBe(before.totalCents + 600);
+  });
+});
+
+/* ------------------------------- 7 · a ticket from a closed shift ------ */
+
+describe("a receipt from another day", () => {
+  it("opens by number and refunds into TODAY's shift", async () => {
+    const p = makeProduct("Cargador");
+    const ticket = makeTicket([{ productId: p, description: "Cargador", qty: 1, unitPriceCents: 1490, taxRegime: "IVA21" }]);
+    const yesterday = openShift().id;
+
+    /* the shift the sale belonged to is closed and its Z frozen — which is the
+       ordinary case for a customer coming back tomorrow */
+    env.db.update(s.shifts).set({ closedAt: new Date(), zDocNumber: "Z1-000001" }).where(eq(s.shifts.id, yesterday)).run();
+    openShiftTx(env.db, ctxOf(), { floatCents: FLOAT, breakdown: null });
+    const today = openShift().id;
+    expect(today).not.toBe(yesterday);
+
+    /* found by the number on the receipt — no date window, no shift filter */
+    const byFull = await call<{ docId: string | null }>("sale:findTicket", { query: "T1-000001" });
+    expect(byFull.docId).toBe(ticket.docId);
+    const byDigits = await call<{ docId: string | null }>("sale:findTicket", { query: "1" });
+    expect(byDigits.docId).toBe(ticket.docId);
+    const byLoose = await call<{ docId: string | null }>("sale:findTicket", { query: " t1-000001 " });
+    expect(byLoose.docId).toBe(ticket.docId);
+    expect((await call<{ docId: string | null }>("sale:findTicket", { query: "9999" })).docId).toBeNull();
+
+    const before = expected();
+    const res = await call<{ docNumber: string }>("refund:create", {
+      documentId: ticket.docId,
+      reason: "Vino al día siguiente",
+      method: "cash",
+      lines: [{ lineId: ticket.lines[0]!.id, qty: 1, restock: true }],
+    });
+
+    /* the money leaves TODAY's drawer. Yesterday's Z is frozen and was right
+       when it was taken (ADR-0015 §8) */
+    const refund = env.db.select().from(s.documents).all().find((d) => d.docNumber === res.docNumber)!;
+    expect(refund.shiftId).toBe(today);
+    expect(refund.shiftId).not.toBe(yesterday);
+    expect(expected()).toBe(before - 1490);
+
+    const yesterdayRow = env.db.select().from(s.shifts).where(eq(s.shifts.id, yesterday)).all()[0]!;
+    expect(yesterdayRow.zDocNumber).toBe("Z1-000001");
+  });
+
+  it("prints the ticket number as bars, so tomorrow is a scan", () => {
+    const ops = renderTicket(
+      {
+        docNumber: "T1-000482",
+        completedAtMs: Date.now(),
+        terminalName: "Caja 1",
+        isCopy: false,
+        lines: [{ description: "Cable", qty: 1, unitPriceCents: 990, totalCents: 990, imei: null, priceOverridden: false }],
+        subtotalCents: 818,
+        taxCents: 172,
+        totalCents: 990,
+        tenders: [{ method: "card", amountCents: 990, cardReference: null }],
+        changeCents: 0,
+      },
+      { legalName: "Arkom", nif: "B1", address: "C/ Mayor", footerLine: "" },
+      80,
+    );
+    const barcode = ops.find((o) => o.op === "barcode");
+    expect(barcode).toBeDefined();
+    // the same string the search box resolves, so scan → peek → Refund closes
+    expect(barcode).toMatchObject({ data: "T1-000482", caption: "T1-000482" });
   });
 });

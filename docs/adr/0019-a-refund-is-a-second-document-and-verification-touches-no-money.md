@@ -107,3 +107,30 @@ as the refund line that moves it, and `db:audit` should learn to assert the two 
 **Accepted, and out of scope:** refunding a refund, exchanges as a single flow, refunds against
 used-device purchase documents, and a formal A4 rectificative invoice. The `D1-` document is a
 receipt, not a *factura rectificativa*; a shop that needs one needs the invoice slice first.
+
+## A1. Amendment (v0.16.1) — finding the ticket, and printing its number as bars
+
+§1 gave a refund its own document and left unsaid how the shop reaches the sale it reverses. In
+practice that is the whole flow: a customer returns three weeks later holding a receipt.
+
+**Find ticket** on the Sale screen takes a document number typed or scanned, and resolves three
+shapes to the same ticket: `T1-000482` (scanned or typed in full), `t1-482`, and `482`. The bare
+number matches on `documents.number` rather than by rebuilding a string, because the prefix and
+the padding belong to the SERIES — a till with two of them would otherwise find the wrong
+ticket, and where a number is ambiguous across series it returns nothing rather than guessing.
+
+It is deliberately **unbounded by date and by shift**. The receipt in the customer's hand is the
+only filter that matters.
+
+It opens the ordinary document peek, where **Refund already lives**. There is no refund screen,
+because a refund is something you do to a ticket you are looking at.
+
+**The ticket footer now carries its own number as a Code128 barcode**, so tomorrow's refund is
+scan → peek → Refund. Code128 rather than EAN-13 because it takes the letters and the dash
+without a second thought. The human-readable number prints under the bars, so a torn receipt is
+still usable by somebody typing it in.
+
+The **PDF fallback prints the number and no bars**, and that is a decision rather than an
+omission: the PDF exists for when there is no printer, so it is read on a screen or emailed —
+where a picture of Code128 is scanned by nobody, and drawing one properly means shipping the
+encoding tables for a surface that cannot use them.

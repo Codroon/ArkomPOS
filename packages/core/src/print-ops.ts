@@ -38,7 +38,29 @@ export interface TicketDrawerOp {
   op: "drawer";
 }
 
-export type TicketOp = TicketTextOp | TicketRuleOp | TicketFeedOp | TicketCutOp | TicketDrawerOp;
+/**
+ * The document's own number, as bars.
+ *
+ * So tomorrow's refund is scan → peek → Refund, instead of somebody reading
+ * "T1-000482" off a crumpled receipt and typing it into a search box.
+ *
+ * Code128 because it takes the letters and the dash without a second thought;
+ * EAN-13 could not carry "T1-" at all.
+ */
+export interface TicketBarcodeOp {
+  op: "barcode";
+  data: string;
+  /** printed under the bars, so a torn label is still readable by a human */
+  caption: string;
+}
+
+export type TicketOp =
+  | TicketTextOp
+  | TicketRuleOp
+  | TicketFeedOp
+  | TicketCutOp
+  | TicketDrawerOp
+  | TicketBarcodeOp;
 
 /** Paper the shop can load. 80mm is the counter printer; 58mm is the fallback roll. */
 export type PaperWidthMm = 80 | 58;
@@ -125,6 +147,10 @@ export function opBuilder(cols: number) {
         ops.push({ op: "text", text: line, align, bold, size });
       }
     },
+    /** the document's own number, as scannable bars */
+    barcode(data: string, caption: string): void {
+      ops.push({ op: "barcode", data, caption });
+    },
     raw(text: string, align: TicketAlign = "left", bold = false): void {
       ops.push({ op: "text", text, align, bold, size: "normal" });
     },
@@ -158,6 +184,12 @@ export function opsToText(ops: readonly TicketOp[], width: PaperWidthMm = 80): s
     else if (op.op === "feed") for (let i = 0; i < op.lines; i++) out.push("");
     else if (op.op === "cut") out.push("-".repeat(cols) + " ✂");
     else if (op.op === "drawer") out.push("[cajón]");
+    else if (op.op === "barcode") {
+      /* the text rendering is what the TESTS read, so it names the data rather
+         than drawing bars nobody could check by eye */
+      out.push(`[||| ${op.data} |||]`.padStart(Math.floor((cols + op.data.length + 10) / 2)).padEnd(cols));
+      out.push(op.caption.padStart(Math.floor((cols + op.caption.length) / 2)).padEnd(cols));
+    }
     else {
       const inner = columnsFor(op.size, cols);
       const padded =
