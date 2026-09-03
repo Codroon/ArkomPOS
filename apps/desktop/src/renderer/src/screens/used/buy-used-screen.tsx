@@ -42,6 +42,7 @@ import {
 } from "@arkom/ui";
 import { ID_DOC_ORDER, idDocLabel } from "../../lib/enum-labels";
 import { errorMessage } from "../../lib/errors";
+import { PrinterRequiredNotice, usePrinterReady } from "../../lib/printer-ready";
 import { PrintToast } from "../../lib/print-toast";
 import { useTicketPrint } from "../../lib/use-ticket-print";
 import { openSaleWithVoucher } from "../../lib/screen-bus";
@@ -80,6 +81,7 @@ export function BuyUsedScreen() {
      point, and Ajustes is where the owner moves it */
   const [marginPct, setMarginPct] = useState(DEFAULT_MARGIN_PCT);
   const printer = useTicketPrint();
+  const printerReady = usePrinterReady();
 
   const patch = useCallback((next: Partial<BuyDraft>) => setDraft((d) => ({ ...d, ...next })), []);
 
@@ -242,7 +244,9 @@ export function BuyUsedScreen() {
 
   const done = completeness(draft);
   const gatePassed = gate.phase === "result" && gate.result.ok && confirmed;
-  const canLog = gatePassed && done.all;
+  /* no printer, no purchase: the seller signs a document carrying their ID, and
+     the police register and the REBU margin both rest on it (v0.18.1) */
+  const canLog = gatePassed && done.all && printerReady;
 
   const missing = !done.device
     ? t("used.missing.device")
@@ -263,6 +267,8 @@ export function BuyUsedScreen() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {printerReady ? null : <PrinterRequiredNotice />}
+
       {/* header */}
       <div className="flex flex-none items-center gap-3 border-b border-line-strong bg-surface px-4 py-2.5">
         <div className="text-[15px] font-bold">{t("used.buy.title")}</div>

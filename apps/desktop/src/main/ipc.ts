@@ -493,22 +493,39 @@ export const SHIFT_REQUIRED_CHANNELS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * The three acts that hand a customer paper — v0.18.1.
+ * Every act that hands a person paper — v0.18.1.
  *
- * A sale's ticket, a refund's document and a repair's collection invoice are
- * things the customer walks out holding. Issuing one on a till with no printer
- * configured leaves the shop with money taken and nothing to show for it, so
- * these refuse until Ajustes names a printer.
+ * The rule is one sentence: if the customer or the seller walks out holding a
+ * document this till issued, the till must be able to print it. A sale's
+ * ticket, a refund, the invoice at repair hand-back, the custody receipt the
+ * customer signs when they leave a phone, and the purchase document the seller
+ * signs when the shop buys one. Each of them is the shop's evidence of what was
+ * agreed, and taking the money or the device without it leaves an argument
+ * nobody can settle.
  *
- * Deliberately short. A shift close is the shop's own paperwork and blocking it
- * would trap the day's takings; receiving stock touches no customer; a repair
- * intake and a used-device purchase still fall back to a PDF, because a shop
- * mid-setup must be able to take a phone in.
+ * What is NOT here is not an oversight:
+ *   · `cash:close` — the Z is the shop's own paperwork, it reprints from the
+ *     frozen snapshot any time, and refusing to close would leave the shift
+ *     open into the next day over a cable. That is worse than no paper.
+ *   · `cash:paidIn` / `cash:paidOut` — a drawer note, nobody is handed anything.
+ *   · `transfer:*` — Western Union prints its own receipt on its own terminal;
+ *     this till only logs what happened.
+ *   · receiving stock, `used:sendToInventory` — internal, and the shelf label is
+ *     an automatic print that already answers `noPrinter` and writes nothing.
+ *
+ * Checked in `guarded()` before the handler runs, so nothing is written first
+ * and rolled back after: no draft numbered, no photo saved, no cash moved.
  */
 export const PRINTER_REQUIRED_CHANNELS: ReadonlySet<string> = new Set([
   "sale:complete",
   "refund:create",
   "repair:collect",
+  /* the intake receipt is the shop's proof of what came in, in what state, and
+     the customer's proof they left it here (ADR-0014) */
+  "repair:create",
+  /* the purchase document is signed by the seller and carries their ID: the
+     police register and the REBU margin both rest on it (ADR-0013) */
+  "used:log",
 ]);
 
 /* ------------------------------------------------------------ registrars */
@@ -678,7 +695,15 @@ export function registerIpcHandlers(db: ArkomDb): void {
   open("meta:context", MetaContextRequestSchema, MetaContextResponseSchema, () => {
     const { meta, ctx } = tillContext(db);
     // read live, not cached with the till: Ajustes may have changed it today
-    return { ...meta, vatRateBp: getSettings(db, ctx).vatRateBp };
+    const settings = getSettings(db, ctx);
+    return {
+      ...meta,
+      vatRateBp: settings.vatRateBp,
+      /* so a screen can say "this till cannot take money yet" BEFORE somebody
+         fills in an intake form. The refusal in main is the rule; this is the
+         courtesy that keeps anyone from meeting it at the end of the work. */
+      printerConfigured: settings.printerName.trim() !== "",
+    };
   });
 
   open("setup:status", SetupStatusRequestSchema, SetupStatusResponseSchema, () => ({

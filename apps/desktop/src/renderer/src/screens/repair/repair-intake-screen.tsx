@@ -40,6 +40,7 @@ import {
   type TKey,
 } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
+import { PrinterRequiredNotice, usePrinterReady } from "../../lib/printer-ready";
 import { PrintToast } from "../../lib/print-toast";
 import { useTicketPrint } from "../../lib/use-ticket-print";
 import { PhotoSlotTile, useHasCamera } from "../used/photo-slots";
@@ -111,6 +112,7 @@ export function RepairIntakeScreen({ onDone }: { onDone: (ticketId: string | nul
   const t = useT();
   const hasCamera = useHasCamera();
   const printer = useTicketPrint();
+  const printerReady = usePrinterReady();
 
   const [customer, setCustomer] = useState<CustomerRow | null>(null);
   const [draft, setDraft] = useState<IntakeDraft>(emptyDraft);
@@ -145,7 +147,9 @@ export function RepairIntakeScreen({ onDone }: { onDone: (ticketId: string | nul
   );
   const promisedBad = draft.promisedDate.trim() !== "" && promisedMs === null;
   const deviceDone = draft.deviceDescription.trim() !== "" && draft.reportedFault.trim() !== "";
-  const canSubmit = customer !== null && deviceDone && !imeiBad && !promisedBad && !submitting;
+  /* no printer, no intake: the customer signs a receipt for a phone they are
+     leaving behind, and there is nothing to sign without one (v0.18.1) */
+  const canSubmit = customer !== null && deviceDone && !imeiBad && !promisedBad && !submitting && printerReady;
 
   const missing = !customer
     ? t("rep.missing.customer")
@@ -207,6 +211,8 @@ export function RepairIntakeScreen({ onDone }: { onDone: (ticketId: string | nul
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {printerReady ? null : <PrinterRequiredNotice />}
+
       {/* header */}
       <div className="flex flex-none items-center gap-3 border-b border-line-strong bg-surface px-4 py-2.5">
         <div className="text-[15px] font-bold">{t("rep.newTitle")}</div>

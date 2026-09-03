@@ -70,6 +70,12 @@ beforeEach(() => {
   cashier = createUser(env.db, env.ctx, { name: "Ana", role: "cashier", pin: "5162" }).user;
   tech = createUser(env.db, env.ctx, { name: "Nuria", role: "technician", pin: null }).user;
   registerIpcHandlers(env.db);
+  /* a printer, because every act that hands a person a document needs one
+     since v0.18.1 — including buying a used phone */
+  env.db
+    .insert(s.settings)
+    .values({ tenantId: env.ctx.tenantId, key: "printerName", value: "Impresora de pruebas", updatedAt: new Date() })
+    .run();
   startSession({ id: owner.id, name: "Ahmer", role: "owner", overrides: {} });
 });
 

@@ -381,14 +381,38 @@ describe("a till with no printer configured", () => {
     expect(ticket.collectionDocumentId).toBeNull();
   });
 
-  it("still lets the shop work: buying a phone, taking a repair in, and closing the day", async () => {
-    /* deliberately short list of refusals. A used purchase and an intake hand
-       over a document too, but a shop mid-setup must be able to take a phone
-       in — and blocking the close would trap the day's takings. */
-    expect(await code("used:log", usedPayload())).toBe("OK");
+  it("refuses a repair intake and a used-device purchase, and writes nothing at all", async () => {
+    /* both hand a person a document they sign: the customer's proof that they
+       left a phone here, and the seller's receipt carrying their ID. Refused
+       BEFORE anything is written — no ticket, no purchase row, no cash out of
+       the drawer, and, for the purchase, no photographs on disk. */
+    const disk = footprint();
     const customerId = upsertCustomer(db, ctx, { name: "Marta Ruiz", phone: "+34 600 000 000" }).id;
-    await expect(createTicket(db, ctx, intake(customerId))).resolves.toBeTruthy();
-    expect(await code("cash:close", { countedCents: 20000, breakdown: null, reason: "Prueba de cierre" })).toBe("OK");
+
+    expect(await code("repair:create", { ...intake(customerId), depositCents: 0 })).toBe("PRINTER_REQUIRED");
+    expect(await code("used:log", usedPayload())).toBe("PRINTER_REQUIRED");
+
+    expect(db.select().from(s.repairTickets).all().filter((r) => r.customerId === customerId)).toEqual([]);
+    expect(db.select().from(s.usedPurchases).all()).toEqual([]);
+    expect(db.select().from(s.cashMovements).all()).toEqual([]);
+    expect(footprint()).toEqual(disk); // the photographs never reached the disk
+  });
+
+  it("still lets the shop keep its own books: the drawer, and closing the day", async () => {
+    /* deliberately not blocked. A Z is the shop's own paperwork and reprints
+       from its frozen snapshot any time — refusing to close would leave the
+       shift open into tomorrow over a cable, which is worse than no paper. A
+       paid-in/out is a note in the drawer, and nobody is handed anything. */
+    expect(await code("cash:paidIn", { amountCents: 5000, concept: "Cambio", reason: null })).toBe("OK");
+    expect(await code("cash:close", { countedCents: 25000, breakdown: null, reason: "Prueba de cierre" })).toBe("OK");
+  });
+
+  it("tells the screens before anybody fills in a form", async () => {
+    /* the refusal is the rule; this is what keeps a cashier from photographing
+       a phone from four angles only to meet it at the end */
+    expect(await call<{ printerConfigured: boolean }>("meta:context")).toMatchObject({ printerConfigured: false });
+    saveSettings(db, ctx, { printerName: "Impresora de pruebas" });
+    expect(await call<{ printerConfigured: boolean }>("meta:context")).toMatchObject({ printerConfigured: true });
   });
 
   it("says what to do about it, once, in a typed code the UI can act on", async () => {

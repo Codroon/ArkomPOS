@@ -56,6 +56,7 @@ export function PaymentPanel({
   charging,
   onChange,
   onCharge,
+  blocked = false,
   onFindVoucher,
 }: {
   sale: SaleState | null;
@@ -63,6 +64,8 @@ export function PaymentPanel({
   charging: boolean;
   onChange: (entries: TenderEntry[]) => void;
   onCharge: () => void;
+  /** the till has no printer configured: main would refuse (v0.18.1) */
+  blocked?: boolean;
   /** store credit has no amount to type — the voucher's is the amount */
   onFindVoucher: () => void;
 }) {
@@ -189,7 +192,7 @@ export function PaymentPanel({
       {summary?.nonCashExcess ? <div className="mt-1 text-[11px] text-ink-2">{t("err.tenderMismatch")}</div> : null}
 
       {/* the single blue element on Venta — the manual's one-blue rule */}
-      <AccentButton className="mt-2 h-9 w-full text-[13px]" disabled={!canCharge} onClick={onCharge}>
+      <AccentButton className="mt-2 h-9 w-full text-[13px]" disabled={!canCharge || blocked} onClick={onCharge}>
         {charging ? t("pay.charging") : t("pay.charge")}
       </AccentButton>
     </div>

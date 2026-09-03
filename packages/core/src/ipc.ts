@@ -210,6 +210,9 @@ export const MetaContextResponseSchema = z.object({
   terminal: EntityRefSchema,
   /** the general VAT rate this till snapshots today, in basis points (v0.18.0) */
   vatRateBp: z.number().int(),
+  /** whether Ajustes names a printer: the acts that issue a document refuse
+      without one, and the screens say so before the work starts (v0.18.1) */
+  printerConfigured: z.boolean(),
 });
 export type MetaContextResponse = z.infer<typeof MetaContextResponseSchema>;
 

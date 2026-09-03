@@ -42,6 +42,7 @@ import {
 } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
 import { fileNameOf } from "../../lib/use-ticket-print";
+import { refreshPrinterReady } from "../../lib/printer-ready";
 import { BackupPanel } from "./backup-panel";
 
 /** Shown beneath any field the seed left as a placeholder. */
@@ -99,6 +100,9 @@ export function SettingsScreen() {
       try {
         const next = SettingsSchema.parse(await window.arkom.invoke("settings:save", patch));
         setSettings(next);
+        /* the screens that refuse without a printer read a shared cache, not
+           Ajustes: configuring one here has to reach them without a remount */
+        if ("printerName" in patch) void refreshPrinterReady();
         say(t("set.saved"));
       } catch (err) {
         say(errorMessage(t, err), "danger");

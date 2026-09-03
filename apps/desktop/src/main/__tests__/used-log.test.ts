@@ -92,6 +92,12 @@ beforeEach(() => {
   env = freshDb();
   owner = createUser(env.db, env.ctx, { name: "Ahmer", role: "owner", pin: "8317" }).user;
   registerIpcHandlers(env.db);
+  /* a printer, because every act that hands a person a document needs one
+     since v0.18.1 — including buying a used phone */
+  env.db
+    .insert(s.settings)
+    .values({ tenantId: env.ctx.tenantId, key: "printerName", value: "Impresora de pruebas", updatedAt: new Date() })
+    .run();
   /* money now needs an open drawer (ADR-0015 §9) */
   openShiftTx(env.db, ctxOf(), { floatCents: 20000, breakdown: null });
 });

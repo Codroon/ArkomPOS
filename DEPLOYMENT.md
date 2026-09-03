@@ -126,13 +126,20 @@ screen, without inventing new roles.
 
 ## 4. Printer setup — Citizen CT-S310S
 
-**Do this before the first real sale — the till will not let you charge without
-it.** With no printer chosen in Ajustes, pressing **Cobrar** answers "No hay
-impresora configurada" and nothing is sold: a shop that takes money it cannot
-hand a ticket for has an argument waiting for it. Once a printer is configured
-the till sells normally, and if that printer later jams or is unplugged the sale
-still goes through — the ticket is then retried or saved from the document
-itself.
+**Do this before the shop starts working — the till will not issue a document
+without it.** With no printer chosen in Ajustes, **Cobrar**, a refund, a repair
+hand-back, taking a repair in and buying a used phone all answer "No hay
+impresora configurada" and nothing happens; those screens say so at the top
+before anything is filled in. A shop that takes money, or somebody's phone,
+without being able to hand over paper has an argument waiting for it.
+
+The drawer and the shift are not blocked: paid-in/out and closing the day work
+whatever the printer is doing, because a Z that cannot be closed strands the
+day's takings and reprints from its own snapshot later anyway.
+
+Once a printer is configured the till works normally, and if that printer later
+jams or is unplugged the sale still goes through — the ticket is retried or
+saved from the document itself.
 
 1. **Install the Citizen driver first, with the printer unplugged.** Get it from
    Citizen's support site (the CT-S310 family driver). Reboot if it asks.

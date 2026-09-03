@@ -266,13 +266,16 @@ table, and copying one into the other would create two answers to "what did we t
 **Shift preconditions.** `sale:complete`, `used:log`, `repair:collect`, `cash:paidIn` and
 `cash:paidOut` are refused with `SHIFT_REQUIRED` when no shift is open on the till.
 
-**Printer preconditions (v0.18.1).** `sale:complete`, `refund:create` and `repair:collect` are
-refused with `PRINTER_REQUIRED` when `settings.printerName` is blank — the three acts that hand
-the customer a document. Checked in `guarded()` beside the shift gate, so no channel can forget
-it. Everything else is unaffected: a shift close, receiving stock, a repair intake and a
-used-device purchase still work on a till with no printer (their auto-print answers `noPrinter`
-and writes nothing). A CONFIGURED printer that then fails is `PRINT_FAILED`, raised after the
-document exists — the sale stands and the paper is retried on its own.
+**Printer preconditions (v0.18.1).** `sale:complete`, `refund:create`, `repair:collect`,
+`repair:create` and `used:log` are refused with `PRINTER_REQUIRED` when `settings.printerName`
+is blank — every act that hands a person a document. Checked in `guarded()` beside the shift
+gate and BEFORE the handler, so nothing is written first: no draft numbered, no photograph
+saved, no cash moved. `meta:context` carries `printerConfigured` so those screens can say so
+before the form is filled in. Not blocked, deliberately: `cash:close` (the Z is the shop's own
+paperwork, reprints from its frozen snapshot, and refusing to close would leave the shift open
+into the next day over a cable), drawer paid-in/out, transfers (Western Union prints its own
+receipt) and receiving stock. A CONFIGURED printer that then fails is `PRINT_FAILED`, raised
+after the document exists — the sale stands and the paper is retried on its own.
 `repair:create` and `repair:markNotRepaired` require one **only on the branch that moves a
 deposit**, checked inside the transaction where the branch is known. `stock:add`, catalogue
 work and a depositless intake need none — and stamp the shift when one is open. A registry

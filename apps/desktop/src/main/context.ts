@@ -7,7 +7,7 @@ import { schema, type ArkomDb } from "@arkom/db";
 
 export interface TillContext {
   /** the rate is read live by the channel, so it is not part of the cache */
-  meta: Omit<MetaContextResponse, "vatRateBp">;
+  meta: Omit<MetaContextResponse, "vatRateBp" | "printerConfigured">;
   ctx: MutationCtx;
 }
 

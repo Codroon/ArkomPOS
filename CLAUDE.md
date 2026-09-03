@@ -88,12 +88,16 @@ Schema already anticipates them — build nothing for them.
   the FROZEN Z snapshot and never a recomputation. A miscount found tomorrow is a movement in
   tomorrow's shift with a reason naming the Z it corrects. Correcting by editing the record
   destroys the evidence that there was anything to correct (ADR-0015 §7–8).
-- **Money at the counter needs a printer.** `sale:complete`, `refund:create` and `repair:collect`
-  raise `PRINTER_REQUIRED` when Ajustes names no printer: a till that takes money it cannot hand
-  a ticket for leaves an argument nobody can settle. This is about CONFIGURATION — a printer that
-  is configured and then jams raises `PRINT_FAILED` *after* the document exists, and the sale
-  stands. Nothing else is blocked: a shift close is the shop's own paperwork, and an intake or a
-  used-device purchase must work on a till still being set up.
+- **Anything that hands a person paper needs a printer.** `sale:complete`, `refund:create`,
+  `repair:collect`, `repair:create` and `used:log` raise `PRINTER_REQUIRED` when Ajustes names
+  none (`PRINTER_REQUIRED_CHANNELS`, checked in `guarded()` beside the shift gate, before the
+  handler runs — nothing is written and rolled back). A ticket, a refund, a repair invoice, the
+  custody receipt for a phone left behind and the purchase document a seller signs are all the
+  shop's evidence of what was agreed. This is about CONFIGURATION: a printer that is configured
+  and then jams raises `PRINT_FAILED` *after* the document exists and the sale stands. NOT
+  blocked, deliberately: `cash:close` (the Z is internal, reprints from its snapshot, and a
+  stuck close strands the day), drawer paid-in/out, transfers (WU prints its own), receiving
+  stock. `meta:context.printerConfigured` lets those screens say so before the work starts.
 - **Money needs an open shift, and the refusal is an invitation.** Any action that creates a
   fiscal document or moves notes raises `SHIFT_REQUIRED` when none is open; the Sale screen
   answers it with the open dialog and re-runs the charge. Receiving stock and a depositless
