@@ -27,6 +27,9 @@ interface Draft {
   shopLegalName: string;
   shopNif: string;
   shopAddress: string;
+  shopCity: string;
+  shopPostalCode: string;
+  shopPhone: string;
   ticketFooter: string;
   terminalName: string;
   seriesPrefix: string;
@@ -43,6 +46,9 @@ const initialDraft = (t: TFn): Draft => ({
   shopLegalName: "",
   shopNif: "",
   shopAddress: "",
+  shopCity: "",
+  shopPostalCode: "",
+  shopPhone: "",
   // the default the brand ships with; the shop can make it their own
   ticketFooter: t("setup.defaultFooter"),
   terminalName: t("setup.defaultTerminal"),
@@ -117,6 +123,9 @@ export function FirstRunDialog({ onDone }: { onDone: () => void }) {
           shopLegalName: draft.shopLegalName.trim(),
           shopNif: draft.shopNif.trim(),
           shopAddress: draft.shopAddress.trim(),
+          shopCity: draft.shopCity.trim(),
+          shopPostalCode: draft.shopPostalCode.trim(),
+          shopPhone: draft.shopPhone.trim(),
           ticketFooter: draft.ticketFooter.trim(),
           terminalName: draft.terminalName.trim(),
           seriesPrefix: draft.seriesPrefix.trim(),
@@ -183,6 +192,21 @@ export function FirstRunDialog({ onDone }: { onDone: () => void }) {
                   placeholder={t("first.addressPlaceholder")}
                   onChange={(e) => set("shopAddress", e.target.value)}
                 />
+              </Field>
+            </div>
+
+            {/* the rest of the letterhead. Optional — a shop can finish setup
+                without a phone and add it in Ajustes — but asking once beats
+                never asking (v0.17.0) */}
+            <div className="grid grid-cols-3 gap-2">
+              <Field label={t("set.shopPostalCode")}>
+                <TextInput mono value={draft.shopPostalCode} onChange={(e) => set("shopPostalCode", e.target.value)} />
+              </Field>
+              <Field label={t("set.shopCity")}>
+                <TextInput value={draft.shopCity} onChange={(e) => set("shopCity", e.target.value)} />
+              </Field>
+              <Field label={t("set.shopPhone")}>
+                <TextInput mono value={draft.shopPhone} onChange={(e) => set("shopPhone", e.target.value)} />
               </Field>
             </div>
 

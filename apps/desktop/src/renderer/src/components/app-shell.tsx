@@ -18,6 +18,7 @@ import { UsedDevicesScreen } from "../screens/used/used-devices-screen";
 import { RepairsScreen } from "../screens/repair/repairs-screen";
 import { WorkshopScreen } from "../screens/repair/workshop-screen";
 import { TransfersScreen } from "../screens/transfers/transfers-screen";
+import { DocumentsScreen } from "../screens/documents/documents-screen";
 import { CashScreen } from "../screens/cash/cash-screen";
 import { ReportsScreen } from "../screens/reports/reports-screen";
 import { ShiftChip } from "../screens/cash/shift-chip";
@@ -40,6 +41,7 @@ const NAV_ITEMS: ReadonlyArray<{ n: string; labelKey: TKey; id?: ScreenId; needs
   { n: "08", labelKey: "nav.transferencias", id: "transferencias", needs: "transfers.view" },
   { n: "09", labelKey: "nav.caja", id: "caja", needs: "cash.view" },
   { n: "10", labelKey: "nav.informes", id: "informes", needs: "reports.view" },
+  { n: "13", labelKey: "docs.title", id: "documentos", needs: "sale.create" },
   { n: "11", labelKey: "nav.ajustes", id: "ajustes", needs: "settings.edit" },
   { n: "12", labelKey: "usr.title", id: "usuarios", needs: "users.manage" },
 ];
@@ -231,6 +233,8 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
             <TransfersScreen key={navTick} />
           ) : screen === "caja" ? (
             <CashScreen key={navTick} terminalName={context?.terminal.name ?? t("common.dash")} />
+          ) : screen === "documentos" ? (
+            <DocumentsScreen key={navTick} />
           ) : screen === "informes" ? (
             <ReportsScreen key={navTick} />
           ) : screen === "ajustes" ? (

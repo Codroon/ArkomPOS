@@ -205,6 +205,19 @@ export function PurchasePeekModal({
               {printer.state.busy ? t("print.printing") : t("print.reprint")}
             </GhostButton>
           ) : null}
+          {/* the same action as the ticket peek, for the same reason: a file
+              only when the shop asks for one (v0.17.0) */}
+          {peek ? (
+            <GhostButton
+              onClick={() =>
+                void window.arkom
+                  .invoke("print:savePdf", { docId: peek.purchaseId, kind: "purchase", copy: false })
+                  .catch((err) => console.error("print:savePdf failed", err))
+              }
+            >
+              {t("peek.savePdf")}
+            </GhostButton>
+          ) : null}
           <GhostButton onClick={onClose}>{t("peek.close")}</GhostButton>
         </div>
       </div>

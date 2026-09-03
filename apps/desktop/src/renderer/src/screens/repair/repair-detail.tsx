@@ -22,6 +22,7 @@ import {
   type TKey,
 } from "@arkom/ui";
 import { notifyMethodLabel } from "../../lib/enum-labels";
+import { TicketPeekModal } from "../../components/ticket-peek-modal";
 import { errorMessage } from "../../lib/errors";
 import { useTicketPrint } from "../../lib/use-ticket-print";
 import { PrintToast } from "../../lib/print-toast";
@@ -71,6 +72,7 @@ export function RepairDetailPane({
 }) {
   const t = useT();
   const printer = useTicketPrint();
+  const [peekDoc, setPeekDoc] = useState<string | null>(null);
   const [detail, setDetail] = useState<RepairDetail | null>(null);
   const [photos, setPhotos] = useState<Array<{ id: string; kind: string; dataUrl: string }>>([]);
   const [revealed, setRevealed] = useState(false);
@@ -365,6 +367,14 @@ export function RepairDetailPane({
                   {t("rep.action.printReceipt")}
                 </GhostButton>
               ) : null}
+              {/* the T1- the hand-back created: the SAME peek every other screen
+                  opens, so Reprint and Save PDF are here without this page
+                  knowing they exist (v0.17.0) */}
+              {detail.collectionDocumentId ? (
+                <GhostButton onClick={() => setPeekDoc(detail.collectionDocumentId)}>
+                  {t("rep.action.openTicket")}
+                </GhostButton>
+              ) : null}
               {detail.notRepairedAt ? (
                 <GhostButton onClick={() => printer.printRepair(ticketId, "return", true)}>
                   {t("rep.action.printReturn")}
@@ -520,6 +530,7 @@ export function RepairDetailPane({
         </div>
       ) : null}
       <PrintToast printer={printer} />
+      {peekDoc ? <TicketPeekModal docId={peekDoc} onClose={() => setPeekDoc(null)} /> : null}
     </div>
   );
 }

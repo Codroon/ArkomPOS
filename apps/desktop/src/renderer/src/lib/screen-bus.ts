@@ -4,6 +4,7 @@
  * line). AppShell registers the navigator; CatalogScreen consumes the prefill.
  */
 export type ScreenId =
+  | "documentos"
   | "transferencias"
   | "venta"
   | "catalogo"

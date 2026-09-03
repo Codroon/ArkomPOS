@@ -134,6 +134,9 @@ export interface FirstRunInput {
   ticketFooter: string;
   terminalName: string;
   seriesPrefix: string;
+  shopCity?: string;
+  shopPostalCode?: string;
+  shopPhone?: string;
   loadDemo: boolean;
   /** decides the starter group names, and nothing else */
   locale?: SetupLocale;
@@ -182,6 +185,9 @@ export function completeFirstRun(db: ArkomDb, input: FirstRunInput): FirstRunRes
       shopLegalName: input.shopLegalName,
       shopNif: input.shopNif,
       shopAddress: input.shopAddress,
+      shopCity: input.shopCity ?? "",
+      shopPostalCode: input.shopPostalCode ?? "",
+      shopPhone: input.shopPhone ?? "",
       ticketFooter: input.ticketFooter,
       [SETUP_DONE_KEY]: "true",
     };

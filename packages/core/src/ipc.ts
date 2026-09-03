@@ -815,6 +815,11 @@ export const SetupCompleteRequestSchema = z.object({
   shopLegalName: z.string().trim().min(1).max(200),
   shopNif: z.string().trim().min(1).max(40),
   shopAddress: z.string().trim().min(1).max(300),
+  /* the rest of the letterhead. Optional: a shop can finish setup without a
+     phone number and add it in Ajustes, but asking once beats never (v0.17.0) */
+  shopCity: z.string().trim().max(120).optional(),
+  shopPostalCode: z.string().trim().max(20).optional(),
+  shopPhone: z.string().trim().max(40).optional(),
   ticketFooter: z.string().trim().max(200),
   terminalName: z.string().trim().min(1).max(60),
   // ADR-0008: the series prefix is frozen once tickets start being issued

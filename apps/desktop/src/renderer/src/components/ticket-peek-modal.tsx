@@ -11,6 +11,7 @@ import type { TicketPeek } from "@arkom/core";
 import { GhostButton, MoneyText, SectionLabel, useT, type TKey, useDataLabel } from "@arkom/ui";
 import { useTicketPrint } from "../lib/use-ticket-print";
 import { useCan } from "../lib/use-session";
+import { errorMessage } from "../lib/errors";
 import { RefundDialog } from "./refund-dialog";
 import { PrintToast } from "../lib/print-toast";
 
@@ -35,6 +36,23 @@ export function TicketPeekModal({ docId, onClose }: { docId: string; onClose: ()
   const can = useCan();
   const [refunding, setRefunding] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  /** A file only when the shop asks for one, at a path they picked. */
+  const savePdf = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const res = await window.arkom.invoke("print:savePdf", { docId, kind: "ticket", copy: false });
+      /* cancelling the dialog is a decision, not a failure: no toast for it */
+      if (res.kind === "saved") setToast(t("peek.saved", { path: res.path }));
+    } catch (err) {
+      setToast(errorMessage(t, err));
+    } finally {
+      setSaving(false);
+      setTimeout(() => setToast(null), 4000);
+    }
+  };
 
   useEffect(() => {
     window.arkom
@@ -129,6 +147,13 @@ export function TicketPeekModal({ docId, onClose }: { docId: string; onClose: ()
           ) : null}
           {/* a refund starts from the ticket, which is the thing the customer
               is holding (ADR-0019) */}
+          {/* Save PDF sits on the peek, so it exists at every entry point the
+              peek does — the inventory trail, a sales search, a repair page, a
+              used device, the shift history, a report drill-down. One component
+              is why that sentence is true rather than a list to maintain. */}
+          <GhostButton disabled={saving} onClick={() => void savePdf()}>
+            {t("peek.savePdf")}
+          </GhostButton>
           {peek?.status === "completed" && can("sale.refund") ? (
             <GhostButton onClick={() => setRefunding(true)}>{t("refund.start")}</GhostButton>
           ) : null}

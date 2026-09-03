@@ -67,6 +67,10 @@ business rows + `product_stock` cache + `oplog` entry → typed result back.
 | `transfer:bulkVerify` | {ids} → {verified} | IDs only, never a filter; skips flagged rows |
 | `transfer:editMtcn` | {id, mtcn} → row | `transfers.editMtcn`; uniqueness re-checked |
 | `sale:findTicket` | {query} → {docId\|null} | ADR-0019 A1; full number, prefixed or bare digits; any age or shift |
+| `print:savePdf` | {docId, kind, what?, copy} → saved \| cancelled | v0.17.0; save dialog; nothing is filed per sale any more |
+| `print:testDrawer` | — → {ok} | `settings.edit`; a pulse through the configured command set |
+| `docs:list` | filters → rows | read-only flat list of completed documents |
+| `settings:series` | — → series + regimes | DISPLAY ONLY; there is no write channel and there must not be |
 | `refund:peek` | {documentId} → lines + what is left | `sale.create` |
 | `refund:create` | {documentId, reason, method, lines} → {docNumber, …} | ADR-0019; `sale.refund`, APPROVABLE; shift required |
 | `supplier:list` · `supplier:create` | — | `supplier.manage`, not `inventory.receive`: a technician orders parts but may not receive stock |

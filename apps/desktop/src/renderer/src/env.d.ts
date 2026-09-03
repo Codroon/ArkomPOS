@@ -98,6 +98,19 @@ declare global {
       invoke(channel: "transfer:bulkVerify", payload: { ids: string[] }): Promise<{ verified: number }>;
       invoke(channel: "transfer:editMtcn", payload: { id: string; mtcn: string }): Promise<TransferRow>;
       invoke(channel: "sale:findTicket", payload: { query: string }): Promise<{ docId: string | null }>;
+      invoke(channel: "print:testDrawer", payload?: Record<string, never>): Promise<{ ok: boolean }>;
+      invoke(
+        channel: "print:savePdf",
+        payload: { docId: string; kind?: string; what?: string | null; copy?: boolean },
+      ): Promise<{ kind: "saved"; path: string } | { kind: "cancelled" }>;
+      invoke(channel: "docs:list", payload?: unknown): Promise<{
+        rows: Array<{ id: string; docNumber: string; docType: string; completedAtMs: number | null; totalCents: number; userName: string | null }>;
+        truncated: boolean;
+      }>;
+      invoke(channel: "settings:series", payload?: Record<string, never>): Promise<{
+        series: Array<{ docType: string; prefix: string; nextNumber: number; nextDocNumber: string }>;
+        taxRegimes: Array<{ code: string; rateBp: number }>;
+      }>;
       invoke(channel: "refund:peek", payload: { documentId: string }): Promise<RefundPeekResponse>;
       invoke(
         channel: "refund:create",
@@ -152,7 +165,6 @@ declare global {
         channel: "print:reveal",
         payload: { path: string; mode: "open" | "folder" },
       ): Promise<{ ok: boolean }>;
-      invoke(channel: "print:ticketsDir", payload?: undefined): Promise<{ path: string }>;
       invoke(channel: "setup:status", payload?: undefined): Promise<{ needed: boolean; ownerNeeded: boolean }>;
       invoke(
         channel: "setup:complete",

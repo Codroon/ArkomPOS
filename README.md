@@ -10,7 +10,7 @@ shop's data lives in one SQLite file on the counter PC.
 
 ---
 
-## Current state — v0.14.1
+## Current state — v0.17.0
 
 Phase 1 is complete and packaged. Verified on a clean Windows machine end to
 end, with one exception noted below.
@@ -23,7 +23,8 @@ end, with one exception noted below.
 | **Catalog** | Products, groups the shop creates and renames itself, multiple scannable codes per product, incomplete-data flags, deactivate |
 | **Inventory** | Insert-only stock ledger, receiving drawer with per-IMEI entry, movement history, low-stock and reorder points |
 | **Tickets** | ESC/POS over the Windows RAW spooler, branded PDF fallback, reprints stamped COPIA, cash-drawer pulse |
-| **Ajustes** | Printer, paper width, command set, the shop's legal block, demo-data removal, backups |
+| **Ajustes** | A card per subject: the shop's full letterhead, taxes and document series (read-only), printer + paper + command set + drawer and scanner tests, the till's own limits, repairs, used devices, reports, backups |
+| **Documentos** | Every completed document in one read-only list — filter by type and date, search by number, any row opens the standard peek with Reprint and Save PDF |
 | **Backups** | Nightly + on close via SQLite's online backup API, each one verified, last 14 kept, optional second destination |
 | **First run** | Fresh install asks the shop who it is, then migrates and starts — no seed step on a client machine |
 | **Audit** | `db:audit --verify` checks every invariant the design rests on |

@@ -34,6 +34,7 @@ import {
   type TKey,
 } from "@arkom/ui";
 import { idDocLabel } from "../../lib/enum-labels";
+import { PurchasePeekModal } from "../../components/purchase-peek-modal";
 import { errorMessage } from "../../lib/errors";
 import { PrintToast } from "../../lib/print-toast";
 import { useTicketPrint } from "../../lib/use-ticket-print";
@@ -126,6 +127,7 @@ export function UsedDeviceDetailPane({
     }
   };
 
+  const [peekPurchase, setPeekPurchase] = useState(false);
   const reprint = (what: "document" | "label") => printer.printPurchase(purchaseId, what, true);
 
   /* set when main refuses a flagged device; carries the price already chosen so
@@ -402,6 +404,9 @@ export function UsedDeviceDetailPane({
             )}
 
             <div className="mt-3 flex flex-col gap-1.5">
+              {/* the SAME peek every other screen opens, so Save PDF is here
+                  without this page knowing it exists (v0.17.0) */}
+              <GhostButton onClick={() => setPeekPurchase(true)}>{t("usedDetail.openDoc")}</GhostButton>
               <GhostButton onClick={() => reprint("document")}>{t("usedDetail.reprint")}</GhostButton>
               <GhostButton onClick={() => reprint("label")}>{t("usedDetail.reprintLabel")}</GhostButton>
             </div>
@@ -476,6 +481,7 @@ export function UsedDeviceDetailPane({
         />
       ) : null}
       <PrintToast printer={printer} />
+      {peekPurchase ? <PurchasePeekModal purchaseId={purchaseId} onClose={() => setPeekPurchase(false)} /> : null}
 
       {zoom ? (
         <button

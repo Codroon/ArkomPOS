@@ -1,6 +1,7 @@
 import { app, BrowserWindow, screen } from "electron";
 import { join } from "node:path";
 import { initDb } from "./db";
+import { cleanPdfTemp } from "./print";
 import { registerIpcHandlers } from "./ipc";
 import { runBackup, startNightlyBackups, stopNightlyBackups } from "./backup";
 import { tillContext } from "./context";
@@ -116,6 +117,12 @@ if (!app.requestSingleInstanceLock()) {
 
     const db = initDb();
     registerIpcHandlers(db);
+
+    /* Last session's PDF renders. At STARTUP rather than after opening one: the
+       viewer may still hold the file, and a till that deletes a PDF out from
+       under the window showing it has traded a tidy folder for a support call
+       (v0.17.0). Failure here is never worth blocking a launch over. */
+    void cleanPdfTemp().catch(() => undefined);
     await createWindow();
 
     // the till may not be configured yet, so the context is read per run rather
