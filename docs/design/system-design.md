@@ -72,6 +72,8 @@ business rows + `product_stock` cache + `oplog` entry → typed result back.
 | `print:testDrawer` | — → {ok} | `settings.edit`; a pulse through the configured command set |
 | `docs:list` | filters → rows | read-only flat list of completed documents |
 | `settings:series` | — → series + regimes | DISPLAY ONLY for the series; the general rate shown is `settings.vatRateBp` (ADR-0007 A1) and is saved through `settings:save` like any setting. There is no series write channel and there must not be |
+| `setup:checklist` | — → {printerConfigured, hasProducts, hasStaff, hasShift, dismissed, done} | v0.18.2; authed, no permission; read from FACTS (a settings row, a product, a second user, a shift) and never from a "seen it" flag |
+| `setup:dismissChecklist` | — → checklist | v0.18.2; records the dismissal as a setting, so the card stays gone across launches |
 | `refund:peek` | {documentId} → lines + what is left | `sale.create` |
 | `refund:create` | {documentId, reason, method, lines} → {docNumber, …} | ADR-0019; `sale.refund`, APPROVABLE; shift required |
 | `supplier:list` · `supplier:create` | — | `supplier.manage`, not `inventory.receive`: a technician orders parts but may not receive stock |
