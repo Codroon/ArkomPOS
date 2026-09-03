@@ -1,0 +1,345 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the footer that came out of the client's printer cut > lays a refund, an intake and a Z out the same way every time > intake-58mm 1`] = `
+"          A R K O M
+      ELECTRONICS · PHONES
+
+  Arkom Electronics Barcelona
+       Sociedad Limitada
+       Arkom Sant Andreu
+         NIF B15987870
+ Carrer Turó de la Trinitat 25,
+       Bajos, Sant Andreu
+        08033 Barcelona
+        Tel. 934 000 111
+--------------------------------
+RESGUARDO DE DEPÓSITO
+R-000042        26/08/2026 22:48
+Caja 1 · Atendido por Ana
+--------------------------------
+CLIENTE
+Joan Puig · +34 671 220 918
+--------------------------------
+DISPOSITIVO
+Apple iPhone 11 64GB
+IMEI 356938104420030
+Avería: Pantalla rota
+Daños: pantalla rota
+Accesorios: ninguno
+--------------------------------
+La reparación tiene 3 meses de
+garantía en piezas y mano de
+obra.
+
+No se realizará ningún trabajo
+con cargo sin la aprobación
+previa del cliente.
+
+
+Firma del cliente
+
+
+
+X ______________________________
+--------------------------------
+     Gracias por su visita
+
+
+-------------------------------- ✂"
+`;
+
+exports[`the footer that came out of the client's printer cut > lays a refund, an intake and a Z out the same way every time > intake-80mm 1`] = `
+"                A R K O M
+   E L E C T R O N I C S · P H O N E S
+
+   Arkom Electronics Barcelona Sociedad
+                 Limitada
+            Arkom Sant Andreu
+              NIF B15987870
+Carrer Turó de la Trinitat 25, Bajos, Sant
+                  Andreu
+             08033 Barcelona
+             Tel. 934 000 111
+------------------------------------------
+RESGUARDO DE DEPÓSITO
+R-000042                  26/08/2026 22:48
+Caja 1 · Atendido por Ana
+------------------------------------------
+CLIENTE
+Joan Puig · +34 671 220 918
+------------------------------------------
+DISPOSITIVO
+Apple iPhone 11 64GB
+IMEI 356938104420030
+Avería: Pantalla rota
+Daños: pantalla rota
+Accesorios: ninguno
+------------------------------------------
+La reparación tiene 3 meses de garantía en
+piezas y mano de obra.
+
+No se realizará ningún trabajo con cargo
+sin la aprobación previa del cliente.
+
+
+Firma del cliente
+
+
+
+X ________________________________________
+------------------------------------------
+          Gracias por su visita
+
+
+------------------------------------------ ✂"
+`;
+
+exports[`the footer that came out of the client's printer cut > lays a refund, an intake and a Z out the same way every time > refund-58mm 1`] = `
+"      D E V O L U C I O N
+      Del ticket T1-000001
+
+          A R K O M
+      ELECTRONICS · PHONES
+
+  Arkom Electronics Barcelona
+       Sociedad Limitada
+       Arkom Sant Andreu
+         NIF B15987870
+ Carrer Turó de la Trinitat 25,
+       Bajos, Sant Andreu
+        08033 Barcelona
+        Tel. 934 000 111
+--------------------------------
+D1-000004       26/08/2026 22:48
+Terminal: Caja 1
+--------------------------------
+Funda transparente iPhone 13
+2 x 12,90 €              25,80 €
+--------------------------------
+Base imponible           21,32 €
+IVA 21%                   4,48 €
+T O T A L         2 5 , 8 0   €
+                    IVA INCLUIDO
+--------------------------------
+Efectivo                 13,00 €
+Tarjeta                   5,00 €
+  78799
+Bizum                     7,80 €
+--------------------------------
+Tu Único Punto Tecnológico en el
+       barrio desde 2011
+     Gracias por su visita
+
+      [||| D1-000004 |||]
+           D1-000004
+
+
+-------------------------------- ✂"
+`;
+
+exports[`the footer that came out of the client's printer cut > lays a refund, an intake and a Z out the same way every time > refund-80mm 1`] = `
+"           D E V O L U C I O N
+           Del ticket T1-000001
+
+                A R K O M
+   E L E C T R O N I C S · P H O N E S
+
+   Arkom Electronics Barcelona Sociedad
+                 Limitada
+            Arkom Sant Andreu
+              NIF B15987870
+Carrer Turó de la Trinitat 25, Bajos, Sant
+                  Andreu
+             08033 Barcelona
+             Tel. 934 000 111
+------------------------------------------
+D1-000004                 26/08/2026 22:48
+Terminal: Caja 1
+------------------------------------------
+Funda transparente iPhone 13
+2 x 12,90 €                        25,80 €
+------------------------------------------
+Base imponible                     21,32 €
+IVA 21%                             4,48 €
+T O T A L                   2 5 , 8 0   €
+                              IVA INCLUIDO
+------------------------------------------
+Efectivo                           13,00 €
+Tarjeta                             5,00 €
+  78799
+Bizum                               7,80 €
+------------------------------------------
+ Tu Único Punto Tecnológico en el barrio
+                desde 2011
+          Gracias por su visita
+
+           [||| D1-000004 |||]
+                D1-000004
+
+
+------------------------------------------ ✂"
+`;
+
+exports[`the footer that came out of the client's printer cut > lays a refund, an intake and a Z out the same way every time > z-58mm 1`] = `
+"  Arkom Electronics Barcelona
+       Sociedad Limitada
+       Arkom Sant Andreu
+         NIF B15987870
+ Carrer Turó de la Trinitat 25,
+       Bajos, Sant Andreu
+        08033 Barcelona
+        Tel. 934 000 111
+--------------------------------
+           INFORME Z
+           Z1-000007
+    Caja Caja 1 · 26/08/2026
+--------------------------------
+Abierto       26/08 11:32  Ahmer
+Cerrado         27/08 00:04  Ana
+--------------------------------
+VENTAS
+Base imponible            0,00 €
+IVA                       0,00 €
+TOTAL VENTAS              0,00 €
+--------------------------------
+COBROS
+TOTAL COBRADO             0,00 €
+--------------------------------
+Compras de usado registradas   0
+Reparaciones entregadas        0
+Tickets aparcados al cierre    0
+--------------------------------
+Fondo inicial           200,00 €
+Efectivo esperado       200,00 €
+Efectivo contado        200,00 €
+DESCUADRE                 0,00 €
+--------------------------------
+  Informe generado por el TPV
+
+
+
+-------------------------------- ✂"
+`;
+
+exports[`the footer that came out of the client's printer cut > lays a refund, an intake and a Z out the same way every time > z-80mm 1`] = `
+"   Arkom Electronics Barcelona Sociedad
+                 Limitada
+            Arkom Sant Andreu
+              NIF B15987870
+Carrer Turó de la Trinitat 25, Bajos, Sant
+                  Andreu
+             08033 Barcelona
+             Tel. 934 000 111
+------------------------------------------
+                INFORME Z
+                Z1-000007
+         Caja Caja 1 · 26/08/2026
+------------------------------------------
+Abierto                 26/08 11:32  Ahmer
+Cerrado                   27/08 00:04  Ana
+------------------------------------------
+VENTAS
+Base imponible                      0,00 €
+IVA                                 0,00 €
+TOTAL VENTAS                        0,00 €
+------------------------------------------
+COBROS
+TOTAL COBRADO                       0,00 €
+------------------------------------------
+Compras de usado registradas             0
+Reparaciones entregadas                  0
+Tickets aparcados al cierre              0
+------------------------------------------
+Fondo inicial                     200,00 €
+Efectivo esperado                 200,00 €
+Efectivo contado                  200,00 €
+DESCUADRE                           0,00 €
+------------------------------------------
+       Informe generado por el TPV
+
+
+
+------------------------------------------ ✂"
+`;
+
+exports[`the footer that came out of the client's printer cut > lays the whole ticket out the same way every time > ticket-58mm 1`] = `
+"          A R K O M
+      ELECTRONICS · PHONES
+
+  Arkom Electronics Barcelona
+       Sociedad Limitada
+       Arkom Sant Andreu
+         NIF B15987870
+ Carrer Turó de la Trinitat 25,
+       Bajos, Sant Andreu
+        08033 Barcelona
+        Tel. 934 000 111
+--------------------------------
+T1-000001       26/08/2026 22:48
+Terminal: Caja 1
+--------------------------------
+Funda transparente iPhone 13
+2 x 12,90 €              25,80 €
+--------------------------------
+Base imponible           21,32 €
+IVA 21%                   4,48 €
+T O T A L         2 5 , 8 0   €
+                    IVA INCLUIDO
+--------------------------------
+Efectivo                 13,00 €
+Tarjeta                   5,00 €
+  78799
+Bizum                     7,80 €
+--------------------------------
+Tu Único Punto Tecnológico en el
+       barrio desde 2011
+     Gracias por su visita
+
+      [||| T1-000001 |||]
+           T1-000001
+
+
+-------------------------------- ✂
+[cajón]"
+`;
+
+exports[`the footer that came out of the client's printer cut > lays the whole ticket out the same way every time > ticket-80mm 1`] = `
+"                A R K O M
+   E L E C T R O N I C S · P H O N E S
+
+   Arkom Electronics Barcelona Sociedad
+                 Limitada
+            Arkom Sant Andreu
+              NIF B15987870
+Carrer Turó de la Trinitat 25, Bajos, Sant
+                  Andreu
+             08033 Barcelona
+             Tel. 934 000 111
+------------------------------------------
+T1-000001                 26/08/2026 22:48
+Terminal: Caja 1
+------------------------------------------
+Funda transparente iPhone 13
+2 x 12,90 €                        25,80 €
+------------------------------------------
+Base imponible                     21,32 €
+IVA 21%                             4,48 €
+T O T A L                   2 5 , 8 0   €
+                              IVA INCLUIDO
+------------------------------------------
+Efectivo                           13,00 €
+Tarjeta                             5,00 €
+  78799
+Bizum                               7,80 €
+------------------------------------------
+ Tu Único Punto Tecnológico en el barrio
+                desde 2011
+          Gracias por su visita
+
+           [||| T1-000001 |||]
+                T1-000001
+
+
+------------------------------------------ ✂
+[cajón]"
+`;

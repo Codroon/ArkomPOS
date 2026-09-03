@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { openDb, runMigrations, schema as s } from "@arkom/db";
 import { opsToText, parseIpcError, renderTicket, shopHeaderLines, uuidv7 } from "@arkom/core";
+import { encodeEscPos } from "../print/escpos";
 import { handlers, setNextSavePath } from "./electron-stub";
 import { registerIpcHandlers } from "../ipc";
 import { endSession, startSession } from "../auth/session";
@@ -422,6 +423,82 @@ describe("the document peek", () => {
 });
 
 /* ---------------------------------- 7 · upgrading a populated database -- */
+
+/* ------------------------- what actually reaches the Citizen (v0.18.1) */
+
+describe("the bytes the thermal printer receives", () => {
+  /**
+   * The client's ticket T1-000001 came off the roll reading "Tu Unico Punto
+   * Tecnologi" — cut mid-word. The screen renderer wraps, so this asserts the
+   * other half of the journey: that what the ESC/POS encoder hands the spooler
+   * still contains every character, and that the shop's block and footer carry
+   * the centre command in front of them.
+   */
+  const LONG_SHOP = {
+    legalName: "Arkom Electronics Barcelona Sociedad Limitada",
+    nif: "B15987870",
+    address: "Carrer Turó de la Trinitat 25, Bajos, Sant Andreu",
+    footerLine: "Tu Único Punto Tecnológico en el barrio desde 2011",
+  };
+
+  const ticketOps = (width: 58 | 80) =>
+    renderTicket(
+      {
+        docNumber: "T1-000001",
+        completedAtMs: Date.UTC(2026, 7, 26, 17, 48),
+        terminalName: "Caja 1",
+        isCopy: false,
+        vatRateBp: 2100,
+        lines: [
+          {
+            description: "Funda transparente iPhone 13",
+            qty: 2,
+            unitPriceCents: 1290,
+            totalCents: 2580,
+            imei: null,
+            priceOverridden: false,
+          },
+        ],
+        subtotalCents: 2132,
+        taxCents: 448,
+        totalCents: 2580,
+        tenders: [{ method: "cash", amountCents: 2580, cardReference: null }],
+        changeCents: 0,
+      },
+      LONG_SHOP,
+      width,
+    );
+
+  it.each([80, 58] as const)("carries every word of a long footer at %dmm, in pieces but never cut", (width) => {
+    const bytes = encodeEscPos(ticketOps(width), "epson", width);
+    const text = bytes.toString("latin1");
+    /* the line does not fit, so it arrives as more than one — and every word of
+       it is there. "Tecnologi" with nothing after it is the failure. */
+    for (const word of ["Tu", "Punto", "en", "el", "barrio", "desde", "2011"]) {
+      expect(text.includes(word), `${word} missing at ${width}mm`).toBe(true);
+    }
+    expect(text).not.toMatch(/Tecnologi[^c]/);
+  });
+
+  it("puts the ESC/POS centre command in front of the shop's block", () => {
+    const bytes = encodeEscPos(ticketOps(80), "epson", 80);
+    // ESC a 1 — centre. Its absence is what "off-centre on the paper" means.
+    expect(bytes.includes(Buffer.from([0x1b, 0x61, 0x01]))).toBe(true);
+    expect(bytes.includes(Buffer.from("NIF B15987870", "latin1"))).toBe(true);
+  });
+
+  it("wraps rather than truncates at the narrower roll too", () => {
+    const wide = encodeEscPos(ticketOps(80), "epson", 80).toString("latin1");
+    const narrow = encodeEscPos(ticketOps(58), "epson", 58).toString("latin1");
+    const words = (t: string) => (t.match(/[A-Za-zÀ-ÿ0-9]+/g) ?? []).join(" ");
+    /* 58mm breaks the same sentence in more places, and loses none of it: the
+       words on the narrow roll are the words on the wide one */
+    for (const word of ["Sociedad", "Limitada", "Trinitat", "Tecnol", "barrio"]) {
+      expect(words(narrow).includes(word), `${word} lost at 58mm`).toBe(true);
+      expect(words(wide).includes(word), `${word} lost at 80mm`).toBe(true);
+    }
+  });
+});
 
 /* ------------------------------------ the printing card (v0.18.1) */
 
