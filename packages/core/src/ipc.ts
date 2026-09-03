@@ -2282,8 +2282,19 @@ export const TransferKindSchema = z.enum(["send", "payout"]);
 export const TransferStatusSchema = z.enum(["sent", "paid", "cancelled"]);
 export const TransferMethodSchema = z.enum(["cash", "card"]);
 
-/** Ten digits. Spaces and dashes are stripped before this sees the value. */
-const MtcnSchema = z.string().trim().regex(/^\d{10}$/, "El MTCN son 10 dígitos.");
+/**
+ * Ten digits, however the operator typed them.
+ *
+ * WU prints the MTCN in groups on its receipt, so somebody copying it across
+ * will type spaces or dashes. Stripping them at the boundary is what makes the
+ * uniqueness check mean anything: "987-654 3210" and "9876543210" are the same
+ * transfer, and a till that logs both has logged one transfer twice.
+ */
+const MtcnSchema = z
+  .string()
+  .trim()
+  .transform((v) => v.replace(/[\s-]/g, ""))
+  .refine((v) => /^\d{10}$/.test(v), "El MTCN son 10 dígitos.");
 const PartyName = z.string().trim().min(1).max(120);
 /** ISO-3166 alpha-2, upper case */
 const CountrySchema = z.string().trim().length(2).regex(/^[A-Z]{2}$/);
