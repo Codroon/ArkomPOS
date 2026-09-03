@@ -114,7 +114,14 @@ export function RefundDialog({
   if (!peek) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-inverse/40">
+    /* stopPropagation because this dialog is rendered INSIDE the ticket peek,
+       whose own backdrop closes on mousedown. Without it, every click in here —
+       a quantity, a checkbox, the confirm button — bubbled up and shut the
+       whole thing, so a refund could be filled in but never submitted. */
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-inverse/40"
+      onMouseDown={(e) => e.stopPropagation()}
+    >
       <div className="max-h-[86vh] w-[640px] overflow-hidden rounded-[3px] border border-line-strong bg-card shadow-lg">
         <div className="flex items-baseline gap-2 border-b border-line px-4 py-2.5">
           <div className="text-[13px] font-bold">{t("refund.title")}</div>

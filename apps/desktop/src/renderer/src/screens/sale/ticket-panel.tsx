@@ -5,7 +5,7 @@
  */
 import { useState } from "react";
 import { formatCents, type SaleLineRow, type SaleState } from "@arkom/core";
-import { Chip, cn, MoneyText, useT, useDataLabel } from "@arkom/ui";
+import { Chip, cn, MoneyText, useT, useDataLabel, GhostButton } from "@arkom/ui";
 
 function LineRow({
   line,
@@ -131,6 +131,7 @@ export function TicketPanel({
   onSetQty,
   onOverride,
   onRemove,
+  onFindTicket,
 }: {
   sale: SaleState | null;
   flashLineId: string | null;
@@ -138,6 +139,8 @@ export function TicketPanel({
   onSetQty: (line: SaleLineRow, qty: number) => void;
   onOverride: (line: SaleLineRow) => void;
   onRemove: (line: SaleLineRow) => void;
+  /** absent when the cashier may not refund; the header simply omits it */
+  onFindTicket?: () => void;
 }) {
   const t = useT();
   const lines = sale?.lines ?? [];
@@ -149,6 +152,14 @@ export function TicketPanel({
         <div className="text-[11px] text-muted">
           {lines.length === 1 ? t("sale.lineCountOne") : t("sale.lineCountMany", { n: lines.length })}
         </div>
+        <div className="flex-1" />
+        {/* A refund starts on the ticket side of the screen, beside the money —
+            not among the product filters, which are about what to sell next. */}
+        {onFindTicket ? (
+          <GhostButton className="h-6 px-2 text-[11px]" onClick={onFindTicket}>
+            {t("sale.refundAction")}
+          </GhostButton>
+        ) : null}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
