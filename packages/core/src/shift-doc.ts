@@ -14,6 +14,7 @@
  * reprint honest. Following the rule CLAUDE.md states for every document: a type
  * that cannot express a claim the facts do not support.
  */
+import { hasTransferActivity } from "./transfer";
 import { formatCents } from "./money";
 import { opBuilder, COLUMNS_BY_PAPER, type PaperWidthMm, type TicketOp } from "./print-ops";
 import type { ShiftTotals } from "./shift";
@@ -27,6 +28,8 @@ export interface ShiftLabels {
   tenders: string; tendersTotal: string; imbalance: string;
   movements: string; byMethod: string; methodIn: string; methodOut: string; methodNet: string;
   counts: string; usedPurchases: string; repairsCollected: string; parked: string;
+  transfers: string; trSends: string; trSendCash: string; trSendCard: string; trFees: string;
+  trPayouts: string; trCancels: string; trNote: string;
   float: string; expected: string; counted: string; variance: string; short: string; over: string;
   reason: string; approvedBy: string; footer: string; copy: string;
 }
@@ -54,6 +57,14 @@ export const SHIFT_ES: ShiftLabels = {
   methodOut: "Sale",
   methodNet: "Neto",
   counts: "RECUENTOS",
+  transfers: "GIROS (WESTERN UNION)",
+  trSends: "Envíos",
+  trSendCash: "  En efectivo",
+  trSendCard: "  Con tarjeta",
+  trFees: "Comisiones cobradas",
+  trPayouts: "Pagos entregados",
+  trCancels: "Cancelaciones",
+  trNote: "El principal no es una venta.",
   usedPurchases: "Compras de usado registradas",
   repairsCollected: "Reparaciones entregadas",
   parked: "Tickets aparcados al cierre",
@@ -93,6 +104,14 @@ export const SHIFT_EN: ShiftLabels = {
   methodOut: "Out",
   methodNet: "Net",
   counts: "COUNTS",
+  transfers: "TRANSFERS (WESTERN UNION)",
+  trSends: "Sends",
+  trSendCash: "  In cash",
+  trSendCard: "  By card",
+  trFees: "Fees taken",
+  trPayouts: "Payouts made",
+  trCancels: "Cancellations",
+  trNote: "The principal is not a sale.",
   usedPurchases: "Used devices bought",
   repairsCollected: "Repairs collected",
   parked: "Parked tickets at close",
@@ -256,6 +275,28 @@ export function renderZReport(
       b.pair(`  ${SHIFT_ES.methodOut}`, formatCents(row.outCents));
       b.pair(`  ${SHIFT_ES.methodNet}`, formatCents(row.netCents), { bold: true });
     }
+    b.rule();
+  }
+
+  /* ---- the WU counter, its own block, below the sales and apart from them ----
+     Rendered only when a snapshot HAS it: a Z frozen before v0.15.0 carries no
+     `transfers` key and must print exactly what it printed then (ADR-0015 §7). */
+  if (t.transfers && hasTransferActivity(t.transfers)) {
+    const tr = t.transfers;
+    b.text(SHIFT_ES.transfers, { bold: true });
+    if (tr.sendCount > 0) {
+      b.pair(`${SHIFT_ES.trSends} · ${tr.sendCount}`, formatCents(tr.sendPrincipalCents));
+      b.pair(SHIFT_ES.trSendCash, formatCents(tr.sendCashPrincipalCents + tr.sendCashFeesCents));
+      b.pair(SHIFT_ES.trSendCard, formatCents(tr.sendCardPrincipalCents + tr.sendCardFeesCents));
+      b.pair(SHIFT_ES.trFees, formatCents(tr.sendFeesCents));
+    }
+    if (tr.payoutCount > 0) {
+      b.pair(`${SHIFT_ES.trPayouts} · ${tr.payoutCount}`, formatCents(tr.payoutPrincipalCents));
+    }
+    if (tr.cancelCount > 0) {
+      b.pair(`${SHIFT_ES.trCancels} · ${tr.cancelCount}`, formatCents(tr.cancelDrawerCents));
+    }
+    b.text(SHIFT_ES.trNote);
     b.rule();
   }
 

@@ -43,6 +43,16 @@ import {
   CatalogCodesRequestSchema,
   CatalogCodesResponseSchema,
   CatalogGroupCreateRequestSchema,
+  TransferSendRequestSchema,
+  TransferSendResponseSchema,
+  TransferPayoutRequestSchema,
+  TransferPayoutResponseSchema,
+  TransferListRequestSchema,
+  TransferListResponseSchema,
+  TransferGetRequestSchema,
+  TransferGetResponseSchema,
+  TransferCancelRequestSchema,
+  TransferCancelResponseSchema,
   CatalogGroupRenameRequestSchema,
   CatalogGroupResponseSchema,
   CatalogAddCodeRequestSchema,
@@ -230,6 +240,7 @@ import {
 } from "@arkom/core";
 import type { ArkomDb } from "@arkom/db";
 import { resetTillContext, tillContext } from "./context";
+import { cancelTransfer, getTransfer, listTransfers, logPayout, logSend } from "./repos/transfer";
 import {
   addCode,
   createGroup,
@@ -432,6 +443,10 @@ export const SHIFT_REQUIRED_CHANNELS: ReadonlySet<string> = new Set([
   "repair:collect",
   "cash:paidIn",
   "cash:paidOut",
+  /* every WU op moves or records money against a drawer (ADR-0018) */
+  "transfer:send",
+  "transfer:payout",
+  "transfer:cancel",
   "cash:preview",
   "cash:close",
 ]);
@@ -1305,6 +1320,25 @@ export function registerIpcHandlers(db: ArkomDb): void {
     PrintTicketResponseSchema,
     (s, input) => printShiftReport(db, s.ctx, input),
   );
+
+  /* ------------------------------------------- transfers: WU (ADR-0018) */
+
+  guarded("transfer:list", "transfers.view", TransferListRequestSchema, TransferListResponseSchema, (s, input) =>
+    listTransfers(db, s.ctx, input),
+  );
+  guarded("transfer:get", "transfers.view", TransferGetRequestSchema, TransferGetResponseSchema, (s, { id }) =>
+    getTransfer(db, s.ctx, id),
+  );
+  guarded("transfer:send", "transfers.create", TransferSendRequestSchema, TransferSendResponseSchema, (s, input) => ({
+    row: logSend(db, s.ctx, input),
+  }));
+  guarded("transfer:payout", "transfers.create", TransferPayoutRequestSchema, TransferPayoutResponseSchema, (s, input) =>
+    logPayout(db, s.ctx, input),
+  );
+  /* approvable: a cancel hands back money that is already out of the drawer */
+  guarded("transfer:cancel", "transfers.cancel", TransferCancelRequestSchema, TransferCancelResponseSchema, (s, input) => ({
+    row: cancelTransfer(db, s.ctx, input),
+  }));
 
   /* --------------------------------------------------- reports (ADR-0016) */
 

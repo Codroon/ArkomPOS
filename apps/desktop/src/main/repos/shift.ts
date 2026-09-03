@@ -13,6 +13,7 @@ import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { ArkomDb } from "@arkom/db";
 import * as schema from "@arkom/db/schema";
 import { makeMutateRunner, type DbTx } from "../mutate-runner";
+import { transferFactsForShift } from "./transfer";
 import {
   allocateNumber,
   appError,
@@ -229,6 +230,9 @@ export function loadShiftFacts(db: Reader, shift: ShiftRow): ShiftFacts {
     payouts,
     parkedCount: parked.length,
     repairsCollectedCount: repairsCollected.length,
+    /* the WU counter: rows logged in this shift, plus any cancelled in it
+       whatever shift they were logged in (ADR-0018) */
+    transfers: transferFactsForShift(db, shift.id),
   };
 }
 

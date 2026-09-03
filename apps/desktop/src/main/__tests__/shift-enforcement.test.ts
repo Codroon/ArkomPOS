@@ -160,7 +160,20 @@ describe("the declared list", () => {
     // a pin: adding a money channel without the gate should fail the build the
     // same way one without a permission does
     expect([...SHIFT_REQUIRED_CHANNELS].sort()).toEqual(
-      ["cash:close", "cash:paidIn", "cash:paidOut", "cash:preview", "repair:collect", "sale:complete", "used:log"].sort(),
+      [
+        "cash:close",
+        "cash:paidIn",
+        "cash:paidOut",
+        "cash:preview",
+        "repair:collect",
+        "sale:complete",
+        /* WU: every op either moves notes or records against the shift that
+           would have (ADR-0018) */
+        "transfer:cancel",
+        "transfer:payout",
+        "transfer:send",
+        "used:log",
+      ].sort(),
     );
   });
 

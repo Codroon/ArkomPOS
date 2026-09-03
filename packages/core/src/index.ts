@@ -235,6 +235,27 @@ export {
 export type { DatePreset, DateRange, CostEstimate, ReportId, SalesGroupBy } from "./reports";
 export { STARTER_GROUPS, starterGroupNames, groupNameKey, groupDisplayName, starterEnglishName } from "./groups";
 export type { StarterGroup, SetupLocale, GroupRef } from "./groups";
+export type {
+  TransferRow,
+  TransferListRequest,
+  TransferSendRequest,
+  TransferPayoutRequest,
+  TransferCancelRequest,
+} from "./ipc";
+export {
+  TRANSFER_KINDS,
+  TRANSFER_STATUSES,
+  TRANSFER_METHODS,
+  MTCN_PATTERN,
+  normalizeMtcn,
+  isValidMtcn,
+  transferDrawerDelta,
+  transferCancelDelta,
+  computeTransferTotals,
+  hasTransferActivity,
+  EMPTY_TRANSFER_TOTALS,
+} from "./transfer";
+export type { TransferKind, TransferStatus, TransferMethod, TransferFact, TransferTotals } from "./transfer";
 export { opsToText, opBuilder } from "./print-ops";
 export { renderZReport, SHIFT_ES, SHIFT_EN, shiftLabels } from "./shift-doc";
 export type { ShiftReportDoc, ShiftLabels, ShiftDocLocale } from "./shift-doc";
@@ -307,6 +328,20 @@ export {
   CatalogSaveRequestSchema,
   CatalogSaveResponseSchema,
   CatalogGroupsRequestSchema,
+  TransferKindSchema,
+  TransferStatusSchema,
+  TransferMethodSchema,
+  TransferSendRequestSchema,
+  TransferSendResponseSchema,
+  TransferPayoutRequestSchema,
+  TransferPayoutResponseSchema,
+  TransferListRequestSchema,
+  TransferListResponseSchema,
+  TransferGetRequestSchema,
+  TransferGetResponseSchema,
+  TransferCancelRequestSchema,
+  TransferCancelResponseSchema,
+  TransferRowSchema,
   GroupRefSchema,
   CatalogGroupCreateRequestSchema,
   CatalogGroupRenameRequestSchema,

@@ -18,7 +18,7 @@
  */
 
 /** Groups the Usuarios screen renders as sections, in this order. */
-export const PERMISSION_MODULES = ["sale", "catalog", "inventory", "usedDevices", "repair", "workshop", "cash", "reports", "admin"] as const;
+export const PERMISSION_MODULES = ["sale", "catalog", "inventory", "transfers", "usedDevices", "repair", "workshop", "cash", "reports", "admin"] as const;
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
 
 export interface PermissionDef {
@@ -58,6 +58,14 @@ export const PERMISSIONS = [
      (ADR-0012 §"what a technician may do"). Low stakes both ways — a supplier
      is a name on a list until a delivery or a part order references it. */
   { key: "supplier.manage", module: "inventory", labelEs: "Ver y añadir proveedores", approvable: false },
+
+  /* ---- transfers: the WU counter (ADR-0018) ----
+     Counter work: a cashier sends, pays out and reads the log by default. A
+     CANCEL is approvable — it hands back money that is already out of the
+     drawer, which is the one transfer action with a way to lose cash. */
+  { key: "transfers.view", module: "transfers", labelEs: "Ver el registro de giros", approvable: false },
+  { key: "transfers.create", module: "transfers", labelEs: "Registrar envíos y pagos", approvable: false },
+  { key: "transfers.cancel", module: "transfers", labelEs: "Cancelar un giro", approvable: true },
 
   /* ---- used devices (ADR-0013) ----
      Buying is counter work, so the cashier holds most of these by default. The
@@ -176,6 +184,8 @@ export const CASHIER_DEFAULTS: readonly PermissionKey[] = [
   "supplier.manage",
   /* the client asked for the whole buy-and-shelve flow at the counter, so
      sending to inventory is a cashier default and not an approval */
+  "transfers.view",
+  "transfers.create",
   "usedDevices.create",
   "usedDevices.sendToInventory",
   "usedDevices.editRefurbCost",

@@ -692,6 +692,12 @@ export const CASH_MOVEMENT_REASONS = [
   /* manual, typed by a human, with a concept saying why (ADR-0015 §9) */
   "paid_in",
   "paid_out",
+  /* Western Union counter (ADR-0018). The PRINCIPAL is pass-through — never a
+     sale, never revenue, never in a VAT figure — but the notes are real and the
+     drawer has to know about them. */
+  "transfer_send",
+  "transfer_payout",
+  "transfer_cancel",
 ] as const;
 
 /**
@@ -780,4 +786,67 @@ export const shifts = sqliteTable("shifts", {
   /* THE guarantee, not a convenience: one open shift per till, decided by SQLite
      rather than by whichever code path happened to check first (ADR-0015 §1). */
   uniqueIndex("ux_shift_open_per_terminal").on(t.terminalId).where(sql`${t.closedAt} is null`),
+]);
+
+/* ---------------- transfers: the WU counter, shadowed (ADR-0018) ----------------
+ *
+ * Ahmer operates Western Union's own terminal; there is no API and this table is
+ * not the system of record. It is a shadow log so the drawer, the Z and next
+ * round's reconciliation import have something to agree with.
+ *
+ * The MTCN is the only identifier both sides share, so it is unique per tenant:
+ * that is what lets an imported cancellation find the send it cancels without
+ * inventing a second key.
+ */
+export const TRANSFER_KINDS = ["send", "payout"] as const;
+/** `sent` and `paid` are the live states; `cancelled` is either, reversed. */
+export const TRANSFER_STATUSES = ["sent", "paid", "cancelled"] as const;
+/** How the customer paid for a SEND. A payout is always cash out of the drawer. */
+export const TRANSFER_METHODS = ["cash", "card"] as const;
+
+export const transfers = sqliteTable("transfers", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  locationId: text("location_id").notNull().references(() => locations.id),
+  terminalId: text("terminal_id").notNull().references(() => terminals.id),
+
+  kind: text("kind", { enum: TRANSFER_KINDS }).notNull(),
+  status: text("status", { enum: TRANSFER_STATUSES }).notNull(),
+  /** 10 digits, as WU issues them */
+  mtcn: text("mtcn").notNull(),
+
+  senderName: text("sender_name").notNull(),
+  receiverName: text("receiver_name").notNull(),
+  /** ISO-3166 alpha-2: destination on a send, origin on a payout */
+  countryCode: text("country_code").notNull(),
+
+  /** the money being moved. NOT revenue, NOT taxable, NOT in any sales figure. */
+  principalCents: integer("principal_cents").notNull(),
+  /** WU's charge. Zero is normal, even on a large send. */
+  feeCents: integer("fee_cents").notNull().default(0),
+  /** send only; null on a payout, which is cash by definition */
+  method: text("method", { enum: TRANSFER_METHODS }),
+
+  /** the shift the money moved in — stamped, like every other cash event */
+  shiftId: text("shift_id").notNull(),
+  userId: text("user_id"),
+  createdAt: ts("created_at").notNull(),
+
+  /* ---- cancellation. A cancel returns the FULL amount, fee included. ---- */
+  cancelledAt: ts("cancelled_at"),
+  cancelledByUserId: text("cancelled_by_user_id"),
+  cancelReason: text("cancel_reason"),
+  /** the shift the REVERSAL landed in, which is today's, not the original's */
+  cancelShiftId: text("cancel_shift_id"),
+  /** the owner who approved it, when one was needed */
+  cancelApprovedByUserId: text("cancel_approved_by_user_id"),
+
+  updatedAt: ts("updated_at").notNull(),
+}, (t) => [
+  /* THE guarantee: one row per MTCN, decided by SQLite. A duplicate is how a
+     double-entry happens at a busy counter, and the answer is to show the
+     operator the record that already exists (ADR-0018). */
+  uniqueIndex("ux_transfer_tenant_mtcn").on(t.tenantId, t.mtcn),
+  index("ix_transfer_shift").on(t.shiftId),
+  index("ix_transfer_created").on(t.tenantId, t.createdAt),
 ]);

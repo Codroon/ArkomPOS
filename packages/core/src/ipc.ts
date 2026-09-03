@@ -13,6 +13,11 @@ export const IPC_CHANNELS = [
   "catalog:get",
   "catalog:save",
   "catalog:groups",
+  "transfer:send",
+  "transfer:payout",
+  "transfer:list",
+  "transfer:get",
+  "transfer:cancel",
   "catalog:createGroup",
   "catalog:renameGroup",
   "catalog:codes",
@@ -146,6 +151,9 @@ export const ErrorCodeSchema = z.enum([
      (ADR-0013 amendment). Like SHIFT_REQUIRED, an invitation rather than a
      refusal: the UI answers it with a confirmation, not an error. */
   "REVIEW_REQUIRED",
+  /* The MTCN is already logged. Not a refusal to be argued with — the answer
+     is to show the operator the record that exists (ADR-0018). */
+  "DUPLICATE_MTCN",
   "VALIDATION",
 ]);
 export type ErrorCode = z.infer<typeof ErrorCodeSchema>;
@@ -2267,3 +2275,112 @@ export const ReportsExportResponseSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("cancelled") }),
 ]);
 export type ReportsExportResponse = z.infer<typeof ReportsExportResponseSchema>;
+
+/* ---------------------------------- transfers: the WU counter (ADR-0018) --- */
+
+export const TransferKindSchema = z.enum(["send", "payout"]);
+export const TransferStatusSchema = z.enum(["sent", "paid", "cancelled"]);
+export const TransferMethodSchema = z.enum(["cash", "card"]);
+
+/** Ten digits. Spaces and dashes are stripped before this sees the value. */
+const MtcnSchema = z.string().trim().regex(/^\d{10}$/, "El MTCN son 10 dígitos.");
+const PartyName = z.string().trim().min(1).max(120);
+/** ISO-3166 alpha-2, upper case */
+const CountrySchema = z.string().trim().length(2).regex(/^[A-Z]{2}$/);
+
+export const TransferSendRequestSchema = z.object({
+  mtcn: MtcnSchema,
+  senderName: PartyName,
+  receiverName: PartyName,
+  /** where the money is going */
+  countryCode: CountrySchema,
+  principalCents: z.number().int().min(1),
+  /** zero is normal, even on a large send */
+  feeCents: z.number().int().min(0).default(0),
+  method: TransferMethodSchema,
+});
+
+export const TransferPayoutRequestSchema = z.object({
+  mtcn: MtcnSchema,
+  receiverName: PartyName,
+  senderName: PartyName,
+  /** where the money came from */
+  countryCode: CountrySchema,
+  principalCents: z.number().int().min(1),
+  /** set after the shop has been shown the drawer warning and said yes anyway */
+  confirmedOverDrawer: z.boolean().optional(),
+});
+
+export const TransferRowSchema = z.object({
+  id: z.string(),
+  kind: TransferKindSchema,
+  status: TransferStatusSchema,
+  mtcn: z.string(),
+  senderName: z.string(),
+  receiverName: z.string(),
+  countryCode: z.string(),
+  principalCents: z.number().int(),
+  feeCents: z.number().int(),
+  method: TransferMethodSchema.nullable(),
+  /** signed, as it hit the notes: 0 for a card send */
+  drawerCents: z.number().int(),
+  shiftId: z.string(),
+  userName: z.string().nullable(),
+  createdAtMs: z.number().int(),
+  cancelledAtMs: z.number().int().nullable(),
+  cancelledByName: z.string().nullable(),
+  cancelReason: z.string().nullable(),
+});
+export type TransferRow = z.infer<typeof TransferRowSchema>;
+
+/**
+ * A payout the drawer cannot cover is a WARNING, not a refusal.
+ *
+ * The customer is standing there with ID and WU has already authorised it; the
+ * shop may well have a second cash box. So the till says what it knows — what
+ * it expects to be in the drawer and what is being asked for — and lets a human
+ * decide, which is the same shape as the shared-barcode confirm (ADR-0018).
+ */
+export const TransferPayoutResponseSchema = z.union([
+  z.object({ kind: z.literal("logged"), row: TransferRowSchema }),
+  z.object({
+    kind: z.literal("overDrawerWarning"),
+    expectedCashCents: z.number().int(),
+    amountCents: z.number().int(),
+  }),
+]);
+
+export const TransferSendResponseSchema = z.object({ row: TransferRowSchema });
+
+export const TransferListRequestSchema = z
+  .object({
+    /** default: this shift only, which is the question a counter asks */
+    scope: z.enum(["shift", "all"]).default("shift"),
+    kind: TransferKindSchema.nullish(),
+    status: TransferStatusSchema.nullish(),
+    fromMs: z.number().int().nullish(),
+    toMs: z.number().int().nullish(),
+    /** MTCN or either party's name */
+    search: z.string().trim().max(120).nullish(),
+  })
+  .default({ scope: "shift" });
+
+export type TransferListRequest = z.infer<typeof TransferListRequestSchema>;
+export type TransferSendRequest = z.infer<typeof TransferSendRequestSchema>;
+export type TransferPayoutRequest = z.infer<typeof TransferPayoutRequestSchema>;
+export type TransferCancelRequest = z.infer<typeof TransferCancelRequestSchema>;
+
+export const TransferListResponseSchema = z.object({
+  rows: z.array(TransferRowSchema),
+  /** what the block did to the notes, so the screen can show it without summing */
+  drawerCents: z.number().int(),
+});
+
+export const TransferGetRequestSchema = z.object({ id: z.string() });
+export const TransferGetResponseSchema = TransferRowSchema;
+
+export const TransferCancelRequestSchema = z.object({
+  id: z.string(),
+  reason: z.string().trim().min(1).max(200),
+});
+export const TransferCancelResponseSchema = z.object({ row: TransferRowSchema });

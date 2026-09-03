@@ -50,6 +50,7 @@ describe("registry shape", () => {
         "repair.markNotRepaired",
         "repair.price_override",
         "sale.price_override",
+        "transfers.cancel",
         "usedDevices.priceOverride",
       ].sort(),
     );

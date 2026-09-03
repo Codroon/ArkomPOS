@@ -15,6 +15,7 @@
  * to write the copy.
  */
 import { appError } from "./errors";
+import { computeTransferTotals, type TransferFact, type TransferTotals } from "./transfer";
 
 /* ------------------------------------------------------------- status */
 
@@ -102,6 +103,12 @@ export const DRAWER_EFFECT = {
   used_purchase_payout: true,
   paid_in: true,
   paid_out: true,
+  /* WU (ADR-0018). A CARD send writes no movement at all, so every row that
+     exists here moved notes — including the cancel, which is a signed reversal
+     rather than a second kind of event. */
+  transfer_send: true,
+  transfer_payout: true,
+  transfer_cancel: true,
 } as const satisfies Record<string, boolean>;
 
 export type CashMovementReason = keyof typeof DRAWER_EFFECT;
@@ -191,6 +198,8 @@ export interface ShiftFacts {
   parkedCount: number;
   /** counted by the caller from the tickets, not guessed from document shapes */
   repairsCollectedCount: number;
+  /** WU rows touching this shift, either logged in it or cancelled in it */
+  transfers?: ReadonlyArray<TransferFact>;
 }
 
 export interface SeriesRun {
@@ -239,6 +248,14 @@ export interface ShiftTotals {
   usedPurchaseCount: number;
   repairsCollectedCount: number;
   parkedCount: number;
+
+  /**
+   * The WU counter (ADR-0018), kept apart from every sales figure above it.
+   *
+   * OPTIONAL on purpose: a snapshot frozen before v0.15.0 has no such key, and
+   * the Z renderer must print exactly what it printed then (ADR-0015 §7).
+   */
+  transfers?: TransferTotals;
 }
 
 /** Methods that can appear on the by-method block, in the order the Z prints them. */
@@ -358,6 +375,19 @@ export function computeShiftTotals(facts: ShiftFacts): ShiftTotals {
   for (const movement of facts.movements) {
     if (movement.reason === "paid_in") line("cash").inCents += movement.amountCents;
     if (movement.reason === "paid_out") line("cash").outCents += -movement.amountCents;
+    /* A transfer's notes are cash with no tender behind them, the same as a
+       manual movement. Without these the cash line stops equalling the drawer,
+       and that equality is the whole reason this block exists (ADR-0018). */
+    if (movement.reason.startsWith("transfer_")) {
+      if (movement.amountCents >= 0) line("cash").inCents += movement.amountCents;
+      else line("cash").outCents += -movement.amountCents;
+    }
+  }
+  /* a CARD send never reaches the drawer, so it has no movement row — but the
+     shop still took money on a card and the statement will show it */
+  const transferTotals = facts.transfers ? computeTransferTotals(facts.transfers) : undefined;
+  if (transferTotals && transferTotals.sendCardPrincipalCents + transferTotals.sendCardFeesCents > 0) {
+    line("card").inCents += transferTotals.sendCardPrincipalCents + transferTotals.sendCardFeesCents;
   }
   const byMethod = sortByMethodOrder([...byMethodMap.values()]);
   for (const row of byMethod) row.netCents = row.inCents - row.outCents;
@@ -414,6 +444,7 @@ export function computeShiftTotals(facts: ShiftFacts): ShiftTotals {
     refundsByMethod,
     payoutsByMethod,
     byMethod,
+    ...(transferTotals ? { transfers: transferTotals } : {}),
 
     series,
     usedPurchaseCount: facts.documents.filter((d) => d.docType === "purchase").length,

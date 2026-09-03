@@ -49,6 +49,7 @@ const KEY_FOR: Record<ErrorCode, TKey | null> = {
   TENDER_MISMATCH: "err.tenderMismatch",
   SHIFT_REQUIRED: "err.shiftRequired",
   REVIEW_REQUIRED: "err.reviewRequired",
+  DUPLICATE_MTCN: "err.duplicateMtcn",
   VALIDATION: null,
 };
 

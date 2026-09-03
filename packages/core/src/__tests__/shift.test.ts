@@ -125,6 +125,9 @@ describe("which movements move notes", () => {
       "repair_deposit",
       "repair_deposit_applied",
       "repair_deposit_refund",
+      "transfer_cancel",
+      "transfer_payout",
+      "transfer_send",
       "used_purchase_payout",
     ]);
   });
