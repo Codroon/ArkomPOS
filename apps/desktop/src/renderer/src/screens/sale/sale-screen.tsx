@@ -430,7 +430,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
   useEffect(() => {
     if (!completed || autoPrinted.current === completed.docId) return;
     autoPrinted.current = completed.docId;
-    printer.print(completed.docId);
+    printer.print(completed.docId, false, /* auto */ true);
   }, [completed, printer]);
 
   return (

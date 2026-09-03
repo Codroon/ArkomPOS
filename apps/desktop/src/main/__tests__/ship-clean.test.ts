@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { eq } from "drizzle-orm";
 import { app } from "electron";
-import { openDb, runMigrations, schema as s } from "@arkom/db";
+import { openDb, runMigrations, schema as s, schema as s2 } from "@arkom/db";
 import { imeiWithCheckDigit, parseIpcError, STARTER_GROUPS, uuidv7, type RepairCreateRequest } from "@arkom/core";
 import { handlers } from "./electron-stub";
 import { registerIpcHandlers } from "../ipc";
@@ -260,6 +260,44 @@ describe("the fallback render", () => {
     }
     // the HTML the PDF was printed from is gone the moment the PDF exists
     expect(rendered.some((f) => f.endsWith(".html"))).toBe(false);
+  });
+
+  it("writes nothing at all when the TILL starts the print and there is no printer", async () => {
+    /* the shop's complaint, and the rule behind it: a fallback PDF is for a
+       person who asked for paper. The till printing on its own behalf after
+       every sale filed one file per document that nobody opened, and put a
+       "PDF saved" toast in front of the next customer. */
+    saveSettings(db, ctx, { printerName: "" });
+    const product = await saveProduct();
+    putOnShelf(product.id, 5);
+    const sale = await sell({ productId: product.id });
+    const ticketId = await collectedRepair();
+    const used = await call<{ purchaseId: string }>("used:log", usedPayload());
+
+    const before = footprint();
+    const printsBefore = db.select().from(s2.oplog).all().filter((e) => e.action === "print").length;
+
+    expect(await call("print:ticket", { docId: sale.docId, copy: false, target: "auto", auto: true })).toEqual({
+      kind: "noPrinter",
+    });
+    expect(await call("repair:print", { ticketId, what: "receipt", target: "auto", copy: false, auto: true })).toEqual({
+      kind: "noPrinter",
+    });
+    expect(await call("used:print", { purchaseId: used.purchaseId, what: "document", target: "auto", copy: false, auto: true })).toEqual({
+      kind: "noPrinter",
+    });
+
+    // nothing rendered, nothing filed, and no print attempt to explain away
+    expect(footprint()).toEqual(before);
+    expect(db.select().from(s2.oplog).all().filter((e) => e.action === "print").length).toBe(printsBefore);
+
+    // and the same document, asked for by a person, still falls back to a PDF
+    const res = await call<{ kind: string; path: string }>("print:ticket", { docId: sale.docId, copy: false, target: "auto" });
+    expect(res.kind).toBe("pdf");
+    /* the same file name every time, on purpose: a document is immutable, so
+       re-rendering T1-000001 must not leave T1-000001 (3).pdf behind */
+    expect(res.path.split("\\").join("/")).toContain("arkom-pdf/");
+    expect(existsSync(res.path)).toBe(true);
   });
 });
 

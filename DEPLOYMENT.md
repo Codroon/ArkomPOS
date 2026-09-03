@@ -212,8 +212,12 @@ the folder — easier than typing the path.
 
 Nothing is filed per ticket. A document is kept in the database and re-rendered
 on demand: **Reimprimir** on any ticket, or **Guardar PDF…** to write a copy
-exactly where you choose. When no printer is configured, the fallback PDF opens
-from a temporary folder that is emptied at every launch.
+exactly where you choose.
+
+Until a printer is configured, completing a sale prints nothing and says so —
+"Sin impresora configurada" with a **Guardar PDF** button beside it. It does not
+save a file on its own; the button does, into a temporary folder that is emptied
+at every launch.
 
 > You may see `arkom-pos.db-wal` and `arkom-pos.db-shm` next to the database.
 > They are part of it while the app is running. **Copy all three, or none.**

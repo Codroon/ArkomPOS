@@ -215,7 +215,7 @@ export function BuyUsedScreen() {
       /* The document first — it is the one the seller signs. The label follows
          only if the document got out, so a failure is reported once rather than
          twice about the same dead printer. */
-      printer.printPurchase(result.purchaseId, "document");
+      printer.printPurchase(result.purchaseId, "document", false, /* auto */ true);
     } catch (err) {
       setLogError(errorMessage(t, err));
     } finally {

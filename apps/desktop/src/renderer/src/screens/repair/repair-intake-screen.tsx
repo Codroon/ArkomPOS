@@ -195,7 +195,7 @@ export function RepairIntakeScreen({ onDone }: { onDone: (ticketId: string | nul
       /* The ticket exists by now; the receipt is a separate, retryable act
          driven from here so a print failure reaches the cashier as a toast
          with Reintentar rather than a console line nobody reads. */
-      printer.printRepair(result.ticketId, "intake");
+      printer.printRepair(result.ticketId, "intake", false, /* auto */ true);
     } catch (err) {
       setError(errorMessage(t, err));
     } finally {

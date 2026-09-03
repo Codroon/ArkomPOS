@@ -67,6 +67,7 @@ business rows + `product_stock` cache + `oplog` entry → typed result back.
 | `transfer:bulkVerify` | {ids} → {verified} | IDs only, never a filter; skips flagged rows |
 | `transfer:editMtcn` | {id, mtcn} → row | `transfers.editMtcn`; uniqueness re-checked |
 | `sale:findTicket` | {query} → {docId\|null} | ADR-0019 A1; full number, prefixed or bare digits; any age or shift |
+| `print:ticket` | {docId, copy, target, auto} → printed \| pdf \| noPrinter | `auto:true` is the till printing by itself after a completed document: with no printer it renders NOTHING and answers `noPrinter`. A person asking (auto:false) still falls back to a PDF (v0.18.0). Same flag on `used:print`, `repair:print`, `cash:print` |
 | `print:savePdf` | {docId, kind, what?, copy} → saved \| cancelled | v0.17.0; save dialog; nothing is filed per sale any more |
 | `print:testDrawer` | — → {ok} | `settings.edit`; a pulse through the configured command set |
 | `docs:list` | filters → rows | read-only flat list of completed documents |

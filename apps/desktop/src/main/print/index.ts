@@ -156,6 +156,12 @@ export async function printTicket(
   req: PrintTicketRequest,
 ): Promise<PrintTicketResponse> {
   const settings = getSettings(db, ctx);
+  /* An automatic print with no printer configured writes NOTHING (v0.18.0).
+     The fallback PDF exists for a person who asked for paper; the till asking
+     on its own behalf, once per document, filed a file nobody opened and put a
+     "PDF saved" toast in front of the next customer. */
+  if (req.auto && req.target !== "pdf" && !settings.printerName) return { kind: "noPrinter" };
+
   const doc = toTicketDoc(db, ctx, req.docId, req.copy);
   // ONE render feeds both targets — the paper and the PDF cannot disagree
   const ops = renderTicket(doc, shopProfile(db, ctx), settings.paperWidthMm);
@@ -665,6 +671,12 @@ export async function printRepair(
   req: RepairPrintRequest,
 ): Promise<PrintTicketResponse> {
   const settings = getSettings(db, ctx);
+  /* An automatic print with no printer configured writes NOTHING (v0.18.0).
+     The fallback PDF exists for a person who asked for paper; the till asking
+     on its own behalf, once per document, filed a file nobody opened and put a
+     "PDF saved" toast in front of the next customer. */
+  if (req.auto && req.target !== "pdf" && !settings.printerName) return { kind: "noPrinter" };
+
   const shop = shopProfile(db, ctx);
 
   const loaded =
@@ -741,6 +753,12 @@ export async function printPurchase(
   req: UsedPrintRequest,
 ): Promise<PrintTicketResponse> {
   const settings = getSettings(db, ctx);
+  /* An automatic print with no printer configured writes NOTHING (v0.18.0).
+     The fallback PDF exists for a person who asked for paper; the till asking
+     on its own behalf, once per document, filed a file nobody opened and put a
+     "PDF saved" toast in front of the next customer. */
+  if (req.auto && req.target !== "pdf" && !settings.printerName) return { kind: "noPrinter" };
+
   const loaded = loadPurchaseDoc(db, ctx, req.purchaseId, req.copy);
   const shop = shopProfile(db, ctx);
 
@@ -938,9 +956,15 @@ export function shiftReportDoc(
 export async function printShiftReport(
   db: ArkomDb,
   ctx: MutationCtx,
-  req: { shiftId?: string; what: "z" | "x"; target: "auto" | "pdf"; copy: boolean; locale?: "es" | "en" },
+  req: { shiftId?: string; what: "z" | "x"; target: "auto" | "pdf"; copy: boolean; locale?: "es" | "en"; auto?: boolean },
 ): Promise<PrintTicketResponse> {
   const settings = getSettings(db, ctx);
+  /* An automatic print with no printer configured writes NOTHING (v0.18.0).
+     The fallback PDF exists for a person who asked for paper; the till asking
+     on its own behalf, once per document, filed a file nobody opened and put a
+     "PDF saved" toast in front of the next customer. */
+  if (req.auto && req.target !== "pdf" && !settings.printerName) return { kind: "noPrinter" };
+
   const shop = shopProfile(db, ctx);
   const doc = shiftReportDoc(db, ctx, req);
   const shift = (req.shiftId ? shiftById(db, req.shiftId) : openShift(db, ctx))!;

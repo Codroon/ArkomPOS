@@ -362,6 +362,7 @@ export const es = {
   "print.openPdf": "Abrir",
   "print.showFolder": "Ver carpeta",
   "print.failed": "No se pudo imprimir",
+  "print.noPrinter": "Sin impresora configurada; no se ha impreso nada.",
   "print.retry": "Reintentar",
   "print.savePdf": "Guardar PDF",
   "print.reprint": "Reimprimir",

@@ -4,8 +4,10 @@
  * It has two shapes and both carry actions, which is why it is a component
  * rather than a message string:
  *
- *   failed  — Reintentar · Guardar PDF, bound to the ticket that failed;
- *   saved   — Abrir · Ver carpeta, bound to the file just written.
+ *   failed    — Reintentar · Guardar PDF, bound to the ticket that failed;
+ *   saved     — Abrir · Ver carpeta, bound to the file just written;
+ *   unprinted — Guardar PDF, when the till skipped an automatic print for want
+ *               of a printer and therefore wrote nothing (v0.18.0).
  *
  * The saved shape matters more than it looks. Tickets land under userData,
  * which on Windows is inside a hidden AppData tree with the app's package name
@@ -34,8 +36,8 @@ function ToastButton({ onClick, children }: { onClick: () => void; children: Rea
 
 export function PrintToast({ printer, className }: { printer: Printer; className?: string }) {
   const t = useT();
-  const { failed, savedPath, message, tone } = printer.state;
-  const hasActions = failed !== null || savedPath !== null;
+  const { failed, unprinted, savedPath, message, tone } = printer.state;
+  const hasActions = failed !== null || unprinted !== null || savedPath !== null;
 
   return (
     <Toast
@@ -50,6 +52,9 @@ export function PrintToast({ printer, className }: { printer: Printer; className
                 <ToastButton onClick={printer.retry}>{t("print.retry")}</ToastButton>
                 <ToastButton onClick={printer.savePdfForFailed}>{t("print.savePdf")}</ToastButton>
               </>
+            ) : null}
+            {unprinted && !failed ? (
+              <ToastButton onClick={printer.savePdfForFailed}>{t("print.savePdf")}</ToastButton>
             ) : null}
             {savedPath ? (
               <>

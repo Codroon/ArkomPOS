@@ -34,6 +34,8 @@ export interface PrintState {
   tone: "neutral" | "danger";
   /** the job a failed attempt was for — what Reintentar retries */
   failed: PrintJob | null;
+  /** an automatic print the till skipped for want of a printer — what Guardar PDF would save */
+  unprinted: PrintJob | null;
   /** the PDF a successful save produced — what Abrir opens */
   savedPath: string | null;
 }
@@ -43,6 +45,7 @@ const IDLE: PrintState = {
   message: null,
   tone: "neutral",
   failed: null,
+  unprinted: null,
   savedPath: null,
 };
 
@@ -74,19 +77,20 @@ export function useTicketPrint() {
   }, []);
 
   const run = useCallback(
-    async (job: PrintJob, target: "auto" | "pdf") => {
+    async (job: PrintJob, target: "auto" | "pdf", auto = false) => {
       clearTimer();
       setState({ ...IDLE, busy: true, message: t("print.printing") });
       try {
         const res = PrintTicketResponseSchema.parse(
           job.kind === "ticket"
-            ? await window.arkom.invoke("print:ticket", { docId: job.docId, copy: job.copy, target })
+            ? await window.arkom.invoke("print:ticket", { docId: job.docId, copy: job.copy, target, auto })
             : job.kind === "purchase"
               ? await window.arkom.invoke("used:print", {
                   purchaseId: job.purchaseId,
                   what: job.what,
                   copy: job.copy,
                   target,
+                  auto,
                 })
               : job.kind === "repair"
                 ? await window.arkom.invoke("repair:print", {
@@ -94,12 +98,14 @@ export function useTicketPrint() {
                     what: job.what,
                     copy: job.copy,
                     target,
+                    auto,
                   })
                 : await window.arkom.invoke("cash:print", {
                     ...(job.shiftId ? { shiftId: job.shiftId } : {}),
                     what: job.what,
                     copy: job.copy,
                     target,
+                    auto,
                     locale: job.locale ?? "es",
                   }),
         );
@@ -108,13 +114,20 @@ export function useTicketPrint() {
           ...IDLE,
           // the file NAME, not the path: the folder lives inside a hidden
           // AppData tree, so the useful thing is the Abrir button beside it
-          message: res.kind === "pdf" ? t("print.pdfSaved", { file: fileNameOf(res.path) }) : t("print.printed"),
+          message:
+            res.kind === "pdf"
+              ? t("print.pdfSaved", { file: fileNameOf(res.path) })
+              : res.kind === "noPrinter"
+                ? t("print.noPrinter")
+                : t("print.printed"),
           savedPath: res.kind === "pdf" ? res.path : null,
+          /* nothing was written, so the offer is to write one on purpose */
+          unprinted: res.kind === "noPrinter" ? job : null,
         });
         // a plain "printed" fades; a saved PDF stays until dismissed, because
         // its buttons are the only convenient way to reach the file
         if (res.kind !== "pdf") {
-          timer.current = setTimeout(() => alive.current && setState(IDLE), 6000);
+          timer.current = setTimeout(() => alive.current && setState(IDLE), res.kind === "noPrinter" ? 9000 : 6000);
         }
       } catch (err) {
         if (!alive.current) return;
@@ -131,8 +144,9 @@ export function useTicketPrint() {
     [t],
   );
 
+  /** `auto`: the till printing by itself, right after completing a document. */
   const print = useCallback(
-    (docId: string, copy = false) => void run({ kind: "ticket", docId, copy }, "auto"),
+    (docId: string, copy = false, auto = false) => void run({ kind: "ticket", docId, copy }, "auto", auto),
     [run],
   );
   const savePdf = useCallback(
@@ -141,14 +155,14 @@ export function useTicketPrint() {
   );
   /** The purchase document, or the label that goes on the box. */
   const printPurchase = useCallback(
-    (purchaseId: string, what: "document" | "label", copy = false) =>
-      void run({ kind: "purchase", purchaseId, what, copy }, "auto"),
+    (purchaseId: string, what: "document" | "label", copy = false, auto = false) =>
+      void run({ kind: "purchase", purchaseId, what, copy }, "auto", auto),
     [run],
   );
   /** The intake receipt the customer signs — and, from later slices, the rest. */
   const printRepair = useCallback(
-    (ticketId: string, what: "intake" | "quote" | "receipt" | "return" = "intake", copy = false) =>
-      void run({ kind: "repair", ticketId, what, copy }, "auto"),
+    (ticketId: string, what: "intake" | "quote" | "receipt" | "return" = "intake", copy = false, auto = false) =>
+      void run({ kind: "repair", ticketId, what, copy }, "auto", auto),
     [run],
   );
   /** The Z of a shift, or the X of the open one. No shiftId = the open shift. */
@@ -166,8 +180,9 @@ export function useTicketPrint() {
     if (state.failed) void run(state.failed, "auto");
   }, [run, state.failed]);
   const savePdfForFailed = useCallback(() => {
-    if (state.failed) void run(state.failed, "pdf");
-  }, [run, state.failed]);
+    const job = state.failed ?? state.unprinted;
+    if (job) void run(job, "pdf");
+  }, [run, state.failed, state.unprinted]);
 
   /** Hand the saved PDF to the OS — open it, or show it in the file manager. */
   const reveal = useCallback(

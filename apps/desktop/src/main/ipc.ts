@@ -1066,7 +1066,9 @@ export function registerIpcHandlers(db: ArkomDb): void {
     async (s, input) => {
       const result = sendToInventory(db, s.ctx, input.purchaseId, input.sellPriceCents, input.reviewConfirmed);
       try {
-        await printPurchase(db, s.ctx, { purchaseId: input.purchaseId, what: "label", target: "auto", copy: false });
+        /* the shelf label the till prints for itself when a device goes to
+           inventory: no printer means no label, and no file either */
+        await printPurchase(db, s.ctx, { purchaseId: input.purchaseId, what: "label", target: "auto", copy: false, auto: true });
       } catch (err) {
         console.error("[used] could not print the shelf label:", err);
       }

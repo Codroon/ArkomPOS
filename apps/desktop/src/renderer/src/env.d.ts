@@ -215,7 +215,7 @@ declare global {
       ): Promise<UsedLogResponse>;
       invoke(
         channel: "used:print",
-        payload: { purchaseId: string; what: "document" | "label"; target?: "auto" | "pdf"; copy?: boolean },
+        payload: { purchaseId: string; what: "document" | "label"; target?: "auto" | "pdf"; copy?: boolean; auto?: boolean },
       ): Promise<PrintTicketResponse>;
       invoke(
         channel: "used:list",
@@ -335,7 +335,7 @@ declare global {
       ): Promise<RepairMarkNotRepairedResponse>;
       invoke(
         channel: "repair:print",
-        payload: { ticketId: string; what: "intake" | "quote" | "receipt" | "return"; copy?: boolean; target?: "auto" | "pdf" },
+        payload: { ticketId: string; what: "intake" | "quote" | "receipt" | "return"; copy?: boolean; target?: "auto" | "pdf"; auto?: boolean },
       ): Promise<PrintTicketResponse>;
 
       /* ---- cash / shifts (ADR-0015) ---- */
@@ -355,7 +355,7 @@ declare global {
       invoke(channel: "cash:get", payload: { shiftId: string }): Promise<CashGetResponse>;
       invoke(
         channel: "cash:print",
-        payload: { shiftId?: string; what: "z" | "x"; target?: "auto" | "pdf"; copy?: boolean; locale?: "es" | "en" },
+        payload: { shiftId?: string; what: "z" | "x"; target?: "auto" | "pdf"; copy?: boolean; locale?: "es" | "en"; auto?: boolean },
       ): Promise<PrintTicketResponse>;
 
       /* ---- reports (ADR-0016), every one read-only ---- */

@@ -772,10 +772,23 @@ export const PrintTicketRequestSchema = z.object({
   docId: z.string(),
   copy: z.boolean().default(false),
   target: z.enum(["auto", "pdf"]).default("auto"),
+  /**
+   * True when the till started this print itself, right after a document was
+   * completed — nobody pressed anything (v0.18.0).
+   *
+   * It decides what "no printer" means. Asked for by a person, no printer is a
+   * reason to fall back to a PDF: they wanted paper and this is the nearest
+   * thing. Started by the till, it is a reason to do NOTHING — a shop without a
+   * printer would otherwise accumulate one file per sale that nobody asked for
+   * and nobody opens.
+   */
+  auto: z.boolean().default(false),
 });
 export const PrintTicketResponseSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("printed"), printer: z.string() }),
   z.object({ kind: z.literal("pdf"), path: z.string() }),
+  /** an automatic print with no printer configured: nothing was rendered */
+  z.object({ kind: z.literal("noPrinter") }),
 ]);
 export type PrintTicketRequest = z.infer<typeof PrintTicketRequestSchema>;
 /** What the renderer sends: `copy` and `target` get their defaults main-side. */
@@ -1182,6 +1195,8 @@ export const UsedPrintRequestSchema = z.object({
   target: z.enum(["auto", "pdf"]).default("auto"),
   /** a reprint stamps COPIA and needs usedDevices.viewSeller (ADR-0013 §6) */
   copy: z.boolean().default(false),
+  /** the till printing by itself, right after the document (see PrintTicketRequestSchema) */
+  auto: z.boolean().default(false),
 });
 export type UsedPrintRequest = z.infer<typeof UsedPrintRequestSchema>;
 export const UsedPrintResponseSchema = PrintTicketResponseSchema;
@@ -1507,6 +1522,8 @@ export const RepairPrintRequestSchema = z.object({
   what: z.enum(["intake", "quote", "receipt", "return"]),
   target: z.enum(["auto", "pdf"]).default("auto"),
   copy: z.boolean().default(false),
+  /** the till printing by itself, right after the document (see PrintTicketRequestSchema) */
+  auto: z.boolean().default(false),
 });
 /* ---- the ticket as the screen sees it ---- */
 
@@ -2136,6 +2153,8 @@ export const CashPrintRequestSchema = z.object({
   locale: z.enum(["es", "en"]).default("es"),
   target: z.enum(["auto", "pdf"]).default("auto"),
   copy: z.boolean().default(false),
+  /** the till printing by itself, right after the document (see PrintTicketRequestSchema) */
+  auto: z.boolean().default(false),
 });
 
 /* ============================== reports (ADR-0016) ============================== */

@@ -360,6 +360,7 @@ export const en: Record<TKey, string> = {
   "print.openPdf": "Open",
   "print.showFolder": "Show folder",
   "print.failed": "Could not print",
+  "print.noPrinter": "No printer configured; nothing was printed.",
   "print.retry": "Retry",
   "print.savePdf": "Save PDF",
   "print.reprint": "Reprint",

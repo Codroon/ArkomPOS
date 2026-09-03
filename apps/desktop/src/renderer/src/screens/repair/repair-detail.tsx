@@ -471,7 +471,7 @@ export function RepairDetailPane({
               onChanged();
               // the receipt is a separate, retryable act — the same bargain
               // every other document in this app makes
-              printer.printRepair(ticketId, "receipt");
+              printer.printRepair(ticketId, "receipt", false, /* auto */ true);
             } catch (err) {
               setError(errorMessage(t, err));
             }
@@ -489,7 +489,7 @@ export function RepairDetailPane({
               setDialog(null);
               setNotice(t("rep.close.done"));
               apply(result.detail);
-              printer.printRepair(ticketId, "return");
+              printer.printRepair(ticketId, "return", false, /* auto */ true);
             } catch (err) {
               setError(errorMessage(t, err));
             }
