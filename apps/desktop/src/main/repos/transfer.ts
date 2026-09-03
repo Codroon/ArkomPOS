@@ -11,7 +11,7 @@
  * `DRAWER_EFFECT` map every other non-sale cash event uses (ADR-0015 §3), so
  * expected cash needs no special case to stay right.
  */
-import { and, asc, desc, eq, gte, isNull, like, lte, or, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, like, lte, or, type SQL } from "drizzle-orm";
 import {
   appError,
   mutate,
@@ -54,14 +54,19 @@ function toRow(r: Row, userName: string | null, cancelledByName: string | null):
     cancelledAtMs: r.cancelledAt?.getTime() ?? null,
     cancelledByName,
     cancelReason: r.cancelReason,
+    verification: r.verification,
+    verifiedByName: null,
+    verifiedAtMs: r.verifiedAt?.getTime() ?? null,
+    flagNote: r.flagNote,
   };
 }
 
 function withNames(db: ArkomDb | DbTx, rows: Row[]): TransferRow[] {
   const names = new Map(db.select({ id: users.id, name: users.name }).from(users).all().map((u) => [u.id, u.name]));
-  return rows.map((r) =>
-    toRow(r, r.userId ? (names.get(r.userId) ?? null) : null, r.cancelledByUserId ? (names.get(r.cancelledByUserId) ?? null) : null),
-  );
+  return rows.map((r) => ({
+    ...toRow(r, r.userId ? (names.get(r.userId) ?? null) : null, r.cancelledByUserId ? (names.get(r.cancelledByUserId) ?? null) : null),
+    verifiedByName: r.verifiedByUserId ? (names.get(r.verifiedByUserId) ?? null) : null,
+  }));
 }
 
 export function getTransfer(db: ArkomDb, ctx: MutationCtx, id: string): TransferRow {
@@ -187,6 +192,13 @@ function logTransfer(db: ArkomDb, ctx: MutationCtx, input: LogInput): TransferRo
       cancelReason: null,
       cancelShiftId: null,
       cancelApprovedByUserId: null,
+      /* explicit rather than leaning on the column default: this object is also
+         what the caller gets back, and a row that reads `undefined` in memory
+         and "unverified" in the database is two answers to one question */
+      verification: "unverified" as const,
+      verifiedByUserId: null,
+      verifiedAt: null,
+      flagNote: null,
       updatedAt: now,
     };
     tx.insert(transfers).values(row).run();
@@ -345,5 +357,126 @@ export function cancelTransfer(
 
     const after = tx.select().from(transfers).where(eq(transfers.id, before.id)).all()[0]!;
     return withNames(tx, [after])[0]!;
+  });
+}
+
+/* ------------------------------------------ verification (ADR-0019) ---- */
+
+/**
+ * Has somebody checked this row against WU's own terminal?
+ *
+ * **Touches no money.** A verified transfer and an unverified one do identical
+ * things to the drawer, which is the whole point: verification is a statement
+ * about the RECORD, and if it could move cash it would be a second way to
+ * change the till's figures without a document.
+ */
+export function setVerification(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  input: { id: string; state: "unverified" | "verified" | "flagged"; note?: string | null },
+): TransferRow {
+  const note = input.note?.trim() || null;
+  /* a flag with no note is a mystery rather than a signal: the next person sees
+     a red row and has no idea what to look for */
+  if (input.state === "flagged" && !note) throw appError("VALIDATION", "Un aviso necesita una nota.", "note");
+
+  return mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    const before = tx
+      .select()
+      .from(transfers)
+      .where(and(eq(transfers.tenantId, ctx.tenantId), eq(transfers.id, input.id)))
+      .all()[0];
+    if (!before) throw appError("VALIDATION", "Ese giro no existe.");
+
+    const now = new Date();
+    tx.update(transfers)
+      .set({
+        verification: input.state,
+        /* who and when are stamped for `verified` and cleared when it goes back
+           to unverified: a stale name beside "not checked" is a lie */
+        verifiedByUserId: input.state === "unverified" ? null : ctx.userId,
+        verifiedAt: input.state === "unverified" ? null : now,
+        flagNote: input.state === "flagged" ? note : null,
+        updatedAt: now,
+      })
+      .where(eq(transfers.id, before.id))
+      .run();
+
+    log({
+      entity: "transfer",
+      entityId: before.id,
+      action: "verify",
+      before: { verification: before.verification, flagNote: before.flagNote },
+      after: { verification: input.state, flagNote: input.state === "flagged" ? note : null },
+    });
+
+    return withNames(tx, [tx.select().from(transfers).where(eq(transfers.id, before.id)).all()[0]!])[0]!;
+  });
+}
+
+/**
+ * Verify a batch — exactly the rows the operator was looking at.
+ *
+ * Takes IDS, never a filter. "Verify everything matching" would tick rows that
+ * scrolled in between the screen rendering and the button being pressed, and
+ * verification is a person saying they looked.
+ */
+export function bulkVerify(db: ArkomDb, ctx: MutationCtx, ids: ReadonlyArray<string>): number {
+  return mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    const now = new Date();
+    const rows = tx
+      .select()
+      .from(transfers)
+      .where(and(eq(transfers.tenantId, ctx.tenantId), inArray(transfers.id, [...ids])))
+      .all()
+      /* a flagged row is a question somebody raised; a bulk tick must not
+         quietly answer it */
+      .filter((r) => r.verification === "unverified");
+
+    for (const r of rows) {
+      tx.update(transfers)
+        .set({ verification: "verified", verifiedByUserId: ctx.userId, verifiedAt: now, updatedAt: now })
+        .where(eq(transfers.id, r.id))
+        .run();
+      log({
+        entity: "transfer",
+        entityId: r.id,
+        action: "verify",
+        before: { verification: r.verification },
+        after: { verification: "verified", bulk: true },
+      });
+    }
+    return rows.length;
+  });
+}
+
+/**
+ * Fix a mistyped MTCN.
+ *
+ * Owner-only, because the MTCN is the key the reconciliation import will join
+ * on: changing it re-points the row at a different WU transaction. Uniqueness
+ * is re-checked, for the same reason it is checked on the way in.
+ */
+export function editMtcn(db: ArkomDb, ctx: MutationCtx, input: { id: string; mtcn: string }): TransferRow {
+  const mtcn = normalizeMtcn(input.mtcn);
+  return mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    const before = tx
+      .select()
+      .from(transfers)
+      .where(and(eq(transfers.tenantId, ctx.tenantId), eq(transfers.id, input.id)))
+      .all()[0];
+    if (!before) throw appError("VALIDATION", "Ese giro no existe.");
+    if (before.mtcn === mtcn) return withNames(tx, [before])[0]!;
+
+    const clash = tx
+      .select()
+      .from(transfers)
+      .where(and(eq(transfers.tenantId, ctx.tenantId), eq(transfers.mtcn, mtcn)))
+      .all()[0];
+    if (clash) throw appError("DUPLICATE_MTCN", clash.id, "mtcn");
+
+    tx.update(transfers).set({ mtcn, updatedAt: new Date() }).where(eq(transfers.id, before.id)).run();
+    log({ entity: "transfer", entityId: before.id, action: "edit_mtcn", before: { mtcn: before.mtcn }, after: { mtcn } });
+    return withNames(tx, [tx.select().from(transfers).where(eq(transfers.id, before.id)).all()[0]!])[0]!;
   });
 }

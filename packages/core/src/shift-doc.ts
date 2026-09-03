@@ -28,6 +28,7 @@ export interface ShiftLabels {
   tenders: string; tendersTotal: string; imbalance: string;
   movements: string; byMethod: string; methodIn: string; methodOut: string; methodNet: string;
   counts: string; usedPurchases: string; repairsCollected: string; parked: string;
+  refunds: string; refundCount: string; refundNote: string;
   transfers: string; trSends: string; trSendCash: string; trSendCard: string; trFees: string;
   trPayouts: string; trCancels: string; trNote: string;
   float: string; expected: string; counted: string; variance: string; short: string; over: string;
@@ -57,6 +58,9 @@ export const SHIFT_ES: ShiftLabels = {
   methodOut: "Sale",
   methodNet: "Neto",
   counts: "RECUENTOS",
+  refunds: "DEVOLUCIONES",
+  refundCount: "Devoluciones",
+  refundNote: "Ya descontadas de las ventas.",
   transfers: "GIROS (WESTERN UNION)",
   trSends: "Envíos",
   trSendCash: "  En efectivo",
@@ -104,6 +108,9 @@ export const SHIFT_EN: ShiftLabels = {
   methodOut: "Out",
   methodNet: "Net",
   counts: "COUNTS",
+  refunds: "REFUNDS",
+  refundCount: "Refunds",
+  refundNote: "Already netted out of sales.",
   transfers: "TRANSFERS (WESTERN UNION)",
   trSends: "Sends",
   trSendCash: "  In cash",
@@ -275,6 +282,19 @@ export function renderZReport(
       b.pair(`  ${SHIFT_ES.methodOut}`, formatCents(row.outCents));
       b.pair(`  ${SHIFT_ES.methodNet}`, formatCents(row.netCents), { bold: true });
     }
+    b.rule();
+  }
+
+  /* ---- money given back, before the WU block and after the sales ----
+     Optional exactly like `transfers`: absent from a v1/v2 snapshot, and absent
+     from the paper those snapshots reprint (ADR-0015 §7). */
+  if (t.refunds && t.refunds.count > 0) {
+    b.text(SHIFT_ES.refunds, { bold: true });
+    b.pair(`${SHIFT_ES.refundCount} · ${t.refunds.count}`, formatCents(t.refunds.totalCents));
+    for (const row of t.refunds.byMethod) {
+      b.pair(`  ${METHOD_ES[row.method] ?? row.method} · ${row.count}`, formatCents(row.amountCents));
+    }
+    b.text(SHIFT_ES.refundNote);
     b.rule();
   }
 

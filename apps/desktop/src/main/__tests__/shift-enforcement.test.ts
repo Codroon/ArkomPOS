@@ -165,6 +165,7 @@ describe("the declared list", () => {
         "cash:paidIn",
         "cash:paidOut",
         "cash:preview",
+        "refund:create",
         "repair:collect",
         "sale:complete",
         /* WU: every op either moves notes or records against the shift that

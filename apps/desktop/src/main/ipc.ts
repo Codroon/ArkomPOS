@@ -53,6 +53,15 @@ import {
   TransferGetResponseSchema,
   TransferCancelRequestSchema,
   TransferCancelResponseSchema,
+  TransferVerifyRequestSchema,
+  TransferBulkVerifyRequestSchema,
+  TransferBulkVerifyResponseSchema,
+  TransferEditMtcnRequestSchema,
+  TransferRowSchema,
+  RefundPeekRequestSchema,
+  RefundPeekResponseSchema,
+  RefundCreateRequestSchema,
+  RefundCreateResponseSchema,
   CatalogGroupRenameRequestSchema,
   CatalogGroupResponseSchema,
   CatalogAddCodeRequestSchema,
@@ -240,7 +249,17 @@ import {
 } from "@arkom/core";
 import type { ArkomDb } from "@arkom/db";
 import { resetTillContext, tillContext } from "./context";
-import { cancelTransfer, getTransfer, listTransfers, logPayout, logSend } from "./repos/transfer";
+import {
+  bulkVerify,
+  cancelTransfer,
+  editMtcn,
+  getTransfer,
+  listTransfers,
+  logPayout,
+  logSend,
+  setVerification,
+} from "./repos/transfer";
+import { createRefund, peekRefundable } from "./repos/refund";
 import {
   addCode,
   createGroup,
@@ -447,6 +466,9 @@ export const SHIFT_REQUIRED_CHANNELS: ReadonlySet<string> = new Set([
   "transfer:send",
   "transfer:payout",
   "transfer:cancel",
+  /* a refund is a completed document, so it is stamped with a shift like every
+     other one — and a cash refund opens the drawer (ADR-0015 §9) */
+  "refund:create",
   "cash:preview",
   "cash:close",
 ]);
@@ -1321,6 +1343,17 @@ export function registerIpcHandlers(db: ArkomDb): void {
     (s, input) => printShiftReport(db, s.ctx, input),
   );
 
+  /* ---------------------------------------------- refunds (ADR-0019) --- */
+
+  guarded("refund:peek", "sale.create", RefundPeekRequestSchema, RefundPeekResponseSchema, (s, { documentId }) =>
+    peekRefundable(db, s.ctx, documentId),
+  );
+  /* approvable: the customer is at the counter, a cashier presses the button
+     and an owner's PIN completes it */
+  guarded("refund:create", "sale.refund", RefundCreateRequestSchema, RefundCreateResponseSchema, (s, input) =>
+    createRefund(db, s.ctx, input),
+  );
+
   /* ------------------------------------------- transfers: WU (ADR-0018) */
 
   guarded("transfer:list", "transfers.view", TransferListRequestSchema, TransferListResponseSchema, (s, input) =>
@@ -1339,6 +1372,20 @@ export function registerIpcHandlers(db: ArkomDb): void {
   guarded("transfer:cancel", "transfers.cancel", TransferCancelRequestSchema, TransferCancelResponseSchema, (s, input) => ({
     row: cancelTransfer(db, s.ctx, input),
   }));
+
+  guarded("transfer:verify", "transfers.verify", TransferVerifyRequestSchema, TransferRowSchema, (s, input) =>
+    setVerification(db, s.ctx, input),
+  );
+  guarded(
+    "transfer:bulkVerify",
+    "transfers.verify",
+    TransferBulkVerifyRequestSchema,
+    TransferBulkVerifyResponseSchema,
+    (s, { ids }) => ({ verified: bulkVerify(db, s.ctx, ids) }),
+  );
+  guarded("transfer:editMtcn", "transfers.editMtcn", TransferEditMtcnRequestSchema, TransferRowSchema, (s, input) =>
+    editMtcn(db, s.ctx, input),
+  );
 
   /* --------------------------------------------------- reports (ADR-0016) */
 

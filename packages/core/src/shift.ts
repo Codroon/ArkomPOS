@@ -250,6 +250,20 @@ export interface ShiftTotals {
   parkedCount: number;
 
   /**
+   * Money given back (ADR-0019). Its own block, because "we sold 900 and gave
+   * 120 back" is two facts and a shop that only sees 780 cannot check either.
+   *
+   * OPTIONAL, like `transfers`: a snapshot frozen before v0.16.0 has no such
+   * key and must print exactly what it printed then (ADR-0015 §7).
+   */
+  refunds?: {
+    count: number;
+    /** positive: what was handed back */
+    totalCents: number;
+    byMethod: Array<{ method: string; count: number; amountCents: number }>;
+  };
+
+  /**
    * The WU counter (ADR-0018), kept apart from every sales figure above it.
    *
    * OPTIONAL on purpose: a snapshot frozen before v0.15.0 has no such key, and
@@ -275,6 +289,9 @@ function sortByMethodOrder<T extends { method: string }>(rows: T[]): T[] {
  * Called by the X preview and by the close, so what the screen shows is exactly
  * what a close would freeze (ADR-0015 §12).
  */
+/** A refund document, told apart by its type rather than by a negative total. */
+const isRefund = (doc: { docType: string }) => doc.docType === "refund";
+
 export function computeShiftTotals(facts: ShiftFacts): ShiftTotals {
   /* ---- cash: the only figure the drawer is judged against ---- */
   let salesCashCents = 0;
@@ -349,6 +366,33 @@ export function computeShiftTotals(facts: ShiftFacts): ShiftTotals {
   const depositsByMethod = group(facts.deposits.filter((d) => d.kind === "taken"));
   const refundsByMethod = group(facts.deposits.filter((d) => d.kind === "refunded"));
   const payoutsByMethod = group(facts.payouts);
+
+  /* ---- what was given back ----
+     A refund document's lines and totals are negative, so they already NET out
+     of the sales figures above — which is right, and is also why the shop needs
+     this block: "sold 900, gave 120 back" is two facts, and 780 alone lets you
+     check neither. */
+  const refundDocs = facts.documents.filter(isRefund);
+  const refundMethods = new Map<string, { count: number; amountCents: number }>();
+  for (const doc of refundDocs) {
+    for (const tender of doc.tenders) {
+      const row = refundMethods.get(tender.method) ?? { count: 0, amountCents: 0 };
+      row.count += 1;
+      // shown positive: the shop reads "handed back 120", not "handed back −120"
+      row.amountCents += Math.abs(tender.amountCents);
+      refundMethods.set(tender.method, row);
+    }
+  }
+  const refunds =
+    refundDocs.length > 0
+      ? {
+          count: refundDocs.length,
+          totalCents: refundDocs.reduce((sum, d) => sum + Math.abs(d.totalCents), 0),
+          byMethod: sortByMethodOrder(
+            [...refundMethods.entries()].map(([method, r]) => ({ method, ...r })),
+          ),
+        }
+      : undefined;
 
   /* ---- one line per method, so each can be ticked off a statement ---- */
   const byMethodMap = new Map<string, MethodLine>();
@@ -444,6 +488,7 @@ export function computeShiftTotals(facts: ShiftFacts): ShiftTotals {
     refundsByMethod,
     payoutsByMethod,
     byMethod,
+    ...(refunds ? { refunds } : {}),
     ...(transferTotals ? { transfers: transferTotals } : {}),
 
     series,

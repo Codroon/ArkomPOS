@@ -237,6 +237,8 @@ export { STARTER_GROUPS, starterGroupNames, groupNameKey, groupDisplayName, star
 export type { StarterGroup, SetupLocale, GroupRef } from "./groups";
 export type {
   TransferRow,
+  RefundPeekResponse,
+  RefundCreateRequest,
   TransferListRequest,
   TransferSendRequest,
   TransferPayoutRequest,
@@ -256,6 +258,8 @@ export {
   EMPTY_TRANSFER_TOTALS,
 } from "./transfer";
 export type { TransferKind, TransferStatus, TransferMethod, TransferFact, TransferTotals } from "./transfer";
+export { computeRefund, reverseLine, remainingQty, returnsToReview, canRestock } from "./refund";
+export type { RefundableLine, RefundLineRequest, RefundTotals } from "./refund";
 export { opsToText, opBuilder } from "./print-ops";
 export { renderZReport, SHIFT_ES, SHIFT_EN, shiftLabels } from "./shift-doc";
 export type { ShiftReportDoc, ShiftLabels, ShiftDocLocale } from "./shift-doc";
@@ -340,6 +344,17 @@ export {
   TransferGetRequestSchema,
   TransferGetResponseSchema,
   TransferCancelRequestSchema,
+  TransferVerifyRequestSchema,
+  TransferBulkVerifyRequestSchema,
+  TransferBulkVerifyResponseSchema,
+  TransferEditMtcnRequestSchema,
+  VerificationStateSchema,
+  RefundMethodSchema,
+  RefundableLineSchema,
+  RefundPeekRequestSchema,
+  RefundPeekResponseSchema,
+  RefundCreateRequestSchema,
+  RefundCreateResponseSchema,
   TransferCancelResponseSchema,
   TransferRowSchema,
   GroupRefSchema,

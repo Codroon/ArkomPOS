@@ -18,6 +18,11 @@ export const IPC_CHANNELS = [
   "transfer:list",
   "transfer:get",
   "transfer:cancel",
+  "transfer:verify",
+  "transfer:bulkVerify",
+  "transfer:editMtcn",
+  "refund:peek",
+  "refund:create",
   "catalog:createGroup",
   "catalog:renameGroup",
   "catalog:codes",
@@ -2278,6 +2283,8 @@ export type ReportsExportResponse = z.infer<typeof ReportsExportResponseSchema>;
 
 /* ---------------------------------- transfers: the WU counter (ADR-0018) --- */
 
+export const VerificationStateSchema = z.enum(["unverified", "verified", "flagged"]);
+
 export const TransferKindSchema = z.enum(["send", "payout"]);
 export const TransferStatusSchema = z.enum(["sent", "paid", "cancelled"]);
 export const TransferMethodSchema = z.enum(["cash", "card"]);
@@ -2341,6 +2348,11 @@ export const TransferRowSchema = z.object({
   cancelledAtMs: z.number().int().nullable(),
   cancelledByName: z.string().nullable(),
   cancelReason: z.string().nullable(),
+  /* verification: about the RECORD, never about the money (ADR-0019) */
+  verification: VerificationStateSchema,
+  verifiedByName: z.string().nullable(),
+  verifiedAtMs: z.number().int().nullable(),
+  flagNote: z.string().nullable(),
 });
 export type TransferRow = z.infer<typeof TransferRowSchema>;
 
@@ -2395,3 +2407,92 @@ export const TransferCancelRequestSchema = z.object({
   reason: z.string().trim().min(1).max(200),
 });
 export const TransferCancelResponseSchema = z.object({ row: TransferRowSchema });
+
+/* ------------------------------------------------- refunds (ADR-0019) --- */
+
+/** How the money goes back. No `deposit`: that is a repair's own mechanism. */
+export const RefundMethodSchema = z.enum(["cash", "card", "bizum", "transfer", "store_credit"]);
+
+/** One line of the ticket, with what is still owed on it. */
+export const RefundableLineSchema = z.object({
+  id: z.string(),
+  lineNo: z.number().int(),
+  description: z.string(),
+  qty: z.number().int(),
+  refundedQty: z.number().int(),
+  remainingQty: z.number().int(),
+  unitPriceCents: z.number().int(),
+  taxRegime: z.string(),
+  taxRateBp: z.number().int(),
+  totalCents: z.number().int(),
+  lineType: z.string(),
+  productId: z.string().nullable(),
+  unitId: z.string().nullable(),
+  /** false for labour and anything with no product behind it */
+  restockable: z.boolean(),
+  /** a serialized unit comes back on hold pending review, never straight to sale */
+  returnsToReview: z.boolean(),
+});
+
+export const RefundPeekRequestSchema = z.object({ documentId: z.string() });
+export const RefundPeekResponseSchema = z.object({
+  documentId: z.string(),
+  docNumber: z.string(),
+  docType: z.string(),
+  completedAtMs: z.number().int().nullable(),
+  totalCents: z.number().int(),
+  lines: z.array(RefundableLineSchema),
+  /** refunds already issued against this ticket, newest first */
+  priorRefunds: z.array(
+    z.object({ documentId: z.string(), docNumber: z.string(), totalCents: z.number().int(), completedAtMs: z.number().int().nullable() }),
+  ),
+  /** false when every line is fully refunded — the UI says so instead of offering a dead button */
+  anythingLeft: z.boolean(),
+});
+
+export const RefundCreateRequestSchema = z.object({
+  documentId: z.string(),
+  reason: z.string().trim().min(1).max(200),
+  method: RefundMethodSchema,
+  lines: z
+    .array(z.object({ lineId: z.string(), qty: z.number().int().min(1), restock: z.boolean() }))
+    .min(1),
+  cardReference: z.string().trim().max(60).nullish(),
+});
+
+export const RefundCreateResponseSchema = z.object({
+  documentId: z.string(),
+  docNumber: z.string(),
+  totalCents: z.number().int(),
+  /** set when the money went back as store credit */
+  voucherId: z.string().nullable(),
+  restockedCount: z.number().int(),
+  unitsToReviewCount: z.number().int(),
+});
+
+export type RefundPeekResponse = z.infer<typeof RefundPeekResponseSchema>;
+export type RefundCreateRequest = z.infer<typeof RefundCreateRequestSchema>;
+
+/* ------------------------------- WU verification (ADR-0019) ------------- */
+
+export const TransferVerifyRequestSchema = z.object({
+  id: z.string(),
+  state: VerificationStateSchema,
+  /** required when flagging: a flag with no note is a mystery, not a signal */
+  note: z.string().trim().max(200).nullish(),
+});
+
+export const TransferBulkVerifyRequestSchema = z.object({
+  /** exactly the rows the operator can see — never "everything matching" */
+  ids: z.array(z.string()).min(1).max(500),
+});
+export const TransferBulkVerifyResponseSchema = z.object({ verified: z.number().int() });
+
+export const TransferEditMtcnRequestSchema = z.object({
+  id: z.string(),
+  mtcn: z
+    .string()
+    .trim()
+    .transform((v) => v.replace(/[\s-]/g, ""))
+    .refine((v) => /^\d{10}$/.test(v), "El MTCN son 10 dígitos."),
+});

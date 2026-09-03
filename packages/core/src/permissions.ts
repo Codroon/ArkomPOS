@@ -38,6 +38,10 @@ export const PERMISSIONS = [
   { key: "sale.create", module: "sale", labelEs: "Vender", approvable: false },
   { key: "sale.park", module: "sale", labelEs: "Aparcar tickets", approvable: false },
   { key: "sale.resume", module: "sale", labelEs: "Recuperar tickets aparcados", approvable: false },
+  /* Giving money back. Approvable rather than owner-only: the customer is at
+     the counter and a cashier presses the button, an owner completes it
+     (ADR-0012, ADR-0019). */
+  { key: "sale.refund", module: "sale", labelEs: "Devolver una venta", approvable: true },
   { key: "sale.price_override", module: "sale", labelEs: "Modificar el precio de una línea", approvable: true },
 
   /* ---- catalog ---- */
@@ -66,6 +70,11 @@ export const PERMISSIONS = [
   { key: "transfers.view", module: "transfers", labelEs: "Ver el registro de giros", approvable: false },
   { key: "transfers.create", module: "transfers", labelEs: "Registrar envíos y pagos", approvable: false },
   { key: "transfers.cancel", module: "transfers", labelEs: "Cancelar un giro", approvable: true },
+  /* verification is counter work and moves no money at all (ADR-0019) */
+  { key: "transfers.verify", module: "transfers", labelEs: "Verificar giros", approvable: false },
+  /* the MTCN is the key the reconciliation import joins on: changing it
+     re-points the row at a different WU transaction */
+  { key: "transfers.editMtcn", module: "transfers", labelEs: "Corregir el MTCN de un giro", approvable: false },
 
   /* ---- used devices (ADR-0013) ----
      Buying is counter work, so the cashier holds most of these by default. The
@@ -186,6 +195,7 @@ export const CASHIER_DEFAULTS: readonly PermissionKey[] = [
      sending to inventory is a cashier default and not an approval */
   "transfers.view",
   "transfers.create",
+  "transfers.verify",
   "usedDevices.create",
   "usedDevices.sendToInventory",
   "usedDevices.editRefurbCost",

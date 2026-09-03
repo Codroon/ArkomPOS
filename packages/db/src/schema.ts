@@ -19,7 +19,7 @@ export const MOVEMENT_TYPES = ["purchase_in", "sale_out", "adjustment", "count_p
 /* "purchase" = used-device intake, own series (ADR-0013). "shift" numbers nothing in this
    table — it exists so the Z report borrows ADR-0008's series machinery instead of growing a
    second counter that can produce gaps (ADR-0015 §2). */
-export const DOC_TYPES = ["ticket", "invoice", "credit_note", "purchase", "repair", "shift"] as const;
+export const DOC_TYPES = ["ticket", "invoice", "credit_note", "purchase", "repair", "shift", "refund"] as const;
 export const DOC_STATUSES = ["draft", "parked", "completed"] as const;
 export const LINE_TYPES = ["product", "serialized_unit", "repair", "tradein_credit", "agency", "sim", "topup"] as const; // P1: product, serialized_unit
 export const TENDER_METHODS = ["cash", "card", "bizum", "transfer", "store_credit", "deposit"] as const; // P1: all but store_credit
@@ -223,6 +223,16 @@ export const documents = sqliteTable("documents", {
   number: integer("number"),                                      // set at completion
   docNumber: text("doc_number"),                                  // "T1-000123", set at completion
   parkedLabel: text("parked_label"),                              // req 2.8 park sale
+  /**
+   * The ticket this document reverses — refunds only (ADR-0019).
+   *
+   * The original is never touched. A refund is a second document that points at
+   * the first, so the sale that happened stays exactly as it was recorded and
+   * the reversal is its own numbered, printable fact.
+   */
+  refundsDocumentId: text("refunds_document_id"),
+  /** why, in the shop's words. Required on a refund, null everywhere else. */
+  refundReason: text("refund_reason"),
   subtotalCents: integer("subtotal_cents").notNull().default(0),
   taxCents: integer("tax_cents").notNull().default(0),
   totalCents: integer("total_cents").notNull().default(0),
@@ -278,9 +288,19 @@ export const documentLines = sqliteTable("document_lines", {
    * number, which is worse than an admitted gap. Nothing is backfilled.
    */
   unitCostCents: integer("unit_cost_cents"),
+  /** the ORIGINAL line this one reverses — refund lines only (ADR-0019) */
+  refundsLineId: text("refunds_line_id"),
+  /**
+   * How much of THIS line has already been given back, across every partial
+   * refund. Lives on the original line because that is the only place a
+   * "cannot exceed what was sold" question can be answered without summing the
+   * whole history every time — and summing is how a race refunds twice.
+   */
+  refundedQty: integer("refunded_qty").notNull().default(0),
   createdAt: ts("created_at").notNull(),
 }, (t) => [
   uniqueIndex("ux_line_doc_no").on(t.documentId, t.lineNo),
+  index("ix_line_refunds").on(t.refundsLineId),
   index("ix_line_product").on(t.productId),
   index("ix_line_doc").on(t.documentId), // the reports join lines per document
 ]);
@@ -461,6 +481,8 @@ export const storeCreditVouchers = sqliteTable("store_credit_vouchers", {
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   locationId: text("location_id").notNull().references(() => locations.id),
   purchaseId: text("purchase_id").references(() => usedPurchases.id),
+  /** the refund that issued it, when it came from a return rather than a buy */
+  refundDocumentId: text("refund_document_id"),
   amountCents: integer("amount_cents").notNull(),
   remainingCents: integer("remaining_cents").notNull(),
   status: text("status", { enum: VOUCHER_STATUSES }).notNull().default("issued"),
@@ -803,6 +825,14 @@ export const TRANSFER_KINDS = ["send", "payout"] as const;
 export const TRANSFER_STATUSES = ["sent", "paid", "cancelled"] as const;
 /** How the customer paid for a SEND. A payout is always cash out of the drawer. */
 export const TRANSFER_METHODS = ["cash", "card"] as const;
+/**
+ * Has a human checked this row against WU's own terminal?
+ *
+ * Entirely independent of sent/paid/cancelled, and it touches no money: a
+ * verified transfer and an unverified one do identical things to the drawer.
+ * These are the columns next round's CSV import will fill (ADR-0019).
+ */
+export const VERIFICATION_STATES = ["unverified", "verified", "flagged"] as const;
 
 export const transfers = sqliteTable("transfers", {
   id: text("id").primaryKey(),
@@ -840,6 +870,13 @@ export const transfers = sqliteTable("transfers", {
   cancelShiftId: text("cancel_shift_id"),
   /** the owner who approved it, when one was needed */
   cancelApprovedByUserId: text("cancel_approved_by_user_id"),
+
+  /* ---- verification: records only, never cash (ADR-0019) ---- */
+  verification: text("verification", { enum: VERIFICATION_STATES }).notNull().default("unverified"),
+  verifiedByUserId: text("verified_by_user_id"),
+  verifiedAt: ts("verified_at"),
+  /** required when flagged: a flag with no note is a mystery, not a signal */
+  flagNote: text("flag_note"),
 
   updatedAt: ts("updated_at").notNull(),
 }, (t) => [
