@@ -76,6 +76,7 @@ import type {
   ReportsExportResponse,
   CatalogRemoval,
   CatalogRemoveResponse,
+  SetupChecklistResponse,
 } from "@arkom/core";
 
 declare global {
@@ -179,6 +180,8 @@ declare global {
         payload: { path: string; mode: "open" | "folder" },
       ): Promise<{ ok: boolean }>;
       invoke(channel: "setup:status", payload?: undefined): Promise<{ needed: boolean; ownerNeeded: boolean; packaged: boolean }>;
+      invoke(channel: "setup:checklist", payload?: Record<string, never>): Promise<SetupChecklistResponse>;
+      invoke(channel: "setup:dismissChecklist", payload?: Record<string, never>): Promise<SetupChecklistResponse>;
       invoke(
         channel: "setup:complete",
         payload: SetupCompleteRequest,

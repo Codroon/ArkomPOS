@@ -16,7 +16,7 @@
  * path a v0.9.0 till takes when it updates. One flow, two entry points — rather
  * than a fourth section here that the upgrade case could never reach.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SetupCompleteResponseSchema } from "@arkom/core";
 import { AccentButton, Field, LocaleToggle, TextInput, useLocale, useT, type TFn } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
@@ -33,7 +33,6 @@ interface Draft {
   ticketFooter: string;
   terminalName: string;
   seriesPrefix: string;
-  loadDemo: boolean;
 }
 
 /**
@@ -53,39 +52,7 @@ const initialDraft = (t: TFn): Draft => ({
   ticketFooter: t("setup.defaultFooter"),
   terminalName: t("setup.defaultTerminal"),
   seriesPrefix: "T1-",
-  loadDemo: true,
 });
-
-/** One of the two big choices at the bottom — a card, not a radio button. */
-function DataChoice({
-  selected,
-  title,
-  hint,
-  onSelect,
-}: {
-  selected: boolean;
-  title: string;
-  hint: string;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={
-        "flex-1 rounded-[3px] border px-3 py-2.5 text-left transition-colors " +
-        (selected
-          ? "border-ink bg-inverse text-inverse-ink"
-          : "border-line-strong bg-card text-ink hover:border-ink-2")
-      }
-    >
-      <div className="text-[12px] font-semibold">{title}</div>
-      <div className={"mt-0.5 text-[10px] leading-snug " + (selected ? "text-inverse-muted" : "text-muted")}>
-        {hint}
-      </div>
-    </button>
-  );
-}
 
 export function FirstRunDialog({ onDone }: { onDone: () => void }) {
   const t = useT();
@@ -94,21 +61,21 @@ export function FirstRunDialog({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
-  const [packaged, setPackaged] = useState(false);
 
+  /* The two prefilled fields are OURS until the shop types over them, so they
+     follow the toggle — a till set up in English was offering a Spanish footer
+     and a Spanish till name, which is the app talking to itself (v0.18.2). */
+  const defaults = useRef({ footer: t("setup.defaultFooter"), terminal: t("setup.defaultTerminal") });
   useEffect(() => {
-    /* an installed till starts with its shelves and nothing on them; main
-       refuses the demo dataset too, this only keeps the choice off the screen */
-    window.arkom
-      .invoke("setup:status")
-      .then((status) => {
-        if (status.packaged) {
-          setPackaged(true);
-          setDraft((d) => ({ ...d, loadDemo: false }));
-        }
-      })
-      .catch(() => undefined);
-  }, []);
+    const next = { footer: t("setup.defaultFooter"), terminal: t("setup.defaultTerminal") };
+    const previous = defaults.current;
+    defaults.current = next;
+    setDraft((d) => ({
+      ...d,
+      ticketFooter: d.ticketFooter === previous.footer ? next.footer : d.ticketFooter,
+      terminalName: d.terminalName === previous.terminal ? next.terminal : d.terminalName,
+    }));
+  }, [locale, t]);
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -135,6 +102,9 @@ export function FirstRunDialog({ onDone }: { onDone: () => void }) {
       SetupCompleteResponseSchema.parse(
         await window.arkom.invoke("setup:complete", {
           ...draft,
+          /* never offered, never sent: an installed till starts empty and a dev
+             one is filled by `pnpm db:seed` (v0.18.2) */
+          loadDemo: false,
           shopLegalName: draft.shopLegalName.trim(),
           shopNif: draft.shopNif.trim(),
           shopAddress: draft.shopAddress.trim(),
@@ -257,28 +227,6 @@ export function FirstRunDialog({ onDone }: { onDone: () => void }) {
               </Field>
             </div>
           </section>
-
-          {packaged ? null : (
-          <section className="mt-4 flex flex-col gap-2.5 rounded-[3px] border border-line bg-card p-4">
-            <div className="text-[10px] font-bold uppercase tracking-[.1em] text-muted">
-              {t("first.dataSection")}
-            </div>
-            <div className="flex gap-2.5">
-              <DataChoice
-                selected={draft.loadDemo}
-                title={t("first.demoYes")}
-                hint={t("first.demoYesHint")}
-                onSelect={() => set("loadDemo", true)}
-              />
-              <DataChoice
-                selected={!draft.loadDemo}
-                title={t("first.demoNo")}
-                hint={t("first.demoNoHint")}
-                onSelect={() => set("loadDemo", false)}
-              />
-            </div>
-          </section>
-          )}
 
           {error ? (
             <div className="mt-4 rounded-[3px] border border-danger-ink/30 bg-danger-bg px-3 py-2 text-[12px] font-semibold text-danger-ink">

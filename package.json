@@ -15,6 +15,7 @@
     "db:generate": "pnpm --filter @arkom/db db:generate",
     "db:migrate": "pnpm --filter arkom-pos db:migrate",
     "db:seed": "pnpm --filter arkom-pos db:seed",
+    "fresh": "node apps/desktop/scripts/fresh-start.cjs",
     "db:stats": "pnpm --filter arkom-pos db:stats",
     "db:audit": "pnpm --filter arkom-pos db:audit",
     "imei:gen": "pnpm --filter arkom-pos imei:gen",

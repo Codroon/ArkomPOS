@@ -127,7 +127,11 @@ import {
   SettingsSeriesResponseSchema,
   SetupStatusRequestSchema,
   SetupStatusResponseSchema,
+  SetupChecklistRequestSchema,
+  SetupChecklistResponseSchema,
   SetupCompleteRequestSchema,
+  SetupDismissChecklistRequestSchema,
+  SetupDismissChecklistResponseSchema,
   SetupCompleteResponseSchema,
   SetupOwnerRequestSchema,
   SetupOwnerResponseSchema,
@@ -375,7 +379,7 @@ import {
   printRecoveryCode,
   printShiftReport,
 } from "./print";
-import { completeFirstRun, demoStatus, isSetupNeeded, removeDemoData } from "./setup";
+import { checklist, completeFirstRun, demoStatus, dismissChecklist, isSetupNeeded, removeDemoData } from "./setup";
 import { backupStatus, backupsDir, runBackup } from "./backup";
 import {
   addLine,
@@ -724,6 +728,16 @@ export function registerIpcHandlers(db: ArkomDb): void {
     resetTillContext();
     return result;
   });
+
+  /* The checklist reads facts and needs a session, not a permission: a cashier
+     opening the till on day two should see the same three ticks the owner does
+     (v0.18.2). */
+  authed("setup:checklist", SetupChecklistRequestSchema, SetupChecklistResponseSchema, (s) =>
+    checklist(db, s.ctx),
+  );
+  authed("setup:dismissChecklist", SetupDismissChecklistRequestSchema, SetupDismissChecklistResponseSchema, (s) =>
+    dismissChecklist(db, s.ctx),
+  );
 
   open("setup:owner", SetupOwnerRequestSchema, SetupOwnerResponseSchema, (input) => {
     const ctx = tillContext(db).ctx;

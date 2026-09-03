@@ -179,7 +179,7 @@ export function renderIntakeReceipt(
   b.text(REPAIR_ES.brand, { align: "center", bold: true, size: "big" });
   b.text(letterSpaced(REPAIR_ES.tagline, cols), { align: "center" });
   b.feed(1);
-  const [legal, ...rest] = shopHeaderLines(shop);
+  const [legal, ...rest] = shopHeaderLines(shop, REPAIR_ES.brand);
   if (legal) b.text(legal, { align: "center", bold: true });
   for (const line of rest) b.text(line, { align: "center" });
 
@@ -299,7 +299,7 @@ export function renderQuoteDoc(doc: QuoteDoc, shop: ShopProfile, width: PaperWid
   b.text(REPAIR_ES.brand, { align: "center", bold: true, size: "big" });
   b.text(letterSpaced(REPAIR_ES.tagline, cols), { align: "center" });
   b.feed(1);
-  const [legal, ...rest] = shopHeaderLines(shop);
+  const [legal, ...rest] = shopHeaderLines(shop, REPAIR_ES.brand);
   if (legal) b.text(legal, { align: "center", bold: true });
   for (const line of rest) b.text(line, { align: "center" });
 
@@ -436,7 +436,7 @@ export function renderRepairReceipt(
   b.text(REPAIR_ES.brand, { align: "center", bold: true, size: "big" });
   b.text(letterSpaced(REPAIR_ES.tagline, cols), { align: "center" });
   b.feed(1);
-  const [legal, ...rest] = shopHeaderLines(shop);
+  const [legal, ...rest] = shopHeaderLines(shop, REPAIR_ES.brand);
   if (legal) b.text(legal, { align: "center", bold: true });
   for (const line of rest) b.text(line, { align: "center" });
 
@@ -537,7 +537,7 @@ export function renderReturnDoc(doc: ReturnDoc, shop: ShopProfile, width: PaperW
   b.text(REPAIR_ES.brand, { align: "center", bold: true, size: "big" });
   b.text(letterSpaced(REPAIR_ES.tagline, cols), { align: "center" });
   b.feed(1);
-  const [legal, ...rest] = shopHeaderLines(shop);
+  const [legal, ...rest] = shopHeaderLines(shop, REPAIR_ES.brand);
   if (legal) b.text(legal, { align: "center", bold: true });
   for (const line of rest) b.text(line, { align: "center" });
 

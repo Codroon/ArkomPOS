@@ -89,9 +89,18 @@ The app opens on a welcome screen instead of the till. It asks for:
    the person who can manage users, change settings and authorise a discount.
    Weak PINs are refused — no `1234`, no `1111`, no runs of digits.
 
+4. **The printer**, last and skippable. Pick it and press **Imprimir prueba**:
+   paper coming out is what confirms it. **Ahora no** leaves it for later — and
+   until it is set, the till will not charge (§4).
+
 An installed till starts **empty**: twelve shelves (groups) in the chosen
-language and nothing on them. The demo dataset exists only for development and
-is neither offered nor accepted on an installed build.
+language and nothing on them. The demo dataset is not offered anywhere in the
+wizard and an installed build refuses it outright; it exists for development.
+
+Once inside, the Venta screen carries a short checklist — printer, items, staff
+(optional), first shift. Each line ticks itself when the shop does the thing and
+takes you to the screen that does it; the card disappears for good when the work
+is done or when the owner dismisses it.
 
 Everything except the prefix can be changed later in **Ajustes**.
 

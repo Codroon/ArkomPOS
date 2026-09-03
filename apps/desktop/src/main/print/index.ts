@@ -337,7 +337,20 @@ export async function printRecoveryCode(
     });
 
   if (!settings.printerName) {
-    const path = await renderTicketPdf(ops, settings.paperWidthMm, "CODIGO-RECUPERACION");
+    /* THE one artefact in this app that cannot be recovered from the database.
+       Writing it to the temp folder we empty at every launch was a way to lose
+       it by doing nothing, so the shop is asked where to keep it (v0.18.2). */
+    const suggested = `codigo-recuperacion-${new Date().toISOString().slice(0, 10)}.pdf`;
+    const win = BrowserWindow.getFocusedWindow();
+    const chosen = await (win
+      ? dialog.showSaveDialog(win, { defaultPath: suggested, filters: [{ name: "PDF", extensions: ["pdf"] }] })
+      : dialog.showSaveDialog({ defaultPath: suggested, filters: [{ name: "PDF", extensions: ["pdf"] }] }));
+    const path = await renderTicketPdf(
+      ops,
+      settings.paperWidthMm,
+      "CODIGO-RECUPERACION",
+      chosen.canceled || !chosen.filePath ? undefined : chosen.filePath,
+    );
     logPrint({ ok: true, target: "pdf" });
     return { kind: "pdf", path };
   }

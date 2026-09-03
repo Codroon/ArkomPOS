@@ -24,6 +24,7 @@ import { ReportsScreen } from "../screens/reports/reports-screen";
 import { ShiftChip } from "../screens/cash/shift-chip";
 import { SettingsScreen } from "../screens/settings/settings-screen";
 import { UsersScreen } from "../screens/users/users-screen";
+import { FirstRunChecklist } from "./first-run-checklist";
 
 /**
  * `needs` hides the row entirely when the session lacks it (handoff/auth.md,
@@ -218,7 +219,11 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
         {/* main */}
         <main className="flex min-w-0 flex-1 flex-col bg-canvas">
           {screen === "venta" ? (
-            <SaleScreen terminalName={context?.terminal.name ?? t("common.dash")} />
+            <>
+              {/* what the till still owes, on the screen it lands on (v0.18.2) */}
+              <FirstRunChecklist tick={navTick} />
+              <SaleScreen terminalName={context?.terminal.name ?? t("common.dash")} />
+            </>
           ) : screen === "catalogo" ? (
             <CatalogScreen />
           ) : screen === "comprarUsados" ? (

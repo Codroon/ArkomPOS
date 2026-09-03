@@ -114,7 +114,19 @@ export interface ShopProfile {
  * purchase document disagree about the shop's own address, one of them is
  * wrong and nobody can tell which.
  */
-export function shopHeaderLines(shop: ShopProfile): string[] {
+const sameName = (a: string, b: string): boolean =>
+  a
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/gi, "")
+    .toLowerCase() ===
+  b
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/gi, "")
+    .toLowerCase();
+
+export function shopHeaderLines(shop: ShopProfile, brand?: string): string[] {
   const out = [shop.legalName];
   /* a trading name goes UNDER the legal one: the legal name is what makes the
      document valid, and the sign over the door is what the customer recognises */
@@ -126,7 +138,17 @@ export function shopHeaderLines(shop: ShopProfile): string[] {
   const town = [shop.postalCode?.trim(), shop.city?.trim()].filter(Boolean).join(" ");
   if (town) out.push(town);
   if (shop.phone?.trim()) out.push(`${TICKET_ES.phone} ${shop.phone.trim()}`);
-  return out.filter((l) => l.trim() !== "");
+  /* A shop called Arkom, trading as ARKOM, with "Arkom S.L." on its papers gets
+     ONE name at the top of its ticket, not three. Punctuation, case and accents
+     do not make a second shop, and `brand` lets the renderer hand in the fixed
+     line it has already printed above (v0.18.2). */
+  const deduped: string[] = [];
+  for (const line of out.filter((l) => l.trim() !== "")) {
+    const previous = deduped[deduped.length - 1] ?? brand ?? "";
+    if (previous && sameName(previous, line)) continue;
+    deduped.push(line);
+  }
+  return deduped;
 }
 
 /* ------------------------------------------------- fixed Spanish (ADR-0011) */
@@ -208,7 +230,7 @@ export function renderTicket(doc: TicketDoc, shop: ShopProfile, width: PaperWidt
   feed(1);
 
   /* ---- who the shop legally is (Ajustes, never hardcoded) ---- */
-  const [legal, ...rest] = shopHeaderLines(shop);
+  const [legal, ...rest] = shopHeaderLines(shop, TICKET_ES.brand);
   if (legal) text(legal, { align: "center", bold: true });
   for (const line of rest) text(line, { align: "center" });
 

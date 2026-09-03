@@ -13,7 +13,7 @@
  * them cleanly — until real selling starts, at which point removal is refused
  * rather than allowed to tear documents off their products.
  */
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   appError,
   mutate,
@@ -350,4 +350,85 @@ export function removeDemoData(db: ArkomDb, ctx: MutationCtx): DemoRemoval {
 
     return removed;
   });
+}
+
+/* ------------------------------- the first-run checklist (v0.18.2) -------- */
+
+const CHECKLIST_DONE_KEY = "onboardingChecklistDismissed";
+
+export interface Checklist {
+  printerConfigured: boolean;
+  hasProducts: boolean;
+  hasStaff: boolean;
+  hasShift: boolean;
+  dismissed: boolean;
+  done: boolean;
+}
+
+/**
+ * What a new till still owes, answered from facts.
+ *
+ * Not a tour and not a wizard: the four things without which the shop cannot
+ * work, each one true the moment the shop does the real action somewhere else
+ * in the app. Staff is optional because a one-person shop is a real shop.
+ */
+export function checklist(db: ArkomDb, ctx: MutationCtx): Checklist {
+  const one = <T,>(rows: T[]): boolean => rows.length > 0;
+  const printerConfigured =
+    (db
+      .select()
+      .from(s.settings)
+      .where(and(eq(s.settings.tenantId, ctx.tenantId), eq(s.settings.key, "printerName")))
+      .all()[0]?.value ?? "").trim() !== "";
+  const hasProducts = one(db.select({ id: s.products.id }).from(s.products).limit(1).all());
+  const hasStaff = db.select({ id: s.users.id }).from(s.users).limit(2).all().length > 1;
+  const hasShift = one(db.select({ id: s.shifts.id }).from(s.shifts).limit(1).all());
+  const dismissed =
+    db
+      .select()
+      .from(s.settings)
+      .where(and(eq(s.settings.tenantId, ctx.tenantId), eq(s.settings.key, CHECKLIST_DONE_KEY)))
+      .all()[0]?.value === "true";
+
+  return {
+    printerConfigured,
+    hasProducts,
+    hasStaff,
+    hasShift,
+    dismissed,
+    /* staff is not required to be finished — the card goes when the three that
+       matter are done, or when the owner has had enough of it */
+    done: dismissed || (printerConfigured && hasProducts && hasShift),
+  };
+}
+
+/** "I know, stop showing me this." Recorded, so it stays gone. */
+export function dismissChecklist(db: ArkomDb, ctx: MutationCtx): Checklist {
+  const now = new Date();
+  mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    const existing = tx
+      .select()
+      .from(s.settings)
+      .where(and(eq(s.settings.tenantId, ctx.tenantId), eq(s.settings.key, CHECKLIST_DONE_KEY)))
+      .all()[0];
+    if (existing?.value === "true") return;
+    if (existing) {
+      tx.update(s.settings)
+        .set({ value: "true", updatedAt: now })
+        .where(and(eq(s.settings.tenantId, ctx.tenantId), eq(s.settings.key, CHECKLIST_DONE_KEY)))
+        .run();
+    } else {
+      tx.insert(s.settings)
+        .values({ tenantId: ctx.tenantId, key: CHECKLIST_DONE_KEY, value: "true", updatedAt: now })
+        .run();
+    }
+    log({
+      entity: "setting",
+      entityId: CHECKLIST_DONE_KEY,
+      action: existing ? "update" : "create",
+      before: existing ? { key: CHECKLIST_DONE_KEY, value: existing.value } : null,
+      after: { key: CHECKLIST_DONE_KEY, value: "true" },
+    });
+  });
+  return checklist(db, ctx);
 }

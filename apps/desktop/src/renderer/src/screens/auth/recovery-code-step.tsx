@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PrintTicketResponseSchema } from "@arkom/core";
 import { AccentButton, GhostButton, useT } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
+import { usePrinterReady } from "../../lib/printer-ready";
 
 const CONFIRM_DELAY_SECONDS = 5;
 
@@ -26,6 +27,12 @@ export function RecoveryCodeStep({
   const [countdown, setCountdown] = useState(CONFIRM_DELAY_SECONDS);
   const [printing, setPrinting] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [kept, setKept] = useState(false);
+  /* On a fresh till there is usually no printer yet, and this code is the one
+     thing in the app that cannot be recovered from the database. So the blue
+     button is whichever act actually keeps it: printing when there is a
+     printer, saving the PDF when there is not (v0.18.2). */
+  const printerReady = usePrinterReady();
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -42,6 +49,7 @@ export function RecoveryCodeStep({
       );
       // no printer yet is normal on a fresh till — the PDF still saves the code
       setNote(res.kind === "pdf" ? res.path : t("print.printed"));
+      setKept(true);
     } catch (err) {
       setNote(errorMessage(t, err));
     } finally {
@@ -70,13 +78,27 @@ export function RecoveryCodeStep({
       ) : null}
 
       <div className="mt-5 flex items-center justify-end gap-2">
-        <GhostButton disabled={printing} onClick={() => void print()}>
-          {printing ? t("rec.printing") : t("rec.print")}
-        </GhostButton>
-        {/* the screen's one blue element, and it waits */}
-        <AccentButton disabled={countdown > 0} onClick={onDone}>
-          {countdown > 0 ? t("rec.savedWait", { n: String(countdown) }) : t("rec.saved")}
-        </AccentButton>
+        {printerReady ? (
+          <>
+            <GhostButton disabled={printing} onClick={() => void print()}>
+              {printing ? t("rec.printing") : t("rec.print")}
+            </GhostButton>
+            {/* the screen's one blue element, and it waits */}
+            <AccentButton disabled={countdown > 0} onClick={onDone}>
+              {countdown > 0 ? t("rec.savedWait", { n: String(countdown) }) : t("rec.saved")}
+            </AccentButton>
+          </>
+        ) : (
+          <>
+            <GhostButton disabled={countdown > 0 || (!kept && countdown <= 0 && false)} onClick={onDone}>
+              {countdown > 0 ? t("rec.savedWait", { n: String(countdown) }) : t("rec.saved")}
+            </GhostButton>
+            {/* no printer: the PDF is the only copy that leaves this screen */}
+            <AccentButton disabled={printing} onClick={() => void print()}>
+              {printing ? t("rec.printing") : t("rec.savePdf")}
+            </AccentButton>
+          </>
+        )}
       </div>
     </div>
   );

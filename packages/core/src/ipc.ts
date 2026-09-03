@@ -76,6 +76,8 @@ export const IPC_CHANNELS = [
   "auth:recover",
   "auth:printRecovery",
   "setup:owner",
+  "setup:checklist",
+  "setup:dismissChecklist",
   "users:list",
   "users:create",
   "users:update",
@@ -877,6 +879,27 @@ export const SetupStatusResponseSchema = z.object({
   /** an installed till; the demo dataset is not offered to one (v0.18.0) */
   packaged: z.boolean(),
 });
+
+/* ---- the first-run checklist (v0.18.2) ----
+   Four things a till needs before it is a shop's till, answered from FACTS
+   rather than from a "seen it" flag: the printer is configured, something is in
+   the catalogue, somebody besides the owner can sign in, and a shift has been
+   opened once. The card disappears when they are all true, or when the owner
+   says they have had enough of it. */
+export const SetupChecklistRequestSchema = z.object({}).optional();
+export const SetupChecklistResponseSchema = z.object({
+  printerConfigured: z.boolean(),
+  hasProducts: z.boolean(),
+  /** optional on purpose: a one-person shop never adds a second user */
+  hasStaff: z.boolean(),
+  hasShift: z.boolean(),
+  dismissed: z.boolean(),
+  /** nothing left to do, or told to go away: either way the card is gone */
+  done: z.boolean(),
+});
+export type SetupChecklistResponse = z.infer<typeof SetupChecklistResponseSchema>;
+export const SetupDismissChecklistRequestSchema = z.object({}).optional();
+export const SetupDismissChecklistResponseSchema = SetupChecklistResponseSchema;
 
 export const SetupCompleteRequestSchema = z.object({
   shopLegalName: z.string().trim().min(1).max(200),

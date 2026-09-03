@@ -133,7 +133,7 @@ export function renderPurchaseDoc(
   b.text(PURCHASE_ES.brand, { align: "center", bold: true, size: "big" });
   b.text(letterSpaced(PURCHASE_ES.tagline, cols), { align: "center" });
   b.feed(1);
-  const [legal, ...rest] = shopHeaderLines(shop);
+  const [legal, ...rest] = shopHeaderLines(shop, PURCHASE_ES.brand);
   if (legal) b.text(legal, { align: "center", bold: true });
   for (const line of rest) b.text(line, { align: "center" });
 

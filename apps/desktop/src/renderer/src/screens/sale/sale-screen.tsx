@@ -25,6 +25,7 @@ import { FindTicketDialog } from "./find-ticket-dialog";
 import { useGroupName, useGroups } from "../../components/group-picker";
 import { errorMessage } from "../../lib/errors";
 import { PrinterRequiredNotice, usePrinterReady } from "../../lib/printer-ready";
+import { useChecklistShowing } from "../../components/first-run-checklist";
 import { refreshShift } from "../../lib/use-shift";
 import { OpenShiftDialog } from "../cash/open-shift-dialog";
 import { consumePendingVoucher, openCatalogWithBarcode } from "../../lib/screen-bus";
@@ -104,6 +105,8 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const printer = useTicketPrint();
   const printerReady = usePrinterReady();
+  // the onboarding card already says this, and once is enough (v0.18.2)
+  const checklistShowing = useChecklistShowing();
   const approval = useApprovalFlow();
 
   const showToast = useCallback((message: string, tone: "neutral" | "danger" = "danger") => {
@@ -438,7 +441,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       {/* the till cannot issue a ticket: said here, before a queue forms */}
-      {printerReady ? null : <PrinterRequiredNotice />}
+      {printerReady || checklistShowing ? null : <PrinterRequiredNotice />}
 
       {/* header strip */}
       <div className="flex flex-none items-center gap-3 border-b border-line-strong bg-surface px-4 py-2.5">

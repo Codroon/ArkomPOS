@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MetaContextResponseSchema, SetupStatusResponseSchema, type MetaContextResponse } from "@arkom/core";
 import { AppShell } from "./components/app-shell";
 import { FirstRunDialog } from "./screens/setup/first-run-dialog";
 import { LoginScreen } from "./screens/auth/login-screen";
 import { LockOverlay } from "./screens/auth/lock-overlay";
 import { OwnerStep } from "./screens/auth/owner-step";
+import { AuthFrame } from "./screens/auth/login-screen";
+import { PrinterStep } from "./screens/setup/printer-step";
 import { SessionProvider, useActivityReporter, useSession } from "./lib/use-session";
 
 /**
@@ -18,12 +20,14 @@ import { SessionProvider, useActivityReporter, useSession } from "./lib/use-sess
  * Each question is asked of MAIN, never inferred in the renderer. A restart
  * always lands at step 3 because the session is memory-only (ADR-0012 §4).
  */
-type Stage = "loading" | "setup" | "owner" | "login" | "app";
+type Stage = "loading" | "setup" | "owner" | "printer" | "login" | "app";
 
 function Boot() {
   const { session, ready } = useSession();
   const [stage, setStage] = useState<Stage>("loading");
   const [context, setContext] = useState<MetaContextResponse | null>(null);
+  /** true while this launch is walking somebody through first run */
+  const onboardingRef = useRef(false);
 
   const loadContext = useCallback(() => {
     window.arkom
@@ -37,6 +41,13 @@ function Boot() {
       const status = SetupStatusResponseSchema.parse(await window.arkom.invoke("setup:status"));
       if (status.needed) return setStage("setup");
       if (status.ownerNeeded) return setStage("owner");
+      /* the printer is the last thing first run asks for, and only on the run
+         that just set the shop up: a till that has been working for a week and
+         lost its printer is Ajustes' problem, not a wizard's (v0.18.2) */
+      if (onboardingRef.current) {
+        onboardingRef.current = false;
+        return setStage("printer");
+      }
       loadContext();
       setStage("login");
     } catch (err) {
@@ -66,8 +77,22 @@ function Boot() {
   }, []);
 
   if (stage === "loading") return <div className="h-full bg-canvas" />;
-  if (stage === "setup") return <FirstRunDialog onDone={() => void evaluate()} />;
-  if (stage === "owner") return <OwnerStep upgrade onDone={() => void evaluate()} />;
+  if (stage === "setup")
+    return (
+      <FirstRunDialog
+        onDone={() => {
+          onboardingRef.current = true;
+          void evaluate();
+        }}
+      />
+    );
+  if (stage === "owner") return <OwnerStep upgrade={!onboardingRef.current} onDone={() => void evaluate()} />;
+  if (stage === "printer")
+    return (
+      <AuthFrame>
+        <PrinterStep onDone={() => void evaluate()} />
+      </AuthFrame>
+    );
   if (stage === "login" || !session) {
     return <LoginScreen onSignedIn={() => { loadContext(); setStage("app"); }} />;
   }
