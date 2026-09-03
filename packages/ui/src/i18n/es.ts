@@ -634,6 +634,7 @@ export const es = {
   "set.shopPostalCode": "Código postal",
   "set.shopPhone": "Teléfono",
   "set.conceptsHint": "Atajos al registrar entradas y salidas de efectivo. Son palabras de la tienda: no se traducen.",
+  "set.conceptsHintStarter": "Atajos al registrar entradas y salidas de efectivo. Estos son los que trae la caja: siguen el idioma. En cuanto los cambies, serán tuyos y no se traducirán.",
   "docs.title": "Documentos",
   "docs.subtitle": "Todo lo emitido por esta caja",
   "docs.searchPlaceholder": "Número de documento…",

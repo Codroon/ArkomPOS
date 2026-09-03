@@ -20,6 +20,7 @@ import {
   toOplogJson,
   uuidv7,
   STARTER_GROUPS,
+  STARTER_CASH_CONCEPTS,
   type LogFn,
   type MutationCtx,
   type SetupLocale,
@@ -27,7 +28,7 @@ import {
 import { schema as s, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner } from "../mutate-runner";
 import { insertDemoData } from "./demo-data";
-import { STARTER_CASH_CONCEPTS } from "../repos/settings";
+
 
 export { insertDemoData } from "./demo-data";
 

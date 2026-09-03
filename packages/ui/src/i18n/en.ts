@@ -632,6 +632,7 @@ export const en: Record<TKey, string> = {
   "set.shopPostalCode": "Postal code",
   "set.shopPhone": "Phone",
   "set.conceptsHint": "Shortcuts when recording cash in and out. They are the shop’s own words and are never translated.",
+  "set.conceptsHintStarter": "Shortcuts when recording cash in and out. These are the ones the till ships with, so they follow the app language. Change them and they become yours, untranslated.",
   "docs.title": "Documents",
   "docs.subtitle": "Everything this till has issued",
   "docs.searchPlaceholder": "Document number…",

@@ -345,9 +345,8 @@ describe("a shelf's name in an English till", () => {
     expect(dead.rows[0]).toMatchObject({ groupName: "Cargadores y Cables", groupNameEn: "Chargers & Cables" });
 
     // and the picker's own list, which was already bilingual, still is
-    const groups = await call<Array<{ name: string; nameEn: string | null }>>("catalog:groups", {});
-    expect(groups.find((g) => g.id === chargers.id) ?? groups[0]).toBeTruthy();
-    expect(groups.some((g) => g.nameEn === "Chargers & Cables")).toBe(true);
+    const groups = await call<Array<{ id: string; name: string; nameEn: string | null }>>("catalog:groups", {});
+    expect(groups.some((g) => g.id === chargers.id && g.nameEn === "Chargers & Cables")).toBe(true);
   });
 
   it("keeps the shop's OWN group in one language, because that is all it has", async () => {

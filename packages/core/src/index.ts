@@ -317,6 +317,8 @@ export {
 } from "./catalog";
 export type { MissingField } from "./catalog";
 export { classifyPrinters, isVirtualQueue, looksLikeReceiptPrinter } from "./printers";
+export { STARTER_CASH_CONCEPTS, displayCashConcepts, isStarterCashConcepts } from "./cash-concepts";
+export type { ConceptLocale } from "./cash-concepts";
 export type { PrinterChoices, PrinterLike } from "./printers";
 export {
   IPC_CHANNELS,

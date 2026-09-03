@@ -14,6 +14,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   centsToInput,
   classifyPrinters,
+  displayCashConcepts,
+  isStarterCashConcepts,
   parseMoneyInput,
   SettingsSchema,
   PrintPrintersResponseSchema,
@@ -38,6 +40,7 @@ import {
   Switch,
   TextInput,
   Toast,
+  useLocale,
   useT,
 } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
@@ -49,6 +52,7 @@ import { BackupPanel } from "./backup-panel";
 
 export function SettingsScreen() {
   const t = useT();
+  const [locale] = useLocale();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [printers, setPrinters] = useState<PrinterInfo[]>([]);
   const [showAllPrinters, setShowAllPrinters] = useState(false);
@@ -522,9 +526,14 @@ export function SettingsScreen() {
               />
             </Field>
 
-            <Field label={t("set.cashConcepts")} hint={t("set.conceptsHint")}>
+            <Field
+              label={t("set.cashConcepts")}
+              hint={isStarterCashConcepts(settings.cashConcepts) ? t("set.conceptsHintStarter") : t("set.conceptsHint")}
+            >
+              {/* the list we shipped follows the app language; the moment the
+                  shop edits it, it is theirs and is frozen as typed */}
               <ConceptsSetting
-                concepts={settings.cashConcepts}
+                concepts={displayCashConcepts(settings.cashConcepts, locale)}
                 onCommit={(next) => void save({ cashConcepts: next })}
               />
             </Field>

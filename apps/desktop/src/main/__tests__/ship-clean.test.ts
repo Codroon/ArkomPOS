@@ -15,7 +15,14 @@ import { join, relative } from "node:path";
 import { eq } from "drizzle-orm";
 import { app } from "electron";
 import { openDb, runMigrations, schema as s, schema as s2 } from "@arkom/db";
-import { imeiWithCheckDigit, parseIpcError, STARTER_GROUPS, uuidv7, type RepairCreateRequest } from "@arkom/core";
+import {
+  imeiWithCheckDigit,
+  parseIpcError,
+  STARTER_CASH_CONCEPTS,
+  STARTER_GROUPS,
+  uuidv7,
+  type RepairCreateRequest,
+} from "@arkom/core";
 import { handlers } from "./electron-stub";
 import { registerIpcHandlers } from "../ipc";
 import { endSession, startSession } from "../auth/session";
@@ -23,7 +30,7 @@ import { resetTillContext, tillContext } from "../context";
 import { createUser } from "../auth/users";
 import { completeFirstRun, type FirstRunInput } from "../setup";
 import { openShiftTx } from "../repos/shift";
-import { getSettings, saveSettings, STARTER_CASH_CONCEPTS } from "../repos/settings";
+import { getSettings, saveSettings } from "../repos/settings";
 import { addLine, collect, createTicket, markReady, recordApproval, upsertCustomer } from "../repos/repair";
 import { seed } from "../../../scripts/db-seed";
 

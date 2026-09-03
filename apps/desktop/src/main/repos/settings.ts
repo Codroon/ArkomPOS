@@ -8,7 +8,14 @@
  * answerable from the audit trail.
  */
 import { eq, and } from "drizzle-orm";
-import { appError, mutate, type MutationCtx, type Settings, type ShopProfile } from "@arkom/core";
+import {
+  appError,
+  mutate,
+  STARTER_CASH_CONCEPTS,
+  type MutationCtx,
+  type Settings,
+  type ShopProfile,
+} from "@arkom/core";
 import { schema, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner } from "../mutate-runner";
 
@@ -20,16 +27,6 @@ const { settings } = schema;
  * out loud — a test ticket prints "PENDIENTE" where the NIF belongs, which is
  * far harder to miss than a plausible-looking wrong address.
  */
-/**
- * The one-tap concepts a fresh drawer offers, in the language the till was set
- * up in (v0.18.0). Shop DATA from that moment: Ajustes edits them and the
- * staff toggle never touches them again (ADR-0011).
- */
-export const STARTER_CASH_CONCEPTS: Record<"es" | "en", string[]> = {
-  es: ["A la caja fuerte / banco", "Proveedor", "Gastos", "Cambio para la caja", "Corrección de arqueo"],
-  en: ["To the safe / bank", "Supplier", "Expenses", "Change for the drawer", "Count correction"],
-};
-
 export const DEFAULT_SETTINGS: Settings = {
   printerName: "", // no printer — a legitimate configuration, PDF handles it
   paperWidthMm: 80,
@@ -64,7 +61,7 @@ export const DEFAULT_SETTINGS: Settings = {
   cashVarianceToleranceCents: 300, // 3,00 €
   cashMovementApprovalCents: 10000, // 100,00 €
   // a till that predates the per-language seed keeps the Spanish list it had
-  cashConcepts: STARTER_CASH_CONCEPTS.es,
+  cashConcepts: [...STARTER_CASH_CONCEPTS.es],
 };
 
 type SettingKey = keyof Settings;

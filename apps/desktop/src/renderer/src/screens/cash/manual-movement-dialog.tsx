@@ -9,8 +9,8 @@
  * existing modal takes over — no new mechanism (ADR-0012 §5).
  */
 import { useEffect, useMemo, useState } from "react";
-import { formatCents, parseMoneyInput, type CashMovementsResponse } from "@arkom/core";
-import { AccentButton, Field, GhostButton, TextInput, useFieldError, useT } from "@arkom/ui";
+import { formatCents, parseMoneyInput, type CashMovementsResponse, displayCashConcepts} from "@arkom/core";
+import { AccentButton, Field, GhostButton, TextInput, useFieldError, useT, useLocale} from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
 import { useApprovalFlow } from "../../lib/use-approval";
 
@@ -27,6 +27,7 @@ export function ManualMovementDialog({
   const approval = useApprovalFlow();
   const [amount, setAmount] = useState("");
   const [concept, setConcept] = useState("");
+  const [locale] = useLocale();
   const [presets, setPresets] = useState<string[]>([]);
   const [threshold, setThreshold] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -37,7 +38,8 @@ export function ManualMovementDialog({
     window.arkom
       .invoke("settings:get")
       .then((s) => {
-        setPresets(s.cashConcepts);
+        // ours until the shop edits them, and ours follow the app language
+        setPresets(displayCashConcepts(s.cashConcepts, locale));
         setThreshold(s.cashMovementApprovalCents);
       })
       .catch((err) => console.error("settings:get failed", err));
