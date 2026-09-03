@@ -59,6 +59,10 @@ business rows + `product_stock` cache + `oplog` entry → typed result back.
 | `catalog:get` | {id} → ProductDetail | |
 | `catalog:groups` | {} → {id, name}[] | editor group select; venta group grid reuses it |
 | `catalog:createGroup` | {name} → {id, name} | ADR-0017; `catalog.create`; DUPLICATE_NAME on a clash |
+| `transfer:send` | {mtcn, sender, receiver, country, principal, fee, method} → {row} | ADR-0018; `transfers.create`; shift required |
+| `transfer:payout` | {mtcn, …, confirmedOverDrawer?} → logged \| overDrawerWarning | ADR-0018; a warning, not a refusal |
+| `transfer:list` · `transfer:get` | filters → rows | `transfers.view`; defaults to this shift |
+| `transfer:cancel` | {id, reason} → {row} | `transfers.cancel`, APPROVABLE; reverses in the CURRENT shift |
 | `supplier:list` · `supplier:create` | — | `supplier.manage`, not `inventory.receive`: a technician orders parts but may not receive stock |
 | `catalog:renameGroup` | {id, name} → {id, name} | ADR-0017; `catalog.edit`; no propagation needed |
 | `catalog:save` | ProductInput{…, confirmed?} → {kind:'saved', product} \| {kind:'barcodeWarning', code, conflicts[]} | full req-4 validation; barcode auto-gen if blank; duplicate **name** → typed error; duplicate **barcode** → warning payload, re-sent with `confirmed:true` (PRD 4.4 amended) |

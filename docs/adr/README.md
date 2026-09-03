@@ -22,6 +22,7 @@ If a decision must change, the ADR is superseded by a new one — never silently
 | [0015](0015-cash-shifts-derived-status-and-one-drawer-truth.md) | Shift status derived from facts; sale cash never copied into the drawer ledger; the Z is frozen | Accepted |
 | [0016](0016-reports-read-completed-documents-and-cost-is-snapshotted.md) | Reports read completed documents by completed_at; cost snapshotted on the sale line | Accepted |
 | [0017](0017-product-groups-belong-to-the-shop.md) | Every install seeds groups the shop owns; create and rename in-app; no delete | Accepted |
+| [0018](0018-transfers-are-a-shadow-log-and-the-principal-is-never-revenue.md) | WU counter shadow-logged; principal is pass-through, never revenue; cancel reverses in full | Accepted |
 
 Constraints common to all: team = one developer + Claude Code · Phase 1 = 2 weeks (sale screen, catalog, inventory) ·
 client = retail mobile shop in Spain (unreliable connectivity, Spanish fiscal rules ahead) · product intent = resell to

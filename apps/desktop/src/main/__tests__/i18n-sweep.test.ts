@@ -37,6 +37,16 @@ const LITERAL = /"([^"\\\n]*)"|'([^'\\\n]*)'|`([^`\\\n]*)`/g;
  */
 const ALLOWED: string[] = [];
 
+/**
+ * Data tables of proper nouns, which are not UI copy.
+ *
+ * A country is called Marruecos in Spanish and Morocco in English, but the name
+ * on a WU receipt is the one the corridor is called by, and the printed side of
+ * this app is fixed Spanish anyway (ADR-0011). Listing them in the dictionary
+ * would put 38 proper nouns in a file for words the app says.
+ */
+const SKIP_FILES = new Set(["screens/transfers/countries.ts"]);
+
 function sources(dir: string): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir)) {
@@ -85,6 +95,7 @@ describe("no hardcoded Spanish in the renderer", () => {
     for (const root of ROOTS) {
       for (const file of sources(root)) {
         const rel = file.slice(REPO.length + 1).replace(/\\/g, "/");
+        if ([...SKIP_FILES].some((f) => rel.endsWith(f))) continue;
         code(readFileSync(file, "utf8")).forEach((line, i) => {
           for (const m of line.matchAll(LITERAL)) {
             const text = m[1] ?? m[2] ?? m[3] ?? "";

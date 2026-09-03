@@ -10,6 +10,7 @@ import type {
   ScanResolution,
   EntityRef,
   GroupRef,
+  TransferRow,
   InventoryListRequest,
   InventoryMovementsRequest,
   InventoryMovementsResponse,
@@ -90,6 +91,16 @@ declare global {
         approval?: { userId: string; pin: string },
       ): Promise<CatalogSaveResponse>;
       invoke(channel: "catalog:groups", payload?: undefined): Promise<GroupRef[]>;
+      invoke(channel: "transfer:list", payload: unknown): Promise<{ rows: TransferRow[]; drawerCents: number }>;
+      invoke(channel: "transfer:get", payload: { id: string }): Promise<TransferRow>;
+      invoke(channel: "transfer:send", payload: unknown): Promise<{ row: TransferRow }>;
+      invoke(
+        channel: "transfer:payout",
+        payload: unknown,
+      ): Promise<
+        { kind: "logged"; row: TransferRow } | { kind: "overDrawerWarning"; expectedCashCents: number; amountCents: number }
+      >;
+      invoke(channel: "transfer:cancel", payload: { id: string; reason: string }, approval?: unknown): Promise<{ row: TransferRow }>;
       invoke(channel: "catalog:createGroup", payload: { name: string; nameEn?: string | null }): Promise<GroupRef>;
       invoke(
         channel: "catalog:renameGroup",
