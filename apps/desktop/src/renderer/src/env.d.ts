@@ -381,7 +381,11 @@ declare global {
       invoke(channel: "reports:deadStock", payload: { groupId: string | null }): Promise<ReportsDeadStockResponse>;
       invoke(
         channel: "reports:export",
-        payload: { report: "sales" | "repairsOpen" | "repairsClosed" | "used" | "valuation" | "deadStock"; filters: Record<string, unknown> },
+        payload: {
+          report: "sales" | "repairsOpen" | "repairsClosed" | "used" | "valuation" | "deadStock";
+          filters: Record<string, unknown>;
+          locale?: "es" | "en";
+        },
       ): Promise<ReportsExportResponse>;
       invoke(
         channel: "cash:paidIn",

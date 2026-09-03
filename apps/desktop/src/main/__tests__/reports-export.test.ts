@@ -125,7 +125,10 @@ beforeEach(() => {
   registerIpcHandlers(env.db);
   startSession({ id: owner.id, name: "Ahmer", role: "owner", overrides: {} });
   groupId = uuidv7();
-  env.db.insert(s.productGroups).values({ id: groupId, tenantId: env.ctx.tenantId, name: "Accesorios", sortOrder: 1, createdAt: new Date() }).run();
+  env.db
+    .insert(s.productGroups)
+    .values({ id: groupId, tenantId: env.ctx.tenantId, name: "Accesorios", nameEn: "Accessories", sortOrder: 1, createdAt: new Date() })
+    .run();
 });
 
 const today = () => {
@@ -299,4 +302,70 @@ describe("on a shop's real volume", () => {
     await timed("repairsOpen", () => handlers.get("reports:repairsOpen")!({}, { status: null, technicianId: null }));
     await timed("repairsClosed", () => handlers.get("reports:repairsClosed")!({}, { ...year, byTechnician: false }));
   }, 120_000);
+});
+
+/* ------------------------------------------- the file speaks the staff's language */
+
+describe("the language of the file", () => {
+  /**
+   * v0.18.1. It used to be Spanish always, for the gestor. But the person who
+   * presses Exportar is reading the screen in their own language, and a file
+   * whose columns they cannot check is not a report they can proof-read. The
+   * FORMAT stays Spanish-Windows either way — that is about Excel, not words.
+   */
+  it("writes Spanish headers and a Spanish file name for a Spanish till", () => {
+    const productId = makeProduct("Cable USB-C", 500, 4);
+    sale(productId, new Date(), 1200, 500, "Cable USB-C");
+    const text = renderReportCsv(env.db, ctxOf(), "sales", { ...window(), shiftId: null, groupBy: "product" }, true, "es");
+    expect(text).toContain("Concepto;Operaciones;Unidades;Base;IVA;Total");
+    expect(text).toContain("Ventas —");
+  });
+
+  it("writes English headers for an English till", () => {
+    const productId = makeProduct("Cable USB-C", 500, 4);
+    sale(productId, new Date(), 1200, 500, "Cable USB-C");
+    const text = renderReportCsv(env.db, ctxOf(), "sales", { ...window(), shiftId: null, groupBy: "product" }, true, "en");
+    expect(text).toContain("Concept;Operations;Units;Net;VAT;Total");
+    expect(text).toContain("Sales —");
+    expect(text).toContain("Tickets:");
+    expect(text).not.toContain("Concepto;");
+  });
+
+  it("keeps the Excel format Spanish-Windows in both, because that is about the machine", () => {
+    const productId = makeProduct("Cable USB-C", 500, 4);
+    sale(productId, new Date(), 1200, 500, "Cable USB-C");
+    for (const locale of ["es", "en"] as const) {
+      const text = renderReportCsv(env.db, ctxOf(), "sales", { ...window(), shiftId: null, groupBy: "product" }, true, locale);
+      expect(text.charCodeAt(0)).toBe(0xfeff); // BOM
+      expect(text).toContain(";");
+      expect(text).toMatch(/\d+,\d{2}/); // decimal comma
+      expect(text.includes(String.fromCharCode(13, 10))).toBe(true); // CRLF
+    }
+  });
+
+  it("translates the words the till owns and leaves the shop's alone", () => {
+    /* dead stock is what has NOT sold, so this one just sits there */
+    makeProduct("Cable USB-C", 500, 4);
+    const en = renderReportCsv(env.db, ctxOf(), "deadStock", { groupId: null }, true, "en");
+    const es = renderReportCsv(env.db, ctxOf(), "deadStock", { groupId: null }, true, "es");
+
+    expect(en).toContain("Item;Group;On hand;Cost tied up;Last sale;Days");
+    expect(es).toContain("Artículo;Grupo;Existencias;Coste inmovilizado;Última venta;Días");
+    // the shelf has both names; the product has the one the shop typed
+    expect(en).toContain("Accessories");
+    expect(es).toContain("Accesorios");
+    expect(en).toContain("Cable USB-C");
+    expect(es).toContain("Cable USB-C");
+  });
+
+  it("names the file in the language too", async () => {
+    /* the name is the first thing anyone reads about a file, and a Spanish
+       slug in an English folder is the same mismatch as a Spanish header */
+    const { renderReportCsv: _same } = await import("../reports-export");
+    expect(typeof _same).toBe("function");
+    const es = await import("@arkom/core").then((m) => m.csvFileName("informe-ventas"));
+    const en = await import("@arkom/core").then((m) => m.csvFileName("sales-report"));
+    expect(es).toMatch(/^informe-ventas-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(en).toMatch(/^sales-report-\d{4}-\d{2}-\d{2}\.csv$/);
+  });
 });

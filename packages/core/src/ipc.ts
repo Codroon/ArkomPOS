@@ -2419,6 +2419,9 @@ export const ReportsExportRequestSchema = z.object({
   report: z.enum(["sales", "repairsOpen", "repairsClosed", "used", "valuation", "deadStock"]),
   /** the SAME filters the screen is showing; the query is re-run, never trusted */
   filters: z.record(z.string(), z.unknown()).default({}),
+  /** the staff language at the moment of exporting: the file says what the
+      screen said, while its FORMAT stays Spanish-Windows (ADR-0016 A1) */
+  locale: z.enum(["es", "en"]).default("es"),
 });
 export const ReportsExportResponseSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("saved"), path: z.string(), rows: z.number().int() }),

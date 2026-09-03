@@ -12,7 +12,7 @@
  */
 import { useState, type ReactNode } from "react";
 import { formatCents, type CostEstimate } from "@arkom/core";
-import { GhostButton, SectionLabel, cn, useT } from "@arkom/ui";
+import { GhostButton, SectionLabel, cn, useLocale, useT } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
 
 export type ReportKey = "sales" | "repairsOpen" | "repairsClosed" | "used" | "valuation" | "deadStock";
@@ -38,6 +38,9 @@ export function ReportShell({
   children: ReactNode;
 }) {
   const t = useT();
+  /* the file says what the screen said: headers, words and file name in the
+     staff language, and its Excel format unchanged (ADR-0016 A1) */
+  const [locale] = useLocale();
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -46,7 +49,7 @@ export function ReportShell({
     setBusy(true);
     setToast(null);
     try {
-      const res = await window.arkom.invoke("reports:export", { report: exportOf, filters });
+      const res = await window.arkom.invoke("reports:export", { report: exportOf, filters, locale });
       if (res.kind === "saved") {
         setToast(t("rep2.exported", { file: res.path.split(/[\\/]/).pop() ?? res.path }));
       }

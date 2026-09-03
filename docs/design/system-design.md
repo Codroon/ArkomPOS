@@ -341,7 +341,7 @@ the UI to hide.
 | `reports:used` | {status?, grade?} → {summary, rows, storeCredit} | `reports.costs`. Oldest first |
 | `reports:valuation` | {groupId?} → {totalCents, groups[], products[]} | `reports.costs`. The total must equal the Inventario header to the cent |
 | `reports:deadStock` | {groupId?} → {rows, thresholdDays} | `reports.costs`. Threshold from settings, not from the payload |
-| `reports:export` | {report, filters, suggestedName} → {kind:'saved', path} \| {kind:'cancelled'} | The report's OWN permission. Re-runs the same query rather than serialising the renderer's rows, and writes UTF-8-BOM · `;` · decimal comma · dd/mm/yyyy · CRLF through a save dialog |
+| `reports:export` | {report, filters, suggestedName} → {kind:'saved', path} \| {kind:'cancelled'} | The report's OWN permission. Re-runs the same query rather than serialising the renderer's rows, and writes UTF-8-BOM · `;` · decimal comma · dd/mm/yyyy · CRLF through a save dialog · v0.18.1: takes the staff `locale`; the file's WORDS follow it, its Excel format stays Spanish-Windows (ADR-0016 A1) |
 
 **Schema addition** (migration `0009`, additive):
 

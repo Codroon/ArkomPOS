@@ -107,7 +107,8 @@ Schema already anticipates them — build nothing for them.
   has paid for; `created_at` answers "when did someone start typing", which is not
   a question anybody asks about money. Aggregation is SQL in main returning shaped
   rows — summing in the renderer would be a second implementation of the money
-  (ADR-0016 §1, §3).
+  (ADR-0016 §1, §3). The CSV export's words follow the staff language and its
+  Excel format does not (ADR-0016 A1).
 - **Cost is snapshotted on the sale line, exactly as tax is.**
   `document_lines.unit_cost_cents` is written at completion from the same figure
   the stock movement records. Joining `products.cost_cents` at report time would

@@ -1677,7 +1677,7 @@ export function registerIpcHandlers(db: ArkomDb): void {
     (req: { report: ReportId }) => reportPermission(req.report),
     ReportsExportRequestSchema,
     ReportsExportResponseSchema,
-    (s, input) => exportReport(db, s.ctx, { report: input.report, filters: input.filters }, canCosts(s)),
+    (s, input) => exportReport(db, s.ctx, { report: input.report, filters: input.filters, locale: input.locale }, canCosts(s)),
   );
 }
 

@@ -163,6 +163,8 @@ export function salesSummary(db: Reader, ctx: MutationCtx, f: Omit<SalesFilters,
 export interface SalesRow {
   key: string;
   label: string;
+  /** grouped by group: the shop's English name for that shelf, when it has one */
+  labelEn?: string | null;
   count: number;
   qty: number;
   netCents: number;

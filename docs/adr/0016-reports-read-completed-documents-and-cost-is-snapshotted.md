@@ -237,3 +237,24 @@ fields rather than blank them, so the row types are permission-dependent.
 and the reports will say so on every screen and in every export. That is the
 honest state of a till that started recording cost in September, and pretending
 otherwise was the alternative.
+
+## Amendment A1 — the file speaks the staff's language (v0.18.1, 2026-09-04)
+
+§6 said the CSV is written for the accountant, and left it Spanish whatever the
+till's toggle said. That was half the story: the person who presses **Exportar**
+is the owner, reading a screen in their own language, and handing them a file
+whose columns they cannot check is not respect for the gestor — it is a report
+nobody in the shop can proof-read before sending it.
+
+So `reports:export` takes the staff `locale` and the file says what the screen
+said: file name, title, preamble, column headers, and the words the till owns
+(repair statuses, used-device states, payment methods, "no group", "never").
+Group names use the shop's English name when it has one (ADR-0017 A1); product
+names, customer names and the shop's own concepts are DATA and are never
+touched.
+
+Everything §6 decided about the FORMAT is unchanged and applies in both
+languages: semicolon separator, decimal comma, `dd/mm/yyyy`, CRLF, UTF-8 with a
+BOM. Those exist so the file opens correctly in the Excel on the counter, which
+is a Spanish Windows whatever language the staff read the screen in. Format is
+about the machine; words are about the reader.
