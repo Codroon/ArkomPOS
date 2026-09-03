@@ -653,6 +653,7 @@ export const es = {
   "err.invalidPin": "PIN incorrecto.",
   "err.userLocked": "Demasiados intentos. Espera un momento.",
   "err.shiftRequired": "No hay ningún turno abierto en esta caja.",
+  "err.printerRequired": "No hay impresora configurada. Ve a Ajustes → Impresora y elige una antes de cobrar.",
   "err.reviewRequired": "Este dispositivo está marcado para revisar.",
 
   /* roles and permissions — the registry holds keys, the dictionary holds words */

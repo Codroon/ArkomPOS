@@ -651,6 +651,7 @@ export const en: Record<TKey, string> = {
   "err.invalidPin": "Wrong PIN.",
   "err.userLocked": "Too many attempts. Wait a moment.",
   "err.shiftRequired": "No shift is open on this till.",
+  "err.printerRequired": "No printer configured. Go to Settings → Printer and pick one before charging.",
   "err.reviewRequired": "This device is flagged for review.",
 
   /* roles and permissions */

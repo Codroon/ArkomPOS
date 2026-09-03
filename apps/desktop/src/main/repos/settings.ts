@@ -8,7 +8,7 @@
  * answerable from the audit trail.
  */
 import { eq, and } from "drizzle-orm";
-import { mutate, type MutationCtx, type Settings, type ShopProfile } from "@arkom/core";
+import { appError, mutate, type MutationCtx, type Settings, type ShopProfile } from "@arkom/core";
 import { schema, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner } from "../mutate-runner";
 
@@ -164,4 +164,26 @@ export function saveSettings(db: ArkomDb, ctx: MutationCtx, patch: Partial<Setti
     }
     return { ...current, ...patch } as Settings;
   });
+}
+
+/**
+ * The gate in front of the acts that hand a customer paper — v0.18.1.
+ *
+ * A shop with a thermal printer on the counter has one configured; a till with
+ * an empty `printerName` is one nobody finished setting up. Taking money in
+ * that state produces a sale with no ticket, which is exactly the argument the
+ * paper exists to prevent — so the charge is refused and says where to fix it.
+ *
+ * This is about CONFIGURATION, not about hardware behaving. A printer that is
+ * configured and then jams, runs out of paper or gets unplugged raises
+ * PRINT_FAILED after the sale is already complete: the money is taken, the
+ * document exists, and the paper is a separate act with its own retry. Stopping
+ * a paid sale because a cable fell out would close the shop mid-queue.
+ */
+export function requireConfiguredPrinter(db: ArkomDb, ctx: MutationCtx): string {
+  const { printerName } = getSettings(db, ctx);
+  if (!printerName.trim()) {
+    throw appError("PRINTER_REQUIRED", "No hay impresora configurada. Configúrala en Ajustes antes de cobrar.");
+  }
+  return printerName;
 }

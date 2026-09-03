@@ -197,6 +197,9 @@ beforeEach(() => {
   env = freshDb();
   owner = createUser(env.db, env.ctx, { name: "Ahmer", role: "owner", pin: "8317" }).user;
   registerIpcHandlers(env.db);
+  /* the till has a printer: since v0.18.1 the three acts that hand a customer
+     paper refuse on a till where Ajustes names none */
+  env.db.insert(s.settings).values({ tenantId: env.ctx.tenantId, key: "printerName", value: "Impresora de pruebas", updatedAt: new Date() }).run();
   startSession({ id: owner.id, name: "Ahmer", role: "owner", overrides: {} });
   openShiftTx(env.db, ctxOf(), { floatCents: FLOAT, breakdown: null });
 });

@@ -146,6 +146,11 @@ describe("migrating a populated v0.15.0 database", () => {
     const owner = createUser(env.db, ctx, { name: "Ahmer", role: "owner", pin: "8317" }).user;
     openShiftTx(env.db, { ...ctx, userId: owner.id }, { floatCents: 20000, breakdown: null });
     registerIpcHandlers(env.db);
+    /* a printer, because a refund hands the customer a document (v0.18.1) */
+    env.db
+      .insert(s.settings)
+      .values({ tenantId: ctx.tenantId, key: "printerName", value: "Impresora de pruebas", updatedAt: new Date() })
+      .run();
     startSession({ id: owner.id, name: "Ahmer", role: "owner", overrides: {} });
 
     const res = (await handlers.get("refund:create")!({}, {

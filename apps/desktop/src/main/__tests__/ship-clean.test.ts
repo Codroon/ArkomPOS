@@ -75,6 +75,9 @@ beforeEach(() => {
   registerIpcHandlers(db);
   startSession({ id: owner.id, name: "Ahmer", role: "owner", overrides: {} });
   openShiftTx(db, ctx, { floatCents: 20000, breakdown: null });
+  /* A configured printer is the ordinary state of a shop's till, and since
+     v0.18.1 it is what the three customer-facing acts require. */
+  saveSettings(db, ctx, { printerName: "Impresora de pruebas" });
   groupId = db.select().from(s.productGroups).all()[0]!.id;
 });
 
@@ -202,9 +205,9 @@ const added = (before: string[], after: string[]) => after.filter((f) => !before
 /* ------------------------------------- 1 · completing writes nothing */
 
 describe.each([
-  ["without a printer", ""],
-  ["with a printer configured", "Citizen CT-S310S"],
-])("completing a document %s", (_label, printerName) => {
+  ["a thermal printer", "Citizen CT-S310S"],
+  ["a Windows printer queue", "Microsoft Print to PDF"],
+])("completing a document on a till with %s", (_label, printerName) => {
   beforeEach(() => {
     saveSettings(db, ctx, { printerName });
   });
@@ -238,7 +241,6 @@ describe.each([
 
 describe("the fallback render", () => {
   it("lands in the swept TEMP directory as a PDF and leaves no HTML behind", async () => {
-    saveSettings(db, ctx, { printerName: "" });
     const product = await saveProduct();
     putOnShelf(product.id, 5);
     const sale = await sell({ productId: product.id });
@@ -246,6 +248,9 @@ describe("the fallback render", () => {
     const used = await call<{ purchaseId: string }>("used:log", usedPayload());
     const z = await call<{ shiftId: string }>("cash:close", { countedCents: 20000, breakdown: null, reason: "Prueba de cierre" });
 
+    /* the printer is then taken away — a shop that unplugged it, or one still
+       being set up. Documents already issued must still be printable. */
+    saveSettings(db, ctx, { printerName: "" });
     const before = footprint();
     await call("print:ticket", { docId: sale.docId, copy: false, target: "auto" });
     await call("repair:print", { ticketId, what: "receipt", target: "auto", copy: false });
@@ -267,12 +272,12 @@ describe("the fallback render", () => {
        person who asked for paper. The till printing on its own behalf after
        every sale filed one file per document that nobody opened, and put a
        "PDF saved" toast in front of the next customer. */
-    saveSettings(db, ctx, { printerName: "" });
     const product = await saveProduct();
     putOnShelf(product.id, 5);
     const sale = await sell({ productId: product.id });
     const ticketId = await collectedRepair();
     const used = await call<{ purchaseId: string }>("used:log", usedPayload());
+    saveSettings(db, ctx, { printerName: "" });
 
     const before = footprint();
     const printsBefore = db.select().from(s2.oplog).all().filter((e) => e.action === "print").length;
@@ -298,6 +303,108 @@ describe("the fallback render", () => {
        re-rendering T1-000001 must not leave T1-000001 (3).pdf behind */
     expect(res.path.split("\\").join("/")).toContain("arkom-pdf/");
     expect(existsSync(res.path)).toBe(true);
+  });
+});
+
+/* ------------------------------- 1b · no printer, no money at the counter */
+
+describe("a till with no printer configured", () => {
+  let productId: string;
+  let saleDocId: string;
+  let saleLineId: string;
+  let repairTicketId: string;
+
+  beforeEach(async () => {
+    // set up while the printer is still configured, then take it away
+    const product = await saveProduct();
+    productId = product.id;
+    putOnShelf(productId, 10);
+    const sale = await sell({ productId }, 1);
+    saleDocId = sale.docId;
+    saleLineId = sale.lines[0]!.id;
+
+    const customerId = upsertCustomer(db, ctx, { name: "Joan Puig", phone: "+34 671 220 918" }).id;
+    const ticket = await createTicket(db, ctx, intake(customerId));
+    addLine(db, ctx, { kind: "labor", ticketId: ticket.ticketId, description: "Cambio de pantalla", chargeCents: 7900 });
+    recordApproval(db, ctx, ticket.ticketId, "in_person");
+    markReady(db, ctx, ticket.ticketId);
+    repairTicketId = ticket.ticketId;
+
+    saveSettings(db, ctx, { printerName: "" });
+  });
+
+  it("refuses to charge a sale, and creates no document", async () => {
+    /* the rule the shop asked for: a till that takes money it cannot hand a
+       ticket for leaves an argument for later. Configuration, not hardware —
+       a configured printer that jams still lets the sale through (v0.18.1). */
+    const docsBefore = db.select().from(s.documents).all().length;
+    const added = await call<{ kind: string; state: { docId: string; totalCents: number } }>("sale:addLine", {
+      productId,
+      qty: 1,
+    });
+    expect(
+      await code("sale:complete", {
+        docId: added.state.docId,
+        tenders: [{ method: "cash", amountCents: added.state.totalCents }],
+      }),
+    ).toBe("PRINTER_REQUIRED");
+
+    // the draft is still a draft: nothing completed, nothing numbered, no tender
+    const draft = db.select().from(s.documents).where(eq(s.documents.id, added.state.docId)).all()[0]!;
+    expect(draft.status).toBe("draft");
+    expect(draft.docNumber).toBeNull();
+    expect(db.select().from(s.documentTenders).where(eq(s.documentTenders.documentId, draft.id)).all()).toEqual([]);
+    expect(db.select().from(s.documents).all().filter((d) => d.status === "completed").length).toBe(
+      db.select().from(s.documents).all().filter((d) => d.status === "completed").length,
+    );
+    expect(db.select().from(s.documents).all().length).toBe(docsBefore + 1); // the draft, and only the draft
+  });
+
+  it("refuses a refund and a repair collection, and moves no money", async () => {
+    const drawerBefore = db.select().from(s.cashMovements).all().length;
+
+    expect(
+      await code("refund:create", {
+        documentId: saleDocId,
+        reason: "Cambio de opinión",
+        method: "cash",
+        lines: [{ lineId: saleLineId, qty: 1, restock: true }],
+      }),
+    ).toBe("PRINTER_REQUIRED");
+    expect(await code("repair:collect", { ticketId: repairTicketId, tenders: [{ method: "cash", amountCents: 7900 }] })).toBe(
+      "PRINTER_REQUIRED",
+    );
+
+    expect(db.select().from(s.cashMovements).all().length).toBe(drawerBefore);
+    expect(db.select().from(s.documents).all().some((d) => d.docType === "refund")).toBe(false);
+    const ticket = db.select().from(s.repairTickets).where(eq(s.repairTickets.id, repairTicketId)).all()[0]!;
+    expect(ticket.collectionDocumentId).toBeNull();
+  });
+
+  it("still lets the shop work: buying a phone, taking a repair in, and closing the day", async () => {
+    /* deliberately short list of refusals. A used purchase and an intake hand
+       over a document too, but a shop mid-setup must be able to take a phone
+       in — and blocking the close would trap the day's takings. */
+    expect(await code("used:log", usedPayload())).toBe("OK");
+    const customerId = upsertCustomer(db, ctx, { name: "Marta Ruiz", phone: "+34 600 000 000" }).id;
+    await expect(createTicket(db, ctx, intake(customerId))).resolves.toBeTruthy();
+    expect(await code("cash:close", { countedCents: 20000, breakdown: null, reason: "Prueba de cierre" })).toBe("OK");
+  });
+
+  it("says what to do about it, once, in a typed code the UI can act on", async () => {
+    try {
+      await handlers.get("refund:create")!({}, {
+        documentId: saleDocId,
+        reason: "x",
+        method: "cash",
+        lines: [{ lineId: saleLineId, qty: 1, restock: true }],
+      });
+      throw new Error("expected a refusal");
+    } catch (err) {
+      const ipc = parseIpcError(err)!;
+      expect(ipc.code).toBe("PRINTER_REQUIRED");
+      expect(ipc.message).toContain("Ajustes");
+    }
   });
 });
 

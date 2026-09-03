@@ -19,6 +19,7 @@ Since v0.11.0 the till buys used devices: gate, purchase document, shelf label, 
 Since v0.12.0 the till repairs devices: intake, quote, approval, parts, board, collection (ADR-0014).
 Since v0.13.0 the till has shifts: float, drawer ledger, X preview, close with variance, Z report (ADR-0015).
 Since v0.14.0 the till reports: sales/tax, repairs, used holding, valuation, dead stock, CSV export (ADR-0016).
+Since v0.18.1 the counter refuses to charge with no printer configured (`PRINTER_REQUIRED`).
 Since v0.18.0 the till is handover-clean: the general VAT rate is a SETTING read at snapshot time
 (ADR-0007 A1), Eliminar deletes a row nothing points at and archives one with history, a Used-type
 article can be typed in and sells REBU, an installed build never sees the demo dataset.
@@ -87,6 +88,12 @@ Schema already anticipates them — build nothing for them.
   the FROZEN Z snapshot and never a recomputation. A miscount found tomorrow is a movement in
   tomorrow's shift with a reason naming the Z it corrects. Correcting by editing the record
   destroys the evidence that there was anything to correct (ADR-0015 §7–8).
+- **Money at the counter needs a printer.** `sale:complete`, `refund:create` and `repair:collect`
+  raise `PRINTER_REQUIRED` when Ajustes names no printer: a till that takes money it cannot hand
+  a ticket for leaves an argument nobody can settle. This is about CONFIGURATION — a printer that
+  is configured and then jams raises `PRINT_FAILED` *after* the document exists, and the sale
+  stands. Nothing else is blocked: a shift close is the shop's own paperwork, and an intake or a
+  used-device purchase must work on a till still being set up.
 - **Money needs an open shift, and the refusal is an invitation.** Any action that creates a
   fiscal document or moves notes raises `SHIFT_REQUIRED` when none is open; the Sale screen
   answers it with the open dialog and re-runs the charge. Receiving stock and a depositless

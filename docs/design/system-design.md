@@ -128,7 +128,7 @@ business rows + `product_stock` cache + `oplog` entry → typed result back.
 | `credit:find` | {search?} → VoucherRow[] | `usedDevices.redeemCredit`. Only `issued` vouchers |
 | `credit:void` | {voucherId, reason} → VoucherRow | `usedDevices.voidCredit`. Only from `issued`; reason required and oplogged |
 
-Typed errors: `{code: 'AUTH_REQUIRED' | 'PERMISSION_DENIED' | 'APPROVAL_REQUIRED' | 'INVALID_PIN' | 'USER_LOCKED' | 'WEAK_PIN' | 'LAST_OWNER' | 'PRINT_FAILED' | 'DUPLICATE_NAME' | 'DUPLICATE_BARCODE' | 'DUPLICATE_IMEI' | 'NEGATIVE_STOCK' | 'UNIT_NOT_AVAILABLE' | 'TENDER_MISMATCH' | 'SHIFT_REQUIRED' | 'VALIDATION' , message, field?}` — renderer maps codes to UI, never parses strings. (DUPLICATE_NAME added with the catalog slice: req 4.4 wants name and barcode duplicates distinguished per field. DUPLICATE_IMEI added with the inventory slice: req 6.1 rejects duplicate IMEIs at entry. PRINT_FAILED added with the ticket slice: the sale is already complete when it is raised, so the UI offers Reintentar/Guardar PDF rather than treating it as a write failure. The seven auth codes arrived with ADR-0012; APPROVAL_REQUIRED is the unusual one — it names the permission and is an invitation to retry with an approver's PIN, not a refusal. SHIFT_REQUIRED arrived with ADR-0015 and is the second of that kind: it means "no shift is open on this till", and the Sale screen answers it by offering to open one inline rather than by showing an error.)
+Typed errors: `{code: 'AUTH_REQUIRED' | 'PERMISSION_DENIED' | 'APPROVAL_REQUIRED' | 'INVALID_PIN' | 'USER_LOCKED' | 'WEAK_PIN' | 'LAST_OWNER' | 'PRINT_FAILED' | 'DUPLICATE_NAME' | 'DUPLICATE_BARCODE' | 'DUPLICATE_IMEI' | 'NEGATIVE_STOCK' | 'UNIT_NOT_AVAILABLE' | 'TENDER_MISMATCH' | 'SHIFT_REQUIRED' | 'PRINTER_REQUIRED' | 'VALIDATION' , message, field?}` — renderer maps codes to UI, never parses strings. (DUPLICATE_NAME added with the catalog slice: req 4.4 wants name and barcode duplicates distinguished per field. DUPLICATE_IMEI added with the inventory slice: req 6.1 rejects duplicate IMEIs at entry. PRINT_FAILED added with the ticket slice: the sale is already complete when it is raised, so the UI offers Reintentar/Guardar PDF rather than treating it as a write failure. The seven auth codes arrived with ADR-0012; APPROVAL_REQUIRED is the unusual one — it names the permission and is an invitation to retry with an approver's PIN, not a refusal. SHIFT_REQUIRED arrived with ADR-0015 and is the second of that kind: it means "no shift is open on this till", and the Sale screen answers it by offering to open one inline rather than by showing an error. PRINTER_REQUIRED arrived in v0.18.1 and is a plain refusal: the till has no printer configured, so the three acts that hand a customer paper do not happen at all.)
 
 ### 4.1 Users and permissions (ADR-0012)
 
@@ -265,6 +265,14 @@ table, and copying one into the other would create two answers to "what did we t
 
 **Shift preconditions.** `sale:complete`, `used:log`, `repair:collect`, `cash:paidIn` and
 `cash:paidOut` are refused with `SHIFT_REQUIRED` when no shift is open on the till.
+
+**Printer preconditions (v0.18.1).** `sale:complete`, `refund:create` and `repair:collect` are
+refused with `PRINTER_REQUIRED` when `settings.printerName` is blank — the three acts that hand
+the customer a document. Checked in `guarded()` beside the shift gate, so no channel can forget
+it. Everything else is unaffected: a shift close, receiving stock, a repair intake and a
+used-device purchase still work on a till with no printer (their auto-print answers `noPrinter`
+and writes nothing). A CONFIGURED printer that then fails is `PRINT_FAILED`, raised after the
+document exists — the sale stands and the paper is retried on its own.
 `repair:create` and `repair:markNotRepaired` require one **only on the branch that moves a
 deposit**, checked inside the transaction where the branch is known. `stock:add`, catalogue
 work and a depositless intake need none — and stamp the shift when one is open. A registry

@@ -163,6 +163,12 @@ export const ErrorCodeSchema = z.enum([
      (ADR-0013 amendment). Like SHIFT_REQUIRED, an invitation rather than a
      refusal: the UI answers it with a confirmation, not an error. */
   "REVIEW_REQUIRED",
+  /* Nothing is configured to print on (v0.18.1). A till that takes money it
+     cannot hand a ticket for is a till the shop will be arguing about later, so
+     the three acts that give a customer paper refuse until Ajustes names a
+     printer. A printer that IS configured and then fails is a different thing
+     entirely — PRINT_FAILED, and the sale stands. */
+  "PRINTER_REQUIRED",
   /* The MTCN is already logged. Not a refusal to be argued with — the answer
      is to show the operator the record that exists (ADR-0018). */
   "DUPLICATE_MTCN",

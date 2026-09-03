@@ -126,7 +126,13 @@ screen, without inventing new roles.
 
 ## 4. Printer setup — Citizen CT-S310S
 
-Do this before the first real sale.
+**Do this before the first real sale — the till will not let you charge without
+it.** With no printer chosen in Ajustes, pressing **Cobrar** answers "No hay
+impresora configurada" and nothing is sold: a shop that takes money it cannot
+hand a ticket for has an argument waiting for it. Once a printer is configured
+the till sells normally, and if that printer later jams or is unplugged the sale
+still goes through — the ticket is then retried or saved from the document
+itself.
 
 1. **Install the Citizen driver first, with the printer unplugged.** Get it from
    Citizen's support site (the CT-S310 family driver). Reboot if it asks.
@@ -214,10 +220,11 @@ Nothing is filed per ticket. A document is kept in the database and re-rendered
 on demand: **Reimprimir** on any ticket, or **Guardar PDF…** to write a copy
 exactly where you choose.
 
-Until a printer is configured, completing a sale prints nothing and says so —
-"Sin impresora configurada" with a **Guardar PDF** button beside it. It does not
-save a file on its own; the button does, into a temporary folder that is emptied
-at every launch.
+Until a printer is configured the counter does not sell at all (§4). The parts
+of the till that still work in that state — a repair intake, buying a used phone
+— print nothing and say so, with a **Guardar PDF** button beside the message.
+They save no file on their own; the button does, into a temporary folder that is
+emptied at every launch.
 
 > You may see `arkom-pos.db-wal` and `arkom-pos.db-shm` next to the database.
 > They are part of it while the app is running. **Copy all three, or none.**

@@ -48,6 +48,7 @@ const KEY_FOR: Record<ErrorCode, TKey | null> = {
   UNIT_NOT_AVAILABLE: "err.unitNotAvailable",
   TENDER_MISMATCH: "err.tenderMismatch",
   SHIFT_REQUIRED: "err.shiftRequired",
+  PRINTER_REQUIRED: "err.printerRequired",
   REVIEW_REQUIRED: "err.reviewRequired",
   DUPLICATE_MTCN: "err.duplicateMtcn",
   VALIDATION: null,

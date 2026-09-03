@@ -292,7 +292,7 @@ import {
 import { resolveScanCode } from "./repos/scan";
 import { addStock, listInventory, listMovements } from "./repos/inventory";
 import { createSupplier, listSuppliers } from "./repos/suppliers";
-import { getSettings, saveSettings } from "./repos/settings";
+import { getSettings, requireConfiguredPrinter, saveSettings } from "./repos/settings";
 import {
   checkImei,
   getUsedDevice,
@@ -492,6 +492,25 @@ export const SHIFT_REQUIRED_CHANNELS: ReadonlySet<string> = new Set([
   "cash:close",
 ]);
 
+/**
+ * The three acts that hand a customer paper — v0.18.1.
+ *
+ * A sale's ticket, a refund's document and a repair's collection invoice are
+ * things the customer walks out holding. Issuing one on a till with no printer
+ * configured leaves the shop with money taken and nothing to show for it, so
+ * these refuse until Ajustes names a printer.
+ *
+ * Deliberately short. A shift close is the shop's own paperwork and blocking it
+ * would trap the day's takings; receiving stock touches no customer; a repair
+ * intake and a used-device purchase still fall back to a PDF, because a shop
+ * mid-setup must be able to take a phone in.
+ */
+export const PRINTER_REQUIRED_CHANNELS: ReadonlySet<string> = new Set([
+  "sale:complete",
+  "refund:create",
+  "repair:collect",
+]);
+
 /* ------------------------------------------------------------ registrars */
 
 /**
@@ -589,6 +608,9 @@ function guarded<Req, Res>(
          state of the till rather than about who is standing at it, so it is
          checked before authorization and raises its own code (ADR-0015 §9). */
       if (SHIFT_REQUIRED_CHANNELS.has(channel)) requireOpenShift(dbRef!, withCtx(session).ctx);
+      /* And so is somewhere to print the customer's copy: a precondition about
+         the till, checked before authorization, with its own code (v0.18.1). */
+      if (PRINTER_REQUIRED_CHANNELS.has(channel)) requireConfiguredPrinter(dbRef!, withCtx(session).ctx);
 
       // session.permissions is already resolved (owner holds everything), so
       // this one lookup IS the authorization decision
