@@ -1941,6 +1941,35 @@ export const ShiftTotalsSchema = z.object({
   usedPurchaseCount: z.number().int(),
   repairsCollectedCount: z.number().int(),
   parkedCount: z.number().int(),
+
+  /* Optional blocks, added by later slices. A Zod object STRIPS what it does
+     not declare, so leaving these out did not merely under-document the
+     payload — it deleted the blocks on the way to the screen. Optional here is
+     the same promise it is in `ShiftTotals`: absent from a snapshot frozen
+     before the slice that added it (ADR-0015 §7). */
+  refunds: z
+    .object({
+      count: z.number().int(),
+      totalCents: z.number().int(),
+      byMethod: z.array(z.object({ method: z.string(), count: z.number().int(), amountCents: z.number().int() })),
+    })
+    .optional(),
+  transfers: z
+    .object({
+      sendCount: z.number().int(),
+      sendPrincipalCents: z.number().int(),
+      sendFeesCents: z.number().int(),
+      sendCashPrincipalCents: z.number().int(),
+      sendCashFeesCents: z.number().int(),
+      sendCardPrincipalCents: z.number().int(),
+      sendCardFeesCents: z.number().int(),
+      payoutCount: z.number().int(),
+      payoutPrincipalCents: z.number().int(),
+      cancelCount: z.number().int(),
+      cancelDrawerCents: z.number().int(),
+      drawerCents: z.number().int(),
+    })
+    .optional(),
 });
 export type ShiftTotalsPayload = z.infer<typeof ShiftTotalsSchema>;
 
@@ -2104,6 +2133,9 @@ export const ReportsSalesResponseSchema = z.object({
     grossCents: z.number().int(),
     averageTicketCents: z.number().int(),
     usedSalesCents: z.number().int(),
+    /** handed back, positive; already netted out of the figures beside it */
+    refundsCents: z.number().int(),
+    refundCount: z.number().int(),
   }),
   rows: z.array(SalesReportRowSchema),
   estimate: CostEstimateSchema.nullable(),

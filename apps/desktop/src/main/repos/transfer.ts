@@ -422,6 +422,17 @@ export function setVerification(
  * verification is a person saying they looked.
  */
 export function bulkVerify(db: ArkomDb, ctx: MutationCtx, ids: ReadonlyArray<string>): number {
+  const candidates = db
+    .select({ id: transfers.id })
+    .from(transfers)
+    .where(and(eq(transfers.tenantId, ctx.tenantId), inArray(transfers.id, [...ids])))
+    /* a flagged row is a question somebody raised; a bulk tick must not quietly
+       answer it */
+    .all();
+  /* nothing to do is not a mutation: opening a transaction that writes no oplog
+     entry is exactly what the envelope refuses, and rightly (ADR-0005) */
+  if (candidates.length === 0) return 0;
+
   return mutate(makeMutateRunner(db), ctx, (tx, log) => {
     const now = new Date();
     const rows = tx
@@ -429,9 +440,14 @@ export function bulkVerify(db: ArkomDb, ctx: MutationCtx, ids: ReadonlyArray<str
       .from(transfers)
       .where(and(eq(transfers.tenantId, ctx.tenantId), inArray(transfers.id, [...ids])))
       .all()
-      /* a flagged row is a question somebody raised; a bulk tick must not
-         quietly answer it */
       .filter((r) => r.verification === "unverified");
+
+    if (rows.length === 0) {
+      /* every listed row was already verified or flagged. Say so in the log
+         rather than leaving the operator's tap unrecorded. */
+      log({ entity: "transfer", entityId: candidates[0]!.id, action: "verify", before: null, after: { bulk: true, verified: 0 } });
+      return 0;
+    }
 
     for (const r of rows) {
       tx.update(transfers)

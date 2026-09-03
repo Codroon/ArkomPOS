@@ -456,3 +456,79 @@ describe("a Z frozen before v0.15.0", () => {
     expect(withEmpty).toBe(before);
   });
 });
+
+/* ------------------------------------- 7 · verification (ADR-0019) ----- */
+
+describe("verification says something about the RECORD, never about the money", () => {
+  it("stamps who looked and when", async () => {
+    const { row } = await send();
+    expect(row.verification).toBe("unverified");
+
+    const after = await call<TransferRow>("transfer:verify", { id: row.id, state: "verified" });
+    expect(after.verification).toBe("verified");
+    expect(after.verifiedByName).toBe("Ahmer");
+    expect(after.verifiedAtMs).toBeTypeOf("number");
+  });
+
+  it("refuses a flag with no note", async () => {
+    const { row } = await send();
+    expect(await code("transfer:verify", { id: row.id, state: "flagged" })).toBe("VALIDATION");
+    expect(await code("transfer:verify", { id: row.id, state: "flagged", note: "   " })).toBe("VALIDATION");
+    /* a red row nobody can explain is a mystery, not a signal */
+    expect(await code("transfer:verify", { id: row.id, state: "flagged", note: "WU dice 320, aquí 300" })).toBe("OK");
+    expect(env.db.select().from(s.transfers).all()[0]!.flagNote).toBe("WU dice 320, aquí 300");
+  });
+
+  it("clears the stamp when a row goes back to unverified", async () => {
+    const { row } = await send();
+    await call("transfer:verify", { id: row.id, state: "verified" });
+    const back = await call<TransferRow>("transfer:verify", { id: row.id, state: "unverified" });
+    // a name beside "not checked" would be a lie about who checked it
+    expect(back.verifiedByName).toBeNull();
+    expect(back.verifiedAtMs).toBeNull();
+  });
+
+  it("bulk-verifies only the rows it was given", async () => {
+    const a = await send();
+    const b = await send();
+    const c = await send();
+    await call("transfer:verify", { id: c.row.id, state: "flagged", note: "revisar" });
+
+    const res = await call<{ verified: number }>("transfer:bulkVerify", { ids: [a.row.id, c.row.id] });
+    /* b was never listed and c was flagged: a bulk tick must not quietly answer
+       a question somebody raised */
+    expect(res.verified).toBe(1);
+    const rows = env.db.select().from(s.transfers).all();
+    expect(rows.find((r) => r.id === a.row.id)!.verification).toBe("verified");
+    expect(rows.find((r) => r.id === b.row.id)!.verification).toBe("unverified");
+    expect(rows.find((r) => r.id === c.row.id)!.verification).toBe("flagged");
+  });
+
+  it("re-checks uniqueness when an MTCN is corrected", async () => {
+    const a = await send({ mtcn: "1111100000" });
+    await send({ mtcn: "2222200000" });
+
+    expect(await code("transfer:editMtcn", { id: a.row.id, mtcn: "2222200000" })).toBe("DUPLICATE_MTCN");
+    expect(await code("transfer:editMtcn", { id: a.row.id, mtcn: "3333300000" })).toBe("OK");
+    expect(env.db.select().from(s.transfers).all().find((r) => r.id === a.row.id)!.mtcn).toBe("3333300000");
+
+    const entry = env.db.select().from(s.oplog).all().filter((e) => e.action === "edit_mtcn").at(-1)!;
+    expect(entry.before).toMatchObject({ mtcn: "1111100000" });
+    expect(entry.after).toMatchObject({ mtcn: "3333300000" });
+  });
+
+  it("creates no cash movement, whatever it does", async () => {
+    const { row } = await send({ method: "card" });
+    const before = env.db.select().from(s.cashMovements).all().length;
+
+    await call("transfer:verify", { id: row.id, state: "verified" });
+    await call("transfer:verify", { id: row.id, state: "flagged", note: "n" });
+    await call("transfer:bulkVerify", { ids: [row.id] });
+    await call("transfer:editMtcn", { id: row.id, mtcn: "9090909090" });
+
+    /* if verification could move cash it would be a second way to change the
+       till's figures without a document (ADR-0019) */
+    expect(env.db.select().from(s.cashMovements).all().length).toBe(before);
+    expect(expected()).toBe(FLOAT);
+  });
+});

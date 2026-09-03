@@ -113,7 +113,25 @@ function toTicketDoc(db: ArkomDb, ctx: MutationCtx, docId: string, isCopy: boole
   if (ticket.status !== "completed" || !ticket.docNumber || ticket.completedAtMs === null) {
     throw appError("VALIDATION", "Solo se pueden imprimir tickets completados.");
   }
+  /* A refund prints as a refund, naming the ticket it reverses. The doc type is
+     read from the row rather than guessed from a negative total, because a
+     total is an amount and a type is a fact (ADR-0019). */
+  const row = db
+    .select({ docType: schema.documents.docType, refundsDocumentId: schema.documents.refundsDocumentId })
+    .from(schema.documents)
+    .where(eq(schema.documents.id, docId))
+    .all()[0];
+  let refundOf: string | undefined;
+  if (row?.docType === "refund" && row.refundsDocumentId) {
+    refundOf =
+      db
+        .select({ docNumber: schema.documents.docNumber })
+        .from(schema.documents)
+        .where(eq(schema.documents.id, row.refundsDocumentId))
+        .all()[0]?.docNumber ?? undefined;
+  }
   return {
+    ...(refundOf ? { refundOf } : {}),
     docNumber: ticket.docNumber,
     completedAtMs: ticket.completedAtMs,
     terminalName: tillContext(db).meta.terminal.name,

@@ -98,10 +98,14 @@ function salesWhere(ctx: MutationCtx, f: { fromMs: number; toMs: number; shiftId
   const base = [
     eq(documents.tenantId, ctx.tenantId),
     eq(documents.status, "completed"),
-    /* `ticket` only: a `purchase` is money going OUT and a `repair` document is
-       a record of custody with a zero total. The T1- a repair collection creates
-       is a ticket, so repairs' revenue is already here (ADR-0016 §1). */
-    eq(documents.docType, "ticket"),
+    /* Tickets AND refunds. A `purchase` is money going OUT and a `repair`
+       document is a record of custody with a zero total; the T1- a repair
+       collection creates is a ticket, so repairs' revenue is already here
+       (ADR-0016 §1).
+       A refund document's lines and totals are NEGATIVE, so including it here
+       is what makes every figure on every sales report net of refunds without
+       a single subtraction written anywhere (ADR-0019). */
+    inArray(documents.docType, ["ticket", "refund"]),
   ];
   if (f.shiftId) return and(...base, eq(documents.shiftId, f.shiftId));
   return and(...base, gte(documents.completedAt, new Date(f.fromMs)), lt(documents.completedAt, new Date(f.toMs)));
@@ -115,16 +119,23 @@ export interface SalesSummary {
   averageTicketCents: number;
   /** margin-scheme sales, on their own line because they carry no VAT */
   usedSalesCents: number;
+  /** what was handed back, POSITIVE — already netted out of the figures above */
+  refundsCents: number;
+  refundCount: number;
 }
 
 export function salesSummary(db: Reader, ctx: MutationCtx, f: Omit<SalesFilters, "groupBy">): SalesSummary {
   const where = salesWhere(ctx, f);
   const doc = db
     .select({
-      tickets: sql<number>`count(*)`,
+      /* tickets, not documents: a refund is not a sale, and dividing gross by a
+         count that includes them would report a nonsense average */
+      tickets: sql<number>`coalesce(sum(case when ${documents.docType} = 'ticket' then 1 else 0 end), 0)`,
       netCents: sql<number>`coalesce(sum(${documents.subtotalCents}), 0)`,
       taxCents: sql<number>`coalesce(sum(${documents.taxCents}), 0)`,
       grossCents: sql<number>`coalesce(sum(${documents.totalCents}), 0)`,
+      refundCount: sql<number>`coalesce(sum(case when ${documents.docType} = 'refund' then 1 else 0 end), 0)`,
+      refundsCents: sql<number>`coalesce(-sum(case when ${documents.docType} = 'refund' then ${documents.totalCents} else 0 end), 0)`,
     })
     .from(documents)
     .where(where)
@@ -144,6 +155,8 @@ export function salesSummary(db: Reader, ctx: MutationCtx, f: Omit<SalesFilters,
     grossCents: doc.grossCents,
     averageTicketCents: doc.tickets > 0 ? Math.round(doc.grossCents / doc.tickets) : 0,
     usedSalesCents: used.cents,
+    refundsCents: doc.refundsCents,
+    refundCount: doc.refundCount,
   };
 }
 

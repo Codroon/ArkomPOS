@@ -80,6 +80,14 @@ export interface TicketDoc {
   totalCents: number;
   tenders: TicketTender[];
   changeCents: number;
+  /**
+   * A refund, and the ticket it reverses — ADR-0019.
+   *
+   * Present only on a refund. The customer walks away with a document that
+   * names the sale it undoes, because "here is 24,90 €" without a reference is
+   * not evidence of anything.
+   */
+  refundOf?: string;
 }
 
 /** The shop's own data. Never hardcoded — it comes from Ajustes (settings KV). */
@@ -94,6 +102,8 @@ export interface ShopProfile {
 
 export const TICKET_ES = {
   copy: "COPIA",
+  refund: "DEVOLUCION",
+  refundOf: "Del ticket",
   brand: "ARKOM",
   tagline: "ELECTRONICS · PHONES",
   nif: "NIF",
@@ -143,6 +153,13 @@ export function renderTicket(doc: TicketDoc, shop: ShopProfile, width: PaperWidt
   const feed = (lines: number) => ops.push({ op: "feed", lines });
 
   /* ---- header ---- */
+  if (doc.refundOf) {
+    /* said before anything else: a document handed over at the counter must
+       announce what it is before the reader reaches the figures */
+    text(letterSpaced(TICKET_ES.refund, cols), { align: "center", bold: true });
+    text(`${TICKET_ES.refundOf} ${doc.refundOf}`, { align: "center" });
+    feed(1);
+  }
   if (doc.isCopy) {
     text(letterSpaced(TICKET_ES.copy, cols), { align: "center", bold: true });
     feed(1);
@@ -232,7 +249,7 @@ export function renderTicket(doc: TicketDoc, shop: ShopProfile, width: PaperWidt
 
   // the drawer only opens for cash the customer is actually handing over, and
   // never on a reprint — a COPIA must not pop the till open again
-  if (!doc.isCopy && doc.tenders.some((t) => t.method === "cash")) {
+  if (!doc.isCopy && !doc.refundOf && doc.tenders.some((t) => t.method === "cash")) {
     ops.push({ op: "drawer" });
   }
 
