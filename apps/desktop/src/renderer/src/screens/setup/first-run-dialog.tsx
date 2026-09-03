@@ -33,6 +33,10 @@ interface Draft {
   ticketFooter: string;
   terminalName: string;
   seriesPrefix: string;
+  refundPrefix: string;
+  repairPrefix: string;
+  purchasePrefix: string;
+  shiftPrefix: string;
 }
 
 /**
@@ -52,6 +56,12 @@ const initialDraft = (t: TFn): Draft => ({
   ticketFooter: t("setup.defaultFooter"),
   terminalName: t("setup.defaultTerminal"),
   seriesPrefix: "T1-",
+  /* the four the till issues besides a sale. Defaults a Spanish gestor reads at
+     a glance: D for devolución, R for reparación, C for compra, Z for the Z */
+  refundPrefix: "D1-",
+  repairPrefix: "R-",
+  purchasePrefix: "C-",
+  shiftPrefix: "Z1-",
 });
 
 export function FirstRunDialog({ onDone }: { onDone: () => void }) {
@@ -82,6 +92,21 @@ export function FirstRunDialog({ onDone }: { onDone: () => void }) {
 
   const problems = useMemo(() => {
     const out: Partial<Record<keyof Draft, string>> = {};
+    const PREFIXES = ["seriesPrefix", "refundPrefix", "repairPrefix", "purchasePrefix", "shiftPrefix"] as const;
+    for (const key of PREFIXES) {
+      const value = draft[key].trim();
+      if (!value) out[key] = t("first.required");
+      else if (!/^[A-Za-z0-9-]+$/.test(value) || value.length > 10) out[key] = t("first.prefixInvalid");
+    }
+    /* two series sharing a prefix produce two documents with the same number,
+       and nothing downstream can tell them apart (ADR-0008) */
+    const seen = new Map<string, (typeof PREFIXES)[number]>();
+    for (const key of PREFIXES) {
+      const value = draft[key].trim().toUpperCase();
+      if (!value) continue;
+      if (seen.has(value)) out[key] = t("first.prefixDuplicate");
+      else seen.set(value, key);
+    }
     if (!draft.shopLegalName.trim()) out.shopLegalName = t("first.required");
     if (!draft.shopNif.trim()) out.shopNif = t("first.required");
     if (!draft.shopAddress.trim()) out.shopAddress = t("first.required");
@@ -136,7 +161,11 @@ export function FirstRunDialog({ onDone }: { onDone: () => void }) {
         <span className="ml-2 font-mono text-[9px] font-medium tracking-[.16em] text-inverse-muted">POS</span>
         <div className="flex-1" />
         {/* setup is the first thing anyone sees, and the person doing it may not
-            read Spanish — the toggle has to be reachable before the shell exists */}
+            read Spanish — the toggle has to be reachable before the shell
+            exists, and has to be seen, which is what the label is for */}
+        <span className="mr-2 text-[10px] font-bold uppercase tracking-[.12em] text-inverse-muted">
+          {t("first.languageHint")}
+        </span>
         <LocaleToggle />
         <span aria-hidden className="absolute inset-x-0 bottom-0 h-[3px] bg-accent" />
       </header>
@@ -223,6 +252,41 @@ export function FirstRunDialog({ onDone }: { onDone: () => void }) {
                   className="font-mono"
                   value={draft.seriesPrefix}
                   onChange={(e) => set("seriesPrefix", e.target.value)}
+                />
+              </Field>
+            </div>
+
+            {/* The other four documents this till numbers. Asked here because
+                ADR-0008 freezes every series at its first document, and a shop
+                whose gestor has a convention should not find that out later. */}
+            <div className="text-[11px] leading-snug text-subtle">{t("first.seriesHint")}</div>
+            <div className="grid grid-cols-4 gap-2">
+              <Field label={t("first.prefixRefund")} error={show("refundPrefix")}>
+                <TextInput
+                  className="font-mono"
+                  value={draft.refundPrefix}
+                  onChange={(e) => set("refundPrefix", e.target.value)}
+                />
+              </Field>
+              <Field label={t("first.prefixRepair")} error={show("repairPrefix")}>
+                <TextInput
+                  className="font-mono"
+                  value={draft.repairPrefix}
+                  onChange={(e) => set("repairPrefix", e.target.value)}
+                />
+              </Field>
+              <Field label={t("first.prefixPurchase")} error={show("purchasePrefix")}>
+                <TextInput
+                  className="font-mono"
+                  value={draft.purchasePrefix}
+                  onChange={(e) => set("purchasePrefix", e.target.value)}
+                />
+              </Field>
+              <Field label={t("first.prefixShift")} error={show("shiftPrefix")}>
+                <TextInput
+                  className="font-mono"
+                  value={draft.shiftPrefix}
+                  onChange={(e) => set("shiftPrefix", e.target.value)}
                 />
               </Field>
             </div>

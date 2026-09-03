@@ -452,6 +452,7 @@ export {
   SetupChecklistRequestSchema,
   type SetupChecklistResponse,
   SetupChecklistResponseSchema,
+  SeriesPrefixSchema,
   SetupCompleteRequestSchema,
   SetupDismissChecklistRequestSchema,
   SetupDismissChecklistResponseSchema,

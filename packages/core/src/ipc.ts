@@ -901,6 +901,14 @@ export type SetupChecklistResponse = z.infer<typeof SetupChecklistResponseSchema
 export const SetupDismissChecklistRequestSchema = z.object({}).optional();
 export const SetupDismissChecklistResponseSchema = SetupChecklistResponseSchema;
 
+/** One prefix, by the rules ADR-0008 needs: short, typeable, and frozen after. */
+export const SeriesPrefixSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(10)
+  .regex(/^[A-Za-z0-9-]+$/, "Solo letras, números y guiones.");
+
 export const SetupCompleteRequestSchema = z.object({
   shopLegalName: z.string().trim().min(1).max(200),
   shopNif: z.string().trim().min(1).max(40),
@@ -913,18 +921,32 @@ export const SetupCompleteRequestSchema = z.object({
   ticketFooter: z.string().trim().max(200),
   terminalName: z.string().trim().min(1).max(60),
   // ADR-0008: the series prefix is frozen once tickets start being issued
-  seriesPrefix: z
-    .string()
-    .trim()
-    .min(1)
-    .max(10)
-    .regex(/^[A-Za-z0-9-]+$/, "Solo letras, números y guiones."),
+  seriesPrefix: SeriesPrefixSchema,
+  /* The till issues five kinds of numbered document, and the shop's gestor may
+     already have a convention for each. Asked once, here, because ADR-0008
+     freezes every one of them the moment the first document is issued — and a
+     shop that never thinks about it gets the defaults (v0.18.2). */
+  refundPrefix: SeriesPrefixSchema.optional(),
+  repairPrefix: SeriesPrefixSchema.optional(),
+  purchasePrefix: SeriesPrefixSchema.optional(),
+  shiftPrefix: SeriesPrefixSchema.optional(),
   loadDemo: z.boolean(),
   /* the language the shop is being set up in. It decides the starter group
      names and nothing else — they are shop data from that moment on
      (ADR-0017). Optional so an older renderer still completes setup. */
   locale: z.enum(["es", "en"]).optional(),
-});
+}).refine(
+  (r) => {
+    /* Two series sharing a prefix produce two documents called T1-000001, and
+       nothing downstream — a search, a refund, the gestor's spreadsheet — can
+       tell them apart afterwards. Caught here, where it is still free. */
+    const used = [r.seriesPrefix, r.refundPrefix, r.repairPrefix, r.purchasePrefix, r.shiftPrefix]
+      .filter((p): p is string => typeof p === "string" && p.trim() !== "")
+      .map((p) => p.trim().toUpperCase());
+    return new Set(used).size === used.length;
+  },
+  { message: "Cada serie necesita un prefijo distinto.", path: ["seriesPrefix"] },
+);
 export const SetupCompleteResponseSchema = z.object({
   tenantId: z.string(),
   demoProducts: z.number().int(),

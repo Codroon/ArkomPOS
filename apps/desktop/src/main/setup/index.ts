@@ -37,6 +37,11 @@ export interface ShopIdentity {
   locationName: string;
   terminalName: string;
   seriesPrefix: string;
+  /** the other four series, defaulted when the shop did not say (v0.18.2) */
+  refundPrefix?: string;
+  repairPrefix?: string;
+  purchasePrefix?: string;
+  shiftPrefix?: string;
 }
 
 /**
@@ -68,19 +73,22 @@ export function createShop(
   tx.insert(s.terminals).values(terminal).run();
   logCreate("terminal", terminal.id, terminal);
 
-  // ADR-0008: numbering is per till and gap-free, so the series is created with
-  // the terminal rather than lazily at the first sale
-  const series = {
-    id: uuidv7(),
-    tenantId,
-    locationId,
-    terminalId,
-    docType: "ticket" as const,
-    prefix: identity.seriesPrefix,
-    nextNumber: 1,
-  };
-  tx.insert(s.numberSeries).values(series).run();
-  logCreate("number_series", series.id, series);
+  /* ADR-0008: numbering is per till and gap-free, so the series are created
+     with the terminal rather than lazily at the first document. All five of
+     them, because the shop was asked for all five (v0.18.2) — the repos that
+     used to create one on demand now find it already here. */
+  const prefixes: Array<[("ticket" | "refund" | "repair" | "purchase" | "shift"), string]> = [
+    ["ticket", identity.seriesPrefix],
+    ["refund", identity.refundPrefix ?? "D1-"],
+    ["repair", identity.repairPrefix ?? "R-"],
+    ["purchase", identity.purchasePrefix ?? "C-"],
+    ["shift", identity.shiftPrefix ?? "Z1-"],
+  ];
+  for (const [docType, prefix] of prefixes) {
+    const series = { id: uuidv7(), tenantId, locationId, terminalId, docType, prefix, nextNumber: 1 };
+    tx.insert(s.numberSeries).values(series).run();
+    logCreate("number_series", series.id, series);
+  }
 }
 
 /** Written into settings so the dialog is asked once and never again. */
@@ -136,6 +144,11 @@ export interface FirstRunInput {
   ticketFooter: string;
   terminalName: string;
   seriesPrefix: string;
+  /** the other four series; each defaults when the wizard did not ask (v0.18.2) */
+  refundPrefix?: string;
+  repairPrefix?: string;
+  purchasePrefix?: string;
+  shiftPrefix?: string;
   shopCity?: string;
   shopPostalCode?: string;
   shopPhone?: string;
@@ -173,6 +186,10 @@ export function completeFirstRun(db: ArkomDb, input: FirstRunInput): FirstRunRes
         locationName: "Tienda",
         terminalName: input.terminalName,
         seriesPrefix: input.seriesPrefix,
+        refundPrefix: input.refundPrefix,
+        repairPrefix: input.repairPrefix,
+        purchasePrefix: input.purchasePrefix,
+        shiftPrefix: input.shiftPrefix,
       },
       ids,
       now,

@@ -128,6 +128,100 @@ describe("first run with the printer skipped", () => {
   });
 });
 
+/* --------------------------------------- 1b · every series the till numbers */
+
+describe("the numbering the wizard asks for", () => {
+  it("creates all five series with the shop's own prefixes", async () => {
+    await call("setup:complete", {
+      ...WIZARD,
+      seriesPrefix: "FA-",
+      refundPrefix: "AB-",
+      repairPrefix: "REP-",
+      purchasePrefix: "COM-",
+      shiftPrefix: "CIE-",
+    });
+    const series = env.db.select().from(s.numberSeries).all();
+    expect(Object.fromEntries(series.map((r) => [r.docType, r.prefix]))).toEqual({
+      ticket: "FA-",
+      refund: "AB-",
+      repair: "REP-",
+      purchase: "COM-",
+      shift: "CIE-",
+    });
+    // ADR-0008: each starts at one, and the number is the series', not the doc's
+    expect(series.every((r) => r.nextNumber === 1)).toBe(true);
+  });
+
+  it("defaults the four the shop did not think about", async () => {
+    await call("setup:complete", WIZARD);
+    const series = env.db.select().from(s.numberSeries).all();
+    expect(Object.fromEntries(series.map((r) => [r.docType, r.prefix]))).toEqual({
+      ticket: "T1-",
+      refund: "D1-",
+      repair: "R-",
+      purchase: "C-",
+      shift: "Z1-",
+    });
+  });
+
+  it("refuses two series that would number documents the same way", async () => {
+    /* two series sharing a prefix produce two documents called T1-000001, and
+       no search, refund or spreadsheet can tell them apart afterwards */
+    expect(await code("setup:complete", { ...WIZARD, refundPrefix: "T1-" })).toBe("VALIDATION");
+    expect(await code("setup:complete", { ...WIZARD, repairPrefix: "r-", purchasePrefix: "R-" })).toBe("VALIDATION");
+    expect(env.db.select().from(s.tenants).all()).toEqual([]); // nothing half-created
+  });
+
+  it("refuses a prefix nobody could type at a keyboard", async () => {
+    expect(await code("setup:complete", { ...WIZARD, shiftPrefix: "Z 1/" })).toBe("VALIDATION");
+    expect(await code("setup:complete", { ...WIZARD, refundPrefix: "" })).toBe("VALIDATION");
+  });
+
+  it("hands the shop's prefix to the document that is issued later", async () => {
+    /* the repos used to create their series on demand; now they find the one
+       the wizard made, which is the whole point of asking */
+    await call("setup:complete", { ...WIZARD, refundPrefix: "AB-" });
+    const owner = await call<{ user: { id: string; name: string } }>("setup:owner", { name: "Ahmer", pin: "8317" });
+    startSession({ id: owner.user.id, name: owner.user.name, role: "owner", overrides: {} });
+    await call("settings:save", { printerName: "Citizen CT-S310II" });
+
+    const groupId = env.db.select().from(s.productGroups).all()[0]!.id;
+    const saved = await call<{ product: { id: string } }>("catalog:save", {
+      name: "Cable USB-C 1m",
+      barcode: null,
+      groupId,
+      itemType: "stocked",
+      costCents: 300,
+      priceCents: 890,
+      taxRegime: "IVA21",
+      reorderPoint: 0,
+      lowStockThreshold: 0,
+      active: true,
+    });
+    await call("cash:open", { floatCents: 20000, breakdown: null });
+    const supplier = await call<{ id: string }>("supplier:create", { name: "Distribuidora" });
+    await call("stock:add", {
+      entries: [{ productId: saved.product.id, supplierId: supplier.id, qty: 2, unitCostCents: 300, imeis: [] }],
+    });
+    const line = await call<{ state: { docId: string; totalCents: number } }>("sale:addLine", {
+      productId: saved.product.id,
+      qty: 1,
+    });
+    const sale = await call<{ docId: string }>("sale:complete", {
+      docId: line.state.docId,
+      tenders: [{ method: "cash", amountCents: line.state.totalCents }],
+    });
+    const lineId = env.db.select().from(s.documentLines).where(eq(s.documentLines.documentId, sale.docId)).all()[0]!.id;
+    const refund = await call<{ docNumber: string }>("refund:create", {
+      documentId: sale.docId,
+      reason: "Cambio de opinión",
+      method: "cash",
+      lines: [{ lineId, qty: 1, restock: true }],
+    });
+    expect(refund.docNumber).toBe("AB-000001");
+  });
+});
+
 /* ------------------------------------ 2 · the checklist ticks on real actions */
 
 describe("the first-run checklist", () => {
