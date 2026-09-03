@@ -51,7 +51,10 @@ export const IPC_CHANNELS = [
   "print:ticket",
   "print:test",
   "print:reveal",
-  "print:ticketsDir",
+  "print:savePdf",
+  "print:testDrawer",
+  "docs:list",
+  "settings:series",
   "setup:status",
   "setup:complete",
   "demo:status",
@@ -657,6 +660,12 @@ export const SettingsSchema = z.object({
   shopLegalName: z.string().max(200),
   shopNif: z.string().max(40),
   shopAddress: z.string().max(300),
+  /* the rest of the letterhead. Every one of them reaches the document header
+     that already renders the block above (v0.17.0). */
+  shopDisplayName: z.string().max(120),
+  shopCity: z.string().max(120),
+  shopPostalCode: z.string().max(20),
+  shopPhone: z.string().max(40),
   ticketFooter: z.string().max(200),
   /** a USB stick or synced folder; "" = local backups only */
   backupSecondaryPath: z.string().max(500),
@@ -766,8 +775,28 @@ export const PrintRevealRequestSchema = z.object({
 export const PrintRevealResponseSchema = z.object({ ok: z.boolean() });
 
 /** Where tickets are saved — shown in Ajustes with a button to open it. */
-export const PrintTicketsDirRequestSchema = z.object({}).optional();
-export const PrintTicketsDirResponseSchema = z.object({ path: z.string() });
+/**
+ * Save a document as a PDF, wherever the shop wants it.
+ *
+ * `docKind` picks the renderer, because a repair receipt and a Z are not
+ * tickets and must not be rendered as one.
+ */
+export const PrintSavePdfRequestSchema = z.object({
+  docId: z.string(),
+  kind: z.enum(["ticket", "repair", "purchase", "shift"]).default("ticket"),
+  /** repair documents have four faces; ignored for every other kind */
+  what: z.enum(["intake", "quote", "receipt", "return"]).nullish(),
+  copy: z.boolean().default(false),
+});
+export const PrintSavePdfResponseSchema = z.union([
+  z.object({ kind: z.literal("saved"), path: z.string() }),
+  /** the shop closed the dialog: not an error, and not a silent no-op either */
+  z.object({ kind: z.literal("cancelled") }),
+]);
+
+/** Kick the drawer with nothing to sell — the "is it plugged in" test. */
+export const PrintTestDrawerRequestSchema = z.object({}).optional();
+export const PrintTestDrawerResponseSchema = z.object({ ok: z.boolean() });
 
 /* --------------------------------------------- first run + demo data --- */
 
@@ -2535,4 +2564,54 @@ export const SaleFindTicketRequestSchema = z.object({ query: z.string().trim().m
 export const SaleFindTicketResponseSchema = z.object({
   /** null = nothing matched, which the screen says rather than opening a blank */
   docId: z.string().nullable(),
+});
+
+/* -------------------------------------------- documents & series (v0.17.0) */
+
+/** Every completed document, one flat list, read-only. */
+export const DocsListRequestSchema = z
+  .object({
+    docType: z.enum(["ticket", "purchase", "repair", "refund"]).nullish(),
+    fromMs: z.number().int().nullish(),
+    toMs: z.number().int().nullish(),
+    search: z.string().trim().max(40).nullish(),
+    limit: z.number().int().min(1).max(500).default(200),
+  })
+  .default({ limit: 200 });
+
+export const DocsListResponseSchema = z.object({
+  rows: z.array(
+    z.object({
+      id: z.string(),
+      docNumber: z.string(),
+      docType: z.string(),
+      completedAtMs: z.number().int().nullable(),
+      totalCents: z.number().int(),
+      userName: z.string().nullable(),
+    }),
+  ),
+  /** true when the limit cut the list, so the screen can say so */
+  truncated: z.boolean(),
+});
+
+/**
+ * The numbering, shown and never edited.
+ *
+ * A series' next number is the guarantee behind gap-free numbering (ADR-0008).
+ * There is no editing path and there must never be one, so this is a response
+ * with no matching request.
+ */
+export const SettingsSeriesRequestSchema = z.object({}).optional();
+export const SettingsSeriesResponseSchema = z.object({
+  series: z.array(
+    z.object({
+      docType: z.string(),
+      prefix: z.string(),
+      nextNumber: z.number().int(),
+      /** what the next document will actually be called */
+      nextDocNumber: z.string(),
+    }),
+  ),
+  /** the regimes this till applies, also display-only (ADR-0007) */
+  taxRegimes: z.array(z.object({ code: z.string(), rateBp: z.number().int() })),
 });

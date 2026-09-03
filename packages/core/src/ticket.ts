@@ -96,6 +96,35 @@ export interface ShopProfile {
   nif: string;
   address: string;
   footerLine: string;
+  /* The rest of the letterhead (v0.17.0). All optional, and a blank one simply
+     does not print: a shop with no phone number should not get an empty line
+     where one would be, and a document is not improved by a placeholder. */
+  displayName?: string;
+  city?: string;
+  postalCode?: string;
+  phone?: string;
+}
+
+/**
+ * The shop's block, identically on every document that has one.
+ *
+ * One function rather than four copies, because the moment a ticket and a
+ * purchase document disagree about the shop's own address, one of them is
+ * wrong and nobody can tell which.
+ */
+export function shopHeaderLines(shop: ShopProfile): string[] {
+  const out = [shop.legalName];
+  /* a trading name goes UNDER the legal one: the legal name is what makes the
+     document valid, and the sign over the door is what the customer recognises */
+  if (shop.displayName?.trim() && shop.displayName.trim() !== shop.legalName.trim()) {
+    out.push(shop.displayName.trim());
+  }
+  out.push(`${TICKET_ES.nif} ${shop.nif}`);
+  out.push(shop.address);
+  const town = [shop.postalCode?.trim(), shop.city?.trim()].filter(Boolean).join(" ");
+  if (town) out.push(town);
+  if (shop.phone?.trim()) out.push(`${TICKET_ES.phone} ${shop.phone.trim()}`);
+  return out.filter((l) => l.trim() !== "");
 }
 
 /* ------------------------------------------------- fixed Spanish (ADR-0011) */
@@ -107,6 +136,7 @@ export const TICKET_ES = {
   brand: "ARKOM",
   tagline: "ELECTRONICS · PHONES",
   nif: "NIF",
+  phone: "Tel.",
   terminal: "Terminal",
   imei: "IMEI",
   modified: "MODIFICADO",
@@ -169,9 +199,9 @@ export function renderTicket(doc: TicketDoc, shop: ShopProfile, width: PaperWidt
   feed(1);
 
   /* ---- who the shop legally is (Ajustes, never hardcoded) ---- */
-  text(shop.legalName, { align: "center", bold: true });
-  text(`${TICKET_ES.nif} ${shop.nif}`, { align: "center" });
-  text(shop.address, { align: "center" });
+  const [legal, ...rest] = shopHeaderLines(shop);
+  text(legal!, { align: "center", bold: true });
+  for (const line of rest) text(line, { align: "center" });
 
   rule();
 

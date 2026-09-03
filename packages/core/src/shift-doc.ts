@@ -15,6 +15,7 @@
  * that cannot express a claim the facts do not support.
  */
 import { hasTransferActivity } from "./transfer";
+import { shopHeaderLines } from "./ticket";
 import { formatCents } from "./money";
 import { opBuilder, COLUMNS_BY_PAPER, type PaperWidthMm, type TicketOp } from "./print-ops";
 import type { ShiftTotals } from "./shift";
@@ -209,9 +210,9 @@ export function renderZReport(
   const METHOD_ES = METHOD_NAMES[locale];
   const REASON_ES = REASON_NAMES[locale];
 
-  b.text(shop.legalName, { align: "center", bold: true });
-  b.text(shop.nif, { align: "center" });
-  b.text(shop.address, { align: "center" });
+  const [legal, ...rest] = shopHeaderLines(shop);
+  b.text(legal!, { align: "center", bold: true });
+  for (const line of rest) b.text(line, { align: "center" });
   b.rule();
 
   /* bold, not double-width: "VISTA X (PROVISIONAL)" is 21 characters and a wide

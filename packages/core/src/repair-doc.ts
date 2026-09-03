@@ -14,6 +14,7 @@
  * not in the input type at all, so a future edit cannot add it by reaching for a
  * field that happens to be in scope.
  */
+import { shopHeaderLines } from "./ticket";
 import { formatCents } from "./money";
 import {
   COLUMNS_BY_PAPER,
@@ -178,9 +179,9 @@ export function renderIntakeReceipt(
   b.text(REPAIR_ES.brand, { align: "center", bold: true, size: "big" });
   b.text(letterSpaced(REPAIR_ES.tagline, cols), { align: "center" });
   b.feed(1);
-  b.text(shop.legalName, { align: "center", bold: true });
-  b.text(`${REPAIR_ES.nif} ${shop.nif}`, { align: "center" });
-  b.text(shop.address, { align: "center" });
+  const [legal, ...rest] = shopHeaderLines(shop);
+  b.text(legal!, { align: "center", bold: true });
+  for (const line of rest) b.text(line, { align: "center" });
 
   b.rule();
   b.text(REPAIR_ES.intakeTitle, { bold: true });
@@ -298,9 +299,9 @@ export function renderQuoteDoc(doc: QuoteDoc, shop: ShopProfile, width: PaperWid
   b.text(REPAIR_ES.brand, { align: "center", bold: true, size: "big" });
   b.text(letterSpaced(REPAIR_ES.tagline, cols), { align: "center" });
   b.feed(1);
-  b.text(shop.legalName, { align: "center", bold: true });
-  b.text(`${REPAIR_ES.nif} ${shop.nif}`, { align: "center" });
-  b.text(shop.address, { align: "center" });
+  const [legal, ...rest] = shopHeaderLines(shop);
+  b.text(legal!, { align: "center", bold: true });
+  for (const line of rest) b.text(line, { align: "center" });
 
   b.rule();
   b.text(REPAIR_ES.quoteTitle, { bold: true });
@@ -435,9 +436,9 @@ export function renderRepairReceipt(
   b.text(REPAIR_ES.brand, { align: "center", bold: true, size: "big" });
   b.text(letterSpaced(REPAIR_ES.tagline, cols), { align: "center" });
   b.feed(1);
-  b.text(shop.legalName, { align: "center", bold: true });
-  b.text(`${REPAIR_ES.nif} ${shop.nif}`, { align: "center" });
-  b.text(shop.address, { align: "center" });
+  const [legal, ...rest] = shopHeaderLines(shop);
+  b.text(legal!, { align: "center", bold: true });
+  for (const line of rest) b.text(line, { align: "center" });
 
   b.rule();
   b.text(REPAIR_ES.receiptTitle, { bold: true });
@@ -536,9 +537,9 @@ export function renderReturnDoc(doc: ReturnDoc, shop: ShopProfile, width: PaperW
   b.text(REPAIR_ES.brand, { align: "center", bold: true, size: "big" });
   b.text(letterSpaced(REPAIR_ES.tagline, cols), { align: "center" });
   b.feed(1);
-  b.text(shop.legalName, { align: "center", bold: true });
-  b.text(`${REPAIR_ES.nif} ${shop.nif}`, { align: "center" });
-  b.text(shop.address, { align: "center" });
+  const [legal, ...rest] = shopHeaderLines(shop);
+  b.text(legal!, { align: "center", bold: true });
+  for (const line of rest) b.text(line, { align: "center" });
 
   b.rule();
   b.text(REPAIR_ES.returnTitle, { bold: true });

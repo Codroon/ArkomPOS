@@ -10,7 +10,7 @@
  * Every attempt, successful or not, writes `document.print` to the oplog with
  * its target, so "did that ticket ever come out?" is answerable afterwards.
  */
-import { BrowserWindow, shell } from "electron";
+import { BrowserWindow, shell, dialog } from "electron";
 import { extname, resolve, sep } from "node:path";
 import { mkdir } from "node:fs/promises";
 import { and, eq } from "drizzle-orm";
@@ -50,10 +50,10 @@ import { openShift, shiftById, shiftTotals } from "../repos/shift";
 import { getDetail } from "../repos/repair";
 import { tillContext } from "../context";
 import { encodeEscPos } from "./escpos";
-import { renderTicketPdf, ticketsDir as ticketsDirPath } from "./pdf";
+import { pdfTempDir, renderTicketPdf } from "./pdf";
 import { sendRawToPrinter } from "./raw-windows";
 
-export { ticketsDir } from "./pdf";
+export { cleanPdfTemp, pdfTempDir } from "./pdf";
 
 /**
  * Open a saved ticket in the system viewer, or show it in the file manager.
@@ -64,10 +64,9 @@ export { ticketsDir } from "./pdf";
  */
 export async function revealTicket(path: string, mode: "open" | "folder"): Promise<{ ok: boolean }> {
   const target = resolve(path);
-  const dir = resolve(ticketsDirPath());
+  const dir = resolve(pdfTempDir());
 
-  // the tickets folder itself is openable — that is the "Abrir carpeta" button
-  // in Ajustes, and the folder is created lazily on the first save
+  // the render folder itself is openable, and created lazily on the first render
   if (target === dir) {
     await mkdir(dir, { recursive: true });
     const problem = await shell.openPath(dir);
@@ -887,15 +886,13 @@ function logShiftPrint(db: ArkomDb, ctx: MutationCtx, shiftId: string, after: Re
  * to the underlying rows must not silently rewrite a document somebody already
  * signed and filed. An X, by contrast, is a live computation by definition.
  */
-export async function printShiftReport(
+/** The frozen Z (or the live X) as a document — shared by print and save. */
+export function shiftReportDoc(
   db: ArkomDb,
   ctx: MutationCtx,
-  req: { shiftId?: string; what: "z" | "x"; target: "auto" | "pdf"; copy: boolean; locale?: "es" | "en" },
-): Promise<PrintTicketResponse> {
+  req: { shiftId?: string; what: "z" | "x"; copy: boolean },
+): ShiftReportDoc {
   const { users } = schema;
-  const settings = getSettings(db, ctx);
-  const shop = shopProfile(db, ctx);
-
   const shift = req.shiftId ? shiftById(db, req.shiftId) : openShift(db, ctx);
   if (!shift) throw appError("VALIDATION", "No hay ningún turno que imprimir.");
 
@@ -929,6 +926,19 @@ export async function printShiftReport(
     varianceReason: isZ ? snapshot!.varianceReason : null,
     approvedByName: isZ ? name(snapshot!.approvedByUserId) : null,
   };
+  return doc;
+}
+
+export async function printShiftReport(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  req: { shiftId?: string; what: "z" | "x"; target: "auto" | "pdf"; copy: boolean; locale?: "es" | "en" },
+): Promise<PrintTicketResponse> {
+  const settings = getSettings(db, ctx);
+  const shop = shopProfile(db, ctx);
+  const doc = shiftReportDoc(db, ctx, req);
+  const shift = (req.shiftId ? shiftById(db, req.shiftId) : openShift(db, ctx))!;
+  const isZ = doc.zDocNumber !== null;
 
   /* A Z is the shop talking to itself, so it follows the staff language — unlike
      a customer document, which stays fixed Spanish (ADR-0015 amendment). */
@@ -966,5 +976,101 @@ export async function printShiftReport(
     const path = await renderTicketPdf(ops, settings.paperWidthMm, fileBase);
     logShiftPrint(db, ctx, shift.id, { ok: true, target: "pdf", path, what, copy: req.copy, fallback: "PRINTER_FAILED" });
     return { kind: "pdf", path };
+  }
+}
+
+/* ------------------------------------------ save a PDF where asked (v0.17.0) */
+
+/**
+ * One document, one file, at a path the shop chose.
+ *
+ * The till stopped writing a PDF per sale: a reprint renders from the stored
+ * snapshot, so the file was a duplicate of a record that already existed and a
+ * slow leak of disk nobody swept. What is left is this — an explicit "Guardar
+ * PDF…", which is the only time a shop actually wants a file.
+ *
+ * Cancelling the dialog returns `cancelled` rather than throwing. Closing a
+ * save dialog is a decision, and a red toast for it would be the till arguing.
+ */
+export async function saveDocumentPdf(
+  db: ArkomDb,
+  ctx: MutationCtx,
+  req: { docId: string; kind: "ticket" | "repair" | "purchase" | "shift"; what?: string | null; copy: boolean },
+): Promise<{ kind: "saved"; path: string } | { kind: "cancelled" }> {
+  const settings = getSettings(db, ctx);
+  const shop = shopProfile(db, ctx);
+
+  let ops: TicketOp[];
+  let fileBase: string;
+
+  if (req.kind === "repair") {
+    const what = req.what ?? "intake";
+    const loaded =
+      what === "quote"
+        ? loadQuoteDoc(db, ctx, req.docId, req.copy)
+        : what === "receipt"
+          ? loadReceiptDoc(db, ctx, req.docId, req.copy)
+          : what === "return"
+            ? loadReturnDoc(db, ctx, req.docId, req.copy)
+            : loadIntakeDoc(db, ctx, req.docId, req.copy);
+    ops =
+      what === "quote"
+        ? renderQuoteDoc((loaded as { doc: QuoteDoc }).doc, shop, settings.paperWidthMm)
+        : what === "receipt"
+          ? renderRepairReceipt((loaded as { doc: RepairReceiptDoc }).doc, shop, settings.paperWidthMm)
+          : what === "return"
+            ? renderReturnDoc((loaded as { doc: ReturnDoc }).doc, shop, settings.paperWidthMm)
+            : renderIntakeReceipt((loaded as { doc: IntakeReceiptDoc }).doc, shop, settings.paperWidthMm);
+    fileBase = loaded.doc.docNumber || "REPARACION";
+  } else if (req.kind === "purchase") {
+    const loaded = loadPurchaseDoc(db, ctx, req.docId, req.copy);
+    ops = renderPurchaseDoc(loaded.doc, shop, settings.paperWidthMm);
+    fileBase = loaded.doc.docNumber || "COMPRA";
+  } else if (req.kind === "shift") {
+    const built = shiftReportDoc(db, ctx, { shiftId: req.docId, what: "z", copy: req.copy });
+    ops = renderZReport(built, shop, settings.paperWidthMm);
+    fileBase = built.zDocNumber ?? "X";
+  } else {
+    const doc = toTicketDoc(db, ctx, req.docId, req.copy);
+    ops = renderTicket(doc, shop, settings.paperWidthMm);
+    fileBase = doc.docNumber;
+  }
+
+  const chosen = await dialog.showSaveDialog({
+    defaultPath: `${fileBase}${req.copy ? "-COPIA" : ""}.pdf`,
+    filters: [{ name: "PDF", extensions: ["pdf"] }],
+  });
+  if (chosen.canceled || !chosen.filePath) return { kind: "cancelled" };
+
+  const path = await renderTicketPdf(ops, settings.paperWidthMm, fileBase, chosen.filePath);
+  logPrintAttempt(db, ctx, req.docId, { ok: true, target: "pdf", path, copy: req.copy, saved: true });
+  return { kind: "saved", path };
+}
+
+/**
+ * Kick the drawer with nothing to sell.
+ *
+ * The "is it plugged in" test, and the only way to answer it without ringing up
+ * a fake sale. It goes through the configured command set, because a drawer
+ * that opens on a test and not on a ticket has told the shop nothing.
+ */
+export async function testDrawerKick(db: ArkomDb, ctx: MutationCtx): Promise<{ ok: boolean }> {
+  const settings = getSettings(db, ctx);
+  if (!settings.printerName) throw appError("PRINT_FAILED", "No hay impresora configurada en Ajustes.");
+  /* the drawer is wired to the printer, so the pulse is a printer command with
+     no paper behind it */
+  const bytes = encodeEscPos([{ op: "drawer" }], settings.commandSet, settings.paperWidthMm);
+  try {
+    await sendRawToPrinter(settings.printerName, bytes);
+    mutate(makeMutateRunner(db), ctx, (_tx, log) => {
+      log({ entity: "printer", entityId: settings.printerName, action: "test", before: null, after: { drawer: true, ok: true } });
+    });
+    return { ok: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    mutate(makeMutateRunner(db), ctx, (_tx, log) => {
+      log({ entity: "printer", entityId: settings.printerName, action: "test", before: null, after: { drawer: true, ok: false, error: message } });
+    });
+    throw appError("PRINT_FAILED", message);
   }
 }

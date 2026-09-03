@@ -10,6 +10,7 @@
  * ADR-0011: fixed Spanish, never the UI dictionary. The seller is handed this;
  * flipping the staff locale to English must not change a character of it.
  */
+import { shopHeaderLines } from "./ticket";
 import { formatCents } from "./money";
 import {
   COLUMNS_BY_PAPER,
@@ -132,9 +133,9 @@ export function renderPurchaseDoc(
   b.text(PURCHASE_ES.brand, { align: "center", bold: true, size: "big" });
   b.text(letterSpaced(PURCHASE_ES.tagline, cols), { align: "center" });
   b.feed(1);
-  b.text(shop.legalName, { align: "center", bold: true });
-  b.text(`${PURCHASE_ES.nif} ${shop.nif}`, { align: "center" });
-  b.text(shop.address, { align: "center" });
+  const [legal, ...rest] = shopHeaderLines(shop);
+  b.text(legal!, { align: "center", bold: true });
+  for (const line of rest) b.text(line, { align: "center" });
 
   b.rule();
   b.text(PURCHASE_ES.title, { bold: true });

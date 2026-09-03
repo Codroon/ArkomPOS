@@ -27,6 +27,13 @@ export const DEFAULT_SETTINGS: Settings = {
   shopLegalName: "PENDIENTE — Razón social",
   shopNif: "PENDIENTE — NIF",
   shopAddress: "PENDIENTE — Dirección fiscal",
+  /* the rest of the letterhead. Blank rather than PENDIENTE: a missing phone
+     number simply does not print, whereas a legal name that is missing must
+     shout, because a ticket without one is not a valid document. */
+  shopDisplayName: "",
+  shopCity: "",
+  shopPostalCode: "",
+  shopPhone: "",
   ticketFooter: "Precios claros. Sin letra pequeña.",
   backupSecondaryPath: "", // local backups only until someone points it at a stick
   backupLastAtMs: 0,
@@ -104,6 +111,10 @@ export function shopProfile(db: ArkomDb, ctx: MutationCtx): ShopProfile {
     nif: s.shopNif,
     address: s.shopAddress,
     footerLine: s.ticketFooter,
+    displayName: s.shopDisplayName,
+    city: s.shopCity,
+    postalCode: s.shopPostalCode,
+    phone: s.shopPhone,
   };
 }
 

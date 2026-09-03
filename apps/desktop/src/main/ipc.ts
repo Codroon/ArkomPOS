@@ -111,8 +111,14 @@ import {
   PrintTestResponseSchema,
   PrintRevealRequestSchema,
   PrintRevealResponseSchema,
-  PrintTicketsDirRequestSchema,
-  PrintTicketsDirResponseSchema,
+  PrintSavePdfRequestSchema,
+  PrintSavePdfResponseSchema,
+  PrintTestDrawerRequestSchema,
+  PrintTestDrawerResponseSchema,
+  DocsListRequestSchema,
+  DocsListResponseSchema,
+  SettingsSeriesRequestSchema,
+  SettingsSeriesResponseSchema,
   SetupStatusRequestSchema,
   SetupStatusResponseSchema,
   SetupCompleteRequestSchema,
@@ -262,6 +268,7 @@ import {
   setVerification,
 } from "./repos/transfer";
 import { createRefund, findTicketByNumber, peekRefundable } from "./repos/refund";
+import { listDocuments, seriesOverview } from "./repos/documents";
 import {
   addCode,
   createGroup,
@@ -354,7 +361,8 @@ import {
   printTest,
   printTicket,
   revealTicket,
-  ticketsDir,
+  saveDocumentPdf,
+  testDrawerKick,
   printRecoveryCode,
   printShiftReport,
 } from "./print";
@@ -867,9 +875,26 @@ export function registerIpcHandlers(db: ArkomDb): void {
   guarded("print:reveal", "sale.create", PrintRevealRequestSchema, PrintRevealResponseSchema, (_s, { path, mode }) =>
     revealTicket(path, mode),
   );
-  guarded("print:ticketsDir", "sale.create", PrintTicketsDirRequestSchema, PrintTicketsDirResponseSchema, () => ({
-    path: ticketsDir(),
-  }));
+  /* Save a document as a PDF WHERE THE SHOP CHOSE. The till stopped writing one
+     per sale in v0.17.0: the reprint renders from the stored snapshot, so the
+     file was a duplicate of a record that already existed. */
+  guarded("print:savePdf", "sale.create", PrintSavePdfRequestSchema, PrintSavePdfResponseSchema, (s, input) =>
+    saveDocumentPdf(db, s.ctx, input),
+  );
+  /* the "is it plugged in" test: a drawer pulse with no sale behind it */
+  guarded("print:testDrawer", "settings.edit", PrintTestDrawerRequestSchema, PrintTestDrawerResponseSchema, (s) =>
+    testDrawerKick(db, s.ctx),
+  );
+
+  /* Every completed document, one flat read-only list (v0.17.0). */
+  guarded("docs:list", "sale.create", DocsListRequestSchema, DocsListResponseSchema, (s, input) =>
+    listDocuments(db, s.ctx, input),
+  );
+  /* Numbering and regimes, SHOWN. There is no editing path and there must not
+     be one: a series' next number is the gap-free guarantee (ADR-0008). */
+  guarded("settings:series", "settings.edit", SettingsSeriesRequestSchema, SettingsSeriesResponseSchema, (s) =>
+    seriesOverview(db, s.ctx),
+  );
 
   /* ---- users administration ---- */
 

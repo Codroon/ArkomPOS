@@ -12,8 +12,8 @@
  * one continuous receipt comes out rather than an A4 sheet with a stub on it.
  */
 import { BrowserWindow, app } from "electron";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { TICKET_ES, type PaperWidthMm, type TicketOp } from "@arkom/core";
 
@@ -183,9 +183,43 @@ ${opsToHtmlRows(ops)}
 </body></html>`;
 }
 
-/** Where tickets land. Stable per install, and somewhere the owner can find. */
-export function ticketsDir(): string {
-  return join(app.getPath("userData"), "tickets");
+/**
+ * Where a rendered PDF lands when nobody asked for a file.
+ *
+ * A folder full of one PDF per sale was a filing cabinet nobody opened: the
+ * shop reprints from the DOCUMENT, which renders from its stored snapshot, so
+ * the file was a duplicate of a record that already existed and a slow leak of
+ * disk. Renders now go to a temp directory that is emptied at every launch, and
+ * a PDF the shop actually wants is written by "Guardar PDF…" to a path they
+ * chose (v0.17.0).
+ */
+export function pdfTempDir(): string {
+  return join(app.getPath("temp"), "arkom-pdf");
+}
+
+/**
+ * Clear last session's renders.
+ *
+ * At startup rather than after opening one: the viewer may still hold the file,
+ * and a till that deletes a PDF out from under the window showing it has traded
+ * a tidy folder for a support call.
+ */
+export async function cleanPdfTemp(): Promise<number> {
+  try {
+    const names = await readdir(pdfTempDir());
+    let removed = 0;
+    for (const name of names) {
+      try {
+        await rm(join(pdfTempDir(), name), { force: true });
+        removed += 1;
+      } catch {
+        /* a file the OS still has open: it goes next launch */
+      }
+    }
+    return removed;
+  } catch {
+    return 0; // never rendered anything yet
+  }
 }
 
 /**
@@ -193,13 +227,22 @@ export function ticketsDir(): string {
  * given ticket on purpose: a document is immutable, so re-rendering it should
  * not litter the folder with T1-000042 (3).pdf.
  */
+/**
+ * Render to a PDF file.
+ *
+ * `destination` decides where it lands and is the whole of the difference: a
+ * path the shop picked in a save dialog, or the temp directory for the
+ * no-printer fallback. Nothing is written per-document as a side effect of
+ * selling any more.
+ */
 export async function renderTicketPdf(
   ops: TicketOp[],
   paperWidthMm: PaperWidthMm,
   fileBase: string,
+  destination?: string,
 ): Promise<string> {
-  const dir = ticketsDir();
-  await mkdir(dir, { recursive: true });
+  const out = destination ?? join(pdfTempDir(), `${fileBase}.pdf`);
+  await mkdir(dirname(out), { recursive: true });
 
   const htmlPath = join(app.getPath("temp"), `arkom-ticket-${Date.now()}.html`);
   await writeFile(htmlPath, await buildHtml(ops, paperWidthMm), "utf8");
@@ -228,7 +271,6 @@ export async function renderTicketPdf(
       },
     });
 
-    const out = join(dir, `${fileBase}.pdf`);
     await writeFile(out, pdf);
     return out;
   } finally {

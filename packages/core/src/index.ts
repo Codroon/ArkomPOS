@@ -260,6 +260,7 @@ export {
 export type { TransferKind, TransferStatus, TransferMethod, TransferFact, TransferTotals } from "./transfer";
 export { computeRefund, reverseLine, remainingQty, returnsToReview, canRestock } from "./refund";
 export type { RefundableLine, RefundLineRequest, RefundTotals } from "./refund";
+export { shopHeaderLines } from "./ticket";
 export { opsToText, opBuilder } from "./print-ops";
 export { renderZReport, SHIFT_ES, SHIFT_EN, shiftLabels } from "./shift-doc";
 export type { ShiftReportDoc, ShiftLabels, ShiftDocLocale } from "./shift-doc";
@@ -428,8 +429,14 @@ export {
   PrintTestResponseSchema,
   PrintRevealRequestSchema,
   PrintRevealResponseSchema,
-  PrintTicketsDirRequestSchema,
-  PrintTicketsDirResponseSchema,
+  PrintSavePdfRequestSchema,
+  PrintSavePdfResponseSchema,
+  PrintTestDrawerRequestSchema,
+  PrintTestDrawerResponseSchema,
+  DocsListRequestSchema,
+  DocsListResponseSchema,
+  SettingsSeriesRequestSchema,
+  SettingsSeriesResponseSchema,
   SetupStatusRequestSchema,
   SetupStatusResponseSchema,
   SetupCompleteRequestSchema,
