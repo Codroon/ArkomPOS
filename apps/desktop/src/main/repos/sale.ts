@@ -37,6 +37,7 @@ import {
 import { schema, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner, type DbTx } from "../mutate-runner";
 import { currentShiftId } from "./shift";
+import { getSettings } from "./settings";
 
 const {
   documents,
@@ -185,7 +186,7 @@ interface SellableProduct {
  * accounting matter its gestor settles from the purchase and sale prices, both
  * of which this app records.
  */
-function assertSellable(product: typeof products.$inferSelect): SellableProduct {
+function assertSellable(product: typeof products.$inferSelect, vatRateBp: number): SellableProduct {
   if (!product.active) throw appError("VALIDATION", "Artículo inactivo; no se puede vender.");
   if (product.priceCents == null || product.taxRegime == null || product.taxRateBp == null) {
     throw appError("VALIDATION", "Artículo incompleto (PVP/IVA); complétalo en Catálogo.");
@@ -199,13 +200,17 @@ function assertSellable(product: typeof products.$inferSelect): SellableProduct 
     itemType: product.itemType,
     priceCents: product.priceCents,
     taxRegime: product.taxRegime,
-    taxRateBp: product.taxRegime === "REBU" ? 0 : product.taxRateBp,
+    /* the rate is the till's CURRENT general rate, not the figure the product
+       row happens to carry: a product saved under 21 % sells at 10 % the day
+       Ajustes says so, and the line it lands on keeps 10 % forever (ADR-0007 A1) */
+    taxRateBp: product.taxRegime === "REBU" ? 0 : vatRateBp,
   };
 }
 
 /* ------------------------------ addLine ------------------------------ */
 
 export function addLine(db: ArkomDb, ctx: MutationCtx, req: SaleAddLineRequest): SaleAddLineResponse {
+  const { vatRateBp } = getSettings(db, ctx);
   // resolve OUTSIDE any transaction: the unit-pick path is a pure read
   let unitToAdd: (typeof units.$inferSelect) | null = null;
   let productToAdd: SellableProduct | null = null;
@@ -229,7 +234,7 @@ export function addLine(db: ArkomDb, ctx: MutationCtx, req: SaleAddLineRequest):
       )
       .all()[0];
     if (product) {
-      const sellable = assertSellable(product);
+      const sellable = assertSellable(product, vatRateBp);
       if (isSerializedItem(sellable.itemType)) {
         // handoff 01: scanning/tapping a serialized product opens the unit-pick modal
         const options = db
@@ -328,7 +333,7 @@ export function addLine(db: ArkomDb, ctx: MutationCtx, req: SaleAddLineRequest):
         throw appError("UNIT_NOT_AVAILABLE", "Esa unidad no está disponible.");
       }
       const product = tx.select().from(products).where(eq(products.id, unitToAdd.productId)).all()[0]!;
-      const sellable = assertSellable(product);
+      const sellable = assertSellable(product, vatRateBp);
       /* The unit's price wins when it has one, which is the schema's rule read
          forwards: NULL means "inherit the product's" and every phone bought
          over the counter is priced individually. Without this a used device
@@ -810,6 +815,7 @@ export function peek(db: ArkomDb, ctx: MutationCtx, docId: string): TicketPeek {
       imei,
       priceOverridden: line.priceOverridden,
       taxRegime: line.taxRegime,
+      taxRateBp: line.taxRateBp,
     })),
     subtotalCents: doc.subtotalCents,
     taxCents: doc.taxCents,

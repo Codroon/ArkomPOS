@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import type { TicketPeek } from "@arkom/core";
 import { GhostButton, MoneyText, SectionLabel, useT, type TKey, useDataLabel } from "@arkom/ui";
 import { useTicketPrint } from "../lib/use-ticket-print";
+import { vatLabelFor } from "../lib/vat-label";
 import { useCan } from "../lib/use-session";
 import { errorMessage } from "../lib/errors";
 import { RefundDialog } from "./refund-dialog";
@@ -106,7 +107,7 @@ export function TicketPeekModal({ docId, onClose }: { docId: string; onClose: ()
                   <MoneyText cents={peek.subtotalCents} />
                 </div>
                 <div className="flex justify-between text-muted">
-                  <span>{t("sale.iva21")}</span>
+                  <span>{vatLabelFor(t, peek.lines)}</span>
                   <MoneyText cents={peek.taxCents} />
                 </div>
                 <div className="flex justify-between text-[14px] font-bold">

@@ -133,6 +133,12 @@ function toTicketDoc(db: ArkomDb, ctx: MutationCtx, docId: string, isCopy: boole
     ...(refundOf ? { refundOf } : {}),
     docNumber: ticket.docNumber,
     completedAtMs: ticket.completedAtMs,
+    // the rate the taxed lines were sold at, for the "IVA 21%" label; a ticket
+    // of margin-scheme lines only has none to name
+    vatRateBp: ticket.lines.reduce<number | undefined>(
+      (top, l) => ((l.taxRateBp ?? 0) > 0 && (l.taxRateBp ?? 0) > (top ?? 0) ? (l.taxRateBp ?? 0) : top),
+      undefined,
+    ),
     terminalName: tillContext(db).meta.terminal.name,
     isCopy,
     lines: ticket.lines,
@@ -581,7 +587,7 @@ function loadReceiptDoc(
       lines: lines.map((l) => ({ description: l.description, qty: l.qty, chargeCents: l.totalCents })),
       subtotalCents: doc.subtotalCents,
       taxCents: doc.taxCents,
-      taxRateBp: lines[0]?.taxRateBp ?? 2100,
+      taxRateBp: lines[0]?.taxRateBp ?? getSettings(db, ctx).vatRateBp,
       totalCents: doc.totalCents,
       tenders: tenders.map((t) => ({
         method: TENDER_ES[t.method] ?? t.method,

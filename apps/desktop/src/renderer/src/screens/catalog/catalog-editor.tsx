@@ -16,11 +16,9 @@ import {
   Field,
   AccentButton,
   GhostButton,
-  LockedButton,
   SectionLabel,
   Segmented,
   SelectInput,
-  Switch,
   TextInput,
   useT,
   type SegmentOption,
@@ -31,7 +29,7 @@ import { ConfirmDialog } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
 import { noteGroup, refreshGroups, useGroups } from "../../components/group-picker";
 import { PickOrCreateField } from "../../components/pick-or-create";
-import { resolveErrorText, type Draft, type DraftErrors } from "./model";
+import { expectedRegime, resolveErrorText, type Draft, type DraftErrors } from "./model";
 
 /**
  * Additional codes: every other code this item answers to. Attaching one that
@@ -158,6 +156,10 @@ export function CatalogEditor({
   onPatch,
   onSave,
   onCancel,
+  vatRateBp,
+  canRemove,
+  onRemove,
+  onRestore,
 }: {
   draft: Draft | null;
   errors: DraftErrors;
@@ -167,6 +169,12 @@ export function CatalogEditor({
   onPatch: (patch: Partial<Draft>) => void;
   onSave: () => void;
   onCancel: () => void;
+  /** the till's general rate, for the label of the one option that applies */
+  vatRateBp: number | null;
+  canRemove: boolean;
+  /** Eliminar: deletes a row nothing points at, archives one with history */
+  onRemove: () => void;
+  onRestore: () => void;
 }) {
   const t = useT();
 
@@ -181,14 +189,16 @@ export function CatalogEditor({
     );
   }
 
-  const typeOptions: SegmentOption<Draft["itemType"] | "used_device" | "service" | "repair" | "agency">[] = [
+  /* Standard, serialized, used and repair. Service and agency lines exist in
+     the schema and wait for their own screens — a disabled option is a promise,
+     and the editor makes none (v0.18.0). */
+  const typeOptions: SegmentOption<Draft["itemType"]>[] = [
     { value: "stocked", label: t("editor.type.stocked") },
     { value: "serialized", label: t("editor.type.serialized") },
-    { value: "used_device", label: t("editor.type.used"), disabled: true },
-    { value: "service", label: t("editor.type.service"), disabled: true },
-    { value: "repair", label: t("editor.type.repair"), disabled: true },
-    { value: "agency", label: t("editor.type.agency"), disabled: true },
+    { value: "used_device", label: t("editor.type.used") },
+    { value: "repair", label: t("editor.type.repair") },
   ];
+  const regime = expectedRegime(draft.itemType);
 
   const cost = parseMoneyInput(draft.costInput);
   const price = parseMoneyInput(draft.priceInput);
@@ -278,18 +288,25 @@ export function CatalogEditor({
               placeholder={t("editor.moneyPlaceholder")}
             />
           </Field>
-          <Field label={t("editor.tax")} required error={err("taxRegime")}>
+          <Field
+            label={t("editor.tax")}
+            required
+            error={err("taxRegime")}
+            hint={regime === "REBU" ? t("editor.usedTypeHint") : null}
+          >
+            {/* one option: the regime the type calls for. A row migrated with
+                none (or the other) shows the dash until it is picked. */}
             <SelectInput
               requiredStyle
-              value={draft.taxRegime}
-              onChange={(e) => onPatch({ taxRegime: e.target.value === "IVA21" ? "IVA21" : "" })}
+              value={draft.taxRegime === regime ? regime : ""}
+              onChange={(e) => onPatch({ taxRegime: e.target.value === regime ? regime : "" })}
             >
-              {draft.taxRegime === "" ? <option value="">{t("common.dash")}</option> : null}
-              <option value="IVA21">{t("editor.tax21")}</option>
-              <option disabled>{t("editor.tax10Soon")}</option>
-              <option disabled>{t("editor.tax4Soon")}</option>
-              <option disabled>{t("editor.taxRebuSoon")}</option>
-              <option disabled>{t("editor.taxExemptSoon")}</option>
+              {draft.taxRegime !== regime ? <option value="">{t("common.dash")}</option> : null}
+              <option value={regime}>
+                {regime === "REBU"
+                  ? t("editor.taxRebu")
+                  : t("editor.taxStandard", { pct: vatRateBp === null ? "…" : vatRateBp / 100 })}
+              </option>
             </SelectInput>
           </Field>
         </div>
@@ -311,9 +328,8 @@ export function CatalogEditor({
           <Segmented
             options={typeOptions}
             value={draft.itemType}
-            onChange={(v) => {
-              if (v === "stocked" || v === "serialized") onPatch({ itemType: v });
-            }}
+            // the regime follows the type (ADR-0007 A1)
+            onChange={(v) => onPatch({ itemType: v, taxRegime: expectedRegime(v) })}
           />
           {err("itemType") ? (
             <div className="text-[11px] leading-snug text-ink-2">{err("itemType")}</div>
@@ -341,16 +357,8 @@ export function CatalogEditor({
           </Field>
         </div>
 
-        <div className="flex items-center justify-between border-t border-line pt-3">
-          <SectionLabel>{t("editor.active")}</SectionLabel>
-          <Switch
-            checked={draft.active}
-            onChange={(v) => onPatch({ active: v })}
-            label={draft.active ? t("common.yes") : t("common.no")}
-          />
-        </div>
         {!draft.active ? (
-          <div className="text-[11px] leading-snug text-subtle">{t("editor.inactiveHint")}</div>
+          <div className="border-t border-line pt-3 text-[11px] leading-snug text-subtle">{t("editor.archivedHint")}</div>
         ) : null}
       </div>
 
@@ -363,7 +371,13 @@ export function CatalogEditor({
           </AccentButton>
           <GhostButton onClick={onCancel}>{t("common.cancel")}</GhostButton>
           <div className="flex-1" />
-          <LockedButton title={t("editor.deleteLockedHint")}>{t("editor.delete")}</LockedButton>
+          {draft.id && canRemove ? (
+            draft.active ? (
+              <GhostButton onClick={onRemove}>{t("editor.delete")}</GhostButton>
+            ) : (
+              <GhostButton onClick={onRestore}>{t("editor.restore")}</GhostButton>
+            )
+          ) : null}
         </div>
       </div>
     </div>

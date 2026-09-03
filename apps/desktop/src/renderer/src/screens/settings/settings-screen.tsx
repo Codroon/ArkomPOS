@@ -43,7 +43,6 @@ import { fileNameOf } from "../../lib/use-ticket-print";
 import { BackupPanel } from "./backup-panel";
 
 /** Shown beneath any field the seed left as a placeholder. */
-const PENDING = "PENDIENTE";
 
 export function SettingsScreen() {
   const t = useT();
@@ -264,20 +263,17 @@ export function SettingsScreen() {
               label={t("set.legalName")}
               value={settings.shopLegalName}
               onCommit={(v) => void save({ shopLegalName: v })}
-              pendingHint={t("set.pendingHint")}
             />
             <ShopField
               label={t("set.nif")}
               value={settings.shopNif}
               mono
               onCommit={(v) => void save({ shopNif: v })}
-              pendingHint={t("set.pendingHint")}
             />
             <ShopField
               label={t("set.address")}
               value={settings.shopAddress}
               onCommit={(v) => void save({ shopAddress: v })}
-              pendingHint={t("set.pendingHint")}
             />
             <div className="grid grid-cols-2 gap-2">
               <ShopField
@@ -311,9 +307,15 @@ export function SettingsScreen() {
             <div className="flex flex-col gap-1">
               <div className="text-[10px] font-bold uppercase tracking-[.1em] text-muted">{t("set.taxes")}</div>
               {(series?.taxRegimes ?? []).map((r) => (
-                <div key={r.code} className="flex justify-between text-[12px]">
+                <div key={r.code} className="flex items-center justify-between text-[12px]">
                   <span>{t(TAX_LABEL[r.code] ?? "common.dash")}</span>
-                  <span className="font-mono tabular-nums text-ink-2">{(r.rateBp / 100).toFixed(0)} %</span>
+                  {r.code === "IVA21" ? (
+                    /* the one figure that is the till's to hold: the general
+                       rate, applied to lines from now on (ADR-0007 A1) */
+                    <VatRateSetting rateBp={settings.vatRateBp} onCommit={(bp) => void save({ vatRateBp: bp })} />
+                  ) : (
+                    <span className="font-mono tabular-nums text-ink-2">{(r.rateBp / 100).toFixed(0)} %</span>
+                  )}
                 </div>
               ))}
               <div className="text-[11px] leading-snug text-subtle">{t("set.taxesHint")}</div>
@@ -554,22 +556,19 @@ function ShopField({
   value,
   onCommit,
   hint,
-  pendingHint,
   mono,
 }: {
   label: string;
   value: string;
   onCommit: (next: string) => void;
   hint?: string;
-  pendingHint?: string;
   mono?: boolean;
 }) {
   const [draft, setDraft] = useState(value);
   useEffect(() => setDraft(value), [value]);
-  const isPending = value.startsWith(PENDING);
 
   return (
-    <Field label={label} hint={isPending ? (pendingHint ?? null) : (hint ?? null)}>
+    <Field label={label} hint={hint ?? null}>
       <TextInput
         value={draft}
         mono={mono}
@@ -580,6 +579,40 @@ function ShopField({
         }}
       />
     </Field>
+  );
+}
+
+/**
+ * The general VAT rate, in percent. Commits on blur; anything outside 0–100
+ * puts the stored figure back rather than saving a typo onto every new line.
+ */
+function VatRateSetting({ rateBp, onCommit }: { rateBp: number; onCommit: (bp: number) => void }) {
+  const [draft, setDraft] = useState(() => String(rateBp / 100));
+  useEffect(() => setDraft(String(rateBp / 100)), [rateBp]);
+  const commit = () => {
+    const n = Number(draft.trim().replace(",", "."));
+    if (!Number.isFinite(n) || n < 0 || n > 100) {
+      setDraft(String(rateBp / 100));
+      return;
+    }
+    const bp = Math.round(n * 100);
+    if (bp !== rateBp) onCommit(bp);
+  };
+  return (
+    <div className="flex items-center gap-1.5">
+      <TextInput
+        mono
+        className="h-6 w-[56px] text-right"
+        inputMode="decimal"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+      />
+      <span className="font-mono text-[12px] text-muted">%</span>
+    </div>
   );
 }
 

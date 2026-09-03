@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { formatCents, type SaleLineRow, type SaleState } from "@arkom/core";
 import { Chip, cn, MoneyText, useT, useDataLabel, GhostButton } from "@arkom/ui";
+import { vatLabelFor } from "../../lib/vat-label";
 
 function LineRow({
   line,
@@ -186,7 +187,7 @@ export function TicketPanel({
           <MoneyText cents={sale?.subtotalCents ?? 0} />
         </div>
         <div className="flex justify-between text-[11px] text-muted">
-          <span className="font-sans">{t("sale.iva21")}</span>
+          <span className="font-sans">{vatLabelFor(t, sale?.lines)}</span>
           <MoneyText cents={sale?.taxCents ?? 0} />
         </div>
         <div className="mt-1 flex items-baseline justify-between">

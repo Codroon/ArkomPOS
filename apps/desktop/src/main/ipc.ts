@@ -22,7 +22,7 @@
  * `ipc-registry.test.ts` fails the build if any channel in IPC_CHANNELS is
  * registered by none of the three — "forgot to think about it" cannot compile.
  */
-import { BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { mkdir } from "node:fs/promises";
 import { z, ZodError } from "zod";
 import {
@@ -38,6 +38,12 @@ import {
   CatalogGetResponseSchema,
   CatalogSaveRequestSchema,
   CatalogSaveResponseSchema,
+  CatalogRemovalRequestSchema,
+  CatalogRemovalResponseSchema,
+  CatalogRemoveRequestSchema,
+  CatalogRemoveResponseSchema,
+  CatalogRestoreRequestSchema,
+  CatalogRestoreResponseSchema,
   CatalogGroupsRequestSchema,
   CatalogGroupsResponseSchema,
   CatalogCodesRequestSchema,
@@ -276,8 +282,11 @@ import {
   listCodes,
   listGroups,
   listProducts,
+  removalOf,
   removeCode,
+  removeProduct,
   renameGroup,
+  restoreProduct,
   saveProduct,
 } from "./repos/catalog";
 import { resolveScanCode } from "./repos/scan";
@@ -644,15 +653,26 @@ export function registerIpcHandlers(db: ArkomDb): void {
 
   /* ---- open: everything the Login and setup screens need ---- */
 
-  open("meta:context", MetaContextRequestSchema, MetaContextResponseSchema, () => tillContext(db).meta);
+  open("meta:context", MetaContextRequestSchema, MetaContextResponseSchema, () => {
+    const { meta, ctx } = tillContext(db);
+    // read live, not cached with the till: Ajustes may have changed it today
+    return { ...meta, vatRateBp: getSettings(db, ctx).vatRateBp };
+  });
 
   open("setup:status", SetupStatusRequestSchema, SetupStatusResponseSchema, () => ({
     needed: isSetupNeeded(db),
     // a v0.9.0 till that upgraded has a shop but no users yet (spec I2)
     ownerNeeded: !isSetupNeeded(db) && !hasAnyUser(db, tillContext(db).ctx),
+    packaged: app.isPackaged,
   }));
 
   open("setup:complete", SetupCompleteRequestSchema, SetupCompleteResponseSchema, (input) => {
+    /* the demo dataset is a development convenience; an installed till starts
+       with its shelves and nothing on them (v0.18.0). Refused here and not only
+       hidden by the dialog, for the same reason every guard lives in main. */
+    if (app.isPackaged && input.loadDemo) {
+      throw appError("VALIDATION", "Una caja instalada empieza sin datos de ejemplo.");
+    }
     const result = completeFirstRun(db, input);
     resetTillContext();
     return result;
@@ -767,6 +787,18 @@ export function registerIpcHandlers(db: ArkomDb): void {
     CatalogSaveRequestSchema,
     CatalogSaveResponseSchema,
     (s, input) => saveProduct(db, s.ctx, input),
+  );
+  /* Eliminar (v0.18.0): a question, then an act. Behind catalog.edit because
+     archiving is an edit of the row and deleting is only offered for a row
+     nothing points at — the repo decides which, never the renderer. */
+  guarded("catalog:removal", "catalog.view", CatalogRemovalRequestSchema, CatalogRemovalResponseSchema, (s, { id }) =>
+    removalOf(db, s.ctx, id),
+  );
+  guarded("catalog:remove", "catalog.edit", CatalogRemoveRequestSchema, CatalogRemoveResponseSchema, (s, { id }) =>
+    removeProduct(db, s.ctx, id),
+  );
+  guarded("catalog:restore", "catalog.edit", CatalogRestoreRequestSchema, CatalogRestoreResponseSchema, (s, { id }) =>
+    restoreProduct(db, s.ctx, id),
   );
   guarded("catalog:addCode", "catalog.attach_code", CatalogAddCodeRequestSchema, CatalogAddCodeResponseSchema, (s, req) =>
     addCode(db, s.ctx, req),

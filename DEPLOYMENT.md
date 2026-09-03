@@ -73,25 +73,25 @@ time, so it is deliberately not blocking the shop visit).
 
 The app opens on a welcome screen instead of the till. It asks for:
 
-1. **Shop details** — registered name, NIF, registered address, and the footer
-   line for the ticket. **Bring the real fiscal data to the shop visit.** These
-   three print at the top of every ticket the customer keeps.
+0. **Language.** The toggle in the corner sets the staff language for the
+   screens and for the starter data (group names, the drawer's one-tap
+   concepts). Printed tickets are always Spanish, whatever is chosen here.
+1. **Shop details** — registered name, NIF, registered address, then postcode,
+   town and phone, and the footer line for the ticket. **Bring the real fiscal
+   data to the shop visit.** The first three are the legal block on every ticket
+   the customer keeps; the rest print under it when filled in. Nothing is
+   pre-filled: a field left blank simply does not print.
 2. **Till name and ticket prefix.** The prefix is how tickets are numbered:
    `T1-000001`, `T1-000002`, and so on. **It cannot be changed afterwards** —
    ticket numbering must be gap-free and continuous, so agree it with the owner
    before pressing Start.
-3. **Demo data or empty.**
-   - *Load demo data* puts 29 sample items with stock in the catalogue, so the
-     till can be demonstrated immediately. It can be removed later in
-     **Ajustes → Datos de demostración**, but **only until the first ticket is
-     issued** — after that the sample rows are part of the shop's books and
-     removal is refused.
-   - *Start empty* is the right choice if the owner's real stock is going in
-     that same day.
-
-4. **The shop's responsable.** A name and a 4–6 digit PIN, typed twice. This is
+3. **The shop's responsable.** A name and a 4–6 digit PIN, typed twice. This is
    the person who can manage users, change settings and authorise a discount.
    Weak PINs are refused — no `1234`, no `1111`, no runs of digits.
+
+An installed till starts **empty**: twelve shelves (groups) in the chosen
+language and nothing on them. The demo dataset exists only for development and
+is neither offered nor accepted on an installed build.
 
 Everything except the prefix can be changed later in **Ajustes**.
 
@@ -99,7 +99,8 @@ Everything except the prefix can be changed later in **Ajustes**.
 
 Immediately after the owner is created the till shows a **12-character recovery
 code, once**, with an **Imprimir** button. Print it and put it in the shop's
-folder or safe.
+folder or safe. With no printer configured yet the same button produces a PDF
+and opens it — print that from the PC, or save it somewhere the owner controls.
 
 It is the **only** way back in if the owner forgets their PIN. There is no
 master PIN and no vendor override — deliberately, because a till the developer
@@ -201,14 +202,18 @@ turn on *View → Show → Hidden items*.
 | What | Exact path |
 |---|---|
 | **The database** (everything: products, stock, tickets, takings) | `…\Arkom POS\arkom-pos.db` |
-| Ticket PDFs | `…\Arkom POS\tickets\` |
 | **Photos of used devices** | `…\Arkom POS\photos\` |
 | Backups | `…\Arkom POS\backups\` |
 | Error log | `…\Arkom POS\logs\arkom.log` |
 | The program itself | `C:\Users\<user>\AppData\Local\Programs\arkom-pos\` |
 
-The app shows the first three inside **Ajustes**, each with a button that opens
+Ajustes shows the database and backup locations, each with a button that opens
 the folder — easier than typing the path.
+
+Nothing is filed per ticket. A document is kept in the database and re-rendered
+on demand: **Reimprimir** on any ticket, or **Guardar PDF…** to write a copy
+exactly where you choose. When no printer is configured, the fallback PDF opens
+from a temporary folder that is emptied at every launch.
 
 > You may see `arkom-pos.db-wal` and `arkom-pos.db-shm` next to the database.
 > They are part of it while the app is running. **Copy all three, or none.**
@@ -369,9 +374,9 @@ In order. Do not skip ahead — each step assumes the one above worked.
 
 - [ ] **1. Install.** Run the installer, click through SmartScreen (§2). It
       launches itself.
-- [ ] **2. First run with the REAL data.** Registered name, NIF, address, footer.
-      Agree the ticket prefix with the owner — it is permanent. Choose demo data
-      or empty (§3).
+- [ ] **2. First run with the REAL data.** Language, then registered name, NIF,
+      address, postcode, town, phone, footer. Agree the ticket prefix with the
+      owner — it is permanent. The till starts empty (§3).
 - [ ] **2b. Create the responsable.** The owner picks their own PIN — you should
       not know it. **Print the recovery code and watch them put it somewhere
       safe** before continuing (§3).
@@ -395,7 +400,8 @@ In order. Do not skip ahead — each step assumes the one above worked.
 - [ ] **7. Check the ticket.** The paper ticket should carry the shop's real name
       and NIF, both items, the IMEI on the phone's line, the total with
       **IVA INCLUIDO**, and the change. **The cash drawer should have opened.**
-      Then check the PDF of the same sale in `…\Arkom POS\tickets\`.
+      Then open the same sale from **13 Documentos** and use **Guardar PDF…**
+      once, to confirm the PDF path works too.
 - [ ] **8. Reprint.** From the ticket, press **Reimprimir**. It comes out stamped
       **COPIA**, and the drawer stays shut.
 - [ ] **9. Second backup destination.** Plug in the stick, Ajustes → Copia de
@@ -410,6 +416,26 @@ In order. Do not skip ahead — each step assumes the one above worked.
 - [ ] **13. Have a cashier sign in and sell one thing**, so they have done it
       once with you standing there. Then have them try a price change and let
       the owner authorise it.
+
+### Factory reset for go-live
+
+A till that has been used for training, demos or a dry run should go live from
+nothing rather than from a catalogue full of practice sales. There is no button
+for this on purpose — wiping the books is not something a screen should offer.
+With the app closed:
+
+1. Take one last backup if anything in it might be wanted (Ajustes → **Copiar
+   ahora**, or copy the newest file from `…\Arkom POS\backups\`).
+2. Rename the data folder `C:\Users\<user>\AppData\Roaming\Arkom POS` to
+   `Arkom POS.before-golive` (or delete it — everything in §6 lives there,
+   including the practice photos and backups).
+3. Launch the app. It migrates a fresh database and opens on the welcome screen
+   again: language, real shop details, prefix, owner, recovery code, staff.
+
+Ticket numbering starts again at `T1-000001`, which is the point. Do this
+**before** the first real sale, never after — a till that has issued a real
+ticket is a set of books, and the way to fix a mistake in a set of books is a
+refund or a correcting movement, not a fresh folder.
 
 ### Leave behind
 

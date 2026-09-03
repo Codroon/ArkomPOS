@@ -16,7 +16,7 @@
  * path a v0.9.0 till takes when it updates. One flow, two entry points — rather
  * than a fourth section here that the upgrade case could never reach.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { SetupCompleteResponseSchema } from "@arkom/core";
 import { AccentButton, Field, LocaleToggle, TextInput, useLocale, useT, type TFn } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
@@ -94,6 +94,21 @@ export function FirstRunDialog({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
+  const [packaged, setPackaged] = useState(false);
+
+  useEffect(() => {
+    /* an installed till starts with its shelves and nothing on them; main
+       refuses the demo dataset too, this only keeps the choice off the screen */
+    window.arkom
+      .invoke("setup:status")
+      .then((status) => {
+        if (status.packaged) {
+          setPackaged(true);
+          setDraft((d) => ({ ...d, loadDemo: false }));
+        }
+      })
+      .catch(() => undefined);
+  }, []);
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -243,6 +258,7 @@ export function FirstRunDialog({ onDone }: { onDone: () => void }) {
             </div>
           </section>
 
+          {packaged ? null : (
           <section className="mt-4 flex flex-col gap-2.5 rounded-[3px] border border-line bg-card p-4">
             <div className="text-[10px] font-bold uppercase tracking-[.1em] text-muted">
               {t("first.dataSection")}
@@ -262,6 +278,7 @@ export function FirstRunDialog({ onDone }: { onDone: () => void }) {
               />
             </div>
           </section>
+          )}
 
           {error ? (
             <div className="mt-4 rounded-[3px] border border-danger-ink/30 bg-danger-bg px-3 py-2 text-[12px] font-semibold text-danger-ink">

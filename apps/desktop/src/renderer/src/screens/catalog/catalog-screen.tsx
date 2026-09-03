@@ -4,7 +4,7 @@
  * list table + 380px editor. Dirty guard on row switch ("¿Descartar cambios?").
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { parseIpcError, type CatalogListRequest, type ProductRow } from "@arkom/core";
+import { parseIpcError, type CatalogListRequest, type CatalogRemoval, type ProductRow } from "@arkom/core";
 import { cn, ConfirmDialog, GhostButton, PrimaryButton, SearchInput, useT } from "@arkom/ui";
 import { GroupOptions, useGroupsVersion } from "../../components/group-picker";
 import { GroupsModal } from "../../components/groups-modal";
@@ -27,12 +27,14 @@ import {
 
 interface Filters {
   groupId: string;
-  itemType: "" | "stocked" | "serialized";
+  itemType: "" | "stocked" | "serialized" | "used_device" | "repair";
   lowStockOnly: boolean;
   missingDataOnly: boolean;
+  /** the archive: what Eliminar put away, and the only place it shows */
+  archived: boolean;
 }
 
-const NO_FILTERS: Filters = { groupId: "", itemType: "", lowStockOnly: false, missingDataOnly: false };
+const NO_FILTERS: Filters = { groupId: "", itemType: "", lowStockOnly: false, missingDataOnly: false, archived: false };
 
 function FilterChip({
   active,
@@ -79,6 +81,16 @@ export function CatalogScreen() {
   const [saving, setSaving] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [barcodeWarning, setBarcodeWarning] = useState<{ code: string; names: string[] } | null>(null);
+  const [removal, setRemoval] = useState<{ id: string; name: string; kind: "delete" | "archive" } | null>(null);
+  const [vatRateBp, setVatRateBp] = useState<number | null>(null);
+
+  useEffect(() => {
+    // the general rate, for the tax option's label
+    window.arkom
+      .invoke("meta:context")
+      .then((meta) => setVatRateBp(meta.vatRateBp))
+      .catch((err) => console.error("meta:context failed", err));
+  }, []);
 
   const dirty = draft !== null && isDirty(draft, baseline);
   const dirtyRef = useRef(dirty);
@@ -97,8 +109,11 @@ export function CatalogScreen() {
       itemType: filters.itemType || undefined,
       lowStockOnly: filters.lowStockOnly || undefined,
       missingDataOnly: filters.missingDataOnly || undefined,
+      includeArchived: filters.archived || undefined,
     };
-    setRows(await window.arkom.invoke("catalog:list", request));
+    const list = await window.arkom.invoke("catalog:list", request);
+    // the archive filter shows the archive, not everything plus the archive
+    setRows(filters.archived ? list.filter((r) => !r.active) : list);
   }, [search, filters]);
 
   useEffect(() => {
@@ -202,6 +217,66 @@ export function CatalogScreen() {
 
   const onSave = useCallback(() => submit(false), [submit]);
 
+  /* Eliminar. The repo says what it would do to THIS row — delete a row nothing
+     points at, archive one with history, or refuse while stock is on the shelf
+     — and the confirm says the same thing before anything happens. */
+  const onRemove = useCallback(() => {
+    if (!draft?.id) return;
+    const { id, name } = draft;
+    window.arkom
+      .invoke("catalog:removal", { id })
+      .then((r: CatalogRemoval) => {
+        if (r.kind === "blocked") {
+          setGeneralError({ raw: t("editor.removeBlocked", { n: r.onHand }) });
+          return;
+        }
+        setRemoval({ id, name, kind: r.kind });
+      })
+      .catch((err) => console.error("catalog:removal failed", err));
+  }, [draft, t]);
+
+  const confirmRemove = useCallback(() => {
+    if (!removal) return;
+    const { id, name, kind } = removal;
+    setRemoval(null);
+    void approval
+      .run((auth) => window.arkom.invoke("catalog:remove", { id }, auth), "catalog.edit", {
+        title: kind === "delete" ? t("editor.removeDeleteTitle", { name }) : t("editor.removeArchiveTitle", { name }),
+        details: [{ label: t("editor.name"), value: name }],
+      })
+      .then((res) => {
+        if (res.kind === "deleted" || !res.product) {
+          setDraft(null);
+          setBaseline(null);
+        } else {
+          openDraft(draftFromRow(res.product));
+        }
+        return refresh();
+      })
+      .catch((err) => {
+        const ipc = parseIpcError(err);
+        setGeneralError(ipc ? { raw: ipc.message } : "catalog.saveFailed");
+      });
+  }, [removal, approval, t, openDraft, refresh]);
+
+  const onRestore = useCallback(() => {
+    if (!draft?.id) return;
+    const { id, name } = draft;
+    void approval
+      .run((auth) => window.arkom.invoke("catalog:restore", { id }, auth), "catalog.edit", {
+        title: t("editor.restore"),
+        details: [{ label: t("editor.name"), value: name }],
+      })
+      .then((row) => {
+        openDraft(draftFromRow(row));
+        return refresh();
+      })
+      .catch((err) => {
+        const ipc = parseIpcError(err);
+        setGeneralError(ipc ? { raw: ipc.message } : "catalog.saveFailed");
+      });
+  }, [draft, approval, t, openDraft, refresh]);
+
   const onCancel = useCallback(() => {
     if (draft?.id && baseline) {
       setDraft(baseline); // revert edits on an existing row
@@ -218,6 +293,7 @@ export function CatalogScreen() {
     (filters.itemType ? 1 : 0) +
     (filters.lowStockOnly ? 1 : 0) +
     (filters.missingDataOnly ? 1 : 0) +
+    (filters.archived ? 1 : 0) +
     (search ? 1 : 0);
 
   const clearFilters = () => {
@@ -260,6 +336,8 @@ export function CatalogScreen() {
           <option value="">{t("catalog.filter.typeAll")}</option>
           <option value="stocked">{t("catalog.filter.stocked")}</option>
           <option value="serialized">{t("catalog.filter.serialized")}</option>
+          <option value="used_device">{t("catalog.filter.used")}</option>
+          <option value="repair">{t("catalog.filter.repair")}</option>
         </select>
         <FilterChip
           active={filters.lowStockOnly}
@@ -272,6 +350,9 @@ export function CatalogScreen() {
           onClick={() => setFilters((f) => ({ ...f, missingDataOnly: !f.missingDataOnly }))}
         >
           {t("catalog.filter.missingData")}
+        </FilterChip>
+        <FilterChip active={filters.archived} onClick={() => setFilters((f) => ({ ...f, archived: !f.archived }))}>
+          {t("catalog.filter.archived")}
         </FilterChip>
         <div className="flex-1" />
         {activeFilterCount > 0 ? (
@@ -325,9 +406,29 @@ export function CatalogScreen() {
             }}
             onSave={onSave}
             onCancel={onCancel}
+            vatRateBp={vatRateBp}
+            canRemove={can("catalog.edit")}
+            onRemove={onRemove}
+            onRestore={onRestore}
           />
         </aside>
       </div>
+
+      <ConfirmDialog
+        open={removal !== null}
+        title={
+          removal === null
+            ? ""
+            : removal.kind === "delete"
+              ? t("editor.removeDeleteTitle", { name: removal.name })
+              : t("editor.removeArchiveTitle", { name: removal.name })
+        }
+        body={removal?.kind === "delete" ? t("editor.removeDeleteBody") : t("editor.removeArchiveBody")}
+        confirmLabel={removal?.kind === "delete" ? t("editor.delete") : t("editor.archive")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={confirmRemove}
+        onCancel={() => setRemoval(null)}
+      />
 
       <ConfirmDialog
         open={pendingAction !== null}

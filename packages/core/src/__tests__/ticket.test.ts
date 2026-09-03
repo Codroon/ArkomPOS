@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   COLUMNS_BY_PAPER,
   renderTicket,
+  shopHeaderLines,
   ticketToText,
   TICKET_ES,
   wrapText,
@@ -24,6 +25,8 @@ const SHOP: ShopProfile = {
  */
 const MIXED: TicketDoc = {
   docNumber: "T1-000042",
+  // the rate the taxed lines carry; the breakdown label is built from it
+  vatRateBp: 2100,
   // fixed instant so the snapshot is stable (2026-08-24 09:31 local)
   completedAtMs: new Date(2026, 7, 24, 9, 31, 0).getTime(),
   terminalName: "Till 1",
@@ -169,5 +172,81 @@ describe("wrapText", () => {
   it("keeps long product names whole across the wrap", () => {
     const name = "Auriculares diadema Bluetooth con cancelación de ruido";
     expect(wrapText(name, 32).join(" ")).toBe(name);
+  });
+});
+
+/* ---------------------------------------- v0.18.0 · the letterhead on paper */
+
+/**
+ * A live print once came out as "Tu Unico Punto Tecnologi" and nothing after
+ * it. Every line of the shop's block and the footer has to fit the roll it is
+ * printed on: wrapped at the paper's columns, each fragment centred, nothing
+ * cut. Pinned at both widths, because 58 mm is where it breaks first.
+ */
+const LONG_SHOP: ShopProfile = {
+  legalName: "Tu Único Punto Tecnológico Sociedad Limitada Unipersonal",
+  displayName: "Tu Unico Punto Tecnologico",
+  nif: "B87654321",
+  address: "Avenida de la Constitución 148, Local 3, Esquina con Calle Larga",
+  postalCode: "41001",
+  city: "Sevilla",
+  phone: "954 000 000",
+  footerLine: "Garantía de dos años en todo lo que vendemos. Devoluciones en 14 días con este ticket. Gracias por confiar en nosotros.",
+};
+
+/** The characters of `text`, in order, ignoring whitespace — what wrapping must preserve. */
+const squash = (text: string) => text.replace(/\s+/g, "");
+
+describe.each([80, 58] as const)("the letterhead and footer on %dmm paper", (width) => {
+  const cols = COLUMNS_BY_PAPER[width];
+  const lines = ticketToText(renderTicket(MIXED, LONG_SHOP, width), width).split("\n");
+
+  it("never prints a line wider than the roll", () => {
+    // the ✂ marker is how the screen preview draws the cut, not a printed line
+    for (const line of lines.filter((l) => !l.includes("✂"))) expect(line.length, line).toBeLessThanOrEqual(cols);
+  });
+
+  it("wraps every long line instead of cutting it", () => {
+    const everything = squash(lines.join(""));
+    for (const text of [
+      LONG_SHOP.legalName,
+      LONG_SHOP.displayName!,
+      LONG_SHOP.address,
+      LONG_SHOP.footerLine,
+      `${LONG_SHOP.postalCode} ${LONG_SHOP.city}`,
+      `Tel. ${LONG_SHOP.phone}`,
+    ]) {
+      expect(everything).toContain(squash(text));
+    }
+    expect(lines.join("")).not.toContain("…");
+  });
+
+  it("centres each wrapped fragment on the roll", () => {
+    // every letterhead and footer line is emitted centred; a centred line has
+    // the same number of columns free on both sides, give or take the odd one
+    const centred = lines.filter((l) => /Tecnol|Constitución|Sevilla|Tel\.|Garantía|Devoluciones|confiar/.test(l));
+    expect(centred.length).toBeGreaterThan(0);
+    for (const line of centred) {
+      const left = line.length - line.trimStart().length;
+      const right = cols - line.trimEnd().length;
+      expect(Math.abs(left - right), JSON.stringify(line)).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("lays out the same way every time", () => {
+    expect(lines.join("\n")).toMatchSnapshot();
+  });
+});
+
+describe("a letterhead nobody filled in", () => {
+  it("prints nothing where the shop's block would be — no placeholder, no blank NIF line", () => {
+    const empty: ShopProfile = { legalName: "", nif: "", address: "", footerLine: "" };
+    expect(shopHeaderLines(empty)).toEqual([]);
+    const text = ticketToText(renderTicket(MIXED, empty, 80), 80);
+    expect(text).not.toContain("NIF");
+    expect(text).not.toContain("PENDIENTE");
+    // the brand, the number and the totals are still there (big text is letter-spaced on screen)
+    expect(text).toContain("T1-000042");
+    expect(squash(text)).toContain("TOTAL");
   });
 });

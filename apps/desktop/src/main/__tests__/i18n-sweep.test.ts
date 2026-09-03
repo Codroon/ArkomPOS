@@ -161,3 +161,13 @@ describe("typed errors reach the reader in their own language", () => {
     expect(passthrough).toEqual(["VALIDATION"]);
   });
 });
+
+describe("what the sweep reads", () => {
+  it("includes Ajustes — the screen the shop lives in", () => {
+    /* pinned because a Settings card once shipped with copy the toggle did not
+       reach; the guard only helps if the file is actually in its path */
+    const files = ROOTS.flatMap((root) => sources(root)).map((f) => f.replace(/\\/g, "/"));
+    expect(files.some((f) => f.endsWith("screens/settings/settings-screen.tsx"))).toBe(true);
+    expect(files.some((f) => f.endsWith("screens/catalog/catalog-editor.tsx"))).toBe(true);
+  });
+});

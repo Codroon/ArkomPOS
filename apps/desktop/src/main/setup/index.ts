@@ -27,6 +27,7 @@ import {
 import { schema as s, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner } from "../mutate-runner";
 import { insertDemoData } from "./demo-data";
+import { STARTER_CASH_CONCEPTS } from "../repos/settings";
 
 export { insertDemoData } from "./demo-data";
 
@@ -189,6 +190,8 @@ export function completeFirstRun(db: ArkomDb, input: FirstRunInput): FirstRunRes
       shopPostalCode: input.shopPostalCode ?? "",
       shopPhone: input.shopPhone ?? "",
       ticketFooter: input.ticketFooter,
+      // the drawer's one-tap concepts, in the language the till is set up in
+      cashConcepts: JSON.stringify(STARTER_CASH_CONCEPTS[input.locale ?? "es"]),
       [SETUP_DONE_KEY]: "true",
     };
     for (const [key, value] of Object.entries(settings)) {

@@ -249,7 +249,7 @@ function findOrCreateUsedProduct(
        individuals. Snapshotted onto the sale line by ADR-0007's existing
        mechanism, so nothing about the sale path changes. */
     taxRegime: "REBU" as const,
-    taxRateBp: 2100,
+    taxRateBp: 0, // the margin scheme carries no deductible VAT on the line
     active: true,
     createdAt: now,
     updatedAt: now,

@@ -20,16 +20,26 @@ const { settings } = schema;
  * out loud — a test ticket prints "PENDIENTE" where the NIF belongs, which is
  * far harder to miss than a plausible-looking wrong address.
  */
+/**
+ * The one-tap concepts a fresh drawer offers, in the language the till was set
+ * up in (v0.18.0). Shop DATA from that moment: Ajustes edits them and the
+ * staff toggle never touches them again (ADR-0011).
+ */
+export const STARTER_CASH_CONCEPTS: Record<"es" | "en", string[]> = {
+  es: ["A la caja fuerte / banco", "Proveedor", "Gastos", "Cambio para la caja", "Corrección de arqueo"],
+  en: ["To the safe / bank", "Supplier", "Expenses", "Change for the drawer", "Count correction"],
+};
+
 export const DEFAULT_SETTINGS: Settings = {
   printerName: "", // no printer — a legitimate configuration, PDF handles it
   paperWidthMm: 80,
   commandSet: "epson",
-  shopLegalName: "PENDIENTE — Razón social",
-  shopNif: "PENDIENTE — NIF",
-  shopAddress: "PENDIENTE — Dirección fiscal",
-  /* the rest of the letterhead. Blank rather than PENDIENTE: a missing phone
-     number simply does not print, whereas a legal name that is missing must
-     shout, because a ticket without one is not a valid document. */
+  /* The letterhead ships EMPTY (v0.18.0). A first run asks for it and Ajustes
+     shows what is missing as a blank field; a placeholder the shop could print
+     by accident is not a safer default than nothing. */
+  shopLegalName: "",
+  shopNif: "",
+  shopAddress: "",
   shopDisplayName: "",
   shopCity: "",
   shopPostalCode: "",
@@ -46,17 +56,15 @@ export const DEFAULT_SETTINGS: Settings = {
   repairCapEnabled: true,
   /* how long "no sale" has to last before a product is dead (ADR-0016) */
   deadStockDays: 90,
+  /* the general rate, 21 % — the figure the law gives today, as DATA so that a
+     change reaches new lines through Ajustes and not through a release */
+  vatRateBp: 2100,
   /* the client's answers, landing as data (ADR-0015 §11) */
   cashDefaultFloatCents: 20000, // 200,00 €
   cashVarianceToleranceCents: 300, // 3,00 €
   cashMovementApprovalCents: 10000, // 100,00 €
-  cashConcepts: [
-    "A la caja fuerte / banco",
-    "Proveedor",
-    "Gastos",
-    "Cambio para la caja",
-    "Corrección de arqueo",
-  ],
+  // a till that predates the per-language seed keeps the Spanish list it had
+  cashConcepts: STARTER_CASH_CONCEPTS.es,
 };
 
 type SettingKey = keyof Settings;
@@ -73,6 +81,7 @@ function decode(key: SettingKey, raw: string): Settings[SettingKey] {
   if (key === "repairDepositSuggestionCents") return Number.isFinite(Number(raw)) ? Number(raw) : 0;
   if (key === "repairCapEnabled") return raw !== "false";
   if (key === "deadStockDays") return Number.isFinite(Number(raw)) ? Number(raw) : 90;
+  if (key === "vatRateBp") return Number.isFinite(Number(raw)) ? Number(raw) : 2100;
   if (key === "cashDefaultFloatCents") return Number.isFinite(Number(raw)) ? Number(raw) : 20000;
   if (key === "cashVarianceToleranceCents") return Number.isFinite(Number(raw)) ? Number(raw) : 300;
   if (key === "cashMovementApprovalCents") return Number.isFinite(Number(raw)) ? Number(raw) : 10000;

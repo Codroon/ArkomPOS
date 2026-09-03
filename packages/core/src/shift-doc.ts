@@ -47,7 +47,7 @@ export const SHIFT_ES: ShiftLabels = {
   documents: "DOCUMENTOS",
   sales: "VENTAS",
   base: "Base imponible",
-  vat: "IVA 21%",
+  vat: "IVA",
   used: "Usado (REBU, sin IVA)",
   salesTotal: "TOTAL VENTAS",
   tenders: "COBROS",
@@ -97,7 +97,7 @@ export const SHIFT_EN: ShiftLabels = {
   documents: "DOCUMENTS",
   sales: "SALES",
   base: "Net",
-  vat: "VAT 21%",
+  vat: "VAT",
   used: "Used (margin scheme, no VAT)",
   salesTotal: "TOTAL SALES",
   tenders: "PAYMENTS",
@@ -211,7 +211,7 @@ export function renderZReport(
   const REASON_ES = REASON_NAMES[locale];
 
   const [legal, ...rest] = shopHeaderLines(shop);
-  b.text(legal!, { align: "center", bold: true });
+  if (legal) b.text(legal, { align: "center", bold: true });
   for (const line of rest) b.text(line, { align: "center" });
   b.rule();
 

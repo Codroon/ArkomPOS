@@ -82,3 +82,100 @@ Cambio                   31,20 €
 -------------------------------- ✂
 [cajón]"
 `;
+
+exports[`the letterhead and footer on 58mm paper > lays out the same way every time 1`] = `
+"          A R K O M
+      ELECTRONICS · PHONES
+
+   Tu Único Punto Tecnológico
+ Sociedad Limitada Unipersonal
+   Tu Unico Punto Tecnologico
+         NIF B87654321
+Avenida de la Constitución 148,
+Local 3, Esquina con Calle Larga
+         41001 Sevilla
+        Tel. 954 000 000
+--------------------------------
+T1-000042       24/08/2026 09:31
+Terminal: Till 1
+--------------------------------
+Samsung Galaxy A16 128GB Negro
+IMEI 356938104420030
+1 x 189,00 €            189,00 €
+Cargador 20W USB-C
+2 x 14,90 €              29,80 €
+Funda libro Galaxy A16
+1 x 10,00 €              10,00 €
+                      MODIFICADO
+--------------------------------
+Base imponible          180,82 €
+IVA 21%                  37,98 €
+T O T A L       2 1 8 , 8 0   €
+                    IVA INCLUIDO
+--------------------------------
+Efectivo                200,00 €
+Tarjeta                  50,00 €
+  AUT-9931
+Cambio                   31,20 €
+--------------------------------
+Garantía de dos años en todo lo
+que vendemos. Devoluciones en 14
+ días con este ticket. Gracias
+    por confiar en nosotros.
+     Gracias por su visita
+
+      [||| T1-000042 |||]
+           T1-000042
+
+
+-------------------------------- ✂
+[cajón]"
+`;
+
+exports[`the letterhead and footer on 80mm paper > lays out the same way every time 1`] = `
+"                A R K O M
+   E L E C T R O N I C S · P H O N E S
+
+   Tu Único Punto Tecnológico Sociedad
+           Limitada Unipersonal
+        Tu Unico Punto Tecnologico
+              NIF B87654321
+ Avenida de la Constitución 148, Local 3,
+         Esquina con Calle Larga
+              41001 Sevilla
+             Tel. 954 000 000
+------------------------------------------
+T1-000042                 24/08/2026 09:31
+Terminal: Till 1
+------------------------------------------
+Samsung Galaxy A16 128GB Negro
+IMEI 356938104420030
+1 x 189,00 €                      189,00 €
+Cargador 20W USB-C
+2 x 14,90 €                        29,80 €
+Funda libro Galaxy A16
+1 x 10,00 €                        10,00 €
+                                MODIFICADO
+------------------------------------------
+Base imponible                    180,82 €
+IVA 21%                            37,98 €
+T O T A L                 2 1 8 , 8 0   €
+                              IVA INCLUIDO
+------------------------------------------
+Efectivo                          200,00 €
+Tarjeta                            50,00 €
+  AUT-9931
+Cambio                             31,20 €
+------------------------------------------
+   Garantía de dos años en todo lo que
+vendemos. Devoluciones en 14 días con este
+ ticket. Gracias por confiar en nosotros.
+          Gracias por su visita
+
+           [||| T1-000042 |||]
+                T1-000042
+
+
+------------------------------------------ ✂
+[cajón]"
+`;

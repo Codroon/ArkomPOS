@@ -29,7 +29,6 @@ import {
   quoteTotalCents,
   REPAIR_STATUSES,
   repairStatus,
-  TAX_RATE_BP,
   validateCompletion,
   warrantyEndsAt,
   ticketMargin,
@@ -1593,6 +1592,8 @@ export function collect(
     const facts = loadFacts(tx, input.ticketId);
     assertAction(facts, "collect");
     const shiftId = currentShiftId(tx, ctx);
+    // the general rate as of today — the line keeps it (ADR-0007 A1)
+    const { vatRateBp } = getSettings(db, ctx);
 
     const lines = tx
       .select()
@@ -1621,7 +1622,7 @@ export function collect(
     if (!series) throw appError("VALIDATION", "Serie de numeración no configurada para este terminal.");
 
     const money = lines.map((line) =>
-      computeLine({ qty: 1, unitPriceCents: line.chargeCents, taxRateBp: TAX_RATE_BP.IVA21 }),
+      computeLine({ qty: 1, unitPriceCents: line.chargeCents, taxRateBp: vatRateBp }),
     );
     const totals = computeDocumentTotals(money);
     const { changeCents } = validateCompletion({
@@ -1674,7 +1675,7 @@ export function collect(
         unitCostCents: line.kind === "labor" ? 0 : (line.unitCostCents ?? null),
         // the snapshot: regime and rate travel with the line (ADR-0007)
         taxRegime: "IVA21" as const,
-        taxRateBp: TAX_RATE_BP.IVA21,
+        taxRateBp: vatRateBp,
         baseCents: m.baseCents,
         taxCents: m.taxCents,
         totalCents: m.totalCents,

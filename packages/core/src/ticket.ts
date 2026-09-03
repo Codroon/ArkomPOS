@@ -80,6 +80,8 @@ export interface TicketDoc {
   totalCents: number;
   tenders: TicketTender[];
   changeCents: number;
+  /** the general rate the taxed lines carry, for the breakdown label (v0.18.0) */
+  vatRateBp?: number;
   /**
    * A refund, and the ticket it reverses — ADR-0019.
    *
@@ -119,7 +121,7 @@ export function shopHeaderLines(shop: ShopProfile): string[] {
   if (shop.displayName?.trim() && shop.displayName.trim() !== shop.legalName.trim()) {
     out.push(shop.displayName.trim());
   }
-  out.push(`${TICKET_ES.nif} ${shop.nif}`);
+  if (shop.nif.trim()) out.push(`${TICKET_ES.nif} ${shop.nif.trim()}`);
   out.push(shop.address);
   const town = [shop.postalCode?.trim(), shop.city?.trim()].filter(Boolean).join(" ");
   if (town) out.push(town);
@@ -141,7 +143,7 @@ export const TICKET_ES = {
   imei: "IMEI",
   modified: "MODIFICADO",
   base: "Base imponible",
-  vat: "IVA 21%",
+  vat: "IVA",
   total: "TOTAL",
   vatIncluded: "IVA INCLUIDO",
   rebu: "Régimen especial de bienes usados",
@@ -159,6 +161,13 @@ export const TICKET_ES_METHODS: Record<string, string> = {
 };
 
 /* ------------------------------------------------------------------ render */
+
+/** "IVA 21%" from the rate the lines carry; "IVA" alone when no line was taxed. */
+export function vatLabel(rateBp: number | undefined, word: string = TICKET_ES.vat): string {
+  if (rateBp === undefined) return word;
+  const pct = rateBp / 100;
+  return `${word} ${Number.isInteger(pct) ? pct : pct.toFixed(1)}%`;
+}
 
 /**
  * A completed sale → the ops that print it.
@@ -200,7 +209,7 @@ export function renderTicket(doc: TicketDoc, shop: ShopProfile, width: PaperWidt
 
   /* ---- who the shop legally is (Ajustes, never hardcoded) ---- */
   const [legal, ...rest] = shopHeaderLines(shop);
-  text(legal!, { align: "center", bold: true });
+  if (legal) text(legal, { align: "center", bold: true });
   for (const line of rest) text(line, { align: "center" });
 
   rule();
@@ -230,7 +239,7 @@ export function renderTicket(doc: TicketDoc, shop: ShopProfile, width: PaperWidt
   /* ---- what it adds up to ---- */
   for (const [label, cents] of [
     [TICKET_ES.base, doc.subtotalCents],
-    [TICKET_ES.vat, doc.taxCents],
+    [vatLabel(doc.vatRateBp), doc.taxCents],
   ] as const) {
     for (const row of labelledRows(label, formatCents(cents), cols)) {
       ops.push({ op: "text", text: row, align: "left", bold: false, size: "normal" });

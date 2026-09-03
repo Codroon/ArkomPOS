@@ -6,7 +6,8 @@ import { appError, type MetaContextResponse, type MutationCtx } from "@arkom/cor
 import { schema, type ArkomDb } from "@arkom/db";
 
 export interface TillContext {
-  meta: MetaContextResponse;
+  /** the rate is read live by the channel, so it is not part of the cache */
+  meta: Omit<MetaContextResponse, "vatRateBp">;
   ctx: MutationCtx;
 }
 

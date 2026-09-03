@@ -74,6 +74,8 @@ import type {
   ReportsValuationResponse,
   ReportsDeadStockResponse,
   ReportsExportResponse,
+  CatalogRemoval,
+  CatalogRemoveResponse,
 } from "@arkom/core";
 
 declare global {
@@ -92,6 +94,17 @@ declare global {
         approval?: { userId: string; pin: string },
       ): Promise<CatalogSaveResponse>;
       invoke(channel: "catalog:groups", payload?: undefined): Promise<GroupRef[]>;
+      invoke(channel: "catalog:removal", payload: { id: string }): Promise<CatalogRemoval>;
+      invoke(
+        channel: "catalog:remove",
+        payload: { id: string },
+        approval?: { userId: string; pin: string },
+      ): Promise<CatalogRemoveResponse>;
+      invoke(
+        channel: "catalog:restore",
+        payload: { id: string },
+        approval?: { userId: string; pin: string },
+      ): Promise<ProductRow>;
       invoke(channel: "transfer:list", payload: unknown): Promise<{ rows: TransferRow[]; drawerCents: number }>;
       invoke(channel: "transfer:get", payload: { id: string }): Promise<TransferRow>;
       invoke(channel: "transfer:verify", payload: { id: string; state: string; note?: string | null }): Promise<TransferRow>;
@@ -165,7 +178,7 @@ declare global {
         channel: "print:reveal",
         payload: { path: string; mode: "open" | "folder" },
       ): Promise<{ ok: boolean }>;
-      invoke(channel: "setup:status", payload?: undefined): Promise<{ needed: boolean; ownerNeeded: boolean }>;
+      invoke(channel: "setup:status", payload?: undefined): Promise<{ needed: boolean; ownerNeeded: boolean; packaged: boolean }>;
       invoke(
         channel: "setup:complete",
         payload: SetupCompleteRequest,

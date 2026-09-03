@@ -21,15 +21,28 @@ export function resolveErrorText(t: TFn, err: ErrorText | undefined): string | u
   return typeof err === "string" ? t(err) : err.raw;
 }
 
+/** What the editor can make. Service and agency lines stay out of Phase 1's UI. */
+export type EditorItemType = "stocked" | "serialized" | "used_device" | "repair";
+const EDITOR_TYPES: readonly string[] = ["stocked", "serialized", "used_device", "repair"];
+export const isEditorType = (v: string): v is EditorItemType => EDITOR_TYPES.includes(v);
+
+/**
+ * The regime is a consequence of the type, not a second decision: a used
+ * article sells under the margin scheme, everything else at the general rate
+ * (ADR-0007 A1). The select shows the one that applies.
+ */
+export const expectedRegime = (itemType: EditorItemType): "IVA21" | "REBU" =>
+  itemType === "used_device" ? "REBU" : "IVA21";
+
 export interface Draft {
   id: string | null;
   name: string;
   barcode: string; // "" → server generates an internal EAN-13 (req 4.2)
   groupId: string; // "" = unset
-  itemType: "stocked" | "serialized";
+  itemType: EditorItemType;
   costInput: string;
   priceInput: string;
-  taxRegime: "IVA21" | ""; // "" only on migrated/seed incomplete rows
+  taxRegime: "IVA21" | "REBU" | ""; // "" only on migrated/seed incomplete rows
   reorderInput: string;
   lowStockInput: string;
   active: boolean;
@@ -70,10 +83,10 @@ export function draftFromRow(r: ProductRow): Draft {
     name: r.name,
     barcode: r.barcode ?? "",
     groupId: r.groupId ?? "",
-    itemType: r.itemType === "serialized" ? "serialized" : "stocked",
+    itemType: isEditorType(r.itemType) ? r.itemType : "stocked",
     costInput: r.costCents == null ? "" : centsToInput(r.costCents),
     priceInput: r.priceCents == null ? "" : centsToInput(r.priceCents),
-    taxRegime: r.taxRegime === "IVA21" ? "IVA21" : "",
+    taxRegime: r.taxRegime === "IVA21" || r.taxRegime === "REBU" ? r.taxRegime : "",
     reorderInput: String(r.reorderPoint),
     lowStockInput: String(r.lowStockThreshold),
     active: r.active,
@@ -101,7 +114,8 @@ export function validateDraft(d: Draft): { errors: DraftErrors; request: Catalog
   if (price === undefined) errors.priceCents = "val.priceRequired"; // 4.1
   else if (price === null) errors.priceCents = "val.invalidAmount";
 
-  if (d.taxRegime !== "IVA21") errors.taxRegime = "val.taxRequired"; // 4.1 (P1: IVA21)
+  const regime = expectedRegime(d.itemType);
+  if (d.taxRegime !== regime) errors.taxRegime = "val.taxRequired"; // 4.1 — the regime the type calls for
 
   const reorder = parseIntField(d.reorderInput);
   if (reorder === null) errors.reorderPoint = "val.intGteZero"; // 4.5
@@ -119,7 +133,7 @@ export function validateDraft(d: Draft): { errors: DraftErrors; request: Catalog
       itemType: d.itemType,
       costCents: cost as number,
       priceCents: price as number,
-      taxRegime: "IVA21",
+      taxRegime: regime,
       reorderPoint: reorder as number,
       lowStockThreshold: lowStock as number,
       active: d.active,

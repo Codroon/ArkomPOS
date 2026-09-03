@@ -474,6 +474,10 @@ describe("upgrading a v0.16.1 till", () => {
        the shop's address is a fact about the shop, not about the sale. */
     const rows = env.db.select().from(s.documents).where(eq(s.documents.id, docId)).all();
     expect(rows[0]!.docNumber).toBe("T1-000900");
+    /* a till that never filled its letterhead prints none of it — since v0.18.0
+       there is no PENDIENTE placeholder to print by accident */
+    expect(shopHeaderLines(shopProfile(env.db, ctxOf()))).toEqual([]);
+    saveSettings(env.db, ctxOf(), { shopLegalName: "Arkom Electrónica S.L.", shopNif: "B00000000", shopAddress: "Calle Ejemplo 1" });
     expect(shopHeaderLines(shopProfile(env.db, ctxOf())).length).toBeGreaterThanOrEqual(3);
   });
 });

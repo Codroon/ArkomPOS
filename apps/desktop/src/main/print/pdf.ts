@@ -244,7 +244,12 @@ export async function renderTicketPdf(
   const out = destination ?? join(pdfTempDir(), `${fileBase}.pdf`);
   await mkdir(dirname(out), { recursive: true });
 
-  const htmlPath = join(app.getPath("temp"), `arkom-ticket-${Date.now()}.html`);
+  /* The HTML the PDF is printed from is a working file, not a document. It
+     lives in the same swept directory as the fallback renders and is removed
+     as soon as the PDF exists — before v0.18.0 it went to the TEMP root, where
+     nothing ever cleaned it up. */
+  await mkdir(pdfTempDir(), { recursive: true });
+  const htmlPath = join(pdfTempDir(), `${fileBase}-${Date.now()}.html`);
   await writeFile(htmlPath, await buildHtml(ops, paperWidthMm), "utf8");
 
   const win = new BrowserWindow({
@@ -275,5 +280,6 @@ export async function renderTicketPdf(
     return out;
   } finally {
     win.destroy();
+    await rm(htmlPath, { force: true }).catch(() => undefined);
   }
 }

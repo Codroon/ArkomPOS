@@ -17,20 +17,37 @@ import { makeMutateRunner } from "../src/main/mutate-runner";
 import { createShop, insertDemoData, seedStarterGroups, SETUP_DONE_KEY } from "../src/main/setup";
 import { createUser } from "../src/main/auth/users";
 
-/** Ajustes defaults for a dev database: printer off, shop data still owed. */
+/** Ajustes defaults for a dev database: printer off, a sample letterhead. */
 const DEV_SETTINGS: Record<string, string> = {
   printerName: "",
   paperWidthMm: "80",
   commandSet: "epson",
-  shopLegalName: "PENDIENTE — Razón social",
-  shopNif: "PENDIENTE — NIF",
-  shopAddress: "PENDIENTE — Dirección fiscal",
+  shopLegalName: "Arkom Electrónica S.L.",
+  shopNif: "B00000000",
+  shopAddress: "Calle Ejemplo 1",
+  shopCity: "Madrid",
+  shopPostalCode: "28001",
   ticketFooter: "Precios claros. Sin letra pequeña.",
   // a seeded dev database is already "set up" — no first-run dialog on `pnpm dev`
   [SETUP_DONE_KEY]: "true",
 };
 
-export function seed(db: ArkomDb): { seeded: boolean; message: string } {
+/**
+ * Whether this code is running out of an installed build. The bundle a client
+ * runs lives inside `app.asar`; a checkout never does.
+ */
+export function isPackagedRuntime(): boolean {
+  return __dirname.includes("app.asar") || process.env.ARKOM_PACKAGED === "1";
+}
+
+export function seed(db: ArkomDb, opts: { packaged?: boolean } = {}): { seeded: boolean; message: string } {
+  /* A client install never seeds: first launch asks the shop who it is, and the
+     demo dataset is not offered to an installed till (v0.18.0). The refusal
+     sits in the function and not only in the absence of a terminal to run it
+     from, so the answer does not depend on how the script was reached. */
+  if (opts.packaged ?? isPackagedRuntime()) {
+    throw new Error("db:seed is a development step. An installed till is set up on its first launch.");
+  }
   const existing = db.select({ id: s.tenants.id }).from(s.tenants).limit(1).all();
   if (existing.length > 0) {
     return { seeded: false, message: "Database already seeded (tenants table is not empty) — nothing done." };

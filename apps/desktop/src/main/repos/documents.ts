@@ -9,8 +9,10 @@
  * It lists nothing a peek cannot open, so every row leads somewhere.
  */
 import { and, desc, eq, gte, inArray, like, lt, or, type SQL } from "drizzle-orm";
-import { allocateNumber, TAX_RATE_BP, type MutationCtx } from "@arkom/core";
+import { allocateNumber, type MutationCtx } from "@arkom/core";
 import { schema, type ArkomDb } from "@arkom/db";
+
+import { getSettings } from "./settings";
 
 const { documents, numberSeries, users } = schema;
 
@@ -95,11 +97,11 @@ export function seriesOverview(db: ArkomDb, ctx: MutationCtx) {
       nextNumber: r.nextNumber,
       nextDocNumber: allocateNumber({ prefix: r.prefix, nextNumber: r.nextNumber }).docNumber,
     })),
-    /* Phase 1 applies IVA21 and the margin scheme; exempt exists in the schema
-       and no screen writes it. Shown because "what tax does this till charge"
-       is a question, and not editable because the answer is the law's. */
+    /* Phase 1 applies the general rate and the margin scheme; exempt exists in
+       the schema and no screen writes it. The general FIGURE is a setting
+       (ADR-0007 A1) — the regimes themselves are the law's. */
     taxRegimes: [
-      { code: "IVA21", rateBp: TAX_RATE_BP.IVA21 },
+      { code: "IVA21", rateBp: getSettings(db, ctx).vatRateBp },
       { code: "REBU", rateBp: 0 },
       { code: "EXEMPT", rateBp: 0 },
     ],

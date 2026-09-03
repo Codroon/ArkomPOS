@@ -17,10 +17,11 @@ import {
   normalizeScanCode,
   toOplogJson,
   uuidv7,
-  TAX_RATE_BP,
   type CatalogAddCodeRequest,
   type CatalogAddCodeResponse,
   type CatalogListRequest,
+  type CatalogRemoval,
+  type CatalogRemoveResponse,
   type CatalogSaveRequest,
   type CatalogSaveResponse,
   type MutationCtx,
@@ -30,8 +31,10 @@ import {
 import { schema, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner, type DbTx } from "../mutate-runner";
 import { productsHoldingCode } from "./scan";
+import { getSettings } from "./settings";
 
-const { products, productCodes, productGroups, productStock, units } = schema;
+const { products, productCodes, productGroups, productStock, units, documentLines, stockMovements, repairLines, usedPurchases } =
+  schema;
 
 type Reader = ArkomDb | DbTx;
 
@@ -192,6 +195,10 @@ export function listProducts(db: ArkomDb, ctx: MutationCtx, filters: CatalogList
      asking what is on that shelf, and answering "nothing" about a shelf it can
      see in the dropdown is not an answer (ADR-0013 §"the catalog list"). */
   if (!f.includeUsed && !f.groupId) rows = rows.filter((r) => r.itemType !== "used_device");
+  /* An archived article is out of every list — Venta's grid, the code-attach
+     picker, the management table — unless the catalogue asks for the archive
+     by name. Filtered HERE so no caller has to remember (v0.18.0). */
+  if (!f.includeArchived) rows = rows.filter((r) => r.active);
   if (f.lowStockOnly) rows = rows.filter((r) => isLowStock(r));
   if (f.missingDataOnly) rows = rows.filter((r) => isMissingData(r));
   return rows;
@@ -273,6 +280,7 @@ export function removeCode(db: ArkomDb, ctx: MutationCtx, productId: string, cod
 }
 
 export function saveProduct(db: ArkomDb, ctx: MutationCtx, input: CatalogSaveRequest): CatalogSaveResponse {
+  const { vatRateBp } = getSettings(db, ctx);
   // req 4.4 (amended): a barcode already in use WARNS; the client confirms.
   // Checked outside the transaction — a warning must not open (or abort) one.
   const typedBarcode = normalizeScanCode(input.barcode ?? "");
@@ -294,6 +302,20 @@ export function saveProduct(db: ArkomDb, ctx: MutationCtx, input: CatalogSaveReq
     const now = new Date();
     const name = input.name.trim();
     let barcode = input.barcode?.trim() || null;
+
+    /* the regime follows the type (ADR-0007 A1): a used article sells under the
+       margin scheme and nothing else does. Checked here and not only in the
+       editor, because the editor is a courtesy and this is the rule */
+    const regimeForType = input.itemType === "used_device" ? "REBU" : "IVA21";
+    if (input.taxRegime !== regimeForType) {
+      throw appError(
+        "VALIDATION",
+        input.itemType === "used_device"
+          ? "Un artículo usado se vende en régimen de margen (REBU)."
+          : "Solo un artículo usado puede ir en régimen de margen (REBU).",
+        "taxRegime",
+      );
+    }
 
     // group must exist in this tenant (friendlier than a raw FK failure)
     const group = tx
@@ -376,7 +398,8 @@ export function saveProduct(db: ArkomDb, ctx: MutationCtx, input: CatalogSaveReq
       costCents: input.costCents,
       priceCents: input.priceCents,
       taxRegime: input.taxRegime,
-      taxRateBp: TAX_RATE_BP[input.taxRegime], // snapshot source, derived server-side
+      // the rate is the till's setting, never a figure the renderer sent (ADR-0007 A1)
+      taxRateBp: input.taxRegime === "REBU" ? 0 : vatRateBp,
       reorderPoint: input.reorderPoint,
       lowStockThreshold: input.lowStockThreshold,
       active: input.active,
@@ -405,4 +428,108 @@ export function saveProduct(db: ArkomDb, ctx: MutationCtx, input: CatalogSaveReq
     return getProduct(tx, ctx, id);
   });
   return { kind: "saved", product };
+}
+
+/* ------------------------------------------------- removing an article (v0.18.0) */
+
+/**
+ * Whether anything in the books points at this product.
+ *
+ * A sale line, a stock movement, a unit, a repair part, a used-device purchase:
+ * each is a fact the shop recorded, and deleting the row it names would leave
+ * that fact pointing at nothing. A product with none of them was a typo, and a
+ * typo may be deleted.
+ */
+function hasHistory(db: Reader, productId: string): boolean {
+  const count = (q: { all(): { n: number }[] }) => q.all()[0]!.n;
+  const n = sql<number>`count(*)`;
+  return (
+    count(db.select({ n }).from(documentLines).where(eq(documentLines.productId, productId))) > 0 ||
+    count(db.select({ n }).from(stockMovements).where(eq(stockMovements.productId, productId))) > 0 ||
+    count(db.select({ n }).from(units).where(eq(units.productId, productId))) > 0 ||
+    count(db.select({ n }).from(repairLines).where(eq(repairLines.productId, productId))) > 0 ||
+    count(db.select({ n }).from(usedPurchases).where(eq(usedPurchases.productId, productId))) > 0
+  );
+}
+
+function onHandOf(db: Reader, ctx: MutationCtx, productId: string): number {
+  return (
+    db
+      .select({ onHand: productStock.onHand })
+      .from(productStock)
+      .where(and(eq(productStock.productId, productId), eq(productStock.locationId, ctx.locationId)))
+      .all()[0]?.onHand ?? 0
+  );
+}
+
+/**
+ * What Eliminar would do to this row. Asked before the confirm, so the dialog
+ * can say "delete" or "archive" and mean it — and answered again inside the
+ * transaction, so a sale that landed in between cannot turn an archive into a
+ * delete.
+ */
+export function removalOf(db: Reader, ctx: MutationCtx, id: string): CatalogRemoval {
+  const row = db
+    .select({ id: products.id })
+    .from(products)
+    .where(and(eq(products.tenantId, ctx.tenantId), eq(products.id, id)))
+    .all()[0];
+  if (!row) throw appError("VALIDATION", "Artículo no encontrado.");
+  const history = hasHistory(db, id);
+  const onHand = onHandOf(db, ctx, id);
+  /* history + stock on the shelf: archiving would hide units the shop still
+     owns. The stock has to be adjusted to zero first, and that is a movement
+     with a reason, not something a delete button does on the side */
+  const kind = !history ? "delete" : onHand > 0 ? "blocked" : "archive";
+  return { kind, hasHistory: history, onHand };
+}
+
+export function removeProduct(db: ArkomDb, ctx: MutationCtx, id: string): CatalogRemoveResponse {
+  return mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    const existing = tx
+      .select()
+      .from(products)
+      .where(and(eq(products.tenantId, ctx.tenantId), eq(products.id, id)))
+      .all()[0];
+    if (!existing) throw appError("VALIDATION", "Artículo no encontrado.");
+    const removal = removalOf(tx, ctx, id);
+
+    if (removal.kind === "blocked") {
+      throw appError("VALIDATION", `Tiene ${removal.onHand} en stock; ajusta el stock a cero antes de archivarlo.`);
+    }
+
+    if (removal.kind === "delete") {
+      // its own rows only — the history check above is what makes this safe
+      tx.delete(productCodes).where(eq(productCodes.productId, id)).run();
+      tx.delete(productStock).where(eq(productStock.productId, id)).run();
+      tx.delete(products).where(eq(products.id, id)).run();
+      log({ entity: "product", entityId: id, action: "delete", before: toOplogJson(existing), after: null });
+      return { kind: "deleted", product: null };
+    }
+
+    if (!existing.active) return { kind: "archived", product: getProduct(tx, ctx, id) };
+    const now = new Date();
+    tx.update(products).set({ active: false, updatedAt: now }).where(eq(products.id, id)).run();
+    const after = tx.select().from(products).where(eq(products.id, id)).all()[0]!;
+    log({ entity: "product", entityId: id, action: "archive", before: toOplogJson(existing), after: toOplogJson(after) });
+    return { kind: "archived", product: getProduct(tx, ctx, id) };
+  });
+}
+
+/** Back onto the lists. The history it kept is the reason it was only archived. */
+export function restoreProduct(db: ArkomDb, ctx: MutationCtx, id: string): ProductRow {
+  return mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    const existing = tx
+      .select()
+      .from(products)
+      .where(and(eq(products.tenantId, ctx.tenantId), eq(products.id, id)))
+      .all()[0];
+    if (!existing) throw appError("VALIDATION", "Artículo no encontrado.");
+    if (existing.active) return getProduct(tx, ctx, id);
+    const now = new Date();
+    tx.update(products).set({ active: true, updatedAt: now }).where(eq(products.id, id)).run();
+    const after = tx.select().from(products).where(eq(products.id, id)).all()[0]!;
+    log({ entity: "product", entityId: id, action: "restore", before: toOplogJson(existing), after: toOplogJson(after) });
+    return getProduct(tx, ctx, id);
+  });
 }

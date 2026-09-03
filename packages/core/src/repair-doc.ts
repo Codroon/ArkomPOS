@@ -180,7 +180,7 @@ export function renderIntakeReceipt(
   b.text(letterSpaced(REPAIR_ES.tagline, cols), { align: "center" });
   b.feed(1);
   const [legal, ...rest] = shopHeaderLines(shop);
-  b.text(legal!, { align: "center", bold: true });
+  if (legal) b.text(legal, { align: "center", bold: true });
   for (const line of rest) b.text(line, { align: "center" });
 
   b.rule();
@@ -300,7 +300,7 @@ export function renderQuoteDoc(doc: QuoteDoc, shop: ShopProfile, width: PaperWid
   b.text(letterSpaced(REPAIR_ES.tagline, cols), { align: "center" });
   b.feed(1);
   const [legal, ...rest] = shopHeaderLines(shop);
-  b.text(legal!, { align: "center", bold: true });
+  if (legal) b.text(legal, { align: "center", bold: true });
   for (const line of rest) b.text(line, { align: "center" });
 
   b.rule();
@@ -437,7 +437,7 @@ export function renderRepairReceipt(
   b.text(letterSpaced(REPAIR_ES.tagline, cols), { align: "center" });
   b.feed(1);
   const [legal, ...rest] = shopHeaderLines(shop);
-  b.text(legal!, { align: "center", bold: true });
+  if (legal) b.text(legal, { align: "center", bold: true });
   for (const line of rest) b.text(line, { align: "center" });
 
   b.rule();
@@ -538,7 +538,7 @@ export function renderReturnDoc(doc: ReturnDoc, shop: ShopProfile, width: PaperW
   b.text(letterSpaced(REPAIR_ES.tagline, cols), { align: "center" });
   b.feed(1);
   const [legal, ...rest] = shopHeaderLines(shop);
-  b.text(legal!, { align: "center", bold: true });
+  if (legal) b.text(legal, { align: "center", bold: true });
   for (const line of rest) b.text(line, { align: "center" });
 
   b.rule();

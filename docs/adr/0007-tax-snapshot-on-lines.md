@@ -34,3 +34,18 @@ Rejected.
 - Harder: a few "unused" columns in Phase 1 — deliberate.
 - Revisit: client's region (standard AEAT Verifactu vs Basque TicketBAI) — open question
   with the client; schema supports either.
+
+## Amendment A1 — the general rate is a setting (v0.18.0, 2026-09-03)
+
+`TAX_RATE_BP.IVA21` stopped being the figure lines are snapshotted with. The till
+carries `vatRateBp` in `settings` (default 2100), edited on the Ajustes taxes card,
+and it is read at the moment a line is written: a sale line when it is added, a
+repair's collection lines at hand-back, the product row's `tax_rate_bp` at save.
+Nothing already written moves — the decision above is exactly what makes a rate
+change safe, and the test pins a 21 % line staying 21 % after the setting says 10.
+
+The REGIMES are still the law's and stay read-only. REBU is the regime a Used-type
+article carries, and it is derived from the type rather than chosen: a used article
+is REBU and nothing else is, enforced in `saveProduct` and mirrored in the editor.
+The series card gained the rate field and nothing else — there is still no channel
+that writes a series (ADR-0008).

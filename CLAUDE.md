@@ -19,6 +19,9 @@ Since v0.11.0 the till buys used devices: gate, purchase document, shelf label, 
 Since v0.12.0 the till repairs devices: intake, quote, approval, parts, board, collection (ADR-0014).
 Since v0.13.0 the till has shifts: float, drawer ledger, X preview, close with variance, Z report (ADR-0015).
 Since v0.14.0 the till reports: sales/tax, repairs, used holding, valuation, dead stock, CSV export (ADR-0016).
+Since v0.18.0 the till is handover-clean: the general VAT rate is a SETTING read at snapshot time
+(ADR-0007 A1), Eliminar deletes a row nothing points at and archives one with history, a Used-type
+article can be typed in and sells REBU, an installed build never sees the demo dataset.
 NOT yet: refunds/voids, full invoices, card-terminal SDK, sync, web app, transfers/agency/SIM
 screens, margin on SOLD used devices, the refurbishment pipeline, the police-register export.
 Schema already anticipates them — build nothing for them.
@@ -31,7 +34,9 @@ Schema already anticipates them — build nothing for them.
 - **Stock changes are `stock_movements` inserts only.** Never UPDATE a quantity. Negative on-hand
   must be rejected in core (tested), not by the UI.
 - **Renderer never touches DB/Node.** Everything crosses typed IPC validated with Zod on both sides.
-- **Tax is snapshotted on lines** (regime + rate_bp + amounts). Phase 1 = IVA21 only.
+- **Tax is snapshotted on lines** (regime + rate_bp + amounts). Phase 1 = the general rate — a
+  setting, `vatRateBp`, read when the line is written, never a constant (ADR-0007 A1) — plus REBU
+  for used articles. The regime follows the item type; nothing else picks it.
 - **Errors are typed codes** per the IPC contract — the UI never string-matches messages.
 - **Every IPC handler declares a permission.** Register through `guarded()`, `authed()` or
   `open()` — never `ipcMain.handle` directly. The open allow-list is short and a test pins it.

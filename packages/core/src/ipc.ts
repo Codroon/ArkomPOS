@@ -12,6 +12,9 @@ export const IPC_CHANNELS = [
   "catalog:list",
   "catalog:get",
   "catalog:save",
+  "catalog:removal",
+  "catalog:remove",
+  "catalog:restore",
   "catalog:groups",
   "transfer:send",
   "transfer:payout",
@@ -199,6 +202,8 @@ export const MetaContextResponseSchema = z.object({
   tenant: EntityRefSchema,
   location: EntityRefSchema,
   terminal: EntityRefSchema,
+  /** the general VAT rate this till snapshots today, in basis points (v0.18.0) */
+  vatRateBp: z.number().int(),
 });
 export type MetaContextResponse = z.infer<typeof MetaContextResponseSchema>;
 
@@ -209,13 +214,15 @@ export type MetaContextResponse = z.infer<typeof MetaContextResponseSchema>;
  * What the catalogue EDITOR can set. `used_device` is deliberately absent: a
  * used product is created by buying a phone, never by typing one in.
  */
-export const CatalogItemTypeSchema = z.enum(["stocked", "serialized"]);
+export const CatalogItemTypeSchema = z.enum(["stocked", "serialized", "used_device", "repair"]);
 /** What a catalogue row may CARRY, which includes rows the editor cannot make. */
-export const ProductItemTypeSchema = z.enum(["stocked", "serialized", "used_device"]);
+export const ProductItemTypeSchema = z.enum(["stocked", "serialized", "used_device", "repair", "service", "agency"]);
 export type CatalogItemType = z.infer<typeof CatalogItemTypeSchema>;
 
 /** Tax regimes offered in Phase 1 (ADR-0007: IVA21 only; others visible-disabled). */
-export const TaxRegimeP1Schema = z.enum(["IVA21"]);
+/* IVA21 is the general rate — whose figure is a SETTING since v0.18.0 — and REBU
+   is the margin scheme a Used-type article sells under (ADR-0007 A1). */
+export const TaxRegimeP1Schema = z.enum(["IVA21", "REBU"]);
 
 /**
  * includeUsed decides whether second-hand products appear.
@@ -236,6 +243,9 @@ export const CatalogListRequestSchema = z
     /* second-hand products are hidden from the management list by default; the
        Sale screen asks for them (ADR-0013, catalogue noise) */
     includeUsed: z.boolean().optional(),
+    /* archived articles are out of every list unless the catalogue asks for
+       them by name (v0.18.0) */
+    includeArchived: z.boolean().optional(),
   })
   .optional();
 export type CatalogListRequest = z.infer<typeof CatalogListRequestSchema>;
@@ -319,6 +329,26 @@ export const CatalogSaveResponseSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("barcodeWarning"), code: z.string(), conflicts: z.array(ProductRefSchema) }),
 ]);
 export type CatalogSaveResponse = z.infer<typeof CatalogSaveResponseSchema>;
+
+/* ---- removing an article (v0.18.0) ----
+   One question and one act. The question says what Eliminar would DO to this
+   row — delete it outright, archive it, or nothing until stock is adjusted —
+   so the confirm can say so before anything happens. */
+export const CatalogRemovalRequestSchema = z.object({ id: z.string() });
+export const CatalogRemovalResponseSchema = z.object({
+  kind: z.enum(["delete", "archive", "blocked"]),
+  hasHistory: z.boolean(),
+  onHand: z.number().int(),
+});
+export type CatalogRemoval = z.infer<typeof CatalogRemovalResponseSchema>;
+export const CatalogRemoveRequestSchema = z.object({ id: z.string() });
+export const CatalogRemoveResponseSchema = z.object({
+  kind: z.enum(["deleted", "archived"]),
+  product: ProductRowSchema.nullable(),
+});
+export type CatalogRemoveResponse = z.infer<typeof CatalogRemoveResponseSchema>;
+export const CatalogRestoreRequestSchema = z.object({ id: z.string() });
+export const CatalogRestoreResponseSchema = ProductRowSchema;
 
 /* ---- product codes (additional scannable codes) ---- */
 
@@ -621,6 +651,7 @@ export const TicketPeekSchema = z.object({
       /* what the line was sold under. A REBU line prints the regime mention and
          contributes no VAT to the breakdown (ADR-0007 snapshot, ADR-0013 §5). */
       taxRegime: z.string().nullable().default(null),
+      taxRateBp: z.number().int().nullable().default(null),
     }),
   ),
   subtotalCents: z.number().int(),
@@ -695,6 +726,9 @@ export const SettingsSchema = z.object({
   usedMarginPct: z.number().int().min(0).max(500),
   /** dead stock: no completed sale line in this many days (ADR-0016) */
   deadStockDays: z.number().int().min(1).max(3650),
+  /** the general VAT rate, in basis points. Feeds FUTURE line snapshots only;
+      every line already written keeps the rate it was sold at (ADR-0007 A1) */
+  vatRateBp: z.number().int().min(0).max(10000),
   /* ---- cash (ADR-0015). The client's answers about their own drawer, as data. ---- */
   /** prefilled when opening a shift; the shop can still count something else */
   cashDefaultFloatCents: z.number().int().min(0),
@@ -809,6 +843,8 @@ export const SetupStatusResponseSchema = z.object({
   needed: z.boolean(),
   /** shop exists but has no users — a v0.9.0 till that just upgraded (spec I2) */
   ownerNeeded: z.boolean(),
+  /** an installed till; the demo dataset is not offered to one (v0.18.0) */
+  packaged: z.boolean(),
 });
 
 export const SetupCompleteRequestSchema = z.object({
