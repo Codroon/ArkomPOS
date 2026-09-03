@@ -63,6 +63,11 @@ business rows + `product_stock` cache + `oplog` entry → typed result back.
 | `transfer:payout` | {mtcn, …, confirmedOverDrawer?} → logged \| overDrawerWarning | ADR-0018; a warning, not a refusal |
 | `transfer:list` · `transfer:get` | filters → rows | `transfers.view`; defaults to this shift |
 | `transfer:cancel` | {id, reason} → {row} | `transfers.cancel`, APPROVABLE; reverses in the CURRENT shift |
+| `transfer:verify` | {id, state, note?} → row | ADR-0019; `transfers.verify`; a flag needs a note |
+| `transfer:bulkVerify` | {ids} → {verified} | IDs only, never a filter; skips flagged rows |
+| `transfer:editMtcn` | {id, mtcn} → row | `transfers.editMtcn`; uniqueness re-checked |
+| `refund:peek` | {documentId} → lines + what is left | `sale.create` |
+| `refund:create` | {documentId, reason, method, lines} → {docNumber, …} | ADR-0019; `sale.refund`, APPROVABLE; shift required |
 | `supplier:list` · `supplier:create` | — | `supplier.manage`, not `inventory.receive`: a technician orders parts but may not receive stock |
 | `catalog:renameGroup` | {id, name} → {id, name} | ADR-0017; `catalog.edit`; no propagation needed |
 | `catalog:save` | ProductInput{…, confirmed?} → {kind:'saved', product} \| {kind:'barcodeWarning', code, conflicts[]} | full req-4 validation; barcode auto-gen if blank; duplicate **name** → typed error; duplicate **barcode** → warning payload, re-sent with `confirmed:true` (PRD 4.4 amended) |

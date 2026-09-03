@@ -11,6 +11,7 @@ import type {
   EntityRef,
   GroupRef,
   TransferRow,
+  RefundPeekResponse,
   InventoryListRequest,
   InventoryMovementsRequest,
   InventoryMovementsResponse,
@@ -93,6 +94,15 @@ declare global {
       invoke(channel: "catalog:groups", payload?: undefined): Promise<GroupRef[]>;
       invoke(channel: "transfer:list", payload: unknown): Promise<{ rows: TransferRow[]; drawerCents: number }>;
       invoke(channel: "transfer:get", payload: { id: string }): Promise<TransferRow>;
+      invoke(channel: "transfer:verify", payload: { id: string; state: string; note?: string | null }): Promise<TransferRow>;
+      invoke(channel: "transfer:bulkVerify", payload: { ids: string[] }): Promise<{ verified: number }>;
+      invoke(channel: "transfer:editMtcn", payload: { id: string; mtcn: string }): Promise<TransferRow>;
+      invoke(channel: "refund:peek", payload: { documentId: string }): Promise<RefundPeekResponse>;
+      invoke(
+        channel: "refund:create",
+        payload: unknown,
+        approval?: unknown,
+      ): Promise<{ documentId: string; docNumber: string; totalCents: number; voucherId: string | null; restockedCount: number; unitsToReviewCount: number }>;
       invoke(channel: "transfer:send", payload: unknown): Promise<{ row: TransferRow }>;
       invoke(
         channel: "transfer:payout",

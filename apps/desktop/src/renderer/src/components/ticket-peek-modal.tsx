@@ -10,6 +10,8 @@ import { useEffect, useState } from "react";
 import type { TicketPeek } from "@arkom/core";
 import { GhostButton, MoneyText, SectionLabel, useT, type TKey, useDataLabel } from "@arkom/ui";
 import { useTicketPrint } from "../lib/use-ticket-print";
+import { useCan } from "../lib/use-session";
+import { RefundDialog } from "./refund-dialog";
 import { PrintToast } from "../lib/print-toast";
 
 const METHOD_KEYS: Record<string, TKey> = {
@@ -30,6 +32,9 @@ export function TicketPeekModal({ docId, onClose }: { docId: string; onClose: ()
   const dataLabel = useDataLabel();
   const [peek, setPeek] = useState<TicketPeek | null>(null);
   const printer = useTicketPrint();
+  const can = useCan();
+  const [refunding, setRefunding] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     window.arkom
@@ -122,11 +127,35 @@ export function TicketPeekModal({ docId, onClose }: { docId: string; onClose: ()
               {printer.state.busy ? t("print.printing") : t("print.reprint")}
             </GhostButton>
           ) : null}
+          {/* a refund starts from the ticket, which is the thing the customer
+              is holding (ADR-0019) */}
+          {peek?.status === "completed" && can("sale.refund") ? (
+            <GhostButton onClick={() => setRefunding(true)}>{t("refund.start")}</GhostButton>
+          ) : null}
           <GhostButton onClick={onClose}>{t("peek.close")}</GhostButton>
         </div>
       </div>
 
       <PrintToast printer={printer} />
+      {refunding && peek ? (
+        <RefundDialog
+          documentId={peek.docId}
+          onCancel={() => setRefunding(false)}
+          onDone={(message) => {
+            setRefunding(false);
+            setToast(message);
+            /* re-read: the ticket's remaining quantities have moved, and the
+               next refund must be offered the new figures */
+            void window.arkom.invoke("sale:peek", { docId }).then(setPeek).catch(() => undefined);
+            setTimeout(() => setToast(null), 3200);
+          }}
+        />
+      ) : null}
+      {toast ? (
+        <div className="fixed bottom-4 right-4 z-[80] rounded-[3px] border border-line-strong bg-card px-3 py-2 text-[12px] shadow-lg">
+          {toast}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -50,6 +50,8 @@ export function TransfersScreen() {
   const [scope, setScope] = useState<"shift" | "all">("shift");
   const [kind, setKind] = useState("");
   const [search, setSearch] = useState("");
+  /* the reconciliation question: "what have I not checked yet?" */
+  const [verif, setVerif] = useState<"" | "unverified" | "flagged">("");
   const [dialog, setDialog] = useState<"send" | "payout" | null>(null);
   const [peek, setPeek] = useState<TransferRow | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -61,17 +63,37 @@ export function TransfersScreen() {
         kind: kind || null,
         search: search.trim() || null,
       });
-      setRows(res.rows);
+      /* filtered here rather than in SQL: verification is a property of the
+         rows already on screen, and bulk-verify acts on exactly what is listed */
+      setRows(verif ? res.rows.filter((r) => r.verification === verif) : res.rows);
       setDrawerCents(res.drawerCents);
     } catch (err) {
       console.error("transfer:list failed", err);
       setRows([]);
     }
-  }, [scope, kind, search]);
+  }, [scope, kind, search, verif]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  /**
+   * Verify exactly what is on screen.
+   *
+   * Sends IDS, never the filter: "everything matching" would tick rows that
+   * arrived between the list rendering and the button being pressed, and
+   * verification is a person saying they looked (ADR-0019).
+   */
+  const bulkVerify = async () => {
+    const ids = (rows ?? []).filter((r) => r.verification === "unverified").map((r) => r.id);
+    if (ids.length === 0) return;
+    try {
+      const res = await window.arkom.invoke("transfer:bulkVerify", { ids });
+      done(t("tr.verif.bulkDone", { n: res.verified }));
+    } catch (err) {
+      console.error("transfer:bulkVerify failed", err);
+    }
+  };
 
   const done = (message: string) => {
     setDialog(null);
@@ -108,6 +130,24 @@ export function TransfersScreen() {
           <option value="send">{t("tr.kind.send")}</option>
           <option value="payout">{t("tr.kind.payout")}</option>
         </SelectInput>
+        {(["", "unverified", "flagged"] as const).map((v) => (
+          <button
+            key={v || "all"}
+            type="button"
+            onClick={() => setVerif(v)}
+            className={cn(
+              "h-6 rounded-[3px] border px-2 text-[11px] font-bold",
+              verif === v
+                ? "border-ink bg-ink text-inverse-ink"
+                : "border-line-strong bg-card text-ink-2 hover:border-muted",
+            )}
+          >
+            {t(v === "" ? "tr.verif.all" : v === "unverified" ? "tr.verif.unverified" : "tr.verif.flagged")}
+          </button>
+        ))}
+        {rows && rows.some((r) => r.verification === "unverified") ? (
+          <GhostButton onClick={() => void bulkVerify()}>{t("tr.verif.bulk")}</GhostButton>
+        ) : null}
         <div className="flex-1" />
         <SearchInput
           className="w-[280px]"
@@ -162,6 +202,15 @@ export function TransfersScreen() {
                   </td>
                   <td className="px-2 py-1.5">
                     <Chip variant={r.status === "cancelled" ? "danger" : "success"}>{t(STATUS_KEY[r.status]!)}</Chip>
+                    {r.verification === "verified" ? (
+                      <Chip variant="success" className="ml-1">
+                        {t("tr.verif.state.verified")}
+                      </Chip>
+                    ) : r.verification === "flagged" ? (
+                      <Chip variant="warning" className="ml-1">
+                        {t("tr.verif.state.flagged")}
+                      </Chip>
+                    ) : null}
                   </td>
                 </tr>
               ))}
@@ -433,11 +482,30 @@ function PeekModal({
 }) {
   const t = useT();
   const [cancelling, setCancelling] = useState(false);
+  const [flagging, setFlagging] = useState(false);
+  const [editingMtcn, setEditingMtcn] = useState(false);
+  const [mtcn, setMtcn] = useState(row.mtcn);
+  const [note, setNote] = useState(row.flagNote ?? "");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
-  const err = useFieldError(reason);
+  const err = useFieldError(`${reason}|${note}|${mtcn}`);
 
   const country = useMemo(() => COUNTRIES.find((c) => c.code === row.countryCode)?.name ?? row.countryCode, [row]);
+
+  /** One shape for every records-only action: run it, refresh, say why not. */
+  const act = async (call: () => Promise<unknown>) => {
+    if (busy) return;
+    setBusy(true);
+    err.clear();
+    try {
+      await call();
+      onCancelled(t("tr.toast.updated"));
+    } catch (e) {
+      err.fail(errorMessage(t, e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const doCancel = async () => {
     if (reason.trim() === "" || busy) return;
@@ -493,6 +561,13 @@ function PeekModal({
         {row.method ? <Row label={t("tr.field.method")} value={t(row.method === "cash" ? "pay.cash" : "pay.card")} /> : null}
         <Row label={t("tr.col.drawer")} value={formatCents(row.status === "cancelled" ? 0 : row.drawerCents)} />
         <Row label={t("tr.peek.loggedBy")} value={`${stamp(row.createdAtMs)} · ${row.userName ?? t("common.dash")}`} />
+        {row.verification !== "unverified" ? (
+          <Row
+            label={t("tr.verif.by")}
+            value={`${row.verifiedAtMs ? stamp(row.verifiedAtMs) : t("common.dash")} · ${row.verifiedByName ?? t("common.dash")}`}
+          />
+        ) : null}
+        {row.flagNote ? <Row label={t("tr.verif.note")} value={row.flagNote} /> : null}
         {row.cancelledAtMs !== null ? (
           <>
             <Row
@@ -503,7 +578,40 @@ function PeekModal({
           </>
         ) : null}
 
-        {cancelling ? (
+        {editingMtcn ? (
+          <div className="mt-3 border-t border-line pt-2.5">
+            <Field label={t("tr.field.mtcn")} required error={err.error ?? undefined}>
+              <TextInput mono autoFocus value={mtcn} maxLength={20} onChange={(e) => setMtcn(e.target.value)} />
+            </Field>
+            <div className="mt-2 flex justify-end gap-2">
+              <GhostButton onClick={() => setEditingMtcn(false)}>{t("common.cancel")}</GhostButton>
+              <AccentButton
+                disabled={busy || mtcn.replace(/[\s-]/g, "") === row.mtcn}
+                onClick={() => void act(() => window.arkom.invoke("transfer:editMtcn", { id: row.id, mtcn }))}
+              >
+                {t("common.save")}
+              </AccentButton>
+            </div>
+          </div>
+        ) : flagging ? (
+          <div className="mt-3 border-t border-line pt-2.5">
+            {/* a flag with no note is a mystery rather than a signal */}
+            <Field label={t("tr.verif.note")} required error={err.error ?? undefined}>
+              <TextInput autoFocus value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} />
+            </Field>
+            <div className="mt-2 flex justify-end gap-2">
+              <GhostButton onClick={() => setFlagging(false)}>{t("common.cancel")}</GhostButton>
+              <AccentButton
+                disabled={busy || note.trim() === ""}
+                onClick={() =>
+                  void act(() => window.arkom.invoke("transfer:verify", { id: row.id, state: "flagged", note: note.trim() }))
+                }
+              >
+                {t("tr.verif.flag")}
+              </AccentButton>
+            </div>
+          </div>
+        ) : cancelling ? (
           <div className="mt-3 border-t border-line pt-2.5">
             <Field label={t("tr.cancel.reason")} required error={err.error ?? undefined}>
               <TextInput autoFocus value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} />
@@ -515,8 +623,26 @@ function PeekModal({
           </div>
         ) : null}
 
-        <div className="mt-3 flex justify-end gap-2">
+        <div className="mt-3 flex flex-wrap justify-end gap-2">
           <GhostButton onClick={onClose}>{t("common.close")}</GhostButton>
+          {!cancelling && !flagging && !editingMtcn ? (
+            <>
+              <GhostButton onClick={() => setEditingMtcn(true)}>{t("tr.verif.editMtcn")}</GhostButton>
+              <GhostButton onClick={() => setFlagging(true)}>{t("tr.verif.flag")}</GhostButton>
+              <GhostButton
+                onClick={() =>
+                  void act(() =>
+                    window.arkom.invoke("transfer:verify", {
+                      id: row.id,
+                      state: row.verification === "verified" ? "unverified" : "verified",
+                    }),
+                  )
+                }
+              >
+                {t(row.verification === "verified" ? "tr.verif.unverify" : "tr.verif.verify")}
+              </GhostButton>
+            </>
+          ) : null}
           {row.status !== "cancelled" ? (
             cancelling ? (
               <AccentButton disabled={reason.trim() === "" || busy} onClick={() => void doCancel()}>
