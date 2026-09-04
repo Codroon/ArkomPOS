@@ -271,6 +271,16 @@ export function createRefund(db: ArkomDb, ctx: MutationCtx, req: RefundCreateReq
         createdAt: now,
       };
       tx.insert(documentLines).values(lineRow).run();
+      /* every write goes through the oplog, and a refund line is a write: it is
+         the row that says money went back and which line it came off. Missing
+         here until v1.0.0, where `db:audit --verify` found it on a rehearsal. */
+      log({
+        entity: "document_line",
+        entityId: lineRow.id,
+        action: "create",
+        before: null,
+        after: toOplogJson(lineRow),
+      });
 
       /* the running total lives on the ORIGINAL line, so the next refund's
          check is a read of one row rather than a sum over history */
@@ -278,6 +288,13 @@ export function createRefund(db: ArkomDb, ctx: MutationCtx, req: RefundCreateReq
         .set({ refundedQty: src.refundedQty + entry.qty })
         .where(eq(documentLines.id, src.id))
         .run();
+      log({
+        entity: "document_line",
+        entityId: src.id,
+        action: "update",
+        before: { refundedQty: src.refundedQty },
+        after: { refundedQty: src.refundedQty + entry.qty, refundedBy: doc.docNumber },
+      });
 
       if (!entry.restock || !canRestock(src)) return;
 

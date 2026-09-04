@@ -10,7 +10,7 @@ shop's data lives in one SQLite file on the counter PC.
 
 ---
 
-## Current state — v0.18.1
+## Current state — v1.0.0 · 4 September 2026
 
 Phase 1 is complete and packaged. Verified on a clean Windows machine end to
 end, with one exception noted below.
@@ -28,6 +28,7 @@ end, with one exception noted below.
 | **Backups** | Nightly + on close via SQLite's online backup API, each one verified, last 14 kept, optional second destination |
 | **First run** | Fresh install asks the shop who it is, then migrates and starts — no seed step on a client machine |
 | **Audit** | `db:audit --verify` checks every invariant the design rests on |
+| **Diagnostics** | A boot log in `%TEMP%\arkom-boot.log` names the last step main reached, so a launch that fails before the app's own logger still says where |
 | **Auth** | PIN login with roles, per-action owner approval with dual attribution, idle lock, per-user permission overrides, owner recovery code |
 | **Used devices** | Buy over the counter behind an offline IMEI gate, photos, printed purchase document with a signature line, shelf label, hold or shelve, refurbishment cost, and a register of every device bought |
 | **Store credit** | Paying a seller in credit issues a voucher; it pays for a later sale as a tender, redeemed inside that sale's transaction so it cannot be spent twice |

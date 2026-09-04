@@ -1,7 +1,7 @@
 {
   "name": "arkom-pos",
   "private": true,
-  "version": "0.12.0",
+  "version": "1.0.0",
   "description": "Arkom POS — offline-first desktop till + cloud dashboard (see docs/adr, docs/design/system-design.md)",
   "packageManager": "pnpm@11.22.0",
   "engines": {

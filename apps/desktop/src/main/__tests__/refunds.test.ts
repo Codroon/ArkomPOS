@@ -641,3 +641,41 @@ describe("a receipt from another day", () => {
     expect(barcode).toMatchObject({ data: "T1-000482", caption: "T1-000482" });
   });
 });
+
+/* ------------------------------------------------- the oplog, without gaps */
+
+describe("what the oplog says about a refund", () => {
+  it("has an entry for every row the refund writes", async () => {
+    /* `db:audit --verify` asserts exactly this over a whole database, and it
+       caught the refund line missing on a v1.0.0 release rehearsal. A write
+       that skips the oplog is a bug, full stop (CLAUDE.md). */
+    const productId = makeProduct("Funda");
+    const ticket = makeTicket([
+      { productId, description: "Funda", qty: 2, unitPriceCents: 1290, taxRegime: "IVA21" },
+    ]);
+    await call("refund:create", {
+      documentId: ticket.docId,
+      reason: "Cambio de opinión",
+      method: "cash",
+      lines: [{ lineId: ticket.lines[0]!.id, qty: 1, restock: true }],
+    });
+
+    const audited = new Set(
+      env.db
+        .select()
+        .from(s.oplog)
+        .all()
+        .filter((e) => e.entity === "document_line")
+        .map((e) => e.entityId),
+    );
+    const refundLines = env.db
+      .select()
+      .from(s.documentLines)
+      .all()
+      .filter((l) => l.refundsLineId !== null);
+    expect(refundLines).toHaveLength(1);
+    for (const line of refundLines) expect(audited.has(line.id), `unaudited line ${line.id}`).toBe(true);
+    // and the original line's running total is a visible change too
+    expect(audited.has(ticket.lines[0]!.id)).toBe(true);
+  });
+});

@@ -22,10 +22,13 @@ import { makeMutateRunner } from "../mutate-runner";
 const { settings } = schema;
 
 /**
- * Placeholders, not guesses. The shop's real fiscal data is blocking for
- * go-live but not for build (PRD open question 1), so the till ships saying so
- * out loud — a test ticket prints "PENDIENTE" where the NIF belongs, which is
- * far harder to miss than a plausible-looking wrong address.
+ * Defaults a till can work from, and blanks where only the shop knows.
+ *
+ * The letterhead ships EMPTY (v0.18.0): first run asks for it, Ajustes shows
+ * what is missing as an empty field, and a blank line simply does not print.
+ * Until v0.18.0 these three said "PENDIENTE", which was meant to shout — but a
+ * placeholder that can reach a customer's ticket is a worse failure than a
+ * blank one, and the wizard now makes the fields required anyway.
  */
 export const DEFAULT_SETTINGS: Settings = {
   printerName: "", // no printer — a legitimate configuration, PDF handles it

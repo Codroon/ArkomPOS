@@ -1,3 +1,5 @@
+/* FIRST, before anything that can fail: the log of last resort (v1.0.0). */
+import { bootStep } from "./boot-log";
 import { app, BrowserWindow, screen } from "electron";
 import { join } from "node:path";
 import { initDb } from "./db";
@@ -111,12 +113,15 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.whenReady().then(async () => {
+    bootStep("ready");
     installErrorLogging();
     hardenApp();
     installKdf();
 
+    bootStep("opening the database");
     const db = initDb();
     registerIpcHandlers(db);
+    bootStep("database open, handlers registered");
 
     /* Last session's PDF renders. At STARTUP rather than after opening one: the
        viewer may still hold the file, and a till that deletes a PDF out from
@@ -124,6 +129,7 @@ if (!app.requestSingleInstanceLock()) {
        (v0.17.0). Failure here is never worth blocking a launch over. */
     void cleanPdfTemp().catch(() => undefined);
     await createWindow();
+    bootStep("window created");
 
     // the till may not be configured yet, so the context is read per run rather
     // than captured here — first run creates the tenant this depends on

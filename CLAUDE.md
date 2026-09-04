@@ -20,6 +20,7 @@ Since v0.12.0 the till repairs devices: intake, quote, approval, parts, board, c
 Since v0.13.0 the till has shifts: float, drawer ledger, X preview, close with variance, Z report (ADR-0015).
 Since v0.14.0 the till reports: sales/tax, repairs, used holding, valuation, dead stock, CSV export (ADR-0016).
 Since v0.18.1 the counter refuses to charge with no printer configured (`PRINTER_REQUIRED`).
+**v1.0.0 is the release the shop runs.**
 Since v0.18.2 first run is a four-step wizard (language → shop → owner + recovery code →
 printer, skippable) and the landing screen carries a fact-driven, dismissible checklist
 (`setup:checklist`). `pnpm fresh` archives this machine's dev data and reopens onboarding.

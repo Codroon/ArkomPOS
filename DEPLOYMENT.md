@@ -400,54 +400,93 @@ The tolerance (3 €), the default float, the approval limit for a manual moveme
 and the list of frequent concepts all live in **Ajustes → Caja** and are the
 owner's to change.
 
-## 9. Shop-visit checklist
+## 9. Install day, in order
 
-In order. Do not skip ahead — each step assumes the one above worked.
+Each step assumes the one above worked. Nothing here needs a developer except
+step 11, and nothing here needs administrator rights.
 
-- [ ] **1. Install.** Run the installer, click through SmartScreen (§2). It
-      launches itself.
-- [ ] **2. First run with the REAL data.** Language, then registered name, NIF,
-      address, postcode, town, phone, footer. Agree the ticket prefix with the
-      owner — it is permanent. The till starts empty (§3).
-- [ ] **2b. Create the responsable.** The owner picks their own PIN — you should
-      not know it. **Print the recovery code and watch them put it somewhere
-      safe** before continuing (§3).
-- [ ] **2c. Add the staff** in 12 Usuarios, each with their own PIN, as Cajero.
-- [ ] **3. Printer.** Driver, USB, paper, then Ajustes → pick it → 80 mm → Epson
-      → **Imprimir prueba**. Check the accents, the € sign, and the cut (§4).
-- [ ] **4. Scanner.** Notepad test first, then a scan into the app's search box
+- [ ] **1. Install.** Double-click `Arkom POS Setup 1.0.0.exe`, click through
+      SmartScreen (§2). It installs for the current Windows user only — no
+      administrator prompt — and launches itself.
+- [ ] **2. Onboarding, with the REAL data.** The app opens on the wizard.
+      - **Language** — top right, *Idioma de la caja*. It sets the screens and
+        the starter shelf names. Printed tickets are Spanish either way.
+      - **Shop details** — registered name, NIF, registered address, postcode,
+        town, phone, footer line. These print at the top of every ticket.
+      - **Till and numbering** — till name, and the prefix for each of the five
+        documents: tickets, refunds, repairs, used purchases, Z closes.
+        **Agree these with the owner: they cannot be changed afterwards.**
+      - **Owner** — their name and a PIN they choose, typed twice. You should
+        not know it.
+      - **Recovery code** — shown once. With no printer yet the blue button is
+        **Guardar PDF**; it asks where to save it. Put it in the shop's folder,
+        not on the till. §3 explains why this matters.
+      - **Printer step** — do it now if the printer is on the counter (step 3),
+        or press **Ahora no** and come back to it.
+- [ ] **3. Printer + a test print.** **11 Ajustes → Impresión**. The Citizen
+      should already be selected (the list hides OneNote, Print to PDF and the
+      fax queue behind *Ver todas las impresoras*). Paper **80 mm**, command set
+      **Epson (ESC/POS)**. Press **Imprimir prueba** and check the paper:
+      - the shop's name, NIF and address, centred and complete — a long name
+        wraps onto a second line, it never gets cut;
+      - **the accents and the € sign**: the sample line prints
+        *Prueba de impresión* and *1,00 €*. If you see `Prueba de impresi?n` or
+        a blank where the euro belongs, the printer is on the wrong code page —
+        set it to **PC858** in the Citizen utility and test again;
+      - the cut at the end.
+      **Until a printer is set here, the till refuses to charge** — that is
+      deliberate (§4).
+- [ ] **4. Cash drawer.** Ajustes → **Abrir cajón**. If it does not open here it
+      will not open on a sale (§4).
+- [ ] **5. Scanner.** Notepad test first, then Ajustes → *Probar el escáner*
       (§5).
-- [ ] **5. Real products in.** With the owner, scan the barcodes off three or
-      four real boxes and enter them properly:
-      - **02 Catálogo** — new item, scan the box barcode into the code field,
-        name, group, cost, PVP, IVA 21%.
+- [ ] **6. The shop's own items.** With the owner, three or four real boxes:
+      - **02 Catálogo → + Nuevo artículo** — scan the box barcode into the code
+        field, then name, group, cost, PVP, IVA.
       - **03 Inventario → Entrada de stock** — receive real quantities from a
-        real supplier, at real cost. For phones, enter each IMEI.
-      - **01 Venta** — scan the same boxes and confirm each one finds its item
-        first time.
+        real supplier at real cost. For phones, one IMEI per unit.
       This is the step that proves the shop's own barcodes work, which is the
       whole reason for the visit.
-- [ ] **6. One real sale, end to end.** A phone (with IMEI) and an accessory, on
-      the same ticket. Take **cash**, with change.
-- [ ] **7. Check the ticket.** The paper ticket should carry the shop's real name
-      and NIF, both items, the IMEI on the phone's line, the total with
-      **IVA INCLUIDO**, and the change. **The cash drawer should have opened.**
-      Then open the same sale from **13 Documentos** and use **Guardar PDF…**
-      once, to confirm the PDF path works too.
-- [ ] **8. Reprint.** From the ticket, press **Reimprimir**. It comes out stamped
-      **COPIA**, and the drawer stays shut.
-- [ ] **9. Second backup destination.** Plug in the stick, Ajustes → Copia de
-      seguridad → Elegir carpeta (§7).
-- [ ] **10. Audit.** With the developer present, from the project folder:
-      `pnpm db:audit --verify`. It must report **Todo correcto**.
-- [ ] **11. Back up.** Ajustes → **Copiar ahora**. Confirm a file appears both
-      locally and on the stick.
-- [ ] **12. Show the owner four things:** how to reprint a ticket, where the
-      backups are, that closing the app backs it up automatically, and how to
-      authorise a cashier's price change with their PIN.
-- [ ] **13. Have a cashier sign in and sell one thing**, so they have done it
-      once with you standing there. Then have them try a price change and let
-      the owner authorise it.
+- [ ] **7. Open the first shift.** **09 Caja → Abrir turno**, counting the float
+      that is actually in the drawer.
+- [ ] **8. The first real sale.** A phone (with IMEI) and an accessory on one
+      ticket, paid in **cash**, with change. Check the paper: both items, the
+      IMEI under the phone, **IVA INCLUIDO** under the total, the change, and
+      the drawer opening. Then **Reimprimir** once: it comes out stamped
+      **COPIA** and the drawer stays shut.
+- [ ] **9. The first Z.** **09 Caja**, count the drawer, **Cerrar turno**. The Z
+      appears on screen with the day's figures and a variance of 0,00 €. Print
+      it if the shop wants paper. A closed shift can never be edited (§8).
+- [ ] **10. Second backup destination.** Plug in the stick, Ajustes → Copia de
+      seguridad → **Elegir carpeta** (§7), then **Copiar ahora** and confirm a
+      file lands both locally and on the stick.
+- [ ] **11. Audit** (developer, from the project folder): `pnpm db:audit
+      --verify`. It must say **Todo correcto**.
+- [ ] **12. Show the owner five things:** reprinting a ticket, where the backups
+      are, that closing the app backs it up by itself, how to authorise a
+      cashier's price change with their PIN, and that the day ends with a Z.
+- [ ] **13. Have a cashier sign in and sell one thing** with you standing there,
+      then have them try a price change and let the owner authorise it.
+
+### If install day goes wrong — rollback
+
+Nothing here needs the developer, and none of it deletes anything.
+
+1. **The app will not start, or starts wrong.** Close it. Rename
+   `C:\Users\<user>\AppData\Roaming\Arkom POS` to `Arkom POS.broken` and start
+   the app again: it comes up on the wizard with a new empty database, and the
+   old one is still on disk under the new name.
+2. **The data is wrong but the app works** (a test sale in the books, the wrong
+   prefix agreed, the shop's name misspelt beyond what Ajustes can fix). Do the
+   **factory reset** below — before the first real sale, never after.
+3. **A previous version behaved better.** Uninstall from *Add or remove
+   programs* — uninstalling does NOT touch `…\Arkom POS\`, the data folder —
+   then install the older `Arkom POS Setup <version>.exe`. Data written by a
+   NEWER version may not open in an older one: restore the backup from before
+   the upgrade (§7, *Restoring*) if it refuses.
+4. **The database is damaged.** Close the app, follow §7 *Restoring* with the
+   newest file from `…\Arkom POS\backups\`. Every backup is verified when it is
+   written, so the newest one that exists is a good one.
 
 ### Factory reset for go-live
 
