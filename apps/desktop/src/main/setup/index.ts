@@ -449,3 +449,45 @@ export function dismissChecklist(db: ArkomDb, ctx: MutationCtx): Checklist {
   });
   return checklist(db, ctx);
 }
+
+/**
+ * A shop that upgraded from before starter groups existed — v1.0.0.
+ *
+ * `seedStarterGroups` runs inside first run, which a till set up on an older
+ * build never did. Those shops came out the other side of the upgrade with a
+ * catalogue that cannot accept a single article: the group field is required
+ * and the dropdown is empty, with no way to fill it except one group at a time.
+ *
+ * So: a tenant with no shelves at all gets the starter set. Both names are
+ * written, Spanish canonical with English beside it, because the language the
+ * shop was set up in was never recorded and `groupDisplayName` reads whichever
+ * the staff toggle asks for. A shop that has even one group of its own is left
+ * alone — it made its own shelves and they are not ours to add to.
+ */
+export function ensureStarterGroups(db: ArkomDb): number {
+  const tenant = db.select({ id: s.tenants.id }).from(s.tenants).limit(1).all()[0];
+  if (!tenant) return 0; // not set up yet: first run will do it properly
+  const existing = db
+    .select({ id: s.productGroups.id })
+    .from(s.productGroups)
+    .where(eq(s.productGroups.tenantId, tenant.id))
+    .limit(1)
+    .all();
+  if (existing.length > 0) return 0;
+
+  const location = db.select({ id: s.locations.id }).from(s.locations).limit(1).all()[0];
+  const terminal = db.select({ id: s.terminals.id }).from(s.terminals).limit(1).all()[0];
+  if (!location || !terminal) return 0;
+
+  const ctx: MutationCtx = {
+    tenantId: tenant.id,
+    locationId: location.id,
+    terminalId: terminal.id,
+    userId: null,
+  };
+  const now = new Date();
+  mutate(makeMutateRunner(db), ctx, (tx, log) => {
+    seedStarterGroups(tx, log, tenant.id, "es", now);
+  });
+  return STARTER_GROUPS.length;
+}

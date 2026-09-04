@@ -8,6 +8,7 @@ import { app } from "electron";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { openDb, runDataFixups, runMigrations, type ArkomDb } from "@arkom/db";
+import { ensureStarterGroups } from "./setup";
 import { groupNameKey, starterEnglishName, uuidv7 } from "@arkom/core";
 import type BetterSqlite3 from "better-sqlite3";
 
@@ -47,6 +48,11 @@ export function initDb(): ArkomDb {
   const fixups = runDataFixups(db, uuidv7, (name) =>
     starterEnglishName(name) ?? (groupNameKey(name) === "usados" ? "Used" : null),
   );
+  /* a till that upgraded from before starter groups existed has an empty
+     catalogue it cannot add to; this hands it the shelves (v1.0.0) */
+  const shelves = ensureStarterGroups(db);
+  if (shelves > 0) console.log(`[db] catalogue: seeded ${shelves} starter group(s) for an upgraded till`);
+
   if (fixups.payoutsBackfilled > 0) {
     console.log(`[db] cash ledger: backfilled ${fixups.payoutsBackfilled} used-device payout(s)`);
   }

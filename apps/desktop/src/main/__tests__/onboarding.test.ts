@@ -20,6 +20,7 @@ import { registerIpcHandlers } from "../ipc";
 import { endSession, startSession } from "../auth/session";
 import { resetTillContext, tillContext } from "../context";
 import { getSettings } from "../repos/settings";
+import { ensureStarterGroups } from "../setup";
 
 const MIGRATIONS = join(__dirname, "../../../../../packages/db/drizzle");
 const REPO = join(__dirname, "../../../../..");
@@ -287,6 +288,42 @@ describe("the first-run checklist", () => {
     endSession();
     expect(await code("setup:checklist", {})).toBe("AUTH_REQUIRED");
     expect(await code("setup:dismissChecklist", {})).toBe("AUTH_REQUIRED");
+  });
+});
+
+/* ------------------------- 2b · a till that upgraded from before the shelves */
+
+describe("a shop that was set up before starter groups existed", () => {
+  it("is handed the shelves, because otherwise it cannot save a single article", async () => {
+    /* Found on the v1.0.0 install rehearsal: a till set up on a v0.10-era build
+       came through every migration with a catalogue it could not add to — the
+       group field is required and the dropdown was empty. */
+    await onboard();
+    env.db.delete(s.productGroups).run(); // the state an upgraded till was in
+    expect(env.db.select().from(s.productGroups).all()).toEqual([]);
+
+    const seeded = ensureStarterGroups(env.db);
+    expect(seeded).toBe(STARTER_GROUPS.length);
+    const groups = env.db.select().from(s.productGroups).all();
+    expect(groups).toHaveLength(STARTER_GROUPS.length);
+    // both names, because nobody recorded which language that shop was set up in
+    expect(groups.every((g) => g.name.trim() !== "" && (g.nameEn ?? "").trim() !== "")).toBe(true);
+    expect(groups.every((g) => !g.isDemo)).toBe(true);
+  });
+
+  it("leaves a shop that made its own shelves alone", async () => {
+    await onboard();
+    env.db.delete(s.productGroups).run();
+    await call("catalog:createGroup", { name: "Vitrina del escaparate" });
+
+    expect(ensureStarterGroups(env.db)).toBe(0);
+    expect(env.db.select().from(s.productGroups).all().map((g) => g.name)).toEqual(["Vitrina del escaparate"]);
+  });
+
+  it("does nothing at all on a till nobody has set up yet", () => {
+    const untouched = freshTill();
+    expect(ensureStarterGroups(untouched.db)).toBe(0);
+    expect(untouched.db.select().from(s.productGroups).all()).toEqual([]);
   });
 });
 

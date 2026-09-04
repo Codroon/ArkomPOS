@@ -25,6 +25,7 @@ import { ShiftChip } from "../screens/cash/shift-chip";
 import { SettingsScreen } from "../screens/settings/settings-screen";
 import { UsersScreen } from "../screens/users/users-screen";
 import { FirstRunChecklist } from "./first-run-checklist";
+import { useTillName } from "../lib/till-name";
 
 /**
  * `needs` hides the row entirely when the session lacks it (handoff/auth.md,
@@ -127,6 +128,7 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
   /* bumped on every nav click so a screen that drills into a sub-view returns
      to its root when the section is chosen again — clicking "05" while reading
      one device should land on the list, not on the same device */
+  const tillName = useTillName();
   const [navTick, setNavTick] = useState(0);
   const [now, setNow] = useState(() => new Date());
 
@@ -159,7 +161,7 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
           <LocaleToggle />
         </div>
         <div className="flex items-center border-l border-inverse-2 px-3.5 font-mono text-[11px] font-medium tabular-nums text-inverse-ink">
-          {context?.terminal.name ?? t("common.dash")}
+          {tillName(context?.terminal.name)}
         </div>
         <div className="flex items-center border-l border-inverse-2 px-3.5 font-mono text-[11px] font-medium tabular-nums text-inverse-muted">
           {formatNow(now)}
@@ -212,7 +214,7 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
           )}
           <div className="flex-1" />
           <div className="border-t border-line px-3 py-2.5 text-[10px] leading-normal text-subtle">
-            {context ? `${context.location.name} · ${context.terminal.name}` : t("shell.noContext")}
+            {context ? `${context.location.name} · ${tillName(context.terminal.name)}` : t("shell.noContext")}
           </div>
         </aside>
 
@@ -222,7 +224,7 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
             <>
               {/* what the till still owes, on the screen it lands on (v0.18.2) */}
               <FirstRunChecklist tick={navTick} />
-              <SaleScreen terminalName={context?.terminal.name ?? t("common.dash")} />
+              <SaleScreen terminalName={tillName(context?.terminal.name)} />
             </>
           ) : screen === "catalogo" ? (
             <CatalogScreen />
@@ -237,7 +239,7 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
           ) : screen === "transferencias" ? (
             <TransfersScreen key={navTick} />
           ) : screen === "caja" ? (
-            <CashScreen key={navTick} terminalName={context?.terminal.name ?? t("common.dash")} />
+            <CashScreen key={navTick} terminalName={tillName(context?.terminal.name)} />
           ) : screen === "documentos" ? (
             <DocumentsScreen key={navTick} />
           ) : screen === "informes" ? (

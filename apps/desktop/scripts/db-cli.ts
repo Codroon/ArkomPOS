@@ -8,6 +8,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { openDb, runDataFixups, runMigrations } from "@arkom/db";
 import { uuidv7, groupNameKey, starterEnglishName} from "@arkom/core";
+import { ensureStarterGroups } from "../src/main/setup";
 import { seed } from "./db-seed";
 
 const task = process.argv[2];
@@ -31,6 +32,7 @@ try {
          has never seen */
       /* the SAME mapper the app boots with: a database migrated from the CLI and
          one opened by the app must come out identical (v1.0.0) */
+      ensureStarterGroups(db);
       const fixups = runDataFixups(db, uuidv7, (name) =>
         starterEnglishName(name) ?? (groupNameKey(name) === "usados" ? "Used" : null));
       console.log(`Migrations applied → ${dbPath}`);

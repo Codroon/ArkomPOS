@@ -25,6 +25,7 @@ import { FindTicketDialog } from "./find-ticket-dialog";
 import { useGroupName, useGroups } from "../../components/group-picker";
 import { errorMessage } from "../../lib/errors";
 import { PrinterRequiredNotice, usePrinterReady } from "../../lib/printer-ready";
+import { useScreenTitle } from "../../lib/till-name";
 import { useChecklistShowing } from "../../components/first-run-checklist";
 import { refreshShift } from "../../lib/use-shift";
 import { OpenShiftDialog } from "../cash/open-shift-dialog";
@@ -105,6 +106,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const printer = useTicketPrint();
   const printerReady = usePrinterReady();
+  const screenTitle = useScreenTitle();
   // the onboarding card already says this, and once is enough (v0.18.2)
   const checklistShowing = useChecklistShowing();
   const approval = useApprovalFlow();
@@ -446,7 +448,7 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
       {/* header strip */}
       <div className="flex flex-none items-center gap-3 border-b border-line-strong bg-surface px-4 py-2.5">
         <div className="text-[15px] font-bold">
-          {t("nav.venta")} — {terminalName}
+          {screenTitle(t("nav.venta"), terminalName)}
         </div>
         <div className="text-[11px] text-muted">
           {completed ? (

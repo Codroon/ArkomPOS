@@ -10,7 +10,7 @@ shop's data lives in one SQLite file on the counter PC.
 
 ---
 
-## Current state — v1.0.0 · 4 September 2026
+## Current state — v1.0.1 · 4 September 2026
 
 Phase 1 is complete and packaged. Verified on a clean Windows machine end to
 end, with one exception noted below.
