@@ -55,7 +55,7 @@ if (!app.isPackaged && process.env.ARKOM_DEBUG_PORT) {
  */
 const GRAPHITE_900 = "#15181B";
 
-/** The Arkom mark, for the taskbar, Alt-Tab and the window itself. */
+/** The Codroon mark, for the taskbar, Alt-Tab and the window itself. */
 function brandIcon(): string {
   return app.isPackaged
     ? join(process.resourcesPath, "icon.ico")
