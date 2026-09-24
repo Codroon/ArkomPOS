@@ -117,6 +117,8 @@ export async function dailyTakings(accountId: string, days = 14, handle?: CloudD
 }
 
 export interface DocumentRow {
+  /** the till's own id for the document, so a list row can open it */
+  id: string;
   docNumber: string;
   docType: string;
   totalCents: number;
@@ -131,6 +133,7 @@ export async function recentDocuments(
 ): Promise<DocumentRow[]> {
   const db = handle ?? defaultDb();
   const rows = await db.execute<{
+    id: string;
     doc_number: string;
     doc_type: string;
     total_cents: string;
@@ -138,12 +141,13 @@ export async function recentDocuments(
     completed_at: Date;
   }>(sql`
     with docs as (${completedDocs(accountId)})
-    select doc_number, doc_type, total_cents, tax_cents, completed_at
+    select id, doc_number, doc_type, total_cents, tax_cents, completed_at
     from docs
     order by completed_at desc
     limit ${limit}
   `);
   return rows.map((r) => ({
+    id: r.id,
     docNumber: r.doc_number,
     docType: r.doc_type,
     totalCents: Number(r.total_cents),

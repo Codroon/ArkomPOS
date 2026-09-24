@@ -12,10 +12,8 @@
  * A Server Component: the queries run in the request, scoped to the signed-in
  * account, and the browser is never handed an id to ask with.
  */
-import { redirect } from "next/navigation";
-import { currentUser } from "../../src/auth/supabase";
-import { signOutAction } from "../../src/auth/actions";
-import { accountForUser } from "../../src/db/pg-accounts";
+import Link from "next/link";
+import { requireAccount } from "../../src/auth/session";
 import { shopsForAccount, tillsForAccount } from "../../src/db/panel-queries";
 import {
   dailyTakings,
@@ -28,12 +26,6 @@ import { DOC_TYPES, TENDER_METHODS, dateTime, dayLabel, euros, time } from "../.
 
 export const dynamic = "force-dynamic";
 
-const LICENCE: Record<string, string> = {
-  trial: "De prueba",
-  active: "Activa",
-  suspended: "Suspendida",
-};
-
 function Figure({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div style={{ flex: "1 1 150px" }}>
@@ -45,11 +37,7 @@ function Figure({ label, value, sub }: { label: string; value: string; sub?: str
 }
 
 export default async function PanelPage() {
-  const user = await currentUser();
-  if (!user) redirect("/login");
-
-  const account = await accountForUser(user.id);
-  if (!account) redirect("/login?error=link");
+  const account = await requireAccount();
 
   const [today, days, documents, tenders, shifts, shops, tills] = await Promise.all([
     todayTotals(account.id),
@@ -64,19 +52,7 @@ export default async function PanelPage() {
   const linked = tills.length > 0;
 
   return (
-    <div className="wrap wide">
-      <div className="topbar">
-        <div>
-          <div className="brand" style={{ marginBottom: 6 }}>CODROON POS</div>
-          <div style={{ fontSize: 13, color: "var(--muted)" }}>
-            {account.name} · {account.email} · {LICENCE[account.licenceState] ?? account.licenceState}
-          </div>
-        </div>
-        <form action={signOutAction}>
-          <button className="ghost" type="submit">Salir</button>
-        </form>
-      </div>
-
+    <>
       {!linked ? (
         <div className="card">
           <h1>Todavía no hay ninguna caja enlazada</h1>
@@ -154,8 +130,10 @@ export default async function PanelPage() {
                 </thead>
                 <tbody>
                   {documents.map((doc) => (
-                    <tr key={doc.docNumber}>
-                      <td style={{ fontVariantNumeric: "tabular-nums" }}>{doc.docNumber}</td>
+                    <tr key={doc.id}>
+                      <td style={{ fontVariantNumeric: "tabular-nums" }}>
+                        <Link href={`/panel/documentos/${doc.id}`}>{doc.docNumber}</Link>
+                      </td>
                       <td>{DOC_TYPES[doc.docType] ?? doc.docType}</td>
                       <td>{time(doc.completedAt)}</td>
                       <td className="num">{euros(doc.taxCents)}</td>
@@ -237,6 +215,6 @@ export default async function PanelPage() {
           </tbody>
         </table>
       </div>
-    </div>
+    </>
   );
 }
