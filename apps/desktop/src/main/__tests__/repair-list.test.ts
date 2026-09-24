@@ -13,6 +13,7 @@ import { eq } from "drizzle-orm";
 import { openDb, runMigrations, schema as s } from "@arkom/db";
 import { AppError, parseIpcError, uuidv7, type RepairCreateRequest } from "@arkom/core";
 import { handlers } from "./electron-stub";
+import { keyNames, leafValues } from "./leaks";
 import { registerIpcHandlers } from "../ipc";
 import { endSession } from "../auth/session";
 import { resetTillContext } from "../context";
@@ -215,7 +216,8 @@ describe("the passcode on the ficha", () => {
       .all()
       .find((e) => e.action === "reveal_passcode")!;
     expect(entry.userId).toBe(owner.id);
-    expect(JSON.stringify(entry)).not.toContain("0451");
+    expect(leafValues(entry)).not.toContain("0451");
+    expect(keyNames(entry)).not.toContain("devicePasscode");
   });
 
   it("is stripped from BOTH halves of an edit entry", async () => {
@@ -224,16 +226,23 @@ describe("the passcode on the ficha", () => {
 
     // an update carrying the OLD value leaks it just as surely as the new one
     const entries = env.db.select().from(s.oplog).all();
-    expect(JSON.stringify(entries)).not.toContain("0451");
-    expect(JSON.stringify(entries)).not.toContain("9999");
+    expect(leafValues(entries)).not.toContain("0451");
+    expect(leafValues(entries)).not.toContain("9999");
+    // and the stronger half: no payload carries the field under ANY value
+    expect(keyNames(entries)).not.toContain("devicePasscode");
     expect(env.db.select().from(s.repairTickets).all()[0]!.devicePasscode).toBe("9999");
   });
 
   it("never appears in the list or the peek", async () => {
     const ticket = await createTicket(env.db, ctxOf(), intake({ devicePasscode: "0451" }));
-    expect(JSON.stringify(listTickets(env.db, ctxOf()))).not.toContain("0451");
-    expect(JSON.stringify(peekTicket(env.db, ctxOf(), ticket.ticketId))).not.toContain("0451");
-    expect(JSON.stringify(board(env.db, ctxOf()))).not.toContain("0451");
+    for (const shown of [
+      listTickets(env.db, ctxOf()),
+      peekTicket(env.db, ctxOf(), ticket.ticketId),
+      board(env.db, ctxOf()),
+    ]) {
+      expect(leafValues(shown)).not.toContain("0451");
+      expect(keyNames(shown)).not.toContain("devicePasscode");
+    }
   });
 });
 

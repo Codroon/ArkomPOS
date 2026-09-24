@@ -19,6 +19,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openDb, runMigrations, schema as s } from "@arkom/db";
 import { handlers, app } from "./electron-stub";
+import { keyNames, leafValues } from "./leaks";
 import { registerIpcHandlers } from "../ipc";
 import { endSession, startSession } from "../auth/session";
 import { resetTillContext, tillContext } from "../context";
@@ -194,12 +195,16 @@ describe("a shop links its till and its history goes up", () => {
     const entries = cloud.entriesFor(tenantId);
     expect(entries.filter((e) => e.entity === "user")).not.toHaveLength(0);
 
+    /* the PIN is compared as a leaf VALUE, not as a substring of the dump: a
+       UUIDv7 contains four digits often enough to fail a test by coincidence */
+    expect(leafValues(entries)).not.toContain("4827");
+    for (const key of ["pinHash", "pinSalt", "recoveryCodeHash", "devicePasscode"]) {
+      expect(keyNames(entries)).not.toContain(key);
+    }
+    // a hash is long and distinctive, so a substring search is honest here
     const dump = JSON.stringify(entries);
-    expect(dump).not.toContain("pinHash");
     expect(dump).not.toContain("argon2");
     expect(dump).not.toContain("scrypt");
-    expect(dump).not.toContain("4827");
-    expect(dump).not.toContain("recoveryCodeHash");
   });
 });
 
