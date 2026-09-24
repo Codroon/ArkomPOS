@@ -32,12 +32,18 @@ cannot drift between the two halves.
 
 ## Setting up a deployment
 
-1. **Create a Supabase project in an EU region** (Frankfurt, `eu-central-1`).
-   This is not a preference: ADR-0020 §4 makes the shop the data controller and
-   Codroon the processor, and personal data of Spanish shoppers stays in the union
-   because of where we chose to deploy. `vercel.json` pins the functions to `fra1`
-   for the same reason. One vendor holds the data *and* the identities that sign in
-   to see it, so the DPA names one sub-processor (ADR-0021 §3).
+1. **Create a Supabase project of its own, in an EU region** (Frankfurt,
+   `eu-central-1`). EU is not a preference: ADR-0020 §4 makes the shop the data
+   controller and Codroon the processor, and personal data of Spanish shoppers
+   stays in the union because of where we chose to deploy. `vercel.json` pins the
+   functions to `fra1` for the same reason, and a project's region cannot be
+   changed after it is created. One vendor holds the data *and* the identities
+   that sign in to see it, so the DPA names one sub-processor (ADR-0021 §3).
+
+   **Its own project, not one shared with another Codroon site.** This database
+   holds other people's customers, under a processor obligation, with its own
+   `auth.users`; sharing one with a public marketing site puts those two things
+   behind the same key. `.env.example` spells the reasoning out.
 2. **`cp .env.example .env.local`** and paste BOTH connection strings —
    `DATABASE_URL` is the transaction pooler (6543) the app runs on, `DIRECT_URL`
    is the direct connection (5432) migrations use. `.env.local` is gitignored;
