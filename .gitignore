@@ -18,9 +18,17 @@ backups/
 tickets/
 logs/
 
+# secrets — a cloud database URL and any token pasted beside it. The till has no
+# .env at all; this is the web half's, and it must never be committable.
+.env
+.env.local
+.env*.local
+.vercel/
+
 # misc
 *.log
 *.tsbuildinfo
+next-env.d.ts
 .DS_Store
 
 # Source doc bundles (already merged into ./docs and ./packages/db/src/schema.ts —

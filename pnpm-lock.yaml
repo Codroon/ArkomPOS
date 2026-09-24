@@ -28,7 +28,7 @@ importers:
         version: 12.11.1
       drizzle-orm:
         specifier: ^0.44.4
-        version: 0.44.7(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)
+        version: 0.44.7(@neondatabase/serverless@1.1.0)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)
       electron-updater:
         specifier: ^6.6.2
         version: 6.8.9(supports-color@7.2.0)
@@ -93,6 +93,15 @@ importers:
 
   apps/web:
     dependencies:
+      '@arkom/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@neondatabase/serverless':
+        specifier: ^1.0.0
+        version: 1.1.0
+      drizzle-orm:
+        specifier: ^0.44.4
+        version: 0.44.7(@neondatabase/serverless@1.1.0)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)
       next:
         specifier: ^15.4.5
         version: 15.5.23(@babel/core@7.29.7(supports-color@7.2.0))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -112,9 +121,15 @@ importers:
       '@types/react-dom':
         specifier: ^19.1.0
         version: 19.2.4(@types/react@19.2.18)
+      drizzle-kit:
+        specifier: ^0.31.4
+        version: 0.31.10
       typescript:
         specifier: ^5.9.2
         version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(supports-color@7.2.0)(tsx@4.23.12)
 
   packages/core:
     dependencies:
@@ -139,7 +154,7 @@ importers:
         version: 12.11.1
       drizzle-orm:
         specifier: ^0.44.4
-        version: 0.44.7(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)
+        version: 0.44.7(@neondatabase/serverless@1.1.0)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.13
@@ -952,6 +967,10 @@ packages:
     cpu: [x64]
     os: [linux]
     libc: [glibc]
+
+  '@neondatabase/serverless@1.1.0':
+    resolution: {integrity: sha512-r3ZZhRjEcfEdKIZnoB1RusNgvHuaBRqfCzV4Gi+5A9yUX0S4HTws/ASWqt13wL4y4I+0rqsWGdA2w7EQXHi3+Q==}
+    engines: {node: '>=19.0.0'}
 
   '@next/env@15.5.23':
     resolution: {integrity: sha512-Mv3Z9hVbFcPnoLevsZ6rnX1TBtyHb5E17yN7HTPDXSXxeNsGBjUFrdbjRXKKXIOhfth7/cg6Ay7PZ2UFawaWsQ==}
@@ -3638,6 +3657,8 @@ snapshots:
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true
 
+  '@neondatabase/serverless@1.1.0': {}
+
   '@next/env@15.5.23': {}
 
   '@next/swc-darwin-arm64@15.5.23':
@@ -4374,8 +4395,9 @@ snapshots:
       esbuild: 0.25.12
       tsx: 4.23.12
 
-  drizzle-orm@0.44.7(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1):
+  drizzle-orm@0.44.7(@neondatabase/serverless@1.1.0)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1):
     optionalDependencies:
+      '@neondatabase/serverless': 1.1.0
       '@types/better-sqlite3': 7.6.13
       better-sqlite3: 12.11.1
 

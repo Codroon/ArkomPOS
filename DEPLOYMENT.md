@@ -209,7 +209,7 @@ product barcode, and confirm that:
 
 If the digits appear but there is no new line, the scanner needs a "suffix:
 Enter / CR" setting — the barcode for that is in its manual. If nothing appears
-at all, it is a cable or power problem, not an Arkom problem.
+at all, it is a cable or power problem, not a Codroon POS problem.
 
 Once Notepad is happy, scanning anywhere in Codroon POS works.
 
@@ -232,6 +232,47 @@ What does NOT change is the paper. A receipt has never carried the till's name
 and still does not: the top of every document is the shop's own trading name,
 with its strapline underneath if it has one (**Ajustes → Datos de la tienda →
 Lema de la tienda**).
+
+## 5c. Linking the till to the cloud — only if the shop has bought it
+
+A till is complete without this. Linking adds one thing: the shop's owner can
+see what the till did from a phone or a laptop. It changes nothing about how the
+till sells, and a till whose line is down sells all day exactly as before.
+
+**Before the visit**, from the Codroon end, generate a code for the shop:
+
+```
+pnpm --filter @arkom/web cloud:code -- --email <owner's email> --name "<shop>"
+```
+
+It prints a code like `KRQ4-7T2M-9BXH` once — the database keeps only a digest,
+so a code that is lost is replaced by issuing another. It is good for seven days
+and can be used once.
+
+**At the shop**, with the till already set up (§3) and selling:
+
+1. **11 Ajustes → Nube**.
+2. Leave the address as `https://pos.codroon.com`.
+3. Paste the code and press **Enlazar la caja**.
+
+The card then shows **ENLAZADA**, the shop's name, and a queue that empties over
+the next few minutes: linking sends the till's whole history, not just today, so
+the owner's first look at the dashboard has their past in it.
+
+What to tell the owner:
+
+- **Nothing about a sale waits on the internet.** The queue grows while the line
+  is down and empties when it comes back. *Sin enviar* is a number, not a fault.
+- **The photographs stay on the till** — device photos and photographed ID
+  never leave the shop (ADR-0020). The backups in §7 are still the only copy of
+  those, which is why the USB stick matters as much as it did before.
+- **Unlinking removes the credential from this till and nothing else.** The
+  shop's books are on the till; that is the copy that was ever authoritative.
+
+If the code is refused, the message says which: *ya se ha usado o no existe*
+(issue another) or a number from the server. A link that succeeds and then shows
+a red line under *Último envío* is a network problem, not a data problem — the
+till keeps its place in the queue and retries by itself.
 
 ## 6. Where everything lives
 
@@ -478,12 +519,15 @@ step 11, and nothing here needs administrator rights.
 - [ ] **10. Second backup destination.** Plug in the stick, Ajustes → Copia de
       seguridad → **Elegir carpeta** (§7), then **Copiar ahora** and confirm a
       file lands both locally and on the stick.
-- [ ] **11. Audit** (developer, from the project folder): `pnpm db:audit
+- [ ] **11. Link the cloud** — only if the shop has a Codroon account. Ajustes →
+      Nube, paste the code, watch the queue empty (§5c). Skip it entirely
+      otherwise; nothing else on this list depends on it.
+- [ ] **12. Audit** (developer, from the project folder): `pnpm db:audit
       --verify`. It must say **Todo correcto**.
-- [ ] **12. Show the owner five things:** reprinting a ticket, where the backups
+- [ ] **13. Show the owner five things:** reprinting a ticket, where the backups
       are, that closing the app backs it up by itself, how to authorise a
       cashier's price change with their PIN, and that the day ends with a Z.
-- [ ] **13. Have a cashier sign in and sell one thing** with you standing there,
+- [ ] **14. Have a cashier sign in and sell one thing** with you standing there,
       then have them try a price change and let the owner authorise it.
 
 ### If install day goes wrong — rollback

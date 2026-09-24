@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
-  title: "Arkom POS — Panel",
-  description: "Panel de control (Fase 2)",
+  title: "Codroon POS",
+  description: "El TPV para tiendas de telefonía. Panel de control y sincronización.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

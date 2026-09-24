@@ -1,12 +1,12 @@
-# Arkom POS — System Design v1
+# Codroon POS — System Design v1
 
 Authority order: `docs/adr/` → this document → `packages/db/src/schema.ts`. Phase 1 scope:
 sale screen, catalog, inventory (+ minimal add-stock), ticket printing, Ajustes-lite. Auth
 arrived in v0.10.0 (ADR-0012) — §3, §4 and §4.1 below describe the guarded write path.
 Used-device purchases and store credit arrived in v0.11.0 (ADR-0013) — §4.2. Repairs arrived
 in v0.12.0 (ADR-0014) — §4.3. Shifts, the drawer ledger and the Z report arrive in v0.13.0
-(ADR-0015) — §4.4. Reports arrive in v0.14.0 (ADR-0016) — §4.5. Sync remains
-*designed* here, built later.
+(ADR-0015) — §4.4. Reports arrive in v0.14.0 (ADR-0016) — §4.5. Sync and the cloud's ingest
+door arrive in v1.2.0 (ADR-0020) — §6.
 
 ## 1. Component map
 
@@ -73,10 +73,10 @@ business rows + `product_stock` cache + `oplog` entry → typed result back.
 | `docs:list` | filters → rows | read-only flat list of completed documents |
 | `settings:series` | — → series + regimes | DISPLAY ONLY for the series; the general rate shown is `settings.vatRateBp` (ADR-0007 A1) and is saved through `settings:save` like any setting. There is no series write channel and there must not be |
 | `setup:checklist` | — → {printerConfigured, hasProducts, hasStaff, hasShift, dismissed, done} | v0.18.2; authed, no permission; read from FACTS (a settings row, a product, a second user, a shift) and never from a "seen it" flag |
-| `cloud:status` | — → {linked, pending, lastAckedSeq, lastPushAtMs, lastError, pushing} | v1.1.0; authed, no permission: a cashier seeing "12 pendientes" is how a shop notices its line is down |
-| `cloud:enrol` | {url, code} → status | v1.1.0; `settings.edit`; trades a one-time code for a device token (ADR-0020 §1) |
-| `cloud:unlink` | — → status | v1.1.0; `settings.edit`; removes the credential from this machine, touches no shop data |
-| `cloud:syncNow` | — → status | v1.1.0; `settings.edit`; one push, ignoring the backoff |
+| `cloud:status` | — → {linked, pending, lastAckedSeq, lastPushAtMs, lastError, pushing} | v1.2.0; authed, no permission: a cashier seeing "12 pendientes" is how a shop notices its line is down |
+| `cloud:enrol` | {url, code} → status | v1.2.0; `settings.edit`; trades a one-time code for a device token (ADR-0020 §1) |
+| `cloud:unlink` | — → status | v1.2.0; `settings.edit`; removes the credential from this machine, touches no shop data |
+| `cloud:syncNow` | — → status | v1.2.0; `settings.edit`; one push, ignoring the backoff |
 | `setup:dismissChecklist` | — → checklist | v0.18.2; records the dismissal as a setting, so the card stays gone across launches |
 | `refund:peek` | {documentId} → lines + what is left | `sale.create` |
 | `refund:create` | {documentId, reason, method, lines} → {docNumber, …} | ADR-0019; `sale.refund`, APPROVABLE; shift required |
@@ -387,12 +387,74 @@ sale line is the input it will want, and this slice puts it there.
   peeks rather than growing report-shaped copies of them.
 - **Reparaciones / Taller** = `repair:*` + `customer:*` + `workshop:board`. The board and the list render DERIVED status (ADR-0014); collection reuses the ordinary document + tender path, so repairs add no second way to take money.
 
-## 6. Sync (designed now, built Phase 2)
+## 6. Sync and the cloud (v1.2.0 — ADR-0005 mechanism, ADR-0020 rules)
 
-`POST /api/sync/push` `{terminalId, entries: OplogEntry[≤500]}` → `{ackSeq}`.
-Cloud upserts by `opId` (idempotent), applies entity payloads into PG, returns highest
-contiguous seq. Till timer: flush when online && seq > lastAcked. Failure = retry same
-batch; duplicates are no-ops. Down-sync deliberately out of v1 (ADR-0001).
+Up only. The till owns every write, pushes its own oplog in the background, and **no user
+action ever waits on the network.** The cloud never writes back (ADR-0001).
+
+Both halves import the same Zod schemas from **`packages/core/src/sync.ts`** — one file, so
+the envelope cannot drift between a till built in March and a deployment built in June.
+
+### 6.1 `POST /api/enrol` — the only door that takes no credential
+
+```
+{ code: "XXXX-XXXX-XXXX", tenantId, locationId, terminalId, terminalName, shopName, appVersion }
+  → 200 { deviceToken, accountName, shopName }
+  → 400 BAD_REQUEST      the code is not shaped like a code
+  → 404 CODE_INVALID     unknown, spent or expired — ONE answer for all three
+  → 409 TENANT_CLAIMED   a good code pasted at a shop another account already holds
+```
+
+The till brings the ids it generated at first run and keeps them (ADR-0020 §1). Codes are
+60 bits from an alphabet with no `O/0` or `I/1`, single use, seven-day life. The token is
+returned once and stored as a SHA-256; the database can hold neither secret in the clear.
+
+### 6.2 `POST /api/sync` — `Authorization: Bearer <deviceToken>`
+
+```
+{ tenantId, terminalId, appVersion, ops: SyncOp[≤200] }
+  → 200 { ackedSeq, duplicates, serverTimeMs }
+  → 401 UNAUTHENTICATED  no token, or one nobody issued
+  → 403 DEVICE_REVOKED   the account cut this till off
+  → 403 DEVICE_MISMATCH  the envelope names a till the token was not issued for
+  → 403 TENANT_MISMATCH  a row belongs to another shop — the WHOLE batch is refused
+  → 400 BAD_REQUEST      issues as {path, code}; never the values
+  → 413 / 500            nothing stored, nothing acked, till retries
+```
+
+`SyncOp` is one oplog row: `{seq, opId, tenantId, locationId, terminalId, entity, entityId,
+action, before, after, userId, authorizedByUserId, createdAtMs}`.
+
+**The cursor, which is the part that can lose a shop's history.** The till sends
+`seq > lastAckedSeq` oldest first and moves its cursor **only** on a parsed ack.
+`ackedSeq` is the highest `seq` in the batch we durably stored — *not* the cloud's own copy
+of the cursor: a re-enrolled till replays from zero while that copy still reads 500, and
+answering 500 would make it skip 201–500 without an error anywhere. Failure of any kind
+means no ack, so the next round sends the same rows, which cost one conflict each.
+
+**Excluded, at the source (ADR-0020 §3):** device passcodes, PIN material, photographs.
+`redactForSync()` strips the first two from every payload before the row is queued, and the
+ingest route runs it again on receipt so that the far end is never where a leak becomes
+durable. Photographs are files, not rows, and no push carries one. Everything else goes,
+customer and seller rows included.
+
+### 6.3 Where it lives
+
+| Till | Cloud (`apps/web`) |
+|---|---|
+| `main/sync/link.ts` — the credential, in `userData/cloud-link.json`, never a table | `src/sync/ingest.ts` — who may write, and what gets acked (pure) |
+| `main/sync/push.ts` — the timer, the batch, the backoff; never throws | `src/sync/enrol.ts` — claiming a till for an account (pure) |
+| `main/sync/enrol.ts` — pastes a code, gets a token, replays from zero | `src/db/pg-store.ts` — the atomic half: spend a code once, store a row once |
+| `cloud:*` IPC + Ajustes → Nube | `app/api/{enrol,sync}/route.ts` — thin: read, delegate, answer |
+
+Postgres: `accounts`, `tenants` (a shop, id = the till's `tenant_id`), `devices` (token as a
+digest), `enrol_codes`, `sync_entries` (the raw stream, keyed by `(tenant_id, op_id)`).
+Deleting a tenant cascades to all of it — ADR-0020 §4 makes that a feature, not a support
+ticket answered with SQL.
+
+**Not built yet:** the dashboard and its projections, and down-sync (ADR-0001 reserved it).
+Projections are derivable by replaying `sync_entries` in `seq` order, which is why ingest
+stores rows and computes nothing.
 
 ## 7. Non-functionals & failure notes
 

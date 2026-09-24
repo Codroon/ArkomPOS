@@ -36,9 +36,15 @@ returns a long-lived **device token**. Every later push carries that token.
 - The **till keeps the ids it generated at first run.** The cloud records them; it does not
   issue them. A till that has been selling for a year enrols without renumbering anything,
   and UUIDv7 (ADR-0003) makes collisions across shops a non-question.
-- The token is stored in the till's settings table like any other setting, and is the only
-  credential the sync path has. It authorises **one terminal** to write **one tenant's**
-  stream. A token that arrives with an `op` for another tenant is rejected, not ignored.
+- The token is **machine state, not shop data**: it lives in `userData/cloud-link.json`
+  beside the window state, and NOT in a table. Every row in the database goes through
+  `mutate()` into the oplog and out to the cloud — a token stored as a settings row would
+  be uploaded to the service it authenticates. Losing the file costs a replay (the cloud
+  deduplicates by `op_id`) and never a duplicate.
+- It is the only credential the sync path has, and it authorises **one terminal** to write
+  **one tenant's** stream. A batch carrying an `op` for another tenant is rejected whole,
+  not filtered: storing the honest rows and dropping the one would leave the till believing
+  it had delivered something we deliberately threw away.
 - Enrolment is **reversible from the cloud** (revoke) and **repeatable on the till** (paste
   a new code). Revocation stops ingestion; it never stops selling.
 
@@ -98,6 +104,35 @@ till is complete before the cloud exists.
 **Syncing the photographs.** Rejected for v1 on risk and cost: object storage, bandwidth, and
 the one payload whose breach would be genuinely serious. Revisit behind a per-shop toggle if
 a shop asks for remote access to them.
+
+## What shipped (v1.2.0)
+
+Both halves, against one file of shared Zod schemas (`packages/core/src/sync.ts`) so the
+envelope cannot drift:
+
+| | |
+|---|---|
+| **Till** | `main/sync/{link,push,enrol}.ts` · `cloud:*` IPC · Ajustes → Nube |
+| **Cloud** | `apps/web` — `POST /api/enrol`, `POST /api/sync`, five Postgres tables |
+| **Contract** | `SyncPushRequest/Response`, `SyncEnrolRequest/Response`, `redactForSync()` |
+
+Three things the build decided that this ADR had left open, each pinned by a test:
+
+1. **`seq` is an ordering, not an identity.** `sync_entries` is keyed by `(tenant_id, op_id)`
+   and deliberately NOT by `(tenant_id, terminal_id, seq)`: a till restored from a backup can
+   legitimately re-use a `seq` for a different row, and a unique constraint there would turn
+   that shop's next batch into a poison pill that never drains.
+2. **What we ack is what we stored, never the cursor we remember.** A re-enrolled till
+   replays from zero while the cloud's copy of its cursor still reads 500; answering with 500
+   would make it skip everything in between — a month of a shop's history, silently.
+3. **The redaction runs at both ends.** §3 puts the guarantee at the source and that is still
+   where it lives, because a secret on the wire has already left the shop. Running it again on
+   receipt costs nothing and means the far end is never where a leak becomes *durable* — an
+   old build, a future bug, or a hand-made batch all land there.
+
+Not built here: the dashboard, the projections it will read, and the landing page that sells
+the thing. The raw stream is complete and ordered, so every projection is derivable from it
+by replaying `sync_entries` — which is why this slice stores rows and computes nothing.
 
 ## Consequences
 

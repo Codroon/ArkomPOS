@@ -29,10 +29,17 @@ photographs never leave the shop.
 Since v0.18.2 first run is a four-step wizard (language → shop → owner + recovery code →
 printer, skippable) and the landing screen carries a fact-driven, dismissible checklist
 (`setup:checklist`). `pnpm fresh` archives this machine's dev data and reopens onboarding.
+Since v1.2.0 a till can be **linked to the cloud** (ADR-0020): the owner pastes an enrolment
+code in Ajustes → Nube, the till holds a device token in `userData/cloud-link.json` — never a
+table, because every row is pushed to the service the token authenticates — and a background
+timer pushes oplog rows up only. `apps/web` is the other half: `POST /api/enrol`,
+`POST /api/sync`, Postgres on Neon in the EU. **The cloud is a read model with one door and
+it never writes back.** Nothing in a screen, a sale or a shutdown awaits the network.
 Since v0.18.0 the till is handover-clean: the general VAT rate is a SETTING read at snapshot time
 (ADR-0007 A1), Eliminar deletes a row nothing points at and archives one with history, a Used-type
 article can be typed in and sells REBU, an installed build never sees the demo dataset.
-NOT yet: refunds/voids, full invoices, card-terminal SDK, sync, web app, transfers/agency/SIM
+NOT yet: refunds/voids, full invoices, card-terminal SDK, down-sync, the dashboard and its
+projections, the landing page and payment, transfers/agency/SIM
 screens, margin on SOLD used devices, the refurbishment pipeline, the police-register export.
 Schema already anticipates them — build nothing for them.
 
@@ -124,6 +131,18 @@ Schema already anticipates them — build nothing for them.
   make last month's margin move when this month's delivery arrives at a different
   price. A NULL means "before v0.14.0": reports fall back to the current cost and
   say so on screen and in the export, never silently (ADR-0016 §2).
+- **Nothing in the till ever waits on the cloud, and the cloud never writes back.** The push
+  is a background timer; `pushOnce()` does not throw, records its failure and is awaited by
+  no screen. A batch is redacted by `redactForSync()` BEFORE it is queued — a device
+  passcode, a PIN hash or a recovery hash on the wire has already left the shop. The cursor
+  moves only on a parsed ack, and what the cloud acks is what it stored, never the cursor it
+  remembers (ADR-0020).
+- **The cloud stores digests, not secrets, and `seq` is an ordering, not an identity.**
+  A device token and an enrolment code exist in the clear exactly once, on the way to the
+  person or till that uses them. `sync_entries` is keyed by `(tenant_id, op_id)` — keying it
+  by `seq` would make a restored till's next batch a poison pill. Ingest rules live in
+  `apps/web/src/sync/` as pure functions over a store interface, so they are tested without a
+  Postgres; anything that must be ATOMIC lives in `pg-store.ts` as one statement.
 - **Brand tokens only.** Colours and faces come from `packages/ui/src/styles/tokens.css` by
   meaning (`canvas`, `ink`, `accent`, `warning-bg`…). No raw hex in components. Signal Blue lands
   on exactly **one** element per screen — the primary action. **White-on-blue is banned** (text on
@@ -135,8 +154,11 @@ Schema already anticipates them — build nothing for them.
   staff-only: printed tickets/documents always render fixed Spanish strings, never `useT()`.
 
 ## Commands
-`pnpm dev` (desktop app w/ HMR) · `pnpm test` (Vitest, core) · `pnpm db:generate` / `db:migrate`
-(drizzle-kit) · `pnpm db:seed` · `pnpm db:audit [--verify]` · `pnpm build:win` (installer).
+`pnpm dev` (desktop app w/ HMR) · `pnpm test` (Vitest: core, desktop, web) · `pnpm db:generate`
+/ `db:migrate` (drizzle-kit) · `pnpm db:seed` · `pnpm db:audit [--verify]` · `pnpm build:win`
+(installer) · `pnpm dev:web` (the cloud). Cloud-only, from `apps/web`: `db:generate` /
+`db:migrate` (its own Postgres lineage, never the till's), `cloud:code` (issue an enrolment
+code), `cloud:delete-tenant` (ADR-0020 §4). See `apps/web/README.md`.
 Keep these working at all times. A CLIENT install runs none of them: it migrates on first
 launch and asks the shop who it is (see DEPLOYMENT.md). `db:seed` is a dev convenience that
 calls the same createShop()/insertDemoData() first run uses — keep it that way.
