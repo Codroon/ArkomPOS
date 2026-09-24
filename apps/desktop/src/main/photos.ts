@@ -24,7 +24,18 @@ export interface SavedPhoto {
 }
 
 export function photosRoot(): string {
-  return join(app.getPath("userData"), "photos");
+  /**
+   * `ARKOM_USER_DATA` for the CLI tasks, the same escape hatch `ARKOM_DB_PATH`
+   * already is in db.ts.
+   *
+   * A task run by `scripts/run-db-task.cjs` executes under
+   * ELECTRON_RUN_AS_NODE, where `electron.app` is undefined — so anything that
+   * reached for a path threw, and a seeding run lost every repair and every
+   * used device while quietly keeping the products. The app itself never sets
+   * this variable and is unaffected.
+   */
+  const base = process.env.ARKOM_USER_DATA ?? app.getPath("userData");
+  return join(base, "photos");
 }
 
 export function purchasePhotosDir(purchaseId: string): string {

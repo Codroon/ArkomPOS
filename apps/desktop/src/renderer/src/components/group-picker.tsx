@@ -51,7 +51,19 @@ export async function refreshGroups(): Promise<GroupRef[]> {
     cache = await window.arkom.invoke("catalog:groups");
   } catch (err) {
     console.error("catalog:groups failed", err);
-    cache = cache ?? [];
+    /**
+     * Leave the cache UNSET, never an empty list.
+     *
+     * `cache = cache ?? []` looked harmless and was a day-one bug: the channel
+     * throws while a till has no shop yet, which is exactly the state during
+     * first-run setup. One failed fetch then wrote [] into the cache, and
+     * because consumers only fetch when the cache is null, nothing ever asked
+     * again — so a shop finished the wizard and saw "No groups yet" until the
+     * app was restarted. Staying null costs one retry per mount and is right.
+     */
+    cache = null;
+    announce();
+    return [];
   }
   announce();
   return cache;

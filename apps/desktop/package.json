@@ -17,7 +17,8 @@
     "typecheck": "tsc --noEmit",
     "postinstall": "electron-builder install-app-deps",
     "icons:build": "node scripts/run-icons.cjs",
-    "test": "node scripts/run-tests.cjs"
+    "test": "node scripts/run-tests.cjs",
+    "db:demo": "node scripts/run-db-task.cjs demo"
   },
   "dependencies": {
     "@arkom/core": "workspace:*",

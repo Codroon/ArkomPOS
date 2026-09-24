@@ -22,7 +22,19 @@ export async function refreshTechnicians(): Promise<TechnicianRef[]> {
     cache = await window.arkom.invoke("users:technicians", {});
   } catch (err) {
     console.error("users:technicians failed", err);
-    cache = cache ?? [];
+    /**
+     * Leave the cache UNSET, never an empty list.
+     *
+     * `cache = cache ?? []` looked harmless and was a day-one bug: the channel
+     * throws while a till has no shop yet, which is exactly the state during
+     * first-run setup. One failed fetch then wrote [] into the cache, and
+     * because consumers only fetch when the cache is null, nothing ever asked
+     * again — so a screen that asked before the shop existed stayed empty
+     * for the life of the process. Staying null costs one retry per mount and is right.
+     */
+    cache = null;
+    for (const fn of listeners) fn([]);
+    return [];
   }
   for (const fn of listeners) fn(cache);
   return cache;

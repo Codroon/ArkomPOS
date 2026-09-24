@@ -1,5 +1,5 @@
 /**
- * Runs a @arkom/db task (migrate | seed | stats) under Electron's Node.
+ * Runs a @arkom/db task (migrate | seed | demo | stats | audit) under Electron's Node.
  *
  * Why not plain `node`: better-sqlite3 is a native module rebuilt for the
  * Electron ABI (postinstall: electron-builder install-app-deps), so any script
@@ -13,8 +13,8 @@ const fs = require("node:fs");
 
 const task = process.argv[2];
 const passThrough = process.argv.slice(3); // e.g. --verify
-if (!["migrate", "seed", "stats", "audit"].includes(task)) {
-  console.error("Usage: node scripts/run-db-task.cjs <migrate|seed|stats|audit> [flags]");
+if (!["migrate", "seed", "demo", "stats", "audit"].includes(task)) {
+  console.error("Usage: node scripts/run-db-task.cjs <migrate|seed|demo|stats|audit> [flags]");
   process.exit(2);
 }
 
@@ -50,6 +50,9 @@ const result = spawnSync(electron, [outFile, task, ...passThrough], {
     ...process.env,
     ELECTRON_RUN_AS_NODE: "1",
     ARKOM_DB_PATH: dbPath,
+    /* photos live beside the dev database, so a seeded repair can have one and
+       `app.getPath` is never reached under ELECTRON_RUN_AS_NODE */
+    ARKOM_USER_DATA: process.env.ARKOM_USER_DATA || path.dirname(dbPath),
     ARKOM_MIGRATIONS_DIR: path.join(repoRoot, "packages/db/drizzle"),
   },
 });

@@ -20,7 +20,8 @@
     "db:audit": "pnpm --filter arkom-pos db:audit",
     "imei:gen": "pnpm --filter arkom-pos imei:gen",
     "build:win": "pnpm --filter arkom-pos build:win",
-    "brand": "node scripts/use-brand.mjs"
+    "brand": "node scripts/use-brand.mjs",
+    "db:demo": "pnpm --filter arkom-pos db:demo"
   },
   "devDependencies": {
     "vitest": "^3.2.7"
