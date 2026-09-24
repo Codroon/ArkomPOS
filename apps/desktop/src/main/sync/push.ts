@@ -30,6 +30,15 @@ const INTERVAL_MS = 60_000;
 const MAX_BACKOFF_MS = 15 * 60_000;
 /** A push that has not answered by now is a push on a line that is not there. */
 const TIMEOUT_MS = 20_000;
+/**
+ * How many batches one drain may send before handing back to the timer.
+ *
+ * A shop that was offline for a week has thousands of rows waiting, and one
+ * batch per minute would take most of the morning to clear. A drain keeps going
+ * while there is more; the cap is politeness, not correctness — whatever is
+ * left goes on the next round a minute later.
+ */
+const MAX_DRAIN_ROUNDS = 50;
 
 export interface SyncStatus {
   linked: boolean;
@@ -171,14 +180,37 @@ function fail(message: string, fatal: boolean): void {
   if (link) patchLink({ lastError: message, lastPushAtMs: Date.now() });
 }
 
+/**
+ * Send everything that is waiting, not just the first batch.
+ *
+ * `pushOnce` deliberately sends ONE batch, because a batch that fails should be
+ * cheap to retry. That makes it the wrong thing to hang a timer off on its own:
+ * a till back from a day offline would drain at one batch a minute. So the
+ * timer calls this, which keeps going while the queue is shrinking and stops
+ * the moment it is not — on an error, on an empty queue, or on a round that
+ * made no progress, which would otherwise be a loop.
+ *
+ * Never throws, for the same reason `pushOnce` does not.
+ */
+export async function pushAll(db: ArkomDb, { force = false } = {}): Promise<SyncStatus> {
+  let status = await pushOnce(db, { force });
+  for (let round = 0; round < MAX_DRAIN_ROUNDS; round += 1) {
+    if (!status.linked || status.pending === 0 || status.lastError) break;
+    const before = status.pending;
+    status = await pushOnce(db);
+    if (status.pending >= before) break; // no progress: leave it to the timer
+  }
+  return status;
+}
+
 /** Start the background loop. Safe to call on a till that is not linked. */
 export function startSync(db: ArkomDb): void {
   if (timer) return;
   timer = setInterval(() => {
-    void pushOnce(db).catch(() => undefined);
+    void pushAll(db).catch(() => undefined);
   }, INTERVAL_MS);
   // the first round soon after boot, not instantly: the till has a window to draw
-  setTimeout(() => void pushOnce(db).catch(() => undefined), 10_000);
+  setTimeout(() => void pushAll(db).catch(() => undefined), 10_000);
 }
 
 export function stopSync(): void {

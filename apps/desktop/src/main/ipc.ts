@@ -385,7 +385,7 @@ import {
   printShiftReport,
 } from "./print";
 import { enrol, unlink } from "./sync/enrol";
-import { pushOnce, syncStatus } from "./sync/push";
+import { pushAll, syncStatus } from "./sync/push";
 import { checklist, completeFirstRun, demoStatus, dismissChecklist, isSetupNeeded, removeDemoData } from "./setup";
 import { backupStatus, backupsDir, runBackup } from "./backup";
 import {
@@ -747,7 +747,9 @@ export function registerIpcHandlers(db: ArkomDb): void {
   );
   guarded("cloud:unlink", "settings.edit", CloudUnlinkRequestSchema, CloudStatusResponseSchema, () => unlink(db));
   guarded("cloud:syncNow", "settings.edit", CloudSyncNowRequestSchema, CloudStatusResponseSchema, () =>
-    pushOnce(db, { force: true }),
+    /* everything that is waiting, not the first 200 of it: somebody pressing
+       "Send now" means all of it, and usually after the line came back */
+    pushAll(db, { force: true }),
   );
 
   authed("setup:checklist", SetupChecklistRequestSchema, SetupChecklistResponseSchema, (s) =>

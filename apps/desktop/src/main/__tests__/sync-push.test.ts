@@ -15,7 +15,7 @@ import { openDb, runMigrations, schema as s } from "@arkom/db";
 import { uuidv7 } from "@arkom/core";
 import { app } from "./electron-stub";
 import { readLink, resetLinkCache, writeLink } from "../sync/link";
-import { pendingCount, pushOnce, resetSyncState, syncStatus } from "../sync/push";
+import { pendingCount, pushAll, pushOnce, resetSyncState, syncStatus } from "../sync/push";
 
 const MIGRATIONS = join(__dirname, "../../../../../packages/db/drizzle");
 
@@ -204,6 +204,62 @@ describe("when the shop's line is down", () => {
 
     expect(status.lastAckedSeq).toBe(0);
     expect(status.lastError).toContain("500");
+  });
+});
+
+describe("a till that has been offline for a day", () => {
+  it("drains every batch in one go, instead of one a minute", async () => {
+    /* pushOnce sends ONE batch on purpose — a failed batch should be cheap to
+       retry. That makes it the wrong thing to hang a timer off alone: 450 rows
+       would have taken three minutes, and a week offline most of a morning. */
+    link();
+    for (let i = 0; i < 450; i += 1) op({ after: { n: i } });
+
+    const sent: number[] = [];
+    const fetchSpy = cloud((body) => {
+      const ops = body.ops as Array<{ seq: number }>;
+      sent.push(ops.length);
+      return { json: { ackedSeq: ops[ops.length - 1]!.seq, duplicates: 0, serverTimeMs: 1 } };
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const status = await pushAll(db, { force: true });
+
+    expect(sent).toEqual([200, 200, 50]);
+    expect(status).toMatchObject({ pending: 0, lastAckedSeq: 450, lastError: null });
+  });
+
+  it("stops draining the moment a batch fails, and keeps its place", async () => {
+    link();
+    for (let i = 0; i < 450; i += 1) op({ after: { n: i } });
+
+    let round = 0;
+    vi.stubGlobal("fetch", cloud((body) => {
+      round += 1;
+      if (round === 2) return { ok: false, status: 500 };
+      const ops = body.ops as Array<{ seq: number }>;
+      return { json: { ackedSeq: ops[ops.length - 1]!.seq, duplicates: 0, serverTimeMs: 1 } };
+    }));
+
+    const status = await pushAll(db, { force: true });
+
+    expect(round).toBe(2); // it did not carry on hammering a server that is unwell
+    expect(status.lastAckedSeq).toBe(200); // the first batch stands
+    expect(status.pending).toBe(250);
+    expect(status.lastError).toContain("500");
+  });
+
+  it("gives up rather than looping when a round makes no progress", async () => {
+    /* a cloud that acks nothing would otherwise spin here until the cap */
+    link();
+    for (let i = 0; i < 300; i += 1) op({ after: { n: i } });
+    const fetchSpy = cloud(() => ({ json: { ackedSeq: 0, duplicates: 0, serverTimeMs: 1 } }));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const status = await pushAll(db, { force: true });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(status.pending).toBe(300);
   });
 });
 

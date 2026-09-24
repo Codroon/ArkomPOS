@@ -17,7 +17,7 @@ import type { ArkomDb } from "@arkom/db";
 import { tillContext } from "../context";
 import { getSettings } from "../repos/settings";
 import { clearLink, readLink, writeLink } from "./link";
-import { pushOnce, syncStatus, type SyncStatus } from "./push";
+import { pushAll, syncStatus, type SyncStatus } from "./push";
 
 const TIMEOUT_MS = 20_000;
 
@@ -89,8 +89,9 @@ export async function enrol(
     lastError: null,
   });
 
-  // send the first batch now, so the owner sees the dashboard fill immediately
-  void pushOnce(db, { force: true }).catch(() => undefined);
+  /* send everything now, so the owner sees the dashboard fill immediately — a
+     shop that has been selling for a year has more than one batch of history */
+  void pushAll(db, { force: true }).catch(() => undefined);
   return syncStatus(db);
 }
 
