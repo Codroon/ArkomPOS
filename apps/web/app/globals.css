@@ -11,9 +11,11 @@
  * product that looks like two products.
  *
  * The rules travel with the colours (handoff 00, CLAUDE.md):
- *   · Signal Blue lands on exactly ONE element per screen — the primary action.
- *   · White on blue is banned. Text on blue is always Graphite 900.
- *   · Blue body text on Bone is banned; blue TINT as a surface is allowed, with
+ *   · Codroon Orange lands on exactly ONE element per screen — the primary
+ *     action. Codroon's own tokens say the same thing: "ACTIONS ONLY".
+ *   · White on the accent is banned. Text on it is always #232220, which
+ *     Codroon calls "the ONLY text colour on accent".
+ *   · Accent body text on Bone is banned; a TINT as a surface is allowed, with
  *     dark ink on top.
  */
 @theme {
@@ -23,26 +25,26 @@
   --color-surface-2: #e4e1d7;
   --color-card: #ffffff;
 
-  /* ---- inverse surface (Graphite) — the sidebar ---- */
-  --color-inverse: #15181b;
-  --color-inverse-2: #2a2f35;
-  --color-inverse-ink: #f1efe9;
-  --color-inverse-muted: #70777d;
+  /* ---- inverse surface (Codroon charcoal) — the sidebar ---- */
+  --color-inverse: #232220;
+  --color-inverse-2: #403d36;
+  --color-inverse-ink: #eae5e1;
+  --color-inverse-muted: #8a857a;
 
   /* ---- ink ramp ---- */
-  --color-ink: #15181b;
-  --color-ink-2: #2a2f35;
-  --color-muted: #70777d;
-  --color-subtle: #9b9a92;
+  --color-ink: #232220;
+  --color-ink-2: #403d36;
+  --color-muted: #6b675e;
+  --color-subtle: #8a857a;
 
   /* ---- borders ---- */
   --color-line: #dcd8cd;
   --color-line-strong: #c4bfb1;
 
-  /* ---- accent: the one blue ---- */
-  --color-accent: #2f9bff;
-  --color-accent-ink: #15181b;
-  --color-focus: #2f9bff;
+  /* ---- accent: the one orange ---- */
+  --color-accent: #e96a42;
+  --color-accent-ink: #232220;
+  --color-focus: #e96a42;
 
   /* ---- functional pairs: tint background + strong dark text ---- */
   --color-warning-bg: #f6e7c3;
@@ -59,6 +61,10 @@
   --color-active: #ddd9cd;
   --color-row-selected: #e4e1d7;
 
+  /* ---- type: the till's faces (see app/layout.tsx) ---- */
+  --font-sans: var(--font-plex), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-archivo), var(--font-plex), system-ui, sans-serif;
+
   --radius-card: 3px;
 }
 
@@ -70,7 +76,7 @@
   body {
     background-color: var(--color-canvas);
     color: var(--color-ink);
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-family: var(--font-sans);
     font-size: 14px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;

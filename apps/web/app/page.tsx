@@ -4,11 +4,15 @@
  * can link to this deployment today.
  */
 import Link from "next/link";
+import { Wordmark } from "../src/ui/wordmark";
 
 export default function Home() {
   return (
     <main className="mx-auto flex min-h-screen max-w-[520px] flex-col justify-center px-5 text-center">
-      <h1 className="text-[13px] font-semibold tracking-[0.16em]">CODROON POS</h1>
+      <h1 className="flex items-baseline justify-center gap-2">
+        <Wordmark className="h-[22px] w-auto text-ink" />
+        <span className="text-[13px] font-semibold tracking-[0.14em] text-muted">POS</span>
+      </h1>
       <p className="mt-3 text-[15px] leading-relaxed text-ink-2">
         El TPV para tiendas de telefonía. Vende sin conexión, y mira la tienda desde
         donde estés.

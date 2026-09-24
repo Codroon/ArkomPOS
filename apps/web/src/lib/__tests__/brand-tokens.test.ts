@@ -53,8 +53,50 @@ describe("the colours the cloud uses", () => {
     expect(invented).toEqual([]);
   });
 
-  it("keeps white off blue, where it is banned", () => {
-    expect(cloud["accent-ink"]).toBe("#15181b");
-    expect(cloud["accent-ink"]).not.toBe("#ffffff");
+});
+
+/* WCAG relative luminance, so the rules can be asserted as the PROPERTY they
+   are about rather than as a hex somebody has to remember to update. */
+function luminance(hex: string): number {
+  const channel = (pair: string) => {
+    const v = parseInt(pair, 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  const r = channel(hex.slice(1, 3));
+  const g = channel(hex.slice(3, 5));
+  const b = channel(hex.slice(5, 7));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+const contrast = (a: string, b: string): number => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi! + 0.05) / (lo! + 0.05);
+};
+
+describe("the contrast bans, as contrast", () => {
+  it("puts readable ink on the accent", () => {
+    expect(contrast(cloud["accent-ink"]!, cloud["accent"]!)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("proves white on the accent really would fail, which is why it is banned", () => {
+    /* the ban is not taste. If a future accent made white legible this would go
+       green and the rule could be revisited on evidence. */
+    expect(contrast("#ffffff", cloud["accent"]!)).toBeLessThan(4.5);
+  });
+
+  it("keeps body ink strong on the canvas", () => {
+    expect(contrast(cloud["ink"]!, cloud["canvas"]!)).toBeGreaterThanOrEqual(7);
+    expect(contrast(cloud["ink-2"]!, cloud["canvas"]!)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("keeps LABELS readable, which is where a warm gray goes wrong", () => {
+    /* Codroon's #8a857a is tertiary text on a DARK page; on Bone it lands near
+       3:1. Labels and table headers use --color-muted, so it has to hold 4.5. */
+    expect(contrast(cloud["muted"]!, cloud["canvas"]!)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("keeps the chrome legible on the inverse surface", () => {
+    expect(contrast(cloud["inverse-ink"]!, cloud["inverse"]!)).toBeGreaterThanOrEqual(7);
+    expect(contrast(cloud["inverse-muted"]!, cloud["inverse"]!)).toBeGreaterThanOrEqual(3);
   });
 });

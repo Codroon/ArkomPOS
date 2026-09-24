@@ -142,7 +142,7 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
   return (
     <div className="flex h-full min-h-[860px] flex-col bg-canvas text-ink">
       {/* topbar — the brand plate: Graphite 900 with the Bone wordmark sitting on
-          a 3px Signal Blue rule, exactly as the manual draws the lockup. The blue
+          a 3px Codroon Orange rule, exactly as the lockup is drawn. The accent
           here is a rule, not an action, so the one-blue-per-surface budget of each
           screen below is untouched. */}
       <header className="relative flex h-11 flex-none items-stretch bg-inverse text-[12px] text-inverse-ink">

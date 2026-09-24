@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Reinforced master for small sizes. Three hexagons and their bars turn to
+       mush at 16px, so the taskbar gets a single hexagon at a weight that
+       survives: same family, still unmistakably the mark. -->
+  <rect width="100" height="100" fill="#232220"/>
+  <g fill="none" stroke="#E96A42" stroke-width="11" stroke-linejoin="round">
+    <path d="M 80.00,50.00 L 65.00,75.98 L 35.00,75.98 L 20.00,50.00 L 35.00,24.02 L 65.00,24.02 Z"/>
+  </g>
+</svg>

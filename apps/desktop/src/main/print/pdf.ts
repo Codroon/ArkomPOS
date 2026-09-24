@@ -5,7 +5,7 @@
  * printer and the shop's does not exist until the install visit, so this is not
  * a degraded fallback — it is how the ticket gets checked, and it is the only
  * artefact anyone can email. It gets the full brand treatment: Archivo Black
- * wordmark over the 3px Signal Blue rule (the page's one blue piece), Plex Mono
+ * wordmark over the 3px Codroon Orange rule (the page's one accent piece), Plex Mono
  * body, Bone ground.
  *
  * Roll width drives the page width, and the page grows to fit the content, so
@@ -136,7 +136,7 @@ ${await embeddedFontCss()}
   --canvas:#f1efe9;   /* Bone */
   --ink:#15181b;      /* Graphite 900 */
   --muted:#70777d;    /* Gray 400 */
-  --accent:#2f9bff;   /* Signal Blue — the page's ONE blue piece */
+  --accent:#e96a42;   /* Codroon Orange — the page's ONE accent piece */
   --line:#c4bfb1;
 }
 *{margin:0;padding:0;box-sizing:border-box}
@@ -168,7 +168,7 @@ body{
   text-align:center;
   line-height:1.05;
 }
-/* the 3px Signal Blue rule the wordmark sits on — nothing else on the page is blue */
+/* the 3px accent rule the wordmark sits on — nothing else on the page is orange */
 .underline{height:3px;background:var(--accent);margin:3px auto 6px;width:62%}
 .tagline{
   text-align:center;

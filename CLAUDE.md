@@ -152,9 +152,15 @@ Schema already anticipates them — build nothing for them.
   `apps/web/src/sync/` as pure functions over a store interface, so they are tested without a
   Postgres; anything that must be ATOMIC lives in `pg-store.ts` as one statement.
 - **Brand tokens only.** Colours and faces come from `packages/ui/src/styles/tokens.css` by
-  meaning (`canvas`, `ink`, `accent`, `warning-bg`…). No raw hex in components. Signal Blue lands
-  on exactly **one** element per screen — the primary action. **White-on-blue is banned** (text on
-  blue is always `accent-ink`, Graphite 900); **blue body text on Bone is banned**. See handoff 00.
+  meaning (`canvas`, `ink`, `accent`, `warning-bg`…). No raw hex in components. The palette is
+  **Codroon's** since v1.3.0: Codroon Orange `#E96A42` on charcoal `#232220`, with Bone kept as
+  the light working surface because a till lives on a counter under shop lighting, not on a
+  marketing page. The accent lands on exactly **one** element per screen — the primary action,
+  which is Codroon's own "ACTIONS ONLY" rule. **White on the accent is banned** (text on it is
+  always `accent-ink`); **accent body text on Bone is banned**. The web half keeps a copy of the
+  tokens and `apps/web/src/lib/__tests__/brand-tokens.test.ts` fails if the two drift or if any
+  pairing falls below its contrast floor — the bans are asserted as measured contrast, not as
+  remembered hexes.
 - **No new dependencies without asking.** No Docker. No CSS frameworks beyond Tailwind/shadcn.
 - Language: UI copy Spanish-first, code/comments English. All renderer strings live in the
   typed dictionary (`packages/ui/src/i18n`, `es.ts` = source of truth, `en.ts` must satisfy

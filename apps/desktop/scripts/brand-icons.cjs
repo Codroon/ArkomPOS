@@ -24,9 +24,9 @@ const PNG_SIZES = [16, 32, 64, 128, 256, 512];
 
 const svg = (name) => fs.readFileSync(path.join(brandDir, name), "utf8");
 const masters = {
-  square: svg("arkom-tile-square.svg"),
-  rounded: svg("arkom-tile-rounded.svg"),
-  favicon: svg("arkom-favicon.svg"),
+  square: svg("codroon-tile-square.svg"),
+  rounded: svg("codroon-tile-rounded.svg"),
+  favicon: svg("codroon-favicon.svg"),
 };
 
 let renderWindow = null;
@@ -55,7 +55,7 @@ async function render(svgText, size) {
 <style>html,body{margin:0;padding:0;background:transparent;overflow:hidden}
 svg{display:block;width:${size}px;height:${size}px;shape-rendering:geometricPrecision}</style>
 ${svgText}`;
-  const file = path.join(app.getPath("temp"), `arkom-icon-${size}-${renderCount++}.html`);
+  const file = path.join(app.getPath("temp"), `codroon-icon-${size}-${renderCount++}.html`);
   fs.writeFileSync(file, html, "utf8");
   await renderWindow.loadURL(pathToFileURL(file).href);
   await new Promise((r) => setTimeout(r, 80)); // let the SVG paint

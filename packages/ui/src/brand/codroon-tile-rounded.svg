@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Codroon app mark: three linked hexagons in Codroon Orange on the
+       brand charcoal. Drawn as regular polygons so the stroke can be thickened
+       for small sizes; the full illustrated logomark lives beside this file and
+       is what a website header uses. -->
+  <rect width="100" height="100" rx="22" ry="22" fill="#232220"/>
+  <g fill="none" stroke="#E96A42" stroke-width="5.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 43.50,46.00 L 35.75,59.42 L 20.25,59.42 L 12.50,46.00 L 20.25,32.58 L 35.75,32.58 Z"/>
+    <path d="M 85.50,30.00 L 77.75,43.42 L 62.25,43.42 L 54.50,30.00 L 62.25,16.58 L 77.75,16.58 Z"/>
+    <path d="M 76.50,72.00 L 68.75,85.42 L 53.25,85.42 L 45.50,72.00 L 53.25,58.58 L 68.75,58.58 Z"/>
+    <path d="M 42.57,40.70 L 55.43,35.30"/>
+    <path d="M 39.87,55.96 L 46.43,66.70"/>
+    <path d="M 67.31,45.26 L 68.75,58.58"/>
+  </g>
+</svg>

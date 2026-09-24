@@ -1,25 +1,33 @@
 /*
- * Arkom design tokens — the brand identity manual (v1.0) expressed as the only
- * colours and typefaces this app may use. Components reference tokens by their
- * MEANING (canvas, ink, accent, warning…), never a raw hex value.
+ * Codroon design tokens — the company's brand, expressed as the only colours
+ * and typefaces this app may use. Components reference tokens by their MEANING
+ * (canvas, ink, accent, warning…), never a raw hex value, which is why moving
+ * the product onto Codroon's palette was a change to this file and almost
+ * nothing else.
  *
- * Palette, straight from the manual:
- *   Signal Blue #2F9BFF · Graphite 900 #15181B · Graphite 700 #2A2F35
- *   Gray 400   #70777D · Bone        #F1EFE9
+ * Palette, from Codroon's own brand tokens:
+ *   Codroon Orange #E96A42 · Charcoal #232220 · Charcoal 700 #403D36
+ *   Warm Gray      #6B675E · Tertiary #8A857A · Text on dark #EAE5E1
  *
- * THE ONE-BLUE RULE (manual, page 03):
- *   "Blue appears on ONE piece per surface. Everything else is neutral."
+ * SURFACES STAY LIGHT, deliberately. Codroon's identity is dark and the website
+ * is dark; this is a till. It lives on a counter under shop lighting, is read
+ * for ten-hour shifts, and sits beside white thermal paper. Bone is the POS's
+ * extension of the brand, not a departure from it — a warm off-white belongs
+ * with a warm charcoal and an orange.
+ *
+ * THE ONE-ACCENT RULE — the same rule Codroon writes as "ACTIONS ONLY":
+ *   The accent appears on ONE piece per surface. Everything else is neutral.
  *   In this app that one piece is the screen's primary action — Cobrar on
  *   Venta, Confirmar entrada in the receiving drawer, Guardar in Catálogo.
- *   If you are adding a second blue thing to a screen, the answer is no.
+ *   If you are adding a second orange thing to a screen, the answer is no.
  *
  * TWO CONTRAST BANS, both non-negotiable:
- *   1. WHITE ON BLUE IS BANNED. Signal Blue is a light, bright blue (~#2F9BFF);
- *      white text on it fails contrast. Text on blue is always Graphite 900 —
- *      use `--color-accent-ink`.
- *   2. BLUE BODY TEXT ON BONE IS BANNED. Signal Blue on the Bone canvas is far
- *      too weak to read. Blue is a *surface* colour for the one primary action,
- *      never a text colour for prose, labels, links or data.
+ *   1. WHITE ON THE ACCENT IS BANNED. Codroon's own tokens call #232220 "the
+ *      ONLY text colour on accent", and white on this orange fails contrast.
+ *      Text on the accent is always `--color-accent-ink`.
+ *   2. ACCENT BODY TEXT ON BONE IS BANNED. Orange on the Bone canvas is too
+ *      weak to read. The accent is a *surface* colour for the one primary
+ *      action, never a text colour for prose, labels, links or data.
  */
 @import "./fonts.css";
 
@@ -30,26 +38,28 @@
   --color-surface-2: #e4e1d7; /* table headers, totals strips, footers */
   --color-card: #ffffff; /* rows, cards, inputs — paper on the counter */
 
-  /* ---- inverse surface (Graphite) — topbar, brand chrome ---- */
-  --color-inverse: #15181b; /* Graphite 900 */
-  --color-inverse-2: #2a2f35; /* Graphite 700 — hairlines on dark */
-  --color-inverse-ink: #f1efe9; /* Bone text on graphite */
-  --color-inverse-muted: #70777d; /* Gray 400 on graphite */
+  /* ---- inverse surface (Codroon charcoal) — topbar, brand chrome ---- */
+  --color-inverse: #232220; /* Codroon charcoal — the logomark's own ground */
+  --color-inverse-2: #403d36; /* Codroon border — hairlines on dark */
+  --color-inverse-ink: #eae5e1; /* Codroon text-primary, on charcoal */
+  --color-inverse-muted: #8a857a; /* Codroon text-tertiary, on charcoal */
 
   /* ---- ink ramp ---- */
-  --color-ink: #15181b; /* Graphite 900 — primary text */
-  --color-ink-2: #2a2f35; /* Graphite 700 — secondary text */
-  --color-muted: #70777d; /* Gray 400 — labels, tertiary */
-  --color-subtle: #9b9a92; /* warm gray — placeholders, hints */
+  --color-ink: #232220; /* Codroon charcoal — primary text */
+  --color-ink-2: #403d36; /* Codroon charcoal 700 — secondary text */
+  /* NOT Codroon's #8a857a here: that is tertiary on a DARK page and drops below
+     4.5:1 on Bone. #6b675e is the warm gray from the same family that holds. */
+  --color-muted: #6b675e; /* labels, tertiary — passes AA on Bone */
+  --color-subtle: #8a857a; /* Codroon tertiary — placeholders, hints */
 
   /* ---- borders: two warm neutrals derived from Bone ---- */
   --color-line: #dcd8cd; /* hairlines, row dividers */
   --color-line-strong: #c4bfb1; /* structural separators, input borders */
 
-  /* ---- accent: the one blue ---- */
-  --color-accent: #2f9bff; /* Signal Blue */
-  --color-accent-ink: #15181b; /* ALWAYS this on blue — never white */
-  --color-focus: #2f9bff; /* focus ring */
+  /* ---- accent: the one orange ---- */
+  --color-accent: #e96a42; /* Codroon Orange — ACTIONS ONLY */
+  --color-accent-ink: #232220; /* ALWAYS this on the accent — never white */
+  --color-focus: #e96a42; /* focus ring */
 
   /* ---- functional pairs: tint background + strong dark text ---- */
   --color-warning-bg: #f6e7c3;

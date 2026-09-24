@@ -19,6 +19,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTransition, type ReactNode } from "react";
 import { BarChart3, Boxes, LayoutDashboard, Receipt, Warehouse } from "lucide-react";
 import { cn, ghostClass } from "../../src/ui";
+import { Wordmark } from "../../src/ui/wordmark";
 import { LOCALE_COOKIE, type Locale } from "../../src/i18n";
 
 export interface ChromeLabels {
@@ -89,8 +90,9 @@ export function PanelChrome({
       {/* ---------------------------------------------------------- rail -- */}
       <aside className="bg-inverse text-inverse-ink lg:sticky lg:top-0 lg:h-screen lg:w-[216px] lg:shrink-0">
         <div className="flex items-center justify-between px-4 py-3.5 lg:block">
-          <div className="text-[12px] font-semibold tracking-[0.16em]">{labels.brand}</div>
-          <div className="hidden text-[11px] text-inverse-muted lg:mt-1 lg:block">{account.name}</div>
+          {/* currentColor: the mark takes the rail's ink, no second asset */}
+          <Wordmark className="h-[15px] w-auto text-inverse-ink" title={labels.brand} />
+          <div className="hidden text-[11px] text-inverse-muted lg:mt-1.5 lg:block">{account.name}</div>
         </div>
 
         <nav className="flex gap-1 overflow-x-auto px-2 pb-2 lg:mt-2 lg:flex-col lg:overflow-visible lg:px-2">
