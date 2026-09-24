@@ -30,7 +30,7 @@ import {
  * mistake and that a client would never find. Dev gets its own suffix so a
  * developer's tickets and backups never mix with a real till's.
  */
-app.setName(app.isPackaged ? "Codroon POS" : "Codroon POS (dev)");
+app.setName(app.isPackaged ? "Arkom POS" : "Arkom POS (dev)");
 /* Renaming the product renames the folder its data lives in, and a till whose
    books "disappeared" on upgrade is the worst possible first impression. The
    move happens here, before anything opens the database (v1.1.0). */
@@ -78,7 +78,7 @@ async function createWindow(): Promise<void> {
     useContentSize: true,
     autoHideMenuBar: true,
     backgroundColor: GRAPHITE_900, // the topbar's colour, so the flash on open is the brand
-    title: "Codroon POS",
+    title: "Arkom POS",
     icon: brandIcon(),
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),

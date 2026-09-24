@@ -26,25 +26,25 @@
   --color-card: #ffffff;
 
   /* ---- inverse surface (Codroon charcoal) — the sidebar ---- */
-  --color-inverse: #232220;
-  --color-inverse-2: #403d36;
-  --color-inverse-ink: #eae5e1;
-  --color-inverse-muted: #8a857a;
+  --color-inverse: #15181b;
+  --color-inverse-2: #2a2f35;
+  --color-inverse-ink: #f1efe9;
+  --color-inverse-muted: #70777d;
 
   /* ---- ink ramp ---- */
-  --color-ink: #232220;
-  --color-ink-2: #403d36;
-  --color-muted: #6b675e;
-  --color-subtle: #8a857a;
+  --color-ink: #15181b;
+  --color-ink-2: #2a2f35;
+  --color-muted: #5f666c;
+  --color-subtle: #9b9a92;
 
   /* ---- borders ---- */
   --color-line: #dcd8cd;
   --color-line-strong: #c4bfb1;
 
   /* ---- accent: the one orange ---- */
-  --color-accent: #e96a42;
-  --color-accent-ink: #232220;
-  --color-focus: #e96a42;
+  --color-accent: #2f9bff;
+  --color-accent-ink: #15181b;
+  --color-focus: #2f9bff;
 
   /* ---- functional pairs: tint background + strong dark text ---- */
   --color-warning-bg: #f6e7c3;

@@ -24,9 +24,9 @@ const PNG_SIZES = [16, 32, 64, 128, 256, 512];
 
 const svg = (name) => fs.readFileSync(path.join(brandDir, name), "utf8");
 const masters = {
-  square: svg("codroon-tile-square.svg"),
-  rounded: svg("codroon-tile-rounded.svg"),
-  favicon: svg("codroon-favicon.svg"),
+  square: svg("arkom-tile-square.svg"),
+  rounded: svg("arkom-tile-rounded.svg"),
+  favicon: svg("arkom-favicon.svg"),
 };
 
 let renderWindow = null;

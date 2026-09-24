@@ -6,7 +6,7 @@ import type { TKey } from "./es";
 
 export const en: Record<TKey, string> = {
   /* shell */
-  "shell.brand": "CODROON",
+  "shell.brand": "ARKOM",
   "shell.brandSuffix": "POS",
   "shell.menu": "MENU",
   "shell.noContext": "No context — pnpm db:seed",
@@ -394,7 +394,7 @@ export const en: Record<TKey, string> = {
   "first.printerSkip": "Not now",
   "first.printerDone": "Continue",
   "first.printerSkipHint": "You can pick one later in Settings. Until then the till won’t charge.",
-  "first.title": "Welcome to Codroon POS",
+  "first.title": "Welcome to Arkom POS",
   "first.subtitle": "A couple of details and the till is ready. All of it is changeable later in Settings, except the prefix.",
   "first.shopSection": "Shop details",
   "first.shopHint": "This is what prints at the top of every ticket.",
@@ -1093,7 +1093,7 @@ export const en: Record<TKey, string> = {
   "used.gate.duplicateUnit": "Registered as a unit: {label}",
   "used.gate.duplicatePurchase": "Already bought on {label}",
   "used.gate.confirm": "I have physically checked the device: activation lock is removed and it is factory reset.",
-  "used.gate.offline": "The check is physical. Codroon POS queries no online database.",
+  "used.gate.offline": "The check is physical. Arkom POS queries no online database.",
   "used.gate.passed": "Checked. You can set the price now.",
 
   "used.price.section": "2 · Price",

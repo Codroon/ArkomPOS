@@ -12,17 +12,14 @@ import Link from "next/link";
 import { useActionState } from "react";
 import { signUpAction, type FormResult } from "../../src/auth/actions";
 import { Card, Field, inputClass, primaryClass } from "../../src/ui";
-import { Wordmark } from "../../src/ui/wordmark";
+import { BrandLockup } from "../../src/ui/brand-mark";
 
 export default function SignupPage() {
   const [state, action, pending] = useActionState<FormResult, FormData>(signUpAction, {});
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-[420px] flex-col justify-center px-5 py-10">
-      <div className="mb-6 flex items-baseline gap-2">
-        <Wordmark className="h-[17px] w-auto text-ink" />
-        <span className="text-[12px] font-semibold tracking-[0.14em] text-muted">POS</span>
-      </div>
+      <BrandLockup className="mb-6" />
 
       <Card className="px-5 py-6">
         <h1 className="text-[18px] font-semibold">Crear cuenta</h1>

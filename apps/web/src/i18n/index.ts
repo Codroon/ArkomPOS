@@ -20,7 +20,7 @@ export type Locale = (typeof LOCALES)[number];
 export const LOCALE_COOKIE = "codroon_locale";
 
 const es = {
-  "app.brand": "CODROON POS",
+  "app.brand": "ARKOM POS",
   "app.signOut": "Salir",
   "app.language": "Idioma",
 
@@ -216,7 +216,7 @@ const es = {
 export type MessageKey = keyof typeof es;
 
 const en: Record<MessageKey, string> = {
-  "app.brand": "CODROON POS",
+  "app.brand": "ARKOM POS",
   "app.signOut": "Sign out",
   "app.language": "Language",
 

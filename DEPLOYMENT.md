@@ -459,6 +459,34 @@ The tolerance (3 €), the default float, the approval limit for a manual moveme
 and the list of frequent concepts all live in **Ajustes → Caja** and are the
 owner's to change.
 
+## 8b. Upgrading Arkom's till from v1.0.0
+
+Arkom has been selling on v1.0.0 since before the cloud existed. This is what
+makes that upgrade safe, and it is worth knowing rather than trusting:
+
+- **No migrations.** The fifteen migration files in `packages/db/drizzle` are
+  byte-identical between v1.0.0 and today. His database opens as it is; there is
+  no window in which his books are half-converted.
+- **Same data folder.** Electron names the folder after the app, and the pilot
+  build is called **Arkom POS** — exactly what his install is called. Nothing
+  moves, nothing is adopted.
+- **Same `appId`.** `com.codroon.arkompos` has not changed since before the
+  first installer was ever packaged, so the new `.exe` upgrades in place: one
+  Start-menu entry, one shortcut, one row in *Add or remove programs*.
+- **He re-enters nothing** — catalogue, stock, sales, document numbering, staff
+  and PINs all stay.
+
+Do it in this order anyway:
+
+1. **Close the app** and take a backup by hand (§7, *Taking a backup by hand*),
+   or confirm the closing backup ran. A backup you did not check is a backup you
+   do not have.
+2. Run the new installer. Click through SmartScreen (§2).
+3. Start it and check three things before leaving: the shop's name at the top of
+   a **reprinted** ticket, the catalogue count, and the last document number.
+4. If anything looks wrong, §7 *Restoring* puts the backup back. Nothing has been
+   deleted at any point.
+
 ## 9. Install day, in order
 
 Each step assumes the one above worked. Nothing here needs a developer except

@@ -1,5 +1,5 @@
 appId: com.codroon.arkompos
-productName: Codroon POS
+productName: Arkom POS
 directories:
   output: release
 files:
@@ -41,6 +41,6 @@ nsis:
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
   # taskbar / start-menu shortcut name
-  shortcutName: Codroon POS
+  shortcutName: Arkom POS
 # electron-updater feed configured when updates are wired up
 publish: null

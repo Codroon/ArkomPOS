@@ -29,7 +29,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { cn, ghostClass } from "../../src/ui";
-import { Wordmark } from "../../src/ui/wordmark";
+import { BrandMark } from "../../src/ui/brand-mark";
 import { LOCALE_COOKIE, type Locale } from "../../src/i18n";
 
 export interface ChromeLabels {
@@ -119,7 +119,7 @@ export function PanelChrome({
       <aside className="bg-inverse text-inverse-ink lg:sticky lg:top-0 lg:h-screen lg:w-[216px] lg:shrink-0">
         <div className="flex items-center justify-between px-4 py-3.5 lg:block">
           {/* currentColor: the mark takes the rail's ink, no second asset */}
-          <Wordmark className="h-[15px] w-auto text-inverse-ink" title={labels.brand} />
+          <BrandMark className="h-[15px] text-inverse-ink" height={14} />
           <div className="hidden text-[11px] text-inverse-muted lg:mt-1.5 lg:block">{account.name}</div>
         </div>
 

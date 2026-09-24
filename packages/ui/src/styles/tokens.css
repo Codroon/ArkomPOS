@@ -39,27 +39,27 @@
   --color-card: #ffffff; /* rows, cards, inputs — paper on the counter */
 
   /* ---- inverse surface (Codroon charcoal) — topbar, brand chrome ---- */
-  --color-inverse: #232220; /* Codroon charcoal — the logomark's own ground */
-  --color-inverse-2: #403d36; /* Codroon border — hairlines on dark */
-  --color-inverse-ink: #eae5e1; /* Codroon text-primary, on charcoal */
-  --color-inverse-muted: #8a857a; /* Codroon text-tertiary, on charcoal */
+  --color-inverse: #15181b; /* Codroon charcoal — the logomark's own ground */
+  --color-inverse-2: #2a2f35; /* Codroon border — hairlines on dark */
+  --color-inverse-ink: #f1efe9; /* Codroon text-primary, on charcoal */
+  --color-inverse-muted: #70777d; /* Codroon text-tertiary, on charcoal */
 
   /* ---- ink ramp ---- */
-  --color-ink: #232220; /* Codroon charcoal — primary text */
-  --color-ink-2: #403d36; /* Codroon charcoal 700 — secondary text */
+  --color-ink: #15181b; /* Codroon charcoal — primary text */
+  --color-ink-2: #2a2f35; /* Codroon charcoal 700 — secondary text */
   /* NOT Codroon's #8a857a here: that is tertiary on a DARK page and drops below
      4.5:1 on Bone. #6b675e is the warm gray from the same family that holds. */
-  --color-muted: #6b675e; /* labels, tertiary — passes AA on Bone */
-  --color-subtle: #8a857a; /* Codroon tertiary — placeholders, hints */
+  --color-muted: #5f666c; /* labels, tertiary — passes AA on Bone */
+  --color-subtle: #9b9a92; /* Codroon tertiary — placeholders, hints */
 
   /* ---- borders: two warm neutrals derived from Bone ---- */
   --color-line: #dcd8cd; /* hairlines, row dividers */
   --color-line-strong: #c4bfb1; /* structural separators, input borders */
 
   /* ---- accent: the one orange ---- */
-  --color-accent: #e96a42; /* Codroon Orange — ACTIONS ONLY */
-  --color-accent-ink: #232220; /* ALWAYS this on the accent — never white */
-  --color-focus: #e96a42; /* focus ring */
+  --color-accent: #2f9bff; /* Codroon Orange — ACTIONS ONLY */
+  --color-accent-ink: #15181b; /* ALWAYS this on the accent — never white */
+  --color-focus: #2f9bff; /* focus ring */
 
   /* ---- functional pairs: tint background + strong dark text ---- */
   --color-warning-bg: #f6e7c3;

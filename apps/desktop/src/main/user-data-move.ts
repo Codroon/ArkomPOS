@@ -31,6 +31,11 @@ export function adoptPreviousUserData(): string | null {
 
   for (const former of FORMER_NAMES) {
     const previous = join(parent, `${former}${suffix}`);
+    /* Under a brand whose name IS a former name — the Arkom pilot is called
+       what the product used to be called — these are the same folder. The
+       guard above already covers a shop with data in it, but relying on that
+       is safe by accident; this says so on purpose. */
+    if (previous === current) continue;
     if (!existsSync(previous) || readdirSync(previous).length === 0) continue;
     try {
       renameSync(previous, current);

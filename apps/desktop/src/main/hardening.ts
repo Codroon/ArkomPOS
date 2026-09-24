@@ -66,7 +66,7 @@ export function installErrorLogging(): void {
   app.on("child-process-gone", (_e, details) => logEvent("child-process-gone", details));
   app.on("render-process-gone", (_e, _wc, details) => logEvent("render-process-gone", details));
 
-  logEvent("start", `Codroon POS ${app.getVersion()} · packaged=${app.isPackaged}`);
+  logEvent("start", `Arkom POS ${app.getVersion()} · packaged=${app.isPackaged}`);
 }
 
 /* -------------------------------- lockdown -------------------------------- */

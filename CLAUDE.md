@@ -151,16 +151,25 @@ Schema already anticipates them — build nothing for them.
   by `seq` would make a restored till's next batch a poison pill. Ingest rules live in
   `apps/web/src/sync/` as pure functions over a store interface, so they are tested without a
   Postgres; anything that must be ATOMIC lives in `pg-store.ts` as one statement.
-- **Brand tokens only.** Colours and faces come from `packages/ui/src/styles/tokens.css` by
-  meaning (`canvas`, `ink`, `accent`, `warning-bg`…). No raw hex in components. The palette is
-  **Codroon's** since v1.3.0: Codroon Orange `#E96A42` on charcoal `#232220`, with Bone kept as
-  the light working surface because a till lives on a counter under shop lighting, not on a
-  marketing page. The accent lands on exactly **one** element per screen — the primary action,
-  which is Codroon's own "ACTIONS ONLY" rule. **White on the accent is banned** (text on it is
-  always `accent-ink`); **accent body text on Bone is banned**. The web half keeps a copy of the
-  tokens and `apps/web/src/lib/__tests__/brand-tokens.test.ts` fails if the two drift or if any
-  pairing falls below its contrast floor — the bans are asserted as measured contrast, not as
-  remembered hexes.
+- **Brand tokens only, and the brand is DATA.** Colours and faces come from
+  `packages/ui/src/styles/tokens.css` by meaning (`canvas`, `ink`, `accent`, `warning-bg`…).
+  No raw hex in components. Which brand is on comes from `packages/ui/src/brand/brands.ts`,
+  applied by **`pnpm brand <codroon|arkom>`**, which rewrites the palette in both halves, the
+  product name in the Electron manifest, the main process, `renderer/index.html`, both i18n
+  dictionaries and the cloud, and repoints the icon masters. Never edit those by hand — add a
+  brand and run the command. `active.json` records what is on and `brand-shell.test.ts` asserts
+  every surface agrees with it.
+  **Codroon POS is the product; Arkom POS is the pilot** — same software, Codroon's support,
+  the shop's name while they prove it. The accent lands on exactly **one** element per screen,
+  the primary action. **White on the accent is banned**; **accent body text on the canvas is
+  banned**. `apps/web/src/lib/__tests__/brand-tokens.test.ts` asserts the two halves' palettes
+  are identical and that every pairing clears its contrast floor — measured, not remembered. It
+  caught Gray 400 failing at 3.87:1 on Bone, which the till had shipped from the beginning.
+- **Three things never move with a rebrand.** `appId` stays `com.codroon.arkompos` — Windows
+  identifies an install by it, so changing it turns an upgrade into a second copy of the
+  program. Printed documents carry the SHOP's name and a test forbids any brand name reaching a
+  receipt. The copyright stays Codroon's, on every brand, which is the one line Odoo does not
+  let anybody remove either.
 - **No new dependencies without asking.** No Docker. No CSS frameworks beyond Tailwind/shadcn.
 - Language: UI copy Spanish-first, code/comments English. All renderer strings live in the
   typed dictionary (`packages/ui/src/i18n`, `es.ts` = source of truth, `en.ts` must satisfy
@@ -168,7 +177,7 @@ Schema already anticipates them — build nothing for them.
   staff-only: printed tickets/documents always render fixed Spanish strings, never `useT()`.
 
 ## Commands
-`pnpm dev` (desktop app w/ HMR) · `pnpm test` (Vitest: core, desktop, web) · `pnpm db:generate`
+`pnpm brand <key>` (apply a brand) · `pnpm dev` (desktop app w/ HMR) · `pnpm test` (Vitest: core, desktop, web) · `pnpm db:generate`
 / `db:migrate` (drizzle-kit) · `pnpm db:seed` · `pnpm db:audit [--verify]` · `pnpm build:win`
 (installer) · `pnpm dev:web` (the cloud). Cloud-only, from `apps/web`: `db:generate` /
 `db:migrate` (its own Postgres lineage, never the till's), `cloud:code` (issue an enrolment

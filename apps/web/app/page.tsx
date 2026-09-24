@@ -4,15 +4,13 @@
  * can link to this deployment today.
  */
 import Link from "next/link";
-import { Wordmark } from "../src/ui/wordmark";
+import { BRAND } from "../src/brand";
+import { BrandLockup } from "../src/ui/brand-mark";
 
 export default function Home() {
   return (
     <main className="mx-auto flex min-h-screen max-w-[520px] flex-col justify-center px-5 text-center">
-      <h1 className="flex items-baseline justify-center gap-2">
-        <Wordmark className="h-[22px] w-auto text-ink" />
-        <span className="text-[13px] font-semibold tracking-[0.14em] text-muted">POS</span>
-      </h1>
+      <h1><BrandLockup className="justify-center" /></h1>
       <p className="mt-3 text-[15px] leading-relaxed text-ink-2">
         El TPV para tiendas de telefonía. Vende sin conexión, y mira la tienda desde
         donde estés.
@@ -28,6 +26,8 @@ export default function Home() {
           Entrar
         </Link>
       </div>
+      {/* the one line that stays whoever's name is on the door */}
+      <p className="mt-10 text-[11px] text-subtle">{BRAND.copyright}</p>
     </main>
   );
 }

@@ -21,7 +21,7 @@ const display = Archivo_Black({
 });
 
 export const metadata: Metadata = {
-  title: "Codroon POS",
+  title: "Arkom POS",
   description: "El TPV para tiendas de telefonía. Panel de control y sincronización.",
 };
 
