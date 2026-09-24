@@ -73,6 +73,10 @@ business rows + `product_stock` cache + `oplog` entry → typed result back.
 | `docs:list` | filters → rows | read-only flat list of completed documents |
 | `settings:series` | — → series + regimes | DISPLAY ONLY for the series; the general rate shown is `settings.vatRateBp` (ADR-0007 A1) and is saved through `settings:save` like any setting. There is no series write channel and there must not be |
 | `setup:checklist` | — → {printerConfigured, hasProducts, hasStaff, hasShift, dismissed, done} | v0.18.2; authed, no permission; read from FACTS (a settings row, a product, a second user, a shift) and never from a "seen it" flag |
+| `cloud:status` | — → {linked, pending, lastAckedSeq, lastPushAtMs, lastError, pushing} | v1.1.0; authed, no permission: a cashier seeing "12 pendientes" is how a shop notices its line is down |
+| `cloud:enrol` | {url, code} → status | v1.1.0; `settings.edit`; trades a one-time code for a device token (ADR-0020 §1) |
+| `cloud:unlink` | — → status | v1.1.0; `settings.edit`; removes the credential from this machine, touches no shop data |
+| `cloud:syncNow` | — → status | v1.1.0; `settings.edit`; one push, ignoring the backoff |
 | `setup:dismissChecklist` | — → checklist | v0.18.2; records the dismissal as a setting, so the card stays gone across launches |
 | `refund:peek` | {documentId} → lines + what is left | `sale.create` |
 | `refund:create` | {documentId, reason, method, lines} → {docNumber, …} | ADR-0019; `sale.refund`, APPROVABLE; shift required |

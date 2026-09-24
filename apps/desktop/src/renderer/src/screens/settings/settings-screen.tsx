@@ -47,6 +47,8 @@ import { errorMessage } from "../../lib/errors";
 import { fileNameOf } from "../../lib/use-ticket-print";
 import { refreshPrinterReady } from "../../lib/printer-ready";
 import { BackupPanel } from "./backup-panel";
+import { SettingsCard } from "./settings-card";
+import { CloudCard } from "./cloud-card";
 
 /** Shown beneath any field the seed left as a placeholder. */
 
@@ -549,6 +551,8 @@ export function SettingsScreen() {
               One knob, and it is deliberately not a filter on the Stock muerto
               screen: a threshold in the filter bar invites fishing for a number
               that looks better than the one the shop agreed on. */}
+          <CloudCard />
+
           <SettingsCard title={t("set.reportsSection")}>
             <Field label={t("set.deadStockDays")} hint={t("set.deadStockDaysHint")}>
               <div className="flex items-center gap-1.5">
@@ -637,15 +641,6 @@ const DOC_LABEL: Record<string, TKey> = {
   refund: "docs.type.refund",
   shift: "zdoc.zTitle",
 };
-
-function SettingsCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="flex flex-col gap-3 rounded-[3px] border border-line bg-card px-3.5 py-3">
-      <SectionLabel>{title}</SectionLabel>
-      <div className="flex flex-col gap-3">{children}</div>
-    </section>
-  );
-}
 
 function ShopField({
   label,

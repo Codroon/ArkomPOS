@@ -39,3 +39,30 @@ exists).
   till-UI scale).
 - Revisit: extraction tooling if the dictionary outgrows a few hundred keys; a third
   locale (CA) is an additive file.
+
+## Amendment A1 — the document locale is the shop's setting (v1.1.0, 2026-09-24)
+
+The decision above fixed the document locale at Spanish, on the reasoning that a ticket is a
+Spanish fiscal document and must not change because a staff member pressed a toggle. The
+first half of that is still true and the second half is now wrong in one direction: Codroon
+POS is sold at pos.codroon.com in Spanish and English editions, and an English edition whose
+receipts come out in Spanish is not an English edition.
+
+So the document locale moves from *fixed* to *a shop setting*, defaulted from the language
+the till was installed in:
+
+- It is **a setting, not the staff toggle.** The UI locale stays what ADR-0011 made it —
+  per-member, per-session, staff-only. Printed documents read the shop's setting, so an
+  owner who reads English in a Barcelona shop still hands Spanish receipts to Spanish
+  customers. Changing what the customer receives is a deliberate act in Ajustes, by someone
+  with `settings.edit`.
+- **The structure does not move.** NIF, base imponible, IVA breakdown, the REBU mention, the
+  COPIA stamp: their presence and placement are what the law cares about and they are
+  identical in both languages. Only the words change.
+- **The print path still owns its own strings.** It reads the document dictionary for the
+  shop's locale; it never reaches into the UI dictionary. A ticket printed twice a year
+  apart looks the same because the setting, not the session, decided it.
+
+What this amendment deliberately does NOT do is open a second country. A Spanish fiscal
+ticket in English is still a Spanish fiscal ticket; selling into another jurisdiction means
+another invoice model, Verifactu/TicketBAI equivalents and a separate decision.

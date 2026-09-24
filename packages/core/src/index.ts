@@ -317,6 +317,27 @@ export {
 } from "./catalog";
 export type { MissingField } from "./catalog";
 export { classifyPrinters, isVirtualQueue, looksLikeReceiptPrinter } from "./printers";
+/* the till↔cloud envelope, imported by BOTH halves so it cannot drift (ADR-0020) */
+export {
+  prepareBatch,
+  redactForSync,
+  REDACTED_KEYS,
+  SYNC_BATCH_SIZE,
+  EnrolCodeSchema,
+  SyncOpSchema,
+  SyncPushRequestSchema,
+  SyncPushResponseSchema,
+  SyncEnrolRequestSchema,
+  SyncEnrolResponseSchema,
+} from "./sync";
+export type {
+  SyncOp,
+  SyncPushRequest,
+  SyncPushResponse,
+  SyncEnrolRequest,
+  SyncEnrolResponse,
+  SyncableOplogRow,
+} from "./sync";
 export { STARTER_CASH_CONCEPTS, displayCashConcepts, isStarterCashConcepts } from "./cash-concepts";
 export type { ConceptLocale } from "./cash-concepts";
 export type { PrinterChoices, PrinterLike } from "./printers";
@@ -449,6 +470,12 @@ export {
   SettingsSeriesResponseSchema,
   SetupStatusRequestSchema,
   SetupStatusResponseSchema,
+  CloudStatusRequestSchema,
+  CloudStatusResponseSchema,
+  CloudEnrolRequestSchema,
+  CloudUnlinkRequestSchema,
+  CloudSyncNowRequestSchema,
+  type CloudStatus,
   SetupChecklistRequestSchema,
   type SetupChecklistResponse,
   SetupChecklistResponseSchema,

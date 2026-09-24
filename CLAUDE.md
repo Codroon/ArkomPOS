@@ -20,7 +20,12 @@ Since v0.12.0 the till repairs devices: intake, quote, approval, parts, board, c
 Since v0.13.0 the till has shifts: float, drawer ledger, X preview, close with variance, Z report (ADR-0015).
 Since v0.14.0 the till reports: sales/tax, repairs, used holding, valuation, dead stock, CSV export (ADR-0016).
 Since v0.18.1 the counter refuses to charge with no printer configured (`PRINTER_REQUIRED`).
-**v1.0.0 is the release the shop runs.**
+**v1.0.0 is the release the shop runs.** Since v1.1.0 the product is **Codroon POS**
+(pos.codroon.com): the wordmark on every printed document is the SHOP's own name, never
+ours, and the till can enrol with the cloud (ADR-0020) — Ajustes → Nube pastes a code, gets
+a device token, and a background loop pushes the oplog up. The push never blocks the
+counter, the cursor moves only on an ack, and device passcodes, PIN material and the
+photographs never leave the shop.
 Since v0.18.2 first run is a four-step wizard (language → shop → owner + recovery code →
 printer, skippable) and the landing screen carries a fact-driven, dismissible checklist
 (`setup:checklist`). `pnpm fresh` archives this machine's dev data and reopens onboarding.

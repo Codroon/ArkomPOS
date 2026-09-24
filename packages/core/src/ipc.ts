@@ -76,6 +76,10 @@ export const IPC_CHANNELS = [
   "auth:recover",
   "auth:printRecovery",
   "setup:owner",
+  "cloud:status",
+  "cloud:enrol",
+  "cloud:unlink",
+  "cloud:syncNow",
   "setup:checklist",
   "setup:dismissChecklist",
   "users:list",
@@ -888,6 +892,30 @@ export const SetupStatusResponseSchema = z.object({
    the catalogue, somebody besides the owner can sign in, and a shift has been
    opened once. The card disappears when they are all true, or when the owner
    says they have had enough of it. */
+/* ---- the cloud link (ADR-0020). Status is readable by anyone signed in — a
+   cashier should be able to see the till is behind — and linking is an owner's
+   act, so it carries settings.edit like every other till-wide setting. ---- */
+export const CloudStatusRequestSchema = z.object({}).optional();
+export const CloudStatusResponseSchema = z.object({
+  linked: z.boolean(),
+  url: z.string().nullable(),
+  accountName: z.string(),
+  shopName: z.string(),
+  /** rows written here that the cloud has not acknowledged yet */
+  pending: z.number().int().nonnegative(),
+  lastAckedSeq: z.number().int().nonnegative(),
+  lastPushAtMs: z.number().int().nullable(),
+  lastError: z.string().nullable(),
+  pushing: z.boolean(),
+});
+export type CloudStatus = z.infer<typeof CloudStatusResponseSchema>;
+export const CloudEnrolRequestSchema = z.object({
+  url: z.string().trim().min(1),
+  code: z.string().trim().min(1),
+});
+export const CloudUnlinkRequestSchema = z.object({}).optional();
+export const CloudSyncNowRequestSchema = z.object({}).optional();
+
 export const SetupChecklistRequestSchema = z.object({}).optional();
 export const SetupChecklistResponseSchema = z.object({
   printerConfigured: z.boolean(),

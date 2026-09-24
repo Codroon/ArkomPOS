@@ -127,6 +127,11 @@ import {
   SettingsSeriesResponseSchema,
   SetupStatusRequestSchema,
   SetupStatusResponseSchema,
+  CloudStatusRequestSchema,
+  CloudStatusResponseSchema,
+  CloudEnrolRequestSchema,
+  CloudUnlinkRequestSchema,
+  CloudSyncNowRequestSchema,
   SetupChecklistRequestSchema,
   SetupChecklistResponseSchema,
   SetupCompleteRequestSchema,
@@ -379,6 +384,8 @@ import {
   printRecoveryCode,
   printShiftReport,
 } from "./print";
+import { enrol, unlink } from "./sync/enrol";
+import { pushOnce, syncStatus } from "./sync/push";
 import { checklist, completeFirstRun, demoStatus, dismissChecklist, isSetupNeeded, removeDemoData } from "./setup";
 import { backupStatus, backupsDir, runBackup } from "./backup";
 import {
@@ -732,6 +739,17 @@ export function registerIpcHandlers(db: ArkomDb): void {
   /* The checklist reads facts and needs a session, not a permission: a cashier
      opening the till on day two should see the same three ticks the owner does
      (v0.18.2). */
+  /* The cloud link (ADR-0020). Status needs only a session: a cashier seeing
+     "12 pendientes" is how a shop notices its line has been down all morning. */
+  authed("cloud:status", CloudStatusRequestSchema, CloudStatusResponseSchema, () => syncStatus(db));
+  guarded("cloud:enrol", "settings.edit", CloudEnrolRequestSchema, CloudStatusResponseSchema, (s, input) =>
+    enrol(db, s.ctx, input),
+  );
+  guarded("cloud:unlink", "settings.edit", CloudUnlinkRequestSchema, CloudStatusResponseSchema, () => unlink(db));
+  guarded("cloud:syncNow", "settings.edit", CloudSyncNowRequestSchema, CloudStatusResponseSchema, () =>
+    pushOnce(db, { force: true }),
+  );
+
   authed("setup:checklist", SetupChecklistRequestSchema, SetupChecklistResponseSchema, (s) =>
     checklist(db, s.ctx),
   );

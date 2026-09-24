@@ -77,6 +77,7 @@ import type {
   CatalogRemoval,
   CatalogRemoveResponse,
   SetupChecklistResponse,
+  CloudStatus,
 } from "@arkom/core";
 
 declare global {
@@ -180,6 +181,10 @@ declare global {
         payload: { path: string; mode: "open" | "folder" },
       ): Promise<{ ok: boolean }>;
       invoke(channel: "setup:status", payload?: undefined): Promise<{ needed: boolean; ownerNeeded: boolean; packaged: boolean }>;
+      invoke(channel: "cloud:status", payload?: Record<string, never>): Promise<CloudStatus>;
+      invoke(channel: "cloud:enrol", payload: { url: string; code: string }): Promise<CloudStatus>;
+      invoke(channel: "cloud:unlink", payload?: Record<string, never>): Promise<CloudStatus>;
+      invoke(channel: "cloud:syncNow", payload?: Record<string, never>): Promise<CloudStatus>;
       invoke(channel: "setup:checklist", payload?: Record<string, never>): Promise<SetupChecklistResponse>;
       invoke(channel: "setup:dismissChecklist", payload?: Record<string, never>): Promise<SetupChecklistResponse>;
       invoke(
