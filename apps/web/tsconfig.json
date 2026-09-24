@@ -17,11 +17,12 @@
     "allowImportingTsExtensions": true
   },
   "include": [
-    "next-env.d.ts",
+    "**/*.mts",
     "**/*.ts",
     "**/*.tsx",
-    "**/*.mts",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    "next-env.d.ts",
+    ".next-dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

@@ -14,6 +14,9 @@ export function Wordmark({ className, title = "Codroon" }: { className?: string;
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="1522.98 1307.54 1137.6 192.18"
+      /* an intrinsic height so a stylesheet that fails to load gives a small
+         wordmark rather than one the width of the page; CSS overrides it */
+      height={20}
       fill="currentColor"
       role="img"
       aria-label={title}

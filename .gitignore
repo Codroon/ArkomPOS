@@ -4,6 +4,7 @@ out/
 dist/
 release/
 .next/
+.next-dev/
 
 # local dev database (seeded via pnpm db:seed)
 .data/
