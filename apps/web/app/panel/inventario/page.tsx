@@ -8,21 +8,12 @@
  */
 import { requireAccount } from "../../../src/auth/session";
 import { getT } from "../../../src/i18n/server";
+import { labelFor } from "../../../src/i18n";
 import { recentMovements } from "../../../src/db/catalogue-queries";
 import { dateTime, euros } from "../../../src/lib/format";
 import { Card, CardBody, CardHead, EmptyState, TD, TH, TR, Table } from "../../../src/ui";
 
 export const dynamic = "force-dynamic";
-
-const MOVEMENTS: Record<string, string> = {
-  purchase_in: "Entrada",
-  sale_out: "Venta",
-  return_in: "Devolución",
-  adjust_in: "Ajuste +",
-  adjust_out: "Ajuste −",
-  repair_out: "Reparación",
-  used_in: "Compra usado",
-};
 
 export default async function InventoryPage() {
   const account = await requireAccount();
@@ -51,7 +42,7 @@ export default async function InventoryPage() {
                 <TR key={`${movement.createdAt.getTime()}-${index}`}>
                   <TD>{dateTime(movement.createdAt)}</TD>
                   <TD>{movement.productName}</TD>
-                  <TD>{MOVEMENTS[movement.movementType] ?? movement.movementType}</TD>
+                  <TD>{labelFor(t, "mv", movement.movementType)}</TD>
                   <TD right className={movement.qty < 0 ? "text-danger-ink" : "text-ink"}>
                     {movement.qty > 0 ? `+${movement.qty}` : movement.qty}
                   </TD>

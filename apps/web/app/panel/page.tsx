@@ -7,6 +7,7 @@
  */
 import { requireAccount } from "../../src/auth/session";
 import { getT } from "../../src/i18n/server";
+import { labelFor } from "../../src/i18n";
 import { parseRange } from "../../src/lib/range";
 import {
   paymentMix,
@@ -16,7 +17,7 @@ import {
   topProducts,
 } from "../../src/db/dashboard-queries";
 import { tillsForAccount } from "../../src/db/panel-queries";
-import { TENDER_METHODS, dateTime, euros } from "../../src/lib/format";
+import { dateTime, euros  } from "../../src/lib/format";
 import { Card, CardBody, CardHead, Chip, EmptyState, Stat, TD, TH, TR, Table } from "../../src/ui";
 import { MixChart, TakingsChart } from "./charts";
 
@@ -103,7 +104,7 @@ export default async function SummaryPage({
             {mix.length > 0 ? (
               <MixChart
                 data={mix.map((row) => ({
-                  label: TENDER_METHODS[row.method] ?? row.method,
+                  label: labelFor(t, "tender", row.method),
                   amountCents: row.amountCents,
                 }))}
                 currency="€"

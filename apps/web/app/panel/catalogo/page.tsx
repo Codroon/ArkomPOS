@@ -11,6 +11,7 @@
  */
 import { requireAccount } from "../../../src/auth/session";
 import { getT } from "../../../src/i18n/server";
+import { labelFor } from "../../../src/i18n";
 import { productsForAccount } from "../../../src/db/catalogue-queries";
 import { euros } from "../../../src/lib/format";
 import {
@@ -29,13 +30,6 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const REGIMES: Record<string, string> = {
-  IVA21: "IVA 21%",
-  IVA10: "IVA 10%",
-  IVA4: "IVA 4%",
-  REBU: "REBU",
-};
-
 export default async function CataloguePage({
   searchParams,
 }: {
@@ -47,9 +41,16 @@ export default async function CataloguePage({
 
   const search = (typeof params.q === "string" ? params.q : "").trim().toLowerCase();
   const lowOnly = params.low === "1";
+  const group = typeof params.group === "string" ? params.group : "";
 
   const all = await productsForAccount(account.id);
+
+  /* the groups the shop actually uses, in the order they read on screen */
+  const groups = [...new Set(all.map((product) => product.group).filter((g): g is string => Boolean(g)))]
+    .sort((a, b) => a.localeCompare(b, "es"));
+
   const products = all.filter((product) => {
+    if (group && product.group !== group) return false;
     if (lowOnly && product.onHand > product.lowStockThreshold) return false;
     if (!search) return true;
     return (
@@ -85,6 +86,21 @@ export default async function CataloguePage({
               aria-label={t("cat.search")}
             />
           </div>
+          {groups.length > 0 ? (
+            <select
+              className={`${inputClass} w-auto`}
+              name="group"
+              defaultValue={group}
+              aria-label={t("cat.group")}
+            >
+              <option value="">{t("cat.allGroups")}</option>
+              {groups.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          ) : null}
           <label className="flex items-center gap-2 px-1 text-[13px] text-ink-2">
             <input type="checkbox" name="low" value="1" defaultChecked={lowOnly} />
             {t("cat.lowOnly")}
@@ -126,7 +142,7 @@ export default async function CataloguePage({
                     </TD>
                     <TD>{product.group ?? "—"}</TD>
                     <TD className="tabular text-muted">{product.barcode ?? "—"}</TD>
-                    <TD>{REGIMES[product.taxRegime] ?? product.taxRegime}</TD>
+                    <TD>{labelFor(t, "regime", product.taxRegime)}</TD>
                     <TD right>{euros(product.costCents)}</TD>
                     <TD right>{euros(product.priceCents)}</TD>
                     <TD right>

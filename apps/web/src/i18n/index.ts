@@ -25,7 +25,7 @@ const es = {
   "app.language": "Idioma",
 
   "nav.summary": "Resumen",
-  "nav.sales": "Ventas",
+  "nav.sales": "Transacciones",
   "nav.catalogue": "Catálogo",
   "nav.inventory": "Inventario",
   "nav.tills": "Cajas",
@@ -41,7 +41,7 @@ const es = {
   "range.label": "Periodo",
 
   "kpi.net": "Ventas netas",
-  "kpi.documents": "Documentos",
+  "kpi.documents": "Transacciones",
   "kpi.average": "Ticket medio",
   "kpi.tax": "IVA repercutido",
   "kpi.vsPrevious": "frente al periodo anterior",
@@ -53,12 +53,12 @@ const es = {
   "chart.topProducts": "Lo que más se vende",
   "chart.topProductsHint": "Por importe, en el periodo elegido.",
 
-  "sales.title": "Ventas",
-  "sales.hint": "Solo documentos completados. Un borrador no es dinero.",
+  "sales.title": "Transacciones",
+  "sales.hint": "Solo transacciones completadas. Un borrador no es dinero.",
   "sales.search": "Buscar por número",
   "sales.allTypes": "Todos los tipos",
   "sales.export": "Exportar CSV",
-  "sales.empty": "No hay documentos en este periodo.",
+  "sales.empty": "No hay transacciones en este periodo.",
 
   "doc.number": "Número",
   "doc.type": "Tipo",
@@ -82,6 +82,7 @@ const es = {
   "cat.hint": "El stock es la suma de los movimientos, no una cifra guardada.",
   "cat.search": "Buscar artículo o código",
   "cat.lowOnly": "Solo bajo mínimo",
+  "cat.allGroups": "Todos los grupos",
   "cat.item": "Artículo",
   "cat.group": "Grupo",
   "cat.code": "Código",
@@ -210,6 +211,84 @@ const es = {
   "inf.issued": "Emitido",
   "inf.remaining": "Pendiente",
 
+  "docType.ticket": "Ticket",
+  "docType.refund": "Devolución",
+  "docType.repair": "Reparación",
+  "docType.used_purchase": "Compra usado",
+  "docType.invoice": "Factura",
+  "tender.cash": "Efectivo",
+  "tender.card": "Tarjeta",
+  "tender.transfer": "Transferencia",
+  "tender.store_credit": "Vale",
+  "tender.deposit": "Señal",
+  "mv.purchase_in": "Entrada",
+  "mv.sale_out": "Venta",
+  "mv.return_in": "Devolución",
+  "mv.adjust_in": "Ajuste +",
+  "mv.adjust_out": "Ajuste −",
+  "mv.repair_out": "Reparación",
+  "mv.used_in": "Compra usado",
+  "regime.IVA21": "IVA 21%",
+  "regime.IVA10": "IVA 10%",
+  "regime.IVA4": "IVA 4%",
+  "regime.REBU": "REBU",
+  "meta.description": "El TPV para tiendas de telefonía. Panel de control y sincronización.",
+  "land.lede": "El TPV para tiendas de telefonía. Vende sin conexión, y mira la tienda desde donde estés.",
+  "land.signup": "Crear cuenta",
+  "land.login": "Entrar",
+  "auth.signIn": "Entrar",
+  "auth.signInLede": "Para ver tus cajas desde cualquier sitio.",
+  "auth.signingIn": "Entrando…",
+  "auth.signUp": "Crear cuenta",
+  "auth.signUpLede": "Para tiendas de telefonía. La caja funciona igual sin conexión.",
+  "auth.signingUp": "Creando…",
+  "auth.email": "Correo",
+  "auth.password": "Contraseña",
+  "auth.shopName": "Nombre de la tienda",
+  "auth.shopNamePlaceholder": "Telefonía García",
+  "auth.noAccount": "¿Todavía no tienes cuenta?",
+  "auth.createOne": "Crear una",
+  "auth.haveAccount": "¿Ya tienes cuenta?",
+  "auth.err.missing": "Escribe tu correo y una contraseña.",
+  "auth.err.short": "La contraseña necesita al menos 8 caracteres.",
+  "auth.err.missingSignIn": "Escribe tu correo y tu contraseña.",
+  "auth.err.mismatch": "Esos datos no coinciden. Comprueba el correo y la contraseña.",
+  "auth.err.claimed": "Esa cuenta ya pertenece a otra persona. Escríbenos y lo miramos.",
+  "auth.err.link": "Ese enlace ya no vale. Vuelve a entrar con tu correo y tu contraseña.",
+  "auth.notice.confirm": "Te hemos enviado un correo para confirmar la dirección. Ábrelo y sigue el enlace para entrar.",
+
+  "inf.tab.sales": "Ventas",
+  "inf.tab.repairs": "Reparaciones",
+  "inf.tab.used": "Usados",
+  "inf.tab.valuation": "Valoración",
+  "inf.tab.dead": "Stock parado",
+  "inf.sales.tickets": "Tickets",
+  "inf.sales.net": "Base",
+  "inf.sales.tax": "IVA",
+  "inf.sales.gross": "Total",
+  "inf.sales.average": "Ticket medio",
+  "inf.sales.used": "Ventas REBU",
+  "inf.sales.refunds": "Devuelto",
+  "inf.sales.byGroup": "Por grupo",
+  "inf.sales.byGroupHint": "De qué estantería salió el dinero.",
+  "inf.sales.count": "Líneas",
+  "inf.sales.qty": "Unidades",
+  "inf.rep.open": "Abiertas",
+  "inf.rep.openHint": "Aparatos que la tienda todavía tiene.",
+  "inf.rep.closed": "Cerradas",
+  "inf.rep.closedHint": "Entregadas o devueltas sin reparar.",
+  "inf.rep.days": "Días",
+  "inf.rep.overdue": "Fuera de plazo",
+  "inf.rep.turnaround": "Días en taller",
+  "inf.rep.parts": "Piezas (coste)",
+  "inf.rep.labour": "Mano de obra",
+  "inf.rep.charged": "Presupuestado",
+  "inf.rep.noMargin": "El margen sale del ticket de entrega, que todavía no se cruza con el parte.",
+  "inf.used.title": "Usados en stock",
+  "inf.used.hint": "Comprados y sin vender. Dinero en la estantería.",
+  "inf.used.days": "Días retenido",
+  "inf.used.cost": "Coste total",
+
   "empty.noData": "Nada que enseñar todavía en este periodo.",
 } as const;
 
@@ -221,7 +300,7 @@ const en: Record<MessageKey, string> = {
   "app.language": "Language",
 
   "nav.summary": "Overview",
-  "nav.sales": "Sales",
+  "nav.sales": "Transactions",
   "nav.catalogue": "Catalogue",
   "nav.inventory": "Inventory",
   "nav.tills": "Tills",
@@ -237,7 +316,7 @@ const en: Record<MessageKey, string> = {
   "range.label": "Period",
 
   "kpi.net": "Net sales",
-  "kpi.documents": "Documents",
+  "kpi.documents": "Transactions",
   "kpi.average": "Average sale",
   "kpi.tax": "VAT charged",
   "kpi.vsPrevious": "vs the period before",
@@ -249,12 +328,12 @@ const en: Record<MessageKey, string> = {
   "chart.topProducts": "Best sellers",
   "chart.topProductsHint": "By value, over the chosen period.",
 
-  "sales.title": "Sales",
-  "sales.hint": "Completed documents only. A draft is not money.",
+  "sales.title": "Transactions",
+  "sales.hint": "Completed transactions only. A draft is not money.",
   "sales.search": "Search by number",
   "sales.allTypes": "All types",
   "sales.export": "Export CSV",
-  "sales.empty": "No documents in this period.",
+  "sales.empty": "No transactions in this period.",
 
   "doc.number": "Number",
   "doc.type": "Type",
@@ -278,6 +357,7 @@ const en: Record<MessageKey, string> = {
   "cat.hint": "Stock is the sum of the movements, never a stored figure.",
   "cat.search": "Search name or barcode",
   "cat.lowOnly": "Low stock only",
+  "cat.allGroups": "All groups",
   "cat.item": "Item",
   "cat.group": "Group",
   "cat.code": "Barcode",
@@ -406,6 +486,84 @@ const en: Record<MessageKey, string> = {
   "inf.issued": "Issued",
   "inf.remaining": "Remaining",
 
+  "docType.ticket": "Receipt",
+  "docType.refund": "Refund",
+  "docType.repair": "Repair",
+  "docType.used_purchase": "Used purchase",
+  "docType.invoice": "Invoice",
+  "tender.cash": "Cash",
+  "tender.card": "Card",
+  "tender.transfer": "Transfer",
+  "tender.store_credit": "Voucher",
+  "tender.deposit": "Deposit",
+  "mv.purchase_in": "Received",
+  "mv.sale_out": "Sold",
+  "mv.return_in": "Returned",
+  "mv.adjust_in": "Adjust +",
+  "mv.adjust_out": "Adjust −",
+  "mv.repair_out": "Repair",
+  "mv.used_in": "Used purchase",
+  "regime.IVA21": "VAT 21%",
+  "regime.IVA10": "VAT 10%",
+  "regime.IVA4": "VAT 4%",
+  "regime.REBU": "Margin scheme",
+  "meta.description": "The POS for phone shops. Dashboard and sync.",
+  "land.lede": "The POS for phone shops. Sell with no connection, and see the shop from wherever you are.",
+  "land.signup": "Create an account",
+  "land.login": "Sign in",
+  "auth.signIn": "Sign in",
+  "auth.signInLede": "To see your tills from anywhere.",
+  "auth.signingIn": "Signing in…",
+  "auth.signUp": "Create an account",
+  "auth.signUpLede": "For phone shops. The till works exactly the same with no connection.",
+  "auth.signingUp": "Creating…",
+  "auth.email": "Email",
+  "auth.password": "Password",
+  "auth.shopName": "Shop name",
+  "auth.shopNamePlaceholder": "García Phones",
+  "auth.noAccount": "No account yet?",
+  "auth.createOne": "Create one",
+  "auth.haveAccount": "Already have an account?",
+  "auth.err.missing": "Enter your email and a password.",
+  "auth.err.short": "The password needs at least 8 characters.",
+  "auth.err.missingSignIn": "Enter your email and your password.",
+  "auth.err.mismatch": "Those details do not match. Check the email and the password.",
+  "auth.err.claimed": "That account already belongs to somebody else. Write to us and we will look.",
+  "auth.err.link": "That link is no longer valid. Sign in with your email and password instead.",
+  "auth.notice.confirm": "We have sent you an email to confirm the address. Open it and follow the link to get in.",
+
+  "inf.tab.sales": "Sales",
+  "inf.tab.repairs": "Repairs",
+  "inf.tab.used": "Used",
+  "inf.tab.valuation": "Valuation",
+  "inf.tab.dead": "Dead stock",
+  "inf.sales.tickets": "Receipts",
+  "inf.sales.net": "Base",
+  "inf.sales.tax": "VAT",
+  "inf.sales.gross": "Total",
+  "inf.sales.average": "Average sale",
+  "inf.sales.used": "Margin-scheme sales",
+  "inf.sales.refunds": "Refunded",
+  "inf.sales.byGroup": "By group",
+  "inf.sales.byGroupHint": "Which shelf the money came off.",
+  "inf.sales.count": "Lines",
+  "inf.sales.qty": "Units",
+  "inf.rep.open": "Open",
+  "inf.rep.openHint": "Devices the shop still has.",
+  "inf.rep.closed": "Closed",
+  "inf.rep.closedHint": "Handed back, or returned unrepaired.",
+  "inf.rep.days": "Days",
+  "inf.rep.overdue": "Overdue",
+  "inf.rep.turnaround": "Days in workshop",
+  "inf.rep.parts": "Parts (cost)",
+  "inf.rep.labour": "Labour",
+  "inf.rep.charged": "Quoted",
+  "inf.rep.noMargin": "Margin comes from the collection receipt, which is not yet tied back to the ticket.",
+  "inf.used.title": "Used in stock",
+  "inf.used.hint": "Bought and not yet sold. Money on the shelf.",
+  "inf.used.days": "Days held",
+  "inf.used.cost": "Total cost",
+
   "empty.noData": "Nothing to show for this period yet.",
 };
 
@@ -416,10 +574,28 @@ export type Translate = (key: MessageKey, vars?: Record<string, string | number>
 function make(locale: Locale): Translate {
   const dict = DICTIONARIES[locale];
   return (key, vars) => {
-    const raw = dict[key] ?? es[key];
+    /* A missing key renders as the key rather than throwing: a screen with one
+       odd-looking label is recoverable, a page that crashes on a word is not. */
+    const raw = dict[key] ?? es[key] ?? String(key);
     if (!vars) return raw;
     return raw.replace(/\{(\w+)\}/g, (_, name: string) => String(vars[name] ?? `{${name}}`));
   };
+}
+
+/**
+ * A code from the till — a document type, a tender method, a movement reason —
+ * as a word.
+ *
+ * Falls back to the CODE itself when there is no translation, which matters:
+ * the till can add a movement reason or a document type in a version newer than
+ * this dashboard, and "adjust_write_off" on screen is ugly but true. Inventing
+ * a label for something we do not recognise would be worse.
+ */
+export function labelFor(t: Translate, prefix: string, code: string | null | undefined): string {
+  if (!code) return "—";
+  const key = `${prefix}.${code}` as MessageKey;
+  const word = t(key);
+  return word === key ? code : word;
 }
 
 /** For a component that was handed a locale rather than a cookie. */

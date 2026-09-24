@@ -22,7 +22,17 @@ import postgres from "postgres";
 import { uuidv7 } from "@arkom/core";
 import { accounts, devices, syncEntries, tenants } from "../schema";
 import { repairDetail, repairsForAccount, transfersForAccount, usedForAccount } from "../workshop-queries";
-import { deadStock, outstandingCredit, taxByRegime, valuation } from "../report-queries";
+import {
+  deadStock,
+  outstandingCredit,
+  repairsClosed,
+  repairsOpen,
+  salesByGroup,
+  salesSummary,
+  taxByRegime,
+  usedHolding,
+  valuation,
+} from "../report-queries";
 
 try {
   process.loadEnvFile(".env.local");
@@ -164,7 +174,7 @@ beforeAll(async () => {
       totalCents: 31190, taxCents: 224, subtotalCents: 30966, completedAt: NOW - 7200000,
     }),
     entry("document_line", "create", {
-      id: uuidv7(), documentId: DOC, lineNo: 1, description: "Funda", qty: 1,
+      id: uuidv7(), documentId: DOC, lineNo: 1, description: "Funda", qty: 1, productId: FUNDA,
       taxRegime: "IVA21", baseCents: 1066, taxCents: 224, totalCents: 1290,
     }),
     entry("document_line", "create", {
@@ -312,5 +322,76 @@ describe.skipIf(!ready)("the reports", () => {
 
     expect(vouchers).toHaveLength(1);
     expect(vouchers[0]).toMatchObject({ amountCents: 18000, remainingCents: 5000 });
+  });
+});
+
+describe.skipIf(!ready)("the reports that mirror the till's", () => {
+  it("summarises sales the way the till's sales report does", async () => {
+    const summary = await salesSummary(ACCOUNT, 30);
+
+    expect(summary.tickets).toBe(1);
+    expect(summary.grossCents).toBe(31190);
+    expect(summary.taxCents).toBe(224);
+    expect(summary.netCents).toBe(30966);
+    expect(summary.averageTicketCents).toBe(31190);
+    /* the margin-scheme line on its own figure: it carries no VAT and must not
+       be read as if it did */
+    expect(summary.usedSalesCents).toBe(29900);
+    expect(summary.refundCount).toBe(0);
+  });
+
+  it("splits sales by the shelf they came off", async () => {
+    const rows = await salesByGroup(ACCOUNT, 30);
+
+    const accesorios = rows.find((row) => row.label === "Accesorios");
+    expect(accesorios).toMatchObject({ count: 1, qty: 1, netCents: 1066, grossCents: 1290 });
+
+    /* the used phone was sold as a line with no product behind it, so it lands
+       in the ungrouped row rather than being dropped */
+    const ungrouped = rows.find((row) => row.label === "—");
+    expect(ungrouped?.grossCents).toBe(29900);
+  });
+
+  it("lists the repairs the shop still has, and not the ones it handed back", async () => {
+    const open = await repairsOpen(ACCOUNT);
+
+    expect(open.map((row) => row.device)).toEqual(["iPhone 13 negro"]);
+    expect(open[0]).toMatchObject({ status: "in_repair", customerName: "Marta Ruiz" });
+    expect(open[0]?.daysSinceIntake).toBeGreaterThanOrEqual(0);
+  });
+
+  it("lists the closed ones with what the lines say, and no invented margin", async () => {
+    const closed = await repairsClosed(ACCOUNT);
+
+    expect(closed.map((row) => row.device)).toEqual(["Samsung A52"]);
+    expect(closed[0]).toMatchObject({ status: "collected", chargedCents: 0 });
+    /* no `marginCents` on the row at all — the collection ticket is a separate
+       document and tying it back is not something this report can do honestly */
+    expect(closed[0]).not.toHaveProperty("marginCents");
+  });
+
+  it("shows used stock at what it cost to get there, not what was paid to the seller", async () => {
+    const held = await usedHolding(ACCOUNT);
+
+    expect(held).toHaveLength(1);
+    // 180,00 paid + 25,00 refurbished
+    expect(held[0]).toMatchObject({ state: "in_stock", costCents: 20500, salePriceCents: 29900 });
+    expect(held[0]?.daysHeld).toBeGreaterThanOrEqual(0);
+  });
+
+  it("shows none of it to another account", async () => {
+    const stranger = uuidv7();
+    await admin.insert(accounts).values({
+      id: stranger, name: "Otra", email: `ws3.${stamp}@codroon.invalid`,
+    });
+    try {
+      expect((await salesSummary(stranger, 30)).tickets).toBe(0);
+      expect(await salesByGroup(stranger, 30)).toEqual([]);
+      expect(await repairsOpen(stranger)).toEqual([]);
+      expect(await repairsClosed(stranger)).toEqual([]);
+      expect(await usedHolding(stranger)).toEqual([]);
+    } finally {
+      await admin.delete(accounts).where(eq(accounts.id, stranger));
+    }
   });
 });

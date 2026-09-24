@@ -9,9 +9,10 @@
 import Link from "next/link";
 import { requireAccount } from "../../../src/auth/session";
 import { getT } from "../../../src/i18n/server";
+import { labelFor } from "../../../src/i18n";
 import { parseRange } from "../../../src/lib/range";
 import { documentsInPeriod } from "../../../src/db/dashboard-queries";
-import { DOC_TYPES, dateTime, euros } from "../../../src/lib/format";
+import { dateTime, euros  } from "../../../src/lib/format";
 import { Card, CardHead, CardBody, EmptyState, TD, TH, TR, Table, ghostClass, inputClass } from "../../../src/ui";
 
 export const dynamic = "force-dynamic";
@@ -67,7 +68,7 @@ export default async function SalesPage({
             <option value="">{t("sales.allTypes")}</option>
             {TYPES.map((type) => (
               <option key={type} value={type}>
-                {DOC_TYPES[type] ?? type}
+                {labelFor(t, "docType", type)}
               </option>
             ))}
           </select>
@@ -100,7 +101,7 @@ export default async function SalesPage({
                       {doc.docNumber}
                     </Link>
                   </TD>
-                  <TD>{DOC_TYPES[doc.docType] ?? doc.docType}</TD>
+                  <TD>{labelFor(t, "docType", doc.docType)}</TD>
                   <TD>{dateTime(doc.completedAt)}</TD>
                   <TD right>{euros(doc.totalCents - doc.taxCents)}</TD>
                   <TD right>{euros(doc.taxCents)}</TD>

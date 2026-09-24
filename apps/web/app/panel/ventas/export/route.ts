@@ -17,7 +17,7 @@ import { currentUser } from "../../../../src/auth/supabase";
 import { accountForUser } from "../../../../src/db/pg-accounts";
 import { documentsInPeriod, type DocumentRow } from "../../../../src/db/dashboard-queries";
 import { getT } from "../../../../src/i18n/server";
-import { DOC_TYPES } from "../../../../src/lib/format";
+import { labelFor } from "../../../../src/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const columns: ReadonlyArray<CsvColumn<DocumentRow>> = [
     { header: t("doc.number"), cell: (row) => row.docNumber },
-    { header: t("doc.type"), cell: (row) => DOC_TYPES[row.docType] ?? row.docType },
+    { header: t("doc.type"), cell: (row) => labelFor(t, "docType", row.docType) },
     { header: t("doc.when"), cell: (row) => csvDateTime(row.completedAt.getTime()) },
     { header: t("doc.base"), cell: (row) => csvMoney(row.totalCents - row.taxCents) },
     { header: t("doc.tax"), cell: (row) => csvMoney(row.taxCents) },

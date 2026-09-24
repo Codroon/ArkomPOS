@@ -5,25 +5,26 @@
  */
 import Link from "next/link";
 import { BRAND } from "../src/brand";
+import { getT } from "../src/i18n/server";
 import { BrandLockup } from "../src/ui/brand-mark";
 
-export default function Home() {
+export default async function Home() {
+  const { t } = await getT();
   return (
     <main className="mx-auto flex min-h-screen max-w-[520px] flex-col justify-center px-5 text-center">
       <h1><BrandLockup className="justify-center" /></h1>
       <p className="mt-3 text-[15px] leading-relaxed text-ink-2">
-        El TPV para tiendas de telefonía. Vende sin conexión, y mira la tienda desde
-        donde estés.
+        {t("land.lede")}
       </p>
       <div className="mt-6 flex items-center justify-center gap-3">
         <Link
           href="/signup"
           className="inline-flex items-center rounded-[3px] bg-accent px-4 py-2 text-[13px] font-semibold text-accent-ink"
         >
-          Crear cuenta
+          {t("land.signup")}
         </Link>
         <Link href="/login" className="text-[13px] text-muted underline underline-offset-2">
-          Entrar
+          {t("land.login")}
         </Link>
       </div>
       {/* the one line that stays whoever's name is on the door */}

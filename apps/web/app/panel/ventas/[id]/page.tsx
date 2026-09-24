@@ -16,18 +16,12 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireAccount } from "../../../../src/auth/session";
 import { getT } from "../../../../src/i18n/server";
+import { labelFor } from "../../../../src/i18n";
 import { documentDetail } from "../../../../src/db/document-queries";
-import { DOC_TYPES, TENDER_METHODS, dateTime, euros } from "../../../../src/lib/format";
+import { dateTime, euros  } from "../../../../src/lib/format";
 import { Card, CardBody, CardHead, Chip, TD, TH, TR, Table } from "../../../../src/ui";
 
 export const dynamic = "force-dynamic";
-
-const REGIMES: Record<string, string> = {
-  IVA21: "IVA 21%",
-  IVA10: "IVA 10%",
-  IVA4: "IVA 4%",
-  REBU: "REBU",
-};
 
 export default async function DocumentPage({ params }: { params: Promise<{ id: string }> }) {
   const account = await requireAccount();
@@ -57,7 +51,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
               {head.docNumber ?? "—"}
             </h1>
             <p className="mt-1.5 text-[12px] text-muted">
-              {DOC_TYPES[head.docType] ?? head.docType} · {head.shopName} · {dateTime(head.completedAt)}
+              {labelFor(t, "docType", head.docType)} · {head.shopName} · {dateTime(head.completedAt)}
             </p>
           </div>
           <div className="text-right">
@@ -96,7 +90,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
                   </TD>
                   <TD right>{line.qty}</TD>
                   <TD right>{euros(line.unitPriceCents)}</TD>
-                  <TD>{REGIMES[line.taxRegime] ?? line.taxRegime}</TD>
+                  <TD>{labelFor(t, "regime", line.taxRegime)}</TD>
                   <TD right>{euros(line.baseCents)}</TD>
                   <TD right>{euros(line.taxCents)}</TD>
                   <TD right>{euros(line.totalCents)}</TD>
@@ -137,7 +131,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
             <tbody>
               {tenders.map((tender, index) => (
                 <TR key={`${tender.method}-${index}`}>
-                  <TD>{TENDER_METHODS[tender.method] ?? tender.method}</TD>
+                  <TD>{labelFor(t, "tender", tender.method)}</TD>
                   <TD right>{euros(tender.amountCents)}</TD>
                 </TR>
               ))}

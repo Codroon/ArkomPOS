@@ -25,10 +25,20 @@ export type CloudDb = ReturnType<typeof makeDb>;
 function makeDb(url: string) {
   const sql = postgres(url, {
     prepare: false,
-    /* A route does a couple of statements and goes away. One connection per
-       lambda, recycled quickly, keeps a free-tier pooler from filling up with
-       instances that have nothing left to say. */
-    max: 1,
+    /**
+     * Five, not one.
+     *
+     * One connection per instance sounded prudent for serverless and was a
+     * performance bug: a dashboard that runs six queries in `Promise.all` has
+     * them QUEUE behind a single connection, so the "parallel" fetch costs six
+     * round trips end to end. Measured at ~285ms each from a laptop to
+     * Frankfurt, that was about two seconds of a three-second page.
+     *
+     * Five lets a page's fetches actually overlap while staying small enough
+     * that a fleet of warm instances does not exhaust the pooler. `idle_timeout`
+     * hands them back quickly, which is what keeps that true.
+     */
+    max: 5,
     idle_timeout: 20,
     connect_timeout: 10,
   });

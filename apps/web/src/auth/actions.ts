@@ -7,12 +7,13 @@
  * tested without a database. What is here is the glue: talking to Supabase,
  * reading a form, and saying something a person can act on when it goes wrong.
  *
- * Error messages are Spanish, like the till's. They are also deliberately vague
- * about WHY a sign-in failed — "those details do not match" rather than "no
- * account with that address" — because the second one answers a question the
- * person asking may not be entitled to ask.
+ * Error messages follow the staff language, like every other string here. They
+ * are also deliberately vague about WHY a sign-in failed — "those details do
+ * not match" rather than "no account with that address" — because the second
+ * one answers a question the person asking may not be entitled to ask.
  */
 import { headers } from "next/headers";
+import { getT } from "../i18n/server";
 import { redirect } from "next/navigation";
 import { attachAccount, normaliseEmail } from "./account";
 import { supabaseServer } from "./supabase";
@@ -40,8 +41,9 @@ export async function signUpAction(_prev: FormResult, form: FormData): Promise<F
   const password = asText(form.get("password"));
   const businessName = asText(form.get("businessName"));
 
-  if (!email || !password) return { error: "Escribe tu correo y una contraseña." };
-  if (password.length < 8) return { error: "La contraseña necesita al menos 8 caracteres." };
+  const { t } = await getT();
+  if (!email || !password) return { error: t("auth.err.missing") };
+  if (password.length < 8) return { error: t("auth.err.short") };
 
   const supabase = await supabaseServer();
   const { error } = await supabase.auth.signUp({
@@ -59,22 +61,20 @@ export async function signUpAction(_prev: FormResult, form: FormData): Promise<F
 
   /* Deliberately the same answer whether or not that address already had an
      account: otherwise this form tells a stranger who our customers are. */
-  return {
-    notice:
-      "Te hemos enviado un correo para confirmar la dirección. Ábrelo y sigue el enlace para entrar.",
-  };
+  return { notice: t("auth.notice.confirm") };
 }
 
 export async function signInAction(_prev: FormResult, form: FormData): Promise<FormResult> {
   const email = normaliseEmail(asText(form.get("email")));
   const password = asText(form.get("password"));
-  if (!email || !password) return { error: "Escribe tu correo y tu contraseña." };
+  const { t } = await getT();
+  if (!email || !password) return { error: t("auth.err.missingSignIn") };
 
   const supabase = await supabaseServer();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error || !data.user?.email) {
-    return { error: "Esos datos no coinciden. Comprueba el correo y la contraseña." };
+    return { error: t("auth.err.mismatch") };
   }
 
   /* Idempotent, and here as well as in the callback because a confirmation
@@ -88,7 +88,7 @@ export async function signInAction(_prev: FormResult, form: FormData): Promise<F
 
   if (!outcome.ok) {
     await supabase.auth.signOut();
-    return { error: "Esa cuenta ya pertenece a otra persona. Escríbenos y lo miramos." };
+    return { error: t("auth.err.claimed") };
   }
 
   redirect("/panel");

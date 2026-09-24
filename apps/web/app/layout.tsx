@@ -2,6 +2,8 @@ import "./globals.css";
 import { Archivo_Black, IBM_Plex_Sans } from "next/font/google";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { getT } from "../src/i18n/server";
+import { BRAND } from "../src/brand";
 
 /* The till's own faces, so the two halves of the product are set in the same
    type. The till packages the woff2 files for Electron; the web fetches the
@@ -20,14 +22,16 @@ const display = Archivo_Black({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "Arkom POS",
-  description: "El TPV para tiendas de telefonía. Panel de control y sincronización.",
-};
+/* the tab title and the description follow the staff language too */
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getT();
+  return { title: BRAND.productName, description: t("meta.description") };
+}
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const { locale } = await getT();
   return (
-    <html lang="es" className={`${sans.variable} ${display.variable}`}>
+    <html lang={locale} className={`${sans.variable} ${display.variable}`}>
       <body>{children}</body>
     </html>
   );

@@ -48,9 +48,17 @@ const TENANT = uuidv7();
 const DEVICE = uuidv7();
 const stamp = Date.now();
 
-/** Today, a few hours ago — safely inside the same Madrid date as `now()`. */
-const TODAY = Date.now() - 2 * 60 * 60 * 1000;
-const EARLIER = TODAY - 40 * 60 * 1000;
+/**
+ * Now, and a second before it.
+ *
+ * NOT "a couple of hours ago": these are bucketed by the shop's day in Madrid,
+ * and a fixture dated two hours back lands on YESTERDAY whenever the suite runs
+ * in the first two hours after midnight there. That failed at 00:30 Madrid and
+ * passed every other hour of the day, which is the worst kind of test. The two
+ * only need to differ enough to order.
+ */
+const TODAY = Date.now();
+const EARLIER = TODAY - 1000;
 const LAST_WEEK = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
 let seq = 0;

@@ -27,20 +27,3 @@ export const dayLabel = (iso: string): string => {
   const [y, m, d] = iso.split("-");
   return d && m && y ? `${d}/${m}/${y}` : iso;
 };
-
-/** What the till calls each kind of document, in the language the paper uses. */
-export const DOC_TYPES: Record<string, string> = {
-  ticket: "Ticket",
-  refund: "Devolución",
-  repair: "Reparación",
-  used_purchase: "Compra usado",
-  invoice: "Factura",
-};
-
-export const TENDER_METHODS: Record<string, string> = {
-  cash: "Efectivo",
-  card: "Tarjeta",
-  transfer: "Transferencia",
-  store_credit: "Vale",
-  deposit: "Señal",
-};
