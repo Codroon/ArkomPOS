@@ -13,7 +13,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "cloud:code": "node --env-file-if-exists=.env.local scripts/issue-code.mts",
-    "cloud:delete-tenant": "node --env-file-if-exists=.env.local scripts/delete-tenant.mts"
+    "cloud:delete-tenant": "node --env-file-if-exists=.env.local scripts/delete-tenant.mts",
+    "test:db": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@arkom/core": "workspace:*",
