@@ -45,8 +45,25 @@ cannot drift between the two halves.
 4. **`pnpm dev`** for a local run, or deploy to Vercel with `DATABASE_URL` set as
    an environment variable.
 
-Vercel's Hobby plan forbids commercial use, so a deployment that shops pay to use
-needs Pro.
+### Which Vercel plan
+
+**Hobby while nothing is being sold** — that is the deliberate call, not an
+oversight. Its free tier is more than this workload needs and the EU region pin
+above works on it (one region is allowed; several are not).
+
+**Pro before the first paying shop.** The Hobby terms forbid commercial use, and
+a shop paying for Codroon POS is exactly that. Nothing in the code changes on the
+day you switch.
+
+One thing the plan does constrain: `maxDuration` in `vercel.json` is **10**
+seconds, which is Hobby's ceiling and about twenty times what a batch takes. A
+larger number is rejected at deploy time, so it stays at 10 until there is a
+reason — the till's own client gives up at 20s and retries, and a push that runs
+long costs a repeat and nothing else.
+
+Neon's free tier suspends an idle database, so the first push after a quiet hour
+waits a second for it to wake. Nothing on a counter is waiting for that, which is
+the whole shape of the design.
 
 ## Linking a till
 
