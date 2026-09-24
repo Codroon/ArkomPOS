@@ -28,6 +28,10 @@ export default async function PanelLayout({ children }: { children: ReactNode })
       sales: t("nav.sales"),
       catalogue: t("nav.catalogue"),
       inventory: t("nav.inventory"),
+      repairs: t("nav.repairs"),
+      used: t("nav.used"),
+      transfers: t("nav.transfers"),
+      reports: t("nav.reports"),
       tills: t("nav.tills"),
     },
     ranges: {

@@ -17,7 +17,17 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTransition, type ReactNode } from "react";
-import { BarChart3, Boxes, LayoutDashboard, Receipt, Warehouse } from "lucide-react";
+import {
+  ArrowLeftRight,
+  BarChart3,
+  Boxes,
+  FileText,
+  LayoutDashboard,
+  Receipt,
+  Smartphone,
+  Warehouse,
+  Wrench,
+} from "lucide-react";
 import { cn, ghostClass } from "../../src/ui";
 import { Wordmark } from "../../src/ui/wordmark";
 import { LOCALE_COOKIE, type Locale } from "../../src/i18n";
@@ -27,7 +37,17 @@ export interface ChromeLabels {
   signOut: string;
   language: string;
   period: string;
-  nav: { summary: string; sales: string; catalogue: string; inventory: string; tills: string };
+  nav: {
+    summary: string;
+    sales: string;
+    catalogue: string;
+    inventory: string;
+    repairs: string;
+    used: string;
+    transfers: string;
+    reports: string;
+    tills: string;
+  };
   ranges: { today: string; "7d": string; "30d": string; "90d": string };
 }
 
@@ -36,6 +56,10 @@ const ICONS = {
   sales: Receipt,
   catalogue: Boxes,
   inventory: Warehouse,
+  repairs: Wrench,
+  used: Smartphone,
+  transfers: ArrowLeftRight,
+  reports: FileText,
   tills: BarChart3,
 } as const;
 
@@ -44,6 +68,10 @@ const LINKS = [
   { key: "sales", href: "/panel/ventas" },
   { key: "catalogue", href: "/panel/catalogo" },
   { key: "inventory", href: "/panel/inventario" },
+  { key: "repairs", href: "/panel/reparaciones" },
+  { key: "used", href: "/panel/usados" },
+  { key: "transfers", href: "/panel/transferencias" },
+  { key: "reports", href: "/panel/informes" },
   { key: "tills", href: "/panel/cajas" },
 ] as const;
 
