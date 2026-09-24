@@ -3,15 +3,17 @@
  *
  * These are money queries over a jsonb stream, which is exactly the kind of SQL
  * that returns a plausible number when it is wrong. So the fixture is built by
- * hand — two tickets, one refund, one abandoned draft, one closed shift — and
- * every total is asserted against a figure worked out on paper.
+ * hand — two tickets, one refund, one abandoned draft, one closed shift, one
+ * sale from last week — and every total is asserted against a figure worked out
+ * on paper.
  *
- * Three traps are pinned deliberately, because each one produces a believable
- * wrong answer rather than an error:
+ * Four traps are pinned deliberately, because each produces a believable wrong
+ * answer rather than an error:
  *
  *   · a refund arrives as `document/refund`, not `document/complete`
  *   · a draft that was never completed is not money
  *   · a document corrected by a later op must count once, at its latest figure
+ *   · a day with no sales must still appear in the chart, at zero
  *
  * Throwaway account, deleted afterwards; accounts cascade.
  */
@@ -22,11 +24,12 @@ import postgres from "postgres";
 import { uuidv7 } from "@arkom/core";
 import { accounts, devices, syncEntries, tenants } from "../schema";
 import {
-  dailyTakings,
-  recentDocuments,
+  documentsInPeriod,
+  paymentMix,
+  periodTotals,
   recentShifts,
-  tenderSplit,
-  todayTotals,
+  takingsByDay,
+  topProducts,
 } from "../dashboard-queries";
 
 try {
@@ -122,14 +125,28 @@ beforeAll(async () => {
     })),
     // a draft nobody ever paid for: not money
     entry("document", "create", doc(DRAFT, { status: "draft", totalCents: 9999, completedAt: null })),
-    // and one from last week, so "today" has to exclude it
+    // and one from exactly a week ago, which is the PREVIOUS period for a 7-day window
     entry("document", "complete", doc(OLD_TICKET, {
       docNumber: "T1-000000", totalCents: 5000, taxCents: 868, completedAt: LAST_WEEK,
     })),
+
+    // lines, for "what sells": the funda twice, the cable once
+    entry("document_line", "create", {
+      id: uuidv7(), documentId: TICKET_A, lineNo: 1, description: "Funda", qty: 2, totalCents: 2580,
+    }),
+    entry("document_line", "create", {
+      id: uuidv7(), documentId: TICKET_B, lineNo: 1, description: "Cable USB-C", qty: 1, totalCents: 1200,
+    }),
+    // on the draft, so it must not count
+    entry("document_line", "create", {
+      id: uuidv7(), documentId: DRAFT, lineNo: 1, description: "Fantasma", qty: 9, totalCents: 9999,
+    }),
+
     // tenders: cash on ticket A, card on ticket B, and one on the draft
     entry("document_tender", "create", { id: uuidv7(), documentId: TICKET_A, method: "cash", amountCents: 2580 }),
     entry("document_tender", "create", { id: uuidv7(), documentId: TICKET_B, method: "card", amountCents: 1200 }),
     entry("document_tender", "create", { id: uuidv7(), documentId: DRAFT, method: "cash", amountCents: 9999 }),
+
     // a closed shift
     entry("shift", "close", {
       id: uuidv7(),
@@ -150,47 +167,81 @@ afterAll(async () => {
   await client.end();
 }, 60_000);
 
-describe.skipIf(!ready)("today's takings", () => {
+describe.skipIf(!ready)("the period totals", () => {
   it("counts completed documents only, refunds included as negatives", async () => {
     /* 25,80 + 12,00 − 12,90 = 24,90. The draft's 99,99 is not money, and last
        week's 50,00 is not today. */
-    const totals = await todayTotals(ACCOUNT);
+    const { current } = await periodTotals(ACCOUNT, 1);
 
-    expect(totals.netCents).toBe(2490);
-    expect(totals.documents).toBe(3);
-    expect(totals.refundCents).toBe(-1290);
-    expect(totals.refunds).toBe(1);
+    expect(current.netCents).toBe(2490);
+    expect(current.documents).toBe(3);
+    expect(current.refundCents).toBe(-1290);
+    expect(current.refunds).toBe(1);
+    expect(current.taxCents).toBe(448 + 208 - 224);
+  });
+
+  it("works out the average sale in whole cents", async () => {
+    const { current } = await periodTotals(ACCOUNT, 1);
+    // 2490 / 3, rounded once, in the query rather than in a component
+    expect(current.averageCents).toBe(830);
+  });
+
+  it("compares against the period before, which is what a percentage means", async () => {
+    /* a 7-day window ends today and starts six days back, so last week's 50,00
+       lands in the PREVIOUS window — takings halved, and the dashboard says so */
+    const { current, previous, delta } = await periodTotals(ACCOUNT, 7);
+
+    expect(current.netCents).toBe(2490);
+    expect(previous.netCents).toBe(5000);
+    expect(delta.net).toBeCloseTo(-50.2, 1);
+  });
+
+  it("says nothing rather than infinity when there was nothing before", async () => {
+    /* today against yesterday, and yesterday was empty. A percentage change
+       from zero is not a number anybody should be shown. */
+    const { delta } = await periodTotals(ACCOUNT, 1);
+    expect(delta.net).toBeNull();
+    expect(delta.documents).toBeNull();
   });
 });
 
-describe.skipIf(!ready)("the daily list", () => {
-  it("puts today and last week on their own rows", async () => {
-    const days = await dailyTakings(ACCOUNT, 10);
+describe.skipIf(!ready)("the chart", () => {
+  it("has a bar for every day, including the ones nothing happened on", async () => {
+    /* a chart with the quiet days dropped lies about the shape of a week:
+       Sunday closed has to look like Sunday closed */
+    const days = await takingsByDay(ACCOUNT, 10);
 
-    expect(days).toHaveLength(2);
-    expect(days[0]).toMatchObject({ netCents: 2490, documents: 3 });
-    expect(days[1]).toMatchObject({ netCents: 5000, documents: 1 });
+    expect(days).toHaveLength(10);
+    expect(days[days.length - 1]).toMatchObject({ netCents: 2490, documents: 3 });
+    expect(days.find((day) => day.netCents === 5000)?.documents).toBe(1);
+    expect(days.filter((day) => day.documents === 0)).toHaveLength(8);
+  });
+
+  it("is in calendar order, oldest first, so a chart reads left to right", async () => {
+    const days = await takingsByDay(ACCOUNT, 10);
+    expect([...days].sort((a, b) => a.day.localeCompare(b.day))).toEqual(days);
   });
 });
 
 describe.skipIf(!ready)("the document list", () => {
   it("shows each completed document once, at its latest figure", async () => {
-    const docs = await recentDocuments(ACCOUNT, 20);
+    const docs = await documentsInPeriod(ACCOUNT, 30);
 
-    const numbers = docs.map((d) => d.docNumber);
-    expect(numbers).toContain("T1-000001");
-    expect(numbers).toContain("D1-000001");
-    expect(numbers).not.toContain(null); // the draft has no number and no place here
     expect(docs).toHaveLength(4);
-
-    const corrected = docs.find((d) => d.docNumber === "T1-000002");
-    expect(corrected?.totalCents).toBe(1200); // not the 1000 it was first completed at
+    expect(docs.map((d) => d.docNumber)).toContain("D1-000001");
+    expect(docs.find((d) => d.docNumber === "T1-000002")?.totalCents).toBe(1200);
   });
 
   it("is newest first", async () => {
-    const docs = await recentDocuments(ACCOUNT, 20);
+    const docs = await documentsInPeriod(ACCOUNT, 30);
     const times = docs.map((d) => d.completedAt.getTime());
     expect([...times].sort((a, b) => b - a)).toEqual(times);
+  });
+
+  it("narrows by number and by type, in SQL", async () => {
+    expect(await documentsInPeriod(ACCOUNT, 30, { search: "D1" })).toHaveLength(1);
+    expect(await documentsInPeriod(ACCOUNT, 30, { docType: "refund" })).toHaveLength(1);
+    expect(await documentsInPeriod(ACCOUNT, 30, { docType: "ticket" })).toHaveLength(3);
   });
 });
 
@@ -198,12 +249,22 @@ describe.skipIf(!ready)("how the shop was paid", () => {
   it("counts tenders on completed documents, never on a draft", async () => {
     /* the draft carried a 99,99 tender. Somebody tendered and walked away; the
        drawer never closed on it and it is not takings. */
-    const split = await tenderSplit(ACCOUNT, 30);
+    const mix = await paymentMix(ACCOUNT, 30);
 
-    expect(split).toEqual([
+    expect(mix).toEqual([
       { method: "cash", amountCents: 2580, count: 1 },
       { method: "card", amountCents: 1200, count: 1 },
     ]);
+  });
+});
+
+describe.skipIf(!ready)("what sells", () => {
+  it("ranks lines on completed documents by value, and ignores the draft's", async () => {
+    const top = await topProducts(ACCOUNT, 30);
+
+    expect(top.map((row) => row.description)).toEqual(["Funda", "Cable USB-C"]);
+    expect(top[0]).toMatchObject({ qty: 2, totalCents: 2580 });
+    expect(top.some((row) => row.description === "Fantasma")).toBe(false);
   });
 });
 
@@ -232,11 +293,17 @@ describe.skipIf(!ready)("another account's shop", () => {
     });
 
     try {
-      expect(await todayTotals(stranger)).toMatchObject({ netCents: 0, documents: 0 });
-      expect(await recentDocuments(stranger)).toEqual([]);
-      expect(await tenderSplit(stranger)).toEqual([]);
+      const totals = await periodTotals(stranger, 30);
+      expect(totals.current.netCents).toBe(0);
+      expect(totals.current.documents).toBe(0);
+      expect(await documentsInPeriod(stranger, 30)).toEqual([]);
+      expect(await paymentMix(stranger, 30)).toEqual([]);
+      expect(await topProducts(stranger, 30)).toEqual([]);
       expect(await recentShifts(stranger)).toEqual([]);
-      expect(await dailyTakings(stranger)).toEqual([]);
+      // the calendar still comes back, empty — a chart with no bars, not no chart
+      const days = await takingsByDay(stranger, 7);
+      expect(days).toHaveLength(7);
+      expect(days.every((day) => day.netCents === 0)).toBe(true);
     } finally {
       await admin.delete(accounts).where(eq(accounts.id, stranger));
     }

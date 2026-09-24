@@ -1,161 +1,88 @@
+@import "tailwindcss";
+
 /**
- * The same palette the till uses, so the two halves of one product look like
- * one product. Values copied from packages/ui/src/styles/tokens.css rather than
- * imported: pulling that package in would bring Tailwind and a component
- * library the website does not use.
+ * The cloud wears the same face as the till.
+ *
+ * These tokens are the ones in `packages/ui/src/styles/tokens.css`, copied
+ * rather than imported: that file also pulls in the till's font faces, which
+ * are packaged for Electron and have no business in a web bundle. The copy is
+ * held honest by `src/lib/__tests__/brand-tokens.test.ts`, which fails if the
+ * two drift — a product whose two halves disagree about its own blue is a
+ * product that looks like two products.
  *
  * The rules travel with the colours (handoff 00, CLAUDE.md):
  *   · Signal Blue lands on exactly ONE element per screen — the primary action.
  *   · White on blue is banned. Text on blue is always Graphite 900.
- *   · Blue body text on Bone is banned.
+ *   · Blue body text on Bone is banned; blue TINT as a surface is allowed, with
+ *     dark ink on top.
  */
-:root {
-  --canvas: #f1efe9;      /* Bone */
-  --surface: #eae7de;
-  --card: #ffffff;
-  --ink: #15181b;         /* Graphite 900 */
-  --ink-2: #2a2f35;       /* Graphite 700 */
-  --muted: #70777d;       /* Gray 400 */
-  --subtle: #9b9a92;
-  --line: #dcd8cd;
-  --line-strong: #c4bfb1;
-  --accent: #2f9bff;      /* Signal Blue */
-  --accent-ink: #15181b;  /* ALWAYS this on blue — never white */
-  --danger-ink: #8c2f2f;
-  --ok-bg: #d8ead8;
-  --ok-ink: #24501f;
+@theme {
+  /* ---- surfaces (warm, from Bone) ---- */
+  --color-canvas: #f1efe9;
+  --color-surface: #eae7de;
+  --color-surface-2: #e4e1d7;
+  --color-card: #ffffff;
+
+  /* ---- inverse surface (Graphite) — the sidebar ---- */
+  --color-inverse: #15181b;
+  --color-inverse-2: #2a2f35;
+  --color-inverse-ink: #f1efe9;
+  --color-inverse-muted: #70777d;
+
+  /* ---- ink ramp ---- */
+  --color-ink: #15181b;
+  --color-ink-2: #2a2f35;
+  --color-muted: #70777d;
+  --color-subtle: #9b9a92;
+
+  /* ---- borders ---- */
+  --color-line: #dcd8cd;
+  --color-line-strong: #c4bfb1;
+
+  /* ---- accent: the one blue ---- */
+  --color-accent: #2f9bff;
+  --color-accent-ink: #15181b;
+  --color-focus: #2f9bff;
+
+  /* ---- functional pairs: tint background + strong dark text ---- */
+  --color-warning-bg: #f6e7c3;
+  --color-warning-ink: #6a4a05;
+  --color-danger-bg: #f7dbd6;
+  --color-danger-ink: #7a2015;
+  --color-success-bg: #d9ead9;
+  --color-success-ink: #1d5127;
+  --color-info-bg: #dceeff;
+  --color-info-ink: #0b3a66;
+
+  /* ---- interaction states ---- */
+  --color-hover: #e7e4da;
+  --color-active: #ddd9cd;
+  --color-row-selected: #e4e1d7;
+
+  --radius-card: 3px;
 }
 
-* { box-sizing: border-box; }
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
 
-body {
-  margin: 0;
-  background: var(--canvas);
-  color: var(--ink);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  font-size: 14px;
-  line-height: 1.5;
-}
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
 
-a { color: var(--ink-2); }
+  /* Figures line up in columns or they are not figures, they are decoration. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
 
-.wrap { max-width: 460px; margin: 0 auto; padding: 56px 20px; }
-.wide { max-width: 860px; }
-
-.brand {
-  font-size: 13px;
-  letter-spacing: 0.16em;
-  font-weight: 600;
-  color: var(--ink);
-  margin-bottom: 28px;
-}
-
-.card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  padding: 22px;
-}
-
-h1 { font-size: 18px; margin: 0 0 4px; }
-.lede { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
-
-label { display: block; margin-bottom: 14px; }
-.label {
-  display: block;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 5px;
-}
-
-input {
-  width: 100%;
-  padding: 9px 10px;
-  border: 1px solid var(--line-strong);
-  border-radius: 3px;
-  background: var(--card);
-  color: var(--ink);
-  font: inherit;
-}
-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-input::placeholder { color: var(--subtle); }
-
-/* the one blue element on the screen */
-button.primary {
-  width: 100%;
-  padding: 10px 14px;
-  border: 0;
-  border-radius: 3px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-button.primary:disabled { opacity: 0.55; cursor: default; }
-
-button.ghost {
-  padding: 7px 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: 3px;
-  background: transparent;
-  color: var(--ink-2);
-  font: inherit;
-  cursor: pointer;
-}
-
-.hint { font-size: 12px; color: var(--muted); margin-top: 16px; }
-.error {
-  border: 1px solid #d8b4b4;
-  background: #f6e3e3;
-  color: var(--danger-ink);
-  padding: 9px 11px;
-  border-radius: 3px;
-  font-size: 13px;
-  margin-bottom: 16px;
-}
-.notice {
-  border: 1px solid #b9cdb4;
-  background: var(--ok-bg);
-  color: var(--ok-ink);
-  padding: 9px 11px;
-  border-radius: 3px;
-  font-size: 13px;
-  margin-bottom: 16px;
-}
-
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-th {
-  text-align: left;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-  font-weight: 600;
-  padding: 0 10px 7px 0;
-  border-bottom: 1px solid var(--line);
-}
-td { padding: 9px 10px 9px 0; border-bottom: 1px solid var(--line); }
-td.num { text-align: right; font-variant-numeric: tabular-nums; }
-
-.chip {
-  display: inline-block;
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 2px;
-  background: var(--ok-bg);
-  color: var(--ok-ink);
-}
-.chip.cold { background: var(--surface); color: var(--muted); }
-
-.topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 26px;
-  gap: 16px;
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 1px;
+  }
 }

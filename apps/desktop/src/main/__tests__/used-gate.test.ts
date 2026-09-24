@@ -13,6 +13,7 @@ import { and, eq } from "drizzle-orm";
 import { openDb, runMigrations, schema as s } from "@arkom/db";
 import { imeiWithCheckDigit, parseIpcError, uuidv7 } from "@arkom/core";
 import { handlers } from "./electron-stub";
+import { leafValues } from "./leaks";
 import { registerIpcHandlers } from "../ipc";
 import { endSession, startSession } from "../auth/session";
 import { resetTillContext } from "../context";
@@ -191,10 +192,13 @@ describe("what the gate reveals", () => {
 
   it("never returns seller data with a duplicate", async () => {
     // typing IMEIs into this field must not become a way to read the register
-    const serialized = JSON.stringify(await check(IN_PURCHASE));
+    const answer = await check(IN_PURCHASE);
+    const serialized = JSON.stringify(answer);
+    // distinctive enough to search as text
     expect(serialized).not.toContain("Imran");
     expect(serialized).not.toContain("Y2841170F");
-    expect(serialized).not.toContain("8000");
+    // a price is four digits, so it is compared as a leaf VALUE (see ./leaks.ts)
+    expect(leafValues(answer)).not.toContain("8000");
   });
 });
 

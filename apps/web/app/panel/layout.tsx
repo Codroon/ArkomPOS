@@ -1,45 +1,62 @@
 /**
- * The shell every panel page sits in: who is signed in, where they can go, and
- * the way out.
+ * The shell every panel page sits in.
  *
- * The guard is here rather than repeated on each page — a page added later
- * inherits it instead of having to remember it. `currentUser()` answers
- * "nobody" when Supabase is unreachable, so an outage looks signed-out rather
- * than throwing on every route.
+ * The guard lives here rather than on each page, so a screen added next year
+ * inherits it instead of having to remember it. Copy is resolved here too and
+ * handed to the chrome as plain strings: the client bundle carries the words
+ * this person is reading, not both dictionaries.
  */
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { requireAccount } from "../../src/auth/session";
 import { signOutAction } from "../../src/auth/actions";
-import { PanelNav } from "./nav";
+import { getT } from "../../src/i18n/server";
+import { PanelChrome, type ChromeLabels } from "./chrome";
 
 export const dynamic = "force-dynamic";
 
-const LICENCE: Record<string, string> = {
-  trial: "De prueba",
-  active: "Activa",
-  suspended: "Suspendida",
-};
-
 export default async function PanelLayout({ children }: { children: ReactNode }) {
   const account = await requireAccount();
+  const { t, locale } = await getT();
+
+  const labels: ChromeLabels = {
+    brand: t("app.brand"),
+    signOut: t("app.signOut"),
+    language: t("app.language"),
+    period: t("range.label"),
+    nav: {
+      summary: t("nav.summary"),
+      sales: t("nav.sales"),
+      catalogue: t("nav.catalogue"),
+      inventory: t("nav.inventory"),
+      tills: t("nav.tills"),
+    },
+    ranges: {
+      today: t("range.today"),
+      "7d": t("range.7d"),
+      "30d": t("range.30d"),
+      "90d": t("range.90d"),
+    },
+  };
+
+  const licence =
+    account.licenceState === "active"
+      ? t("licence.active")
+      : account.licenceState === "suspended"
+        ? t("licence.suspended")
+        : t("licence.trial");
 
   return (
-    <div className="wrap wide">
-      <div className="topbar">
-        <div>
-          <div className="brand" style={{ marginBottom: 6 }}>CODROON POS</div>
-          <div style={{ fontSize: 13, color: "var(--muted)" }}>
-            {account.name} · {account.email} · {LICENCE[account.licenceState] ?? account.licenceState}
-          </div>
-        </div>
-        <form action={signOutAction}>
-          <button className="ghost" type="submit">Salir</button>
-        </form>
-      </div>
-
-      <PanelNav />
-
-      {children}
-    </div>
+    /* Suspense because the chrome reads searchParams for the period, and Next
+       needs a boundary around anything that does. */
+    <Suspense fallback={<div className="min-h-screen bg-canvas" />}>
+      <PanelChrome
+        labels={labels}
+        locale={locale}
+        account={{ name: account.name, email: account.email, licence }}
+        signOut={signOutAction}
+      >
+        {children}
+      </PanelChrome>
+    </Suspense>
   );
 }

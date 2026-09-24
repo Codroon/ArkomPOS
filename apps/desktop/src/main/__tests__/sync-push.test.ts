@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { openDb, runMigrations, schema as s } from "@arkom/db";
 import { uuidv7 } from "@arkom/core";
 import { app } from "./electron-stub";
+import { keyNames, leafValues } from "./leaks";
 import { readLink, resetLinkCache, writeLink } from "../sync/link";
 import { pendingCount, pushAll, pushOnce, resetSyncState, syncStatus } from "../sync/push";
 
@@ -137,10 +138,13 @@ describe("a linked till with something to send", () => {
 
     await pushOnce(db, { force: true });
 
-    const sent = String((fetchSpy.mock.calls[0]![1] as RequestInit).body);
-    expect(sent).toContain("r1");
-    expect(sent).not.toContain("devicePasscode");
-    expect(sent).not.toContain("1234");
+    const sent = JSON.parse(String((fetchSpy.mock.calls[0]![1] as RequestInit).body)) as unknown;
+    /* leaf VALUES, not a substring of the body: every op carries UUIDv7 ids, and
+       four digits turn up inside one often enough to fail this by coincidence —
+       which is worse than useless in a test about a secret (see ./leaks.ts) */
+    expect(leafValues(sent)).toContain("r1");
+    expect(leafValues(sent)).not.toContain("1234");
+    expect(keyNames(sent)).not.toContain("devicePasscode");
   });
 
   it("sends oldest first, so a half-delivered day is still in order", async () => {

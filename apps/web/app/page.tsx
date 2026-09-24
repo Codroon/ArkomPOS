@@ -1,16 +1,28 @@
 /**
- * pos.codroon.com — a placeholder until the landing page and the dashboard are
- * built. The ingest door underneath it is not a placeholder: a till that has
- * been given a code can link to this deployment today.
+ * pos.codroon.com — a holding page until the landing page is built. The ingest
+ * door underneath it is not a placeholder: a till that has been given a code
+ * can link to this deployment today.
  */
+import Link from "next/link";
+
 export default function Home() {
   return (
-    <main style={{ display: "grid", placeItems: "center", minHeight: "100vh", color: "#3f3f46" }}>
-      <div style={{ textAlign: "center" }}>
-        <h1 style={{ fontSize: 20, letterSpacing: ".14em" }}>CODROON POS</h1>
-        <p style={{ fontSize: 13, color: "#6b6b70" }}>
-          El TPV para tiendas de telefonía. Panel de control en preparación.
-        </p>
+    <main className="mx-auto flex min-h-screen max-w-[520px] flex-col justify-center px-5 text-center">
+      <h1 className="text-[13px] font-semibold tracking-[0.16em]">CODROON POS</h1>
+      <p className="mt-3 text-[15px] leading-relaxed text-ink-2">
+        El TPV para tiendas de telefonía. Vende sin conexión, y mira la tienda desde
+        donde estés.
+      </p>
+      <div className="mt-6 flex items-center justify-center gap-3">
+        <Link
+          href="/signup"
+          className="inline-flex items-center rounded-[3px] bg-accent px-4 py-2 text-[13px] font-semibold text-accent-ink"
+        >
+          Crear cuenta
+        </Link>
+        <Link href="/login" className="text-[13px] text-muted underline underline-offset-2">
+          Entrar
+        </Link>
       </div>
     </main>
   );
