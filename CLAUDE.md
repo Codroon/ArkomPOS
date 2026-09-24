@@ -33,7 +33,7 @@ Since v1.2.0 a till can be **linked to the cloud** (ADR-0020): the owner pastes 
 code in Ajustes → Nube, the till holds a device token in `userData/cloud-link.json` — never a
 table, because every row is pushed to the service the token authenticates — and a background
 timer pushes oplog rows up only. `apps/web` is the other half: `POST /api/enrol`,
-`POST /api/sync`, Postgres on Neon in the EU. **The cloud is a read model with one door and
+`POST /api/sync`, Supabase Postgres in the EU. **The cloud is a read model with one door and
 it never writes back.** Nothing in a screen, a sale or a shutdown awaits the network.
 Since v0.18.0 the till is handover-clean: the general VAT rate is a SETTING read at snapshot time
 (ADR-0007 A1), Eliminar deletes a row nothing points at and archives one with history, a Used-type
@@ -137,6 +137,14 @@ Schema already anticipates them — build nothing for them.
   passcode, a PIN hash or a recovery hash on the wire has already left the shop. The cursor
   moves only on a parsed ack, and what the cloud acks is what it stored, never the cursor it
   remembers (ADR-0020).
+- **Two identities, never merged (ADR-0021).** A cloud login (Supabase Auth) proves a
+  browser belongs to an account; a PIN proves the person at the counter is Ana. The join is
+  `users.cloud_user_id`, nullable — a link that grants nothing in either direction, because
+  ADR-0012 froze the till's PIN as the only authority the till consults. The **till owns the
+  shop's fiscal identity** (legal name, NIF, address, series); the website owns the account.
+  Codroon's admin console reads shop HEALTH only — no sale, total, customer or `sync_entries`
+  row — and support access needs a `support_grants` row naming who, which shop, why and until
+  when. Staff is a separate table, never a role an account could grant itself.
 - **The cloud stores digests, not secrets, and `seq` is an ordering, not an identity.**
   A device token and an enrolment code exist in the clear exactly once, on the way to the
   person or till that uses them. `sync_entries` is keyed by `(tenant_id, op_id)` — keying it

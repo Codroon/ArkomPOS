@@ -3,9 +3,10 @@
  * are a separate lineage on a different engine, and the two never meet — the
  * till's schema is SQLite and its own business.
  *
- * `db:generate` needs no database. `db:migrate` needs DATABASE_URL, which is
- * read from `.env.local` here so that every caller gets it the same way,
- * whether it is a person, a package script or CI.
+ * `db:generate` needs no database. `db:migrate` needs the DIRECT connection
+ * (port 5432), not the transaction pooler the app runs on: DDL through a pooler
+ * is a way to spend an afternoon. Both are read from `.env.local` here so that
+ * every caller gets them the same way — a person, a package script or CI.
  */
 import { defineConfig } from "drizzle-kit";
 
@@ -20,7 +21,7 @@ export default defineConfig({
   schema: "./src/db/schema.ts",
   out: "./drizzle",
   dialect: "postgresql",
-  dbCredentials: { url: process.env.DATABASE_URL ?? "" },
+  dbCredentials: { url: process.env.DIRECT_URL ?? process.env.DATABASE_URL ?? "" },
   strict: true,
   verbose: true,
 });

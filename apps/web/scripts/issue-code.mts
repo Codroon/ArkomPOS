@@ -12,8 +12,8 @@
  * Run with Node's type stripping (the package script does): it imports the real
  * schema and the real `uuidv7`, rather than a second copy of either.
  */
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import postgres from "postgres";
+import { drizzle } from "drizzle-orm/postgres-js";
 import { eq } from "drizzle-orm";
 import { uuidv7 } from "../../../packages/core/src/ids.ts";
 import { accounts, enrolCodes } from "../src/db/schema.ts";
@@ -33,13 +33,16 @@ if (!email) {
   process.exit(2);
 }
 
-const url = process.env.DATABASE_URL;
+/* the direct connection, like migrations: a one-off script has no reason to go
+   through a pooler sized for a serving app */
+const url = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
 if (!url) {
-  console.error("DATABASE_URL is not set. Put it in apps/web/.env.local (see .env.example).");
+  console.error("DIRECT_URL is not set. Put it in apps/web/.env.local (see .env.example).");
   process.exit(2);
 }
 
-const db = drizzle(neon(url), { schema: { accounts, enrolCodes } });
+const client = postgres(url, { prepare: false, max: 1 });
+const db = drizzle(client, { schema: { accounts, enrolCodes } });
 
 const existing = await db.select().from(accounts).where(eq(accounts.email, email)).limit(1);
 let accountId = existing[0]?.id;
@@ -72,3 +75,6 @@ console.log(`  cuenta             ${email}`);
 if (label) console.log(`  etiqueta           ${label}`);
 console.log("");
 console.log("Paste it into the till: Ajustes → Nube. It is shown once and used once.");
+
+/* postgres.js holds the process open until the socket is closed */
+await client.end();

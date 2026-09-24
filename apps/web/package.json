@@ -2,7 +2,7 @@
   "name": "@arkom/web",
   "version": "0.1.0",
   "private": true,
-  "description": "Codroon POS cloud: the ingest door (/api/enrol, /api/sync) and, later, the dashboard. Read model only — no till logic here, and it never writes back to a till.",
+  "description": "Codroon POS cloud: the ingest door (/api/enrol, /api/sync), the shop's dashboard and Codroon's admin. Read model only — no till logic here, and it never writes back to a till.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -17,9 +17,9 @@
   },
   "dependencies": {
     "@arkom/core": "workspace:*",
-    "@neondatabase/serverless": "^1.0.0",
     "drizzle-orm": "^0.44.4",
     "next": "^15.4.5",
+    "postgres": "^3.4.5",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

@@ -32,13 +32,16 @@ cannot drift between the two halves.
 
 ## Setting up a deployment
 
-1. **Create the database in an EU region.** Neon, `eu-central-1`. This is not a
-   preference: ADR-0020 §4 makes the shop the data controller and Codroon the
-   processor, and personal data of Spanish shoppers stays in the union because of
-   where we chose to deploy. `vercel.json` pins the functions to `fra1` for the
-   same reason.
-2. **`cp .env.example .env.local`** and paste the pooled connection string.
-   `.env.local` is gitignored — it is a database credential.
+1. **Create a Supabase project in an EU region** (Frankfurt, `eu-central-1`).
+   This is not a preference: ADR-0020 §4 makes the shop the data controller and
+   Codroon the processor, and personal data of Spanish shoppers stays in the union
+   because of where we chose to deploy. `vercel.json` pins the functions to `fra1`
+   for the same reason. One vendor holds the data *and* the identities that sign in
+   to see it, so the DPA names one sub-processor (ADR-0021 §3).
+2. **`cp .env.example .env.local`** and paste BOTH connection strings —
+   `DATABASE_URL` is the transaction pooler (6543) the app runs on, `DIRECT_URL`
+   is the direct connection (5432) migrations use. `.env.local` is gitignored;
+   these are database credentials.
 3. **`pnpm db:migrate`** (from this folder). Migrations live in `drizzle/` and
    are a separate lineage from the till's: that one is SQLite and its own
    business, and the two never meet.
@@ -61,9 +64,9 @@ larger number is rejected at deploy time, so it stays at 10 until there is a
 reason — the till's own client gives up at 20s and retries, and a push that runs
 long costs a repeat and nothing else.
 
-Neon's free tier suspends an idle database, so the first push after a quiet hour
-waits a second for it to wake. Nothing on a counter is waiting for that, which is
-the whole shape of the design.
+Supabase pauses a free project after about a week with no activity — something
+to know for a deployment nobody has touched, and irrelevant to a shop whose till
+pushes every minute it is open.
 
 ## Linking a till
 

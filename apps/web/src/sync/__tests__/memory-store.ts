@@ -191,13 +191,14 @@ export function memoryStore(): MemoryStore {
         (c) => c.codeHash === hash && c.usedAt === null && c.expiresAt > input.now,
       );
       if (!code) return { ok: false, reason: "code" };
-      code.usedAt = input.now;
 
+      /* ownership BEFORE the code is spent, mirroring pg-store: a refusal here
+         writes nothing, rather than writing and taking it back */
       const existing = store.tenants.get(input.tenantId);
       if (existing && existing.accountId !== code.accountId) {
-        code.usedAt = null;
         return { ok: false, reason: "tenant" };
       }
+      code.usedAt = input.now;
 
       const shopName = input.shopName.trim() || input.terminalName.trim();
       if (existing) {

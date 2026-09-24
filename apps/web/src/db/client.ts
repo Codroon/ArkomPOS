@@ -1,21 +1,38 @@
 /**
- * The Postgres handle. Neon over HTTP, which is the right shape for a route
- * that does two statements and goes away again — no pool to keep warm between
- * serverless invocations, no WebSocket to negotiate.
+ * The Postgres handle — Supabase, in the EU (ADR-0021 §3).
  *
- * Region is pinned in `vercel.json` (`fra1`) and the database is created in a
- * Neon EU region. ADR-0020 §4 makes that a promise to the shops, not a
- * preference: personal data of Spanish shoppers does not leave the union
- * because of where we chose to deploy.
+ * One vendor holds the shops' personal data and the identities that sign in to
+ * see it, so the data-processing agreement names one sub-processor rather than
+ * two. ADR-0020 §4 makes the region a promise to the shops, not a preference:
+ * Frankfurt, pinned again in `vercel.json` for the functions themselves.
+ *
+ * Two connection strings, because Supabase has two ports and they are not
+ * interchangeable:
+ *
+ * - `DATABASE_URL` — the **transaction pooler** (6543). What a serverless route
+ *   uses: a request checks out a connection, runs, and gives it back. Prepared
+ *   statements cannot survive that, hence `prepare: false` — leave it on and the
+ *   first pooled reuse fails with a prepared-statement name it has never heard of.
+ * - `DIRECT_URL` — the **direct connection** (5432). What migrations use, because
+ *   DDL through a transaction pooler is a way to spend an afternoon.
  */
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import * as schema from "./schema";
 
 export type CloudDb = ReturnType<typeof makeDb>;
 
 function makeDb(url: string) {
-  return drizzle(neon(url), { schema });
+  const sql = postgres(url, {
+    prepare: false,
+    /* A route does a couple of statements and goes away. One connection per
+       lambda, recycled quickly, keeps a free-tier pooler from filling up with
+       instances that have nothing left to say. */
+    max: 1,
+    idle_timeout: 20,
+    connect_timeout: 10,
+  });
+  return drizzle(sql, { schema });
 }
 
 let cached: CloudDb | null = null;

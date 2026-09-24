@@ -11,8 +11,8 @@
  * The till is unaffected. Its database is the shop's own copy and the only one
  * that was ever authoritative; if they link again, they re-push their history.
  */
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import postgres from "postgres";
+import { drizzle } from "drizzle-orm/postgres-js";
 import { eq, sql } from "drizzle-orm";
 import { devices, syncEntries, tenants } from "../src/db/schema.ts";
 
@@ -29,17 +29,21 @@ if (!tenantId) {
   process.exit(2);
 }
 
-const url = process.env.DATABASE_URL;
+/* the direct connection, like migrations: a one-off script has no reason to go
+   through a pooler sized for a serving app */
+const url = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
 if (!url) {
-  console.error("DATABASE_URL is not set. Put it in apps/web/.env.local (see .env.example).");
+  console.error("DIRECT_URL is not set. Put it in apps/web/.env.local (see .env.example).");
   process.exit(2);
 }
 
-const db = drizzle(neon(url), { schema: { tenants, devices, syncEntries } });
+const client = postgres(url, { prepare: false, max: 1 });
+const db = drizzle(client, { schema: { tenants, devices, syncEntries } });
 
 const shop = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
 if (!shop[0]) {
   console.error(`No tenant ${tenantId} in this database. Nothing to delete.`);
+  await client.end();
   process.exit(1);
 }
 
@@ -61,6 +65,7 @@ console.log("");
 
 if (!confirmed) {
   console.log("Nothing deleted. Add --yes to go ahead.");
+  await client.end();
   process.exit(0);
 }
 
@@ -69,3 +74,4 @@ if (!confirmed) {
 await db.delete(tenants).where(eq(tenants.id, tenantId));
 
 console.log(`Deleted. ${shop[0].name} is no longer in the cloud.`);
+await client.end();
