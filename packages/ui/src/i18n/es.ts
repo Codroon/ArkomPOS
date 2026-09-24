@@ -8,7 +8,7 @@
  */
 export const es = {
   /* shell */
-  "shell.brand": "ARKOM",
+  "shell.brand": "CODROON",
   "shell.brandSuffix": "POS",
   "shell.menu": "MENU",
   "shell.noContext": "Sin contexto — pnpm db:seed",
@@ -354,6 +354,8 @@ export const es = {
   "set.legalName": "Razón social",
   "set.nif": "NIF",
   "set.address": "Dirección fiscal",
+  "set.shopTagline": "Lema de la tienda",
+  "set.shopTaglineHint": "Se imprime bajo el nombre, en la cabecera del ticket. Vacío no imprime nada.",
   "set.footer": "Línea del pie del ticket",
   "set.footerHint": "Se imprime encima de «Gracias por su visita».",
   "set.saved": "Ajustes guardados",
@@ -394,7 +396,7 @@ export const es = {
   "first.printerSkip": "Ahora no",
   "first.printerDone": "Continuar",
   "first.printerSkipHint": "Puedes elegirla luego en Ajustes. Hasta entonces la caja no cobra.",
-  "first.title": "Bienvenido a Arkom POS",
+  "first.title": "Bienvenido a Codroon POS",
   "first.subtitle": "Un par de datos y la caja queda lista. Todo se puede cambiar luego en Ajustes, menos el prefijo.",
   "first.shopSection": "Datos de la tienda",
   "first.shopHint": "Es lo que se imprime en la cabecera de cada ticket.",
@@ -1077,7 +1079,7 @@ export const es = {
   "used.gate.duplicateUnit": "Está registrado como unidad: {label}",
   "used.gate.duplicatePurchase": "Ya se compró en {label}",
   "used.gate.confirm": "He verificado físicamente el dispositivo: el bloqueo de activación está quitado y está restaurado de fábrica.",
-  "used.gate.offline": "La comprobación es física. Arkom no consulta ninguna base de datos online.",
+  "used.gate.offline": "La comprobación es física. Codroon POS no consulta ninguna base de datos online.",
   "used.gate.passed": "Comprobado. Ya puedes fijar el precio.",
 
   "used.price.section": "2 · Precio",

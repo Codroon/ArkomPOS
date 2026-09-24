@@ -1,10 +1,9 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`renderTicket > lays out a mixed sale on 80mm paper 1`] = `
-"                A R K O M
-   E L E C T R O N I C S · P H O N E S
+"    A r k o m   E l e c t r ó n i c a
+                S . L .
 
-          Arkom Electrónica S.L.
               NIF B00000000
       Calle Ejemplo 1, 28001 Madrid
 ------------------------------------------
@@ -42,10 +41,9 @@ Cambio                             31,20 €
 `;
 
 exports[`renderTicket > lays out the same sale on 58mm paper 1`] = `
-"          A R K O M
-      ELECTRONICS · PHONES
+"          A r k o m
+E l e c t r ó n i c a   S . L .
 
-     Arkom Electrónica S.L.
          NIF B00000000
  Calle Ejemplo 1, 28001 Madrid
 --------------------------------
@@ -84,8 +82,8 @@ Cambio                   31,20 €
 `;
 
 exports[`the letterhead and footer on 58mm paper > lays out the same way every time 1`] = `
-"          A R K O M
-      ELECTRONICS · PHONES
+"  T u   U n i c o   P u n t o
+    T e c n o l o g i c o
 
    Tu Único Punto Tecnológico
  Sociedad Limitada Unipersonal
@@ -133,8 +131,8 @@ que vendemos. Devoluciones en 14
 `;
 
 exports[`the letterhead and footer on 80mm paper > lays out the same way every time 1`] = `
-"                A R K O M
-   E L E C T R O N I C S · P H O N E S
+"      T u   U n i c o   P u n t o
+          T e c n o l o g i c o
 
    Tu Único Punto Tecnológico Sociedad
            Limitada Unipersonal

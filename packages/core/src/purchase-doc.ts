@@ -60,8 +60,6 @@ export interface PurchaseDoc {
 
 export const PURCHASE_ES = {
   copy: "COPIA",
-  brand: "ARKOM",
-  tagline: "ELECTRONICS · PHONES",
   nif: "NIF",
   title: "COMPRA DE DISPOSITIVO USADO",
   attendedBy: "Atendido por",
@@ -130,10 +128,12 @@ export function renderPurchaseDoc(
     b.text(letterSpaced(PURCHASE_ES.copy, cols), { align: "center", bold: true });
     b.feed(1);
   }
-  b.text(PURCHASE_ES.brand, { align: "center", bold: true, size: "big" });
-  b.text(letterSpaced(PURCHASE_ES.tagline, cols), { align: "center" });
+  /* the SHOP's name, never the till's (v1.1.0) */
+  const brandLine = (shop.displayName?.trim() || shop.legalName).trim();
+  if (brandLine) b.text(brandLine, { align: "center", bold: true, size: "big", role: "brand" });
+  if (shop.tagline?.trim()) b.text(letterSpaced(shop.tagline.trim(), cols), { align: "center", role: "tagline" });
   b.feed(1);
-  const [legal, ...rest] = shopHeaderLines(shop, PURCHASE_ES.brand);
+  const [legal, ...rest] = shopHeaderLines(shop, brandLine);
   if (legal) b.text(legal, { align: "center", bold: true });
   for (const line of rest) b.text(line, { align: "center" });
 

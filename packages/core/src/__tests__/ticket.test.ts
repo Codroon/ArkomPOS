@@ -79,7 +79,10 @@ describe("renderTicket", () => {
   it("stamps COPIA on a reprint", () => {
     const text = ticketToText(renderTicket({ ...MIXED, isCopy: true }, SHOP, 80), 80);
     expect(text).toContain("C O P I A");
-    expect(text.indexOf("C O P I A")).toBeLessThan(text.indexOf("A R K O M"));
+    /* before the shop's name, which is the first thing on an original: a
+       reprint has to announce itself before anything else is read */
+    const flat = text.replace(/\s+/g, "");
+    expect(flat.indexOf("COPIA")).toBeLessThan(flat.indexOf(SHOP.legalName.replace(/\s+/g, "")));
   });
 
   it("never exceeds the paper's column count", () => {
@@ -126,10 +129,13 @@ describe("renderTicket", () => {
       footerLine: "Sin sorpresas.",
     };
     const text = ticketToText(renderTicket(MIXED, other, 80), 80);
-    expect(text).toContain("Otra Tienda SL");
+    /* the name heads the ticket in double-width type, which the screen preview
+       letter-spaces — so compare the characters, not the spacing */
+    const flat = text.replace(/\s+/g, "");
+    expect(flat).toContain("OtraTiendaSL");
     expect(text).toContain("NIF A12345678");
     expect(text).toContain("Sin sorpresas.");
-    expect(text).not.toContain(SHOP.legalName);
+    expect(flat).not.toContain(SHOP.legalName.replace(/\s+/g, ""));
   });
 
   it("shows prices as VAT-inclusive with the split beneath", () => {
@@ -248,5 +254,61 @@ describe("a letterhead nobody filled in", () => {
     // the brand, the number and the totals are still there (big text is letter-spaced on screen)
     expect(text).toContain("T1-000042");
     expect(squash(text)).toContain("TOTAL");
+  });
+});
+
+/* ------------------------------------------------- whose name is on the paper */
+
+describe("the name at the top of a customer's receipt", () => {
+  /**
+   * The till is Codroon POS and the shop is not — v1.1.0.
+   *
+   * Until this release the wordmark was the constant "ARKOM", which was right
+   * for the one shop it was written for and wrong for every shop that buys the
+   * software afterwards. Nobody hands a customer a receipt with their software
+   * vendor's name at the top of it.
+   */
+  it("is the shop's own, and the till's appears nowhere", () => {
+    const shop: ShopProfile = {
+      legalName: "Telefonía García S.L.",
+      displayName: "García Móviles",
+      nif: "B99887766",
+      address: "Calle Real 3",
+      footerLine: "Gracias.",
+    };
+    const text = ticketToText(renderTicket(MIXED, shop, 80), 80);
+    const flat = text.replace(/\s+/g, "");
+
+    // the trading name leads: it is what the customer recognises
+    expect(flat).toContain("GarcíaMóviles".replace(/\s+/g, ""));
+    expect(text).toContain("NIF B99887766");
+    // and no trace of us, or of the shop this software was first written for
+    for (const ours of ["CODROON", "Codroon", "ARKOM", "Arkom", "ELECTRONICS · PHONES"]) {
+      expect(flat, `${ours} must not reach a customer's receipt`).not.toContain(ours.replace(/\s+/g, ""));
+    }
+  });
+
+  it("falls back to the legal name when the shop has no trading name", () => {
+    const shop: ShopProfile = {
+      legalName: "Telefonía García S.L.",
+      nif: "B99887766",
+      address: "Calle Real 3",
+      footerLine: "",
+    };
+    const flat = ticketToText(renderTicket(MIXED, shop, 80), 80).replace(/\s+/g, "");
+    expect(flat).toContain("TelefoníaGarcíaS.L.");
+    // and says it once: the letterhead skips a line that repeats the one above
+    expect(flat.split("TelefoníaGarcíaS.L.").length - 1).toBe(1);
+  });
+
+  it("prints the shop's strapline only when it has one", () => {
+    const bare: ShopProfile = { legalName: "Tienda", nif: "B1", address: "C/ 1", footerLine: "" };
+    const withTag: ShopProfile = { ...bare, tagline: "REPARACIONES · ACCESORIOS" };
+    expect(ticketToText(renderTicket(MIXED, withTag, 80), 80).replace(/\s+/g, "")).toContain(
+      "REPARACIONES·ACCESORIOS",
+    );
+    // nothing invented, and no blank line where a strapline would be
+    const lines = ticketToText(renderTicket(MIXED, bare, 80), 80).split(String.fromCharCode(10));
+    expect(lines.filter((l) => l.trim() === "").length).toBeLessThan(6);
   });
 });

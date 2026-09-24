@@ -1,10 +1,9 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`the intake receipt > prints on 80mm paper 1`] = `
-"                A R K O M
-   E L E C T R O N I C S · P H O N E S
+"    A r k o m   E l e c t r o n i c s
+                S . L .
 
-          Arkom Electronics S.L.
               NIF B12345678
         C/ Mayor 14, 28013 Madrid
 ------------------------------------------
@@ -43,10 +42,9 @@ X ________________________________________
 `;
 
 exports[`the intake receipt > prints on the 58mm fallback roll 1`] = `
-"          A R K O M
-      ELECTRONICS · PHONES
+"          A r k o m
+E l e c t r o n i c s   S . L .
 
-     Arkom Electronics S.L.
          NIF B12345678
    C/ Mayor 14, 28013 Madrid
 --------------------------------

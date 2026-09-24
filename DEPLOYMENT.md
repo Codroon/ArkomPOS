@@ -1,4 +1,4 @@
-# Arkom POS — installing and running it in the shop
+# Codroon POS — installing and running it in the shop
 
 Everything needed to put this on the counter PC and hand it over. Written to be
 followed at the shop, not read beforehand.
@@ -27,7 +27,7 @@ the backup destination in §7 is set up.**
 
 ## 2. What the installer contains, and what it doesn't
 
-`Arkom POS Setup 0.10.0.exe` — about 94 MB.
+`Codroon POS Setup 0.10.0.exe` — about 94 MB.
 
 **Inside it:**
 - the application,
@@ -157,7 +157,7 @@ saved from the document itself.
    and note the exact name shown there.
 3. **Load the paper roll** — 80 mm, printed side facing the head. Close the lid
    until it clicks.
-4. In Arkom POS, open **11 Ajustes → Impresión**:
+4. In Codroon POS, open **11 Ajustes → Impresión**:
    - **Impresora**: the Citizen should already be picked — the list puts real
      printers first and hides OneNote, Print to PDF and the fax queue behind
      **Ver todas las impresoras**, and when exactly one queue looks like a
@@ -211,16 +211,34 @@ If the digits appear but there is no new line, the scanner needs a "suffix:
 Enter / CR" setting — the barcode for that is in its manual. If nothing appears
 at all, it is a cable or power problem, not an Arkom problem.
 
-Once Notepad is happy, scanning anywhere in Arkom POS works.
+Once Notepad is happy, scanning anywhere in Codroon POS works.
 
 ---
+
+## 5b. Upgrading a till that was installed as Arkom POS
+
+The product is called **Codroon POS** from v1.1.0. The installer keeps the same
+application id, so it upgrades an Arkom POS install in place — Start-menu entry,
+shortcut and *Add or remove programs* all take the new name by themselves.
+
+The shop's data moves with it. Electron keeps a till's database, photographs and
+backups in a folder named after the app, so the first launch under the new name
+**moves** `…\Roaming\Arkom POS` to `…\Roaming\Codroon POS`. Nothing is copied
+and nothing is deleted; if the move cannot happen (the folder is open in another
+program, say) the app starts on an empty till and the old folder is still there —
+close everything, rename it by hand, and start the app again.
+
+What does NOT change is the paper. A receipt has never carried the till's name
+and still does not: the top of every document is the shop's own trading name,
+with its strapline underneath if it has one (**Ajustes → Datos de la tienda →
+Lema de la tienda**).
 
 ## 6. Where everything lives
 
 All of the shop's data is under one folder:
 
 ```
-C:\Users\<user>\AppData\Roaming\Arkom POS\
+C:\Users\<user>\AppData\Roaming\Codroon POS\
 ```
 
 `AppData` is hidden by default. Paste the path into the Explorer address bar, or
@@ -228,10 +246,10 @@ turn on *View → Show → Hidden items*.
 
 | What | Exact path |
 |---|---|
-| **The database** (everything: products, stock, tickets, takings) | `…\Arkom POS\arkom-pos.db` |
-| **Photos of used devices** | `…\Arkom POS\photos\` |
-| Backups | `…\Arkom POS\backups\` |
-| Error log | `…\Arkom POS\logs\arkom.log` |
+| **The database** (everything: products, stock, tickets, takings) | `…\Codroon POS\arkom-pos.db` |
+| **Photos of used devices** | `…\Codroon POS\photos\` |
+| Backups | `…\Codroon POS\backups\` |
+| Error log | `…\Codroon POS\logs\arkom.log` |
 | The program itself | `C:\Users\<user>\AppData\Local\Programs\arkom-pos\` |
 
 Ajustes shows the database and backup locations, each with a button that opens
@@ -257,7 +275,7 @@ emptied at every launch.
 ## 7. Backups
 
 The app backs itself up **every night at 03:30** and **every time it closes**,
-into `…\Arkom POS\backups\`. It keeps the last **14** and deletes older ones.
+into `…\Codroon POS\backups\`. It keeps the last **14** and deletes older ones.
 Each backup is reopened and checked immediately after it is made; anything that
 fails the check is deleted rather than kept.
 
@@ -301,13 +319,13 @@ a big stock import, a Windows update, moving the PC.
 There is deliberately no restore button. Overwriting a live database with one
 click is how a day's takings disappear.
 
-1. **Close Arkom POS completely.** Check it is not still in the taskbar.
-2. Open `C:\Users\<user>\AppData\Roaming\Arkom POS\`.
+1. **Close Codroon POS completely.** Check it is not still in the taskbar.
+2. Open `C:\Users\<user>\AppData\Roaming\Codroon POS\`.
 3. Rename the current `arkom-pos.db` to `arkom-pos-broken.db` — do **not** delete
    it. If `arkom-pos.db-wal` and `arkom-pos.db-shm` exist, rename them too.
 4. Copy the backup you want out of `backups\` and rename the copy to
    `arkom-pos.db`.
-5. Start Arkom POS.
+5. Start Codroon POS.
 6. Check the till: open **02 Catálogo** and confirm the products are there.
 
 Everything after the moment that backup was taken is gone — that is what
@@ -352,10 +370,10 @@ is the only update so far that changes what they see when the app opens.
 
 ### Uninstalling
 
-*Settings → Apps → Arkom POS → Uninstall.*
+*Settings → Apps → Codroon POS → Uninstall.*
 
 **This removes the program and leaves the data.** The database, tickets and
-backups stay in `AppData\Roaming\Arkom POS\`, so reinstalling picks up exactly
+backups stay in `AppData\Roaming\Codroon POS\`, so reinstalling picks up exactly
 where the shop left off. To remove the business data as well, that folder has to
 be deleted by hand — deliberately, so an uninstall can never take the books with
 it. *(Verified on a clean machine.)*
@@ -405,7 +423,7 @@ owner's to change.
 Each step assumes the one above worked. Nothing here needs a developer except
 step 11, and nothing here needs administrator rights.
 
-- [ ] **1. Install.** Double-click `Arkom POS Setup 1.0.0.exe`, click through
+- [ ] **1. Install.** Double-click `Codroon POS Setup 1.0.0.exe`, click through
       SmartScreen (§2). It installs for the current Windows user only — no
       administrator prompt — and launches itself.
 - [ ] **2. Onboarding, with the REAL data.** The app opens on the wizard.
@@ -473,19 +491,19 @@ step 11, and nothing here needs administrator rights.
 Nothing here needs the developer, and none of it deletes anything.
 
 1. **The app will not start, or starts wrong.** Close it. Rename
-   `C:\Users\<user>\AppData\Roaming\Arkom POS` to `Arkom POS.broken` and start
+   `C:\Users\<user>\AppData\Roaming\Codroon POS` to `Codroon POS.broken` and start
    the app again: it comes up on the wizard with a new empty database, and the
    old one is still on disk under the new name.
 2. **The data is wrong but the app works** (a test sale in the books, the wrong
    prefix agreed, the shop's name misspelt beyond what Ajustes can fix). Do the
    **factory reset** below — before the first real sale, never after.
 3. **A previous version behaved better.** Uninstall from *Add or remove
-   programs* — uninstalling does NOT touch `…\Arkom POS\`, the data folder —
-   then install the older `Arkom POS Setup <version>.exe`. Data written by a
+   programs* — uninstalling does NOT touch `…\Codroon POS\`, the data folder —
+   then install the older `Codroon POS Setup <version>.exe`. Data written by a
    NEWER version may not open in an older one: restore the backup from before
    the upgrade (§7, *Restoring*) if it refuses.
 4. **The database is damaged.** Close the app, follow §7 *Restoring* with the
-   newest file from `…\Arkom POS\backups\`. Every backup is verified when it is
+   newest file from `…\Codroon POS\backups\`. Every backup is verified when it is
    written, so the newest one that exists is a good one.
 
 ### Factory reset for go-live
@@ -496,9 +514,9 @@ for this on purpose — wiping the books is not something a screen should offer.
 With the app closed:
 
 1. Take one last backup if anything in it might be wanted (Ajustes → **Copiar
-   ahora**, or copy the newest file from `…\Arkom POS\backups\`).
-2. Rename the data folder `C:\Users\<user>\AppData\Roaming\Arkom POS` to
-   `Arkom POS.before-golive` (or delete it — everything in §6 lives there,
+   ahora**, or copy the newest file from `…\Codroon POS\backups\`).
+2. Rename the data folder `C:\Users\<user>\AppData\Roaming\Codroon POS` to
+   `Codroon POS.before-golive` (or delete it — everything in §6 lives there,
    including the practice photos and backups).
 3. Launch the app. It migrates a fresh database and opens on the welcome screen
    again: language, real shop details, prefix, owner, recovery code, staff.

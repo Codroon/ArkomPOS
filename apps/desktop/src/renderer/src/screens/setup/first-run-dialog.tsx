@@ -157,7 +157,7 @@ export function FirstRunDialog({ onDone }: { onDone: () => void }) {
     <div className="flex h-full min-h-[860px] flex-col bg-canvas text-ink">
       {/* the same brand plate the app wears, so first run looks like the app */}
       <header className="relative flex h-11 flex-none items-center bg-inverse px-3.5 text-inverse-ink">
-        <span className="font-display text-[15px] leading-none tracking-[.06em]">ARKOM</span>
+        <span className="font-display text-[15px] leading-none tracking-[.06em]">{t("shell.brand")}</span>
         <span className="ml-2 font-mono text-[9px] font-medium tracking-[.16em] text-inverse-muted">POS</span>
         <div className="flex-1" />
         {/* setup is the first thing anyone sees, and the person doing it may not

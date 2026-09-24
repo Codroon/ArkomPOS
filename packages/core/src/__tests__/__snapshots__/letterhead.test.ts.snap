@@ -1,8 +1,8 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`the footer that came out of the client's printer cut > lays a refund, an intake and a Z out the same way every time > intake-58mm 1`] = `
-"          A R K O M
-      ELECTRONICS · PHONES
+"      A r k o m   S a n t
+          A n d r e u
 
   Arkom Electronics Barcelona
        Sociedad Limitada
@@ -49,8 +49,7 @@ X ______________________________
 `;
 
 exports[`the footer that came out of the client's printer cut > lays a refund, an intake and a Z out the same way every time > intake-80mm 1`] = `
-"                A R K O M
-   E L E C T R O N I C S · P H O N E S
+"    A r k o m   S a n t   A n d r e u
 
    Arkom Electronics Barcelona Sociedad
                  Limitada
@@ -98,8 +97,8 @@ exports[`the footer that came out of the client's printer cut > lays a refund, a
 "      D E V O L U C I O N
       Del ticket T1-000001
 
-          A R K O M
-      ELECTRONICS · PHONES
+      A r k o m   S a n t
+          A n d r e u
 
   Arkom Electronics Barcelona
        Sociedad Limitada
@@ -141,8 +140,7 @@ exports[`the footer that came out of the client's printer cut > lays a refund, a
 "           D E V O L U C I O N
            Del ticket T1-000001
 
-                A R K O M
-   E L E C T R O N I C S · P H O N E S
+    A r k o m   S a n t   A n d r e u
 
    Arkom Electronics Barcelona Sociedad
                  Limitada
@@ -263,8 +261,8 @@ DESCUADRE                           0,00 €
 `;
 
 exports[`the footer that came out of the client's printer cut > lays the whole ticket out the same way every time > ticket-58mm 1`] = `
-"          A R K O M
-      ELECTRONICS · PHONES
+"      A r k o m   S a n t
+          A n d r e u
 
   Arkom Electronics Barcelona
        Sociedad Limitada
@@ -304,8 +302,7 @@ Tu Único Punto Tecnológico en el
 `;
 
 exports[`the footer that came out of the client's printer cut > lays the whole ticket out the same way every time > ticket-80mm 1`] = `
-"                A R K O M
-   E L E C T R O N I C S · P H O N E S
+"    A r k o m   S a n t   A n d r e u
 
    Arkom Electronics Barcelona Sociedad
                  Limitada

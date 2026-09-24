@@ -20,6 +20,16 @@ export interface TicketTextOp {
   align: TicketAlign;
   bold: boolean;
   size: TicketSize;
+  /**
+   * What this line is, for renderers that treat it differently — v1.1.0.
+   *
+   * The PDF gives the shop's name the wordmark face and an underline. It used
+   * to find that line by comparing its text to a constant, which worked while
+   * every ticket in the world said ARKOM. Now the name is the shop's own, so
+   * the line declares its role and the renderer reads it. Paper ignores this:
+   * ESC/POS has one face.
+   */
+  role?: "brand" | "tagline";
 }
 /** A full-width dashed separator. */
 export interface TicketRuleOp {
@@ -141,10 +151,10 @@ export function opBuilder(cols: number) {
     ops,
     text(
       value: string,
-      { align = "left", bold = false, size = "normal" }: Partial<Omit<TicketTextOp, "op" | "text">> = {},
+      { align = "left", bold = false, size = "normal", role }: Partial<Omit<TicketTextOp, "op" | "text">> = {},
     ): void {
       for (const line of wrapText(value, columnsFor(size, cols))) {
-        ops.push({ op: "text", text: line, align, bold, size });
+        ops.push({ op: "text", text: line, align, bold, size, ...(role ? { role } : {}) });
       }
     },
     /** the document's own number, as scannable bars */

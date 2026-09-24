@@ -380,6 +380,12 @@ export function SettingsScreen() {
               onCommit={(v) => void save({ shopPhone: v })}
             />
             <ShopField
+              label={t("set.shopTagline")}
+              value={settings.shopTagline}
+              onCommit={(v) => void save({ shopTagline: v })}
+              hint={t("set.shopTaglineHint")}
+            />
+            <ShopField
               label={t("set.footer")}
               value={settings.ticketFooter}
               onCommit={(v) => void save({ ticketFooter: v })}

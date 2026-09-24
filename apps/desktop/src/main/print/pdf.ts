@@ -62,10 +62,9 @@ async function embeddedFontCss(): Promise<string> {
 const escapeHtml = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-/** The wordmark and tagline get typographic treatment; everything else is data. */
-const isBrand = (text: string): boolean => text === TICKET_ES.brand;
-const isTagline = (text: string): boolean =>
-  text.replace(/\s+/g, "") === TICKET_ES.tagline.replace(/\s+/g, "");
+/* The shop's name and strapline get typographic treatment; everything else is
+   data. Which line is which comes from the op's own role (v1.1.0) — the text
+   cannot say, now that the name belongs to the shop rather than to us. */
 
 function opsToHtmlRows(ops: TicketOp[]): string {
   // trailing feed exists to push paper clear of the cutter; a page has no cutter,
@@ -97,12 +96,12 @@ function opsToHtmlRows(ops: TicketOp[]): string {
         break;
       case "text": {
         const raw = op.text.trim();
-        if (isBrand(raw)) {
+        if (op.role === "brand") {
           rows.push(`<div class="wordmark">${escapeHtml(raw)}</div><div class="underline"></div>`);
           break;
         }
-        if (isTagline(raw)) {
-          rows.push(`<div class="tagline">${escapeHtml(TICKET_ES.tagline)}</div>`);
+        if (op.role === "tagline") {
+          rows.push(`<div class="tagline">${escapeHtml(raw)}</div>`);
           break;
         }
         if (raw === "") {

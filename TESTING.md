@@ -1,4 +1,4 @@
-# Arkom POS — manual walkthrough
+# Codroon POS — manual walkthrough
 
 A test you can run yourself, by hand, with no scanner: every code below is typed
 into the app. Each step says exactly what to type and what you should see.
@@ -485,7 +485,7 @@ Build it:
 pnpm build:win
 ```
 
-The installer lands in `apps/desktop/release/Arkom POS Setup 0.9.0.exe` (~94 MB).
+The installer lands in `apps/desktop/release/Codroon POS Setup 0.9.0.exe` (~94 MB).
 
 ### The clean-machine walk
 
@@ -498,15 +498,15 @@ The installer lands in `apps/desktop/release/Arkom POS Setup 0.9.0.exe` (~94 MB)
 | The ticket | No printer configured yet → the red **No se pudo imprimir** message with **Guardar PDF**. Save it, press **Abrir**, check the shop name you typed is on it. |
 | Close the app | It closes. It does not hang. |
 | Open it again | Straight to the till — **no welcome screen** — and the sale you made is still in the books. |
-| A backup exists | `%APPDATA%\Arkom POS\backups\` has a file, written when the app closed. |
-| Uninstall | *Settings → Apps → Arkom POS → Uninstall*. The program goes; `%APPDATA%\Arkom POS\` and its database **stay**. |
+| A backup exists | `%APPDATA%\Codroon POS\backups\` has a file, written when the app closed. |
+| Uninstall | *Settings → Apps → Codroon POS → Uninstall*. The program goes; `%APPDATA%\Codroon POS\` and its database **stay**. |
 
 ### Where the data lives
 
 Paste this into the Explorer address bar (`AppData` is hidden):
 
 ```
-%APPDATA%\Arkom POS
+%APPDATA%\Codroon POS
 ```
 
 `arkom-pos.db` is the whole business. `tickets\`, `backups\` and `logs\` sit

@@ -1,4 +1,4 @@
-# CLAUDE.md — Arkom POS
+# CLAUDE.md — Codroon POS
 
 Operating instructions for Claude Code in this repo. Read before writing anything.
 

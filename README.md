@@ -1,16 +1,16 @@
-# Arkom POS
+# Codroon POS
 
-An offline-first Windows point-of-sale for a mobile phone shop in Spain: sell
+An offline-first Windows point-of-sale for mobile phone shops: sell
 phones by IMEI and accessories by quantity, keep stock honest, print a legal
 ticket. A cloud dashboard is planned for Phase 2 — the till is built so that
-syncing to it later needs no rewrite. Built by [Codroon](https://codroon.com).
+syncing to it later needs no rewrite. Built by [Codroon](https://codroon.com) · [pos.codroon.com](https://pos.codroon.com)
 
 **The till runs completely offline.** No account, no server, no internet. The
 shop's data lives in one SQLite file on the counter PC.
 
 ---
 
-## Current state — v1.0.1 · 4 September 2026
+## Current state — v1.1.0 · 24 September 2026
 
 Phase 1 is complete and packaged. Verified on a clean Windows machine end to
 end, with one exception noted below.

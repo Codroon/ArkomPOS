@@ -98,6 +98,8 @@ export interface ShopProfile {
   nif: string;
   address: string;
   footerLine: string;
+  /** the shop's own strapline under its name, if it wants one (v1.1.0) */
+  tagline?: string;
   /* The rest of the letterhead (v0.17.0). All optional, and a blank one simply
      does not print: a shop with no phone number should not get an empty line
      where one would be, and a document is not improved by a placeholder. */
@@ -157,8 +159,6 @@ export const TICKET_ES = {
   copy: "COPIA",
   refund: "DEVOLUCION",
   refundOf: "Del ticket",
-  brand: "ARKOM",
-  tagline: "ELECTRONICS · PHONES",
   nif: "NIF",
   phone: "Tel.",
   terminal: "Terminal",
@@ -204,10 +204,10 @@ export function renderTicket(doc: TicketDoc, shop: ShopProfile, width: PaperWidt
 
   const text = (
     value: string,
-    { align = "left", bold = false, size = "normal" }: Partial<Omit<TicketTextOp, "op" | "text">> = {},
+    { align = "left", bold = false, size = "normal", role }: Partial<Omit<TicketTextOp, "op" | "text">> = {},
   ) => {
     for (const line of wrapText(value, columnsFor(size, cols))) {
-      ops.push({ op: "text", text: line, align, bold, size });
+      ops.push({ op: "text", text: line, align, bold, size, ...(role ? { role } : {}) });
     }
   };
   const rule = () => ops.push({ op: "rule", char: "-" });
@@ -225,12 +225,17 @@ export function renderTicket(doc: TicketDoc, shop: ShopProfile, width: PaperWidt
     text(letterSpaced(TICKET_ES.copy, cols), { align: "center", bold: true });
     feed(1);
   }
-  text(TICKET_ES.brand, { align: "center", bold: true, size: "big" });
-  text(letterSpaced(TICKET_ES.tagline, cols), { align: "center" });
+  /* The SHOP's name, in the shop's own words — not the till's. Until v1.1.0
+     this printed "ARKOM", which was right for exactly one customer and wrong
+     for every other shop that will ever run this software. The till's own name
+     belongs on the box it came in, never on the customer's receipt. */
+  const brandLine = (shop.displayName?.trim() || shop.legalName).trim();
+  if (brandLine) text(brandLine, { align: "center", bold: true, size: "big", role: "brand" });
+  if (shop.tagline?.trim()) text(letterSpaced(shop.tagline.trim(), cols), { align: "center", role: "tagline" });
   feed(1);
 
   /* ---- who the shop legally is (Ajustes, never hardcoded) ---- */
-  const [legal, ...rest] = shopHeaderLines(shop, TICKET_ES.brand);
+  const [legal, ...rest] = shopHeaderLines(shop, brandLine);
   if (legal) text(legal, { align: "center", bold: true });
   for (const line of rest) text(line, { align: "center" });
 

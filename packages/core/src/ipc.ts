@@ -718,6 +718,8 @@ export const SettingsSchema = z.object({
   shopPostalCode: z.string().max(20),
   shopPhone: z.string().max(40),
   ticketFooter: z.string().max(200),
+  /** the shop's strapline, printed under its name. Blank prints nothing. */
+  shopTagline: z.string().max(60),
   /** a USB stick or synced folder; "" = local backups only */
   backupSecondaryPath: z.string().max(500),
   /** status, written by the backup runner rather than edited in Ajustes */

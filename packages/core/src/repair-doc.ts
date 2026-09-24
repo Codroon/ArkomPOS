@@ -63,8 +63,6 @@ export interface IntakeReceiptDoc {
 
 export const REPAIR_ES = {
   copy: "COPIA",
-  brand: "ARKOM",
-  tagline: "ELECTRONICS · PHONES",
   nif: "NIF",
   intakeTitle: "RESGUARDO DE DEPÓSITO",
   attendedBy: "Atendido por",
@@ -176,10 +174,12 @@ export function renderIntakeReceipt(
     b.text(letterSpaced(REPAIR_ES.copy, cols), { align: "center", bold: true });
     b.feed(1);
   }
-  b.text(REPAIR_ES.brand, { align: "center", bold: true, size: "big" });
-  b.text(letterSpaced(REPAIR_ES.tagline, cols), { align: "center" });
+  /* the SHOP's name, never the till's (v1.1.0) */
+  const brandLine = (shop.displayName?.trim() || shop.legalName).trim();
+  if (brandLine) b.text(brandLine, { align: "center", bold: true, size: "big", role: "brand" });
+  if (shop.tagline?.trim()) b.text(letterSpaced(shop.tagline.trim(), cols), { align: "center", role: "tagline" });
   b.feed(1);
-  const [legal, ...rest] = shopHeaderLines(shop, REPAIR_ES.brand);
+  const [legal, ...rest] = shopHeaderLines(shop, brandLine);
   if (legal) b.text(legal, { align: "center", bold: true });
   for (const line of rest) b.text(line, { align: "center" });
 
@@ -296,10 +296,12 @@ export function renderQuoteDoc(doc: QuoteDoc, shop: ShopProfile, width: PaperWid
     b.text(letterSpaced(REPAIR_ES.copy, cols), { align: "center", bold: true });
     b.feed(1);
   }
-  b.text(REPAIR_ES.brand, { align: "center", bold: true, size: "big" });
-  b.text(letterSpaced(REPAIR_ES.tagline, cols), { align: "center" });
+  /* the SHOP's name, never the till's (v1.1.0) */
+  const brandLine = (shop.displayName?.trim() || shop.legalName).trim();
+  if (brandLine) b.text(brandLine, { align: "center", bold: true, size: "big", role: "brand" });
+  if (shop.tagline?.trim()) b.text(letterSpaced(shop.tagline.trim(), cols), { align: "center", role: "tagline" });
   b.feed(1);
-  const [legal, ...rest] = shopHeaderLines(shop, REPAIR_ES.brand);
+  const [legal, ...rest] = shopHeaderLines(shop, brandLine);
   if (legal) b.text(legal, { align: "center", bold: true });
   for (const line of rest) b.text(line, { align: "center" });
 
@@ -433,10 +435,12 @@ export function renderRepairReceipt(
     b.text(letterSpaced(REPAIR_ES.copy, cols), { align: "center", bold: true });
     b.feed(1);
   }
-  b.text(REPAIR_ES.brand, { align: "center", bold: true, size: "big" });
-  b.text(letterSpaced(REPAIR_ES.tagline, cols), { align: "center" });
+  /* the SHOP's name, never the till's (v1.1.0) */
+  const brandLine = (shop.displayName?.trim() || shop.legalName).trim();
+  if (brandLine) b.text(brandLine, { align: "center", bold: true, size: "big", role: "brand" });
+  if (shop.tagline?.trim()) b.text(letterSpaced(shop.tagline.trim(), cols), { align: "center", role: "tagline" });
   b.feed(1);
-  const [legal, ...rest] = shopHeaderLines(shop, REPAIR_ES.brand);
+  const [legal, ...rest] = shopHeaderLines(shop, brandLine);
   if (legal) b.text(legal, { align: "center", bold: true });
   for (const line of rest) b.text(line, { align: "center" });
 
@@ -534,10 +538,12 @@ export function renderReturnDoc(doc: ReturnDoc, shop: ShopProfile, width: PaperW
     b.text(letterSpaced(REPAIR_ES.copy, cols), { align: "center", bold: true });
     b.feed(1);
   }
-  b.text(REPAIR_ES.brand, { align: "center", bold: true, size: "big" });
-  b.text(letterSpaced(REPAIR_ES.tagline, cols), { align: "center" });
+  /* the SHOP's name, never the till's (v1.1.0) */
+  const brandLine = (shop.displayName?.trim() || shop.legalName).trim();
+  if (brandLine) b.text(brandLine, { align: "center", bold: true, size: "big", role: "brand" });
+  if (shop.tagline?.trim()) b.text(letterSpaced(shop.tagline.trim(), cols), { align: "center", role: "tagline" });
   b.feed(1);
-  const [legal, ...rest] = shopHeaderLines(shop, REPAIR_ES.brand);
+  const [legal, ...rest] = shopHeaderLines(shop, brandLine);
   if (legal) b.text(legal, { align: "center", bold: true });
   for (const line of rest) b.text(line, { align: "center" });
 

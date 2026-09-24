@@ -1,5 +1,6 @@
 /* FIRST, before anything that can fail: the log of last resort (v1.0.0). */
 import { bootStep } from "./boot-log";
+import { adoptPreviousUserData } from "./user-data-move";
 import { app, BrowserWindow, screen } from "electron";
 import { join } from "node:path";
 import { initDb } from "./db";
@@ -28,7 +29,11 @@ import {
  * mistake and that a client would never find. Dev gets its own suffix so a
  * developer's tickets and backups never mix with a real till's.
  */
-app.setName(app.isPackaged ? "Arkom POS" : "Arkom POS (dev)");
+app.setName(app.isPackaged ? "Codroon POS" : "Codroon POS (dev)");
+/* Renaming the product renames the folder its data lives in, and a till whose
+   books "disappeared" on upgrade is the worst possible first impression. The
+   move happens here, before anything opens the database (v1.1.0). */
+adoptPreviousUserData();
 
 /** How long the app will wait for the closing backup before letting go. */
 const CLOSE_BACKUP_TIMEOUT_MS = 10_000;
@@ -72,7 +77,7 @@ async function createWindow(): Promise<void> {
     useContentSize: true,
     autoHideMenuBar: true,
     backgroundColor: GRAPHITE_900, // the topbar's colour, so the flash on open is the brand
-    title: "Arkom POS",
+    title: "Codroon POS",
     icon: brandIcon(),
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
