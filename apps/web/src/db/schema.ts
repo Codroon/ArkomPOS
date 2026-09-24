@@ -38,8 +38,39 @@ export const accounts = pgTable("accounts", {
   id: text("id").primaryKey(),               // UUIDv7, issued here
   name: text("name").notNull(),
   email: text("email").notNull(),
+  /**
+   * The gate, not the pricing model (ADR-0021 §6). Set by hand in the admin
+   * while payment is manual. It gates the DOWNLOAD and the enrolment CODE and
+   * nothing else — an installed till keeps selling whatever this says, because
+   * a shop that has lapsed still has a legal duty to issue receipts.
+   */
+  licenceState: text("licence_state").notNull().default("trial"),
   createdAt: ts("created_at").notNull().defaultNow(),
 }, (t) => [uniqueIndex("ux_accounts_email").on(t.email)]);
+
+/* -------------------------------------------------------- account members --
+ * Who may sign in and see an account's shops — ADR-0021 §5.
+ *
+ * A table from the start rather than one column on `accounts`, because one shop
+ * with one login is the common case and the day a chain wants its manager to
+ * see the dashboard should be a row, not a migration.
+ *
+ * `auth_user_id` is a Supabase `auth.users` id. There is deliberately no
+ * foreign key to it: that table belongs to the auth schema and is Supabase's to
+ * manage, and a dangling member row is a nuisance where a broken FK would be an
+ * outage. Codroon STAFF are not members of anybody's account (ADR-0021 §4).
+ */
+export const accountMembers = pgTable("account_members", {
+  accountId: text("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
+  authUserId: text("auth_user_id").notNull(),
+  role: text("role").notNull().default("owner"),   // "owner" | "manager"
+  createdAt: ts("created_at").notNull().defaultNow(),
+}, (t) => [
+  primaryKey({ columns: [t.accountId, t.authUserId] }),
+  /* one person, one account, for now: the dashboard has nowhere to ask "which
+     shop am I looking at" yet, and guessing would be worse than refusing */
+  uniqueIndex("ux_members_user").on(t.authUserId),
+]);
 
 /* --------------------------------------------------------------- tenants --
  * A shop, identified by the id ITS TILL generated at first run (ADR-0020 §1).
@@ -150,6 +181,11 @@ export const syncEntries = pgTable("sync_entries", {
 export const accountRelations = relations(accounts, ({ many }) => ({
   tenants: many(tenants),
   devices: many(devices),
+  members: many(accountMembers),
+}));
+
+export const memberRelations = relations(accountMembers, ({ one }) => ({
+  account: one(accounts, { fields: [accountMembers.accountId], references: [accounts.id] }),
 }));
 
 export const tenantRelations = relations(tenants, ({ one, many }) => ({
