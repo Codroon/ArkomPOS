@@ -25,7 +25,20 @@ import {
   valuation,
 } from "../../../src/db/report-queries";
 import { dateTime, euros } from "../../../src/lib/format";
-import { Card, CardBody, CardHead, Chip, EmptyState, Stat, TD, TH, TR, Table, cn } from "../../../src/ui";
+import {
+  Card,
+  CardBody,
+  CardHead,
+  Chip,
+  EmptyState,
+  Stat,
+  TD,
+  TH,
+  TR,
+  Table,
+  cn,
+  ghostClass,
+} from "../../../src/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +62,8 @@ export default async function ReportsPage({
 
   return (
     <div className="space-y-4">
-      <nav className="flex flex-wrap gap-1 border-b border-line">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line">
+      <nav className="flex flex-wrap gap-1">
         {TABS.map((key) => (
           <Link
             key={key}
@@ -65,6 +79,14 @@ export default async function ReportsPage({
           </Link>
         ))}
       </nav>
+        {/* re-runs the same query this tab just ran, for the same period */}
+        <a
+          className={`${ghostClass} mb-1.5`}
+          href={`/panel/informes/export?report=${tab}&range=${period.key}`}
+        >
+          {t("sales.export")}
+        </a>
+      </div>
 
       {tab === "sales" ? <SalesReport accountId={account.id} days={period.days} t={t} /> : null}
       {tab === "repairs" ? <RepairsReport accountId={account.id} t={t} /> : null}
