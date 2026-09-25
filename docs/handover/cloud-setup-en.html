@@ -1,0 +1,484 @@
+<title>Arkom POS Cloud Setup</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    color-scheme: light;
+    --canvas: #f1efe9;
+    --card: #ffffff;
+    --ink: #15181b;
+    --ink-2: #2a2f35;
+    --muted: #5f666c;
+    --subtle: #8d8c85;
+    --line: #dcd8cd;
+    --line-soft: #e6e2d8;
+    --accent: #2f9bff;
+    --accent-ink: #15181b;
+    --warn-bg: #f6e7c3;
+    --warn-ink: #6a4a05;
+    --ok-bg: #d9ead9;
+    --ok-ink: #1d5127;
+    --chip: #eae7de;
+
+    --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --canvas: #121518;
+      --card: #1a1e23;
+      --ink: #f1efe9;
+      --ink-2: #ddd9d1;
+      --muted: #9aa1a8;
+      --subtle: #737a80;
+      --line: #2c3238;
+      --line-soft: #242a30;
+      --accent: #5cb0ff;
+      --accent-ink: #0d1013;
+      --warn-bg: #3a2f14;
+      --warn-ink: #f2d89a;
+      --ok-bg: #1b3524;
+      --ok-ink: #a9d7b4;
+      --chip: #232830;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --canvas: #121518;
+    --card: #1a1e23;
+    --ink: #f1efe9;
+    --ink-2: #ddd9d1;
+    --muted: #9aa1a8;
+    --subtle: #737a80;
+    --line: #2c3238;
+    --line-soft: #242a30;
+    --accent: #5cb0ff;
+    --accent-ink: #0d1013;
+    --warn-bg: #3a2f14;
+    --warn-ink: #f2d89a;
+    --ok-bg: #1b3524;
+    --ok-ink: #a9d7b4;
+    --chip: #232830;
+  }
+
+  body {
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .page {
+    max-width: 700px;
+    margin-inline: auto;
+    padding-inline: 20px;
+    padding-block: 36px 64px;
+  }
+
+  /* ---------------------------------------------------------- masthead -- */
+  .mark {
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    font-size: 13px;
+    color: var(--ink);
+  }
+  .mark span { color: var(--muted); letter-spacing: 0.14em; }
+
+  h1 {
+    font-size: clamp(26px, 6vw, 34px);
+    line-height: 1.15;
+    font-weight: 600;
+    margin: 18px 0 0;
+    text-wrap: balance;
+    letter-spacing: -0.015em;
+  }
+  .standfirst {
+    margin: 12px 0 0;
+    color: var(--muted);
+    font-size: 16px;
+    max-width: 56ch;
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 22px;
+    padding-bottom: 30px;
+    border-bottom: 1px solid var(--line);
+  }
+  .fact {
+    background: var(--chip);
+    border-radius: 3px;
+    padding: 7px 11px;
+    font-size: 12.5px;
+    color: var(--ink-2);
+  }
+  .fact b { font-weight: 600; }
+
+  /* ------------------------------------------------------------- steps -- */
+  ol.steps { list-style: none; margin: 0; padding: 0; }
+
+  li.step {
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 0 16px;
+    padding-block: 26px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  li.step:last-child { border-bottom: 0; }
+
+  .num {
+    grid-row: 1 / span 9;
+    width: 30px; height: 30px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    display: grid; place-items: center;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-2);
+    margin-top: 2px;
+  }
+
+  h2 {
+    font-size: 17.5px;
+    font-weight: 600;
+    margin: 0 0 6px;
+    line-height: 1.3;
+    text-wrap: balance;
+  }
+  .step p { margin: 0 0 10px; color: var(--ink-2); }
+  .step p:last-child { margin-bottom: 0; }
+  .step p.note { color: var(--muted); font-size: 13.5px; }
+
+  /* the exact words on his screen */
+  kbd {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    background: var(--chip);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 1px 6px;
+    white-space: nowrap;
+    color: var(--ink);
+  }
+  code {
+    font-family: var(--mono);
+    font-size: 13px;
+    background: var(--chip);
+    border-radius: 3px;
+    padding: 1px 5px;
+    word-break: break-all;
+  }
+
+  .callout {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-left: 2px solid var(--accent);
+    border-radius: 3px;
+    padding: 12px 14px;
+    margin: 12px 0 0;
+    font-size: 13.5px;
+    color: var(--ink-2);
+  }
+  .callout .lead {
+    display: block;
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+    margin-bottom: 5px;
+  }
+
+  .warn {
+    background: var(--warn-bg);
+    color: var(--warn-ink);
+    border: 0;
+    border-radius: 3px;
+    padding: 11px 13px;
+    font-size: 13.5px;
+    margin: 12px 0 0;
+  }
+  .ok {
+    background: var(--ok-bg);
+    color: var(--ok-ink);
+    border-radius: 3px;
+    padding: 11px 13px;
+    font-size: 13.5px;
+    margin: 12px 0 0;
+  }
+
+  .url-box {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 14px 16px;
+    margin-top: 22px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 12px;
+  }
+  .url-box .lead {
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .url-box a {
+    font-family: var(--mono);
+    font-size: 15px;
+    color: var(--ink);
+    text-decoration-color: var(--accent);
+    text-underline-offset: 3px;
+    word-break: break-all;
+  }
+
+  /* --------------------------------------------------------- reference -- */
+  .after { margin-top: 44px; padding-top: 30px; border-top: 1px solid var(--line); }
+  h3 {
+    font-size: 11px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+    margin: 0 0 14px;
+  }
+  dl.qa { margin: 0; display: grid; gap: 16px; }
+  dl.qa dt { font-weight: 600; font-size: 14.5px; margin-bottom: 3px; }
+  dl.qa dd { margin: 0; color: var(--muted); font-size: 14px; }
+
+  .signoff {
+    margin-top: 40px;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+    font-size: 12.5px;
+    color: var(--subtle);
+  }
+
+  @media print {
+    body { background: #fff; }
+    .page { padding-block: 0; max-width: none; }
+    li.step { break-inside: avoid; }
+  }
+</style>
+
+<div class="page">
+
+  <div class="mark">ARKOM <span>POS</span></div>
+
+  <h1>Connecting your till to the cloud</h1>
+  <p class="standfirst">
+    A new version of Arkom POS lets you see your shop — sales, stock, repairs — from a
+    phone or any browser. This is everything you need to do, once.
+  </p>
+
+  <div class="facts">
+    <span class="fact"><b>About 15 minutes</b></span>
+    <span class="fact">Your sales, stock and repairs <b>stay exactly where they are</b></span>
+    <span class="fact">The till keeps working <b>with no internet</b></span>
+  </div>
+
+  <ol class="steps">
+
+    <li class="step">
+      <div class="num">1</div>
+      <div>
+        <h2>Take a backup first</h2>
+        <p>
+          Nothing in this process touches your data, but take one anyway — it costs a minute
+          and it is the difference between a bad afternoon and no afternoon at all.
+        </p>
+        <p>
+          In the till, open <kbd>Ajustes</kbd> → <kbd>Copia de seguridad</kbd> and press
+          <kbd>Copiar ahora</kbd>. Wait for <kbd>Última copia</kbd> to show today's date and time.
+        </p>
+        <div class="callout">
+          <span class="lead">Worth doing while you are there</span>
+          Press <kbd>Elegir carpeta…</kbd> and pick a USB stick or a synced folder. That gives you
+          a second copy somewhere other than this computer — which is the copy that matters if the
+          computer itself is the thing that fails.
+        </div>
+      </div>
+    </li>
+
+    <li class="step">
+      <div class="num">2</div>
+      <div>
+        <h2>Install the new version</h2>
+        <p>
+          Close the till program. Run the file we sent you —
+          <code>Arkom POS Setup 1.2.0.exe</code> — and let it finish.
+        </p>
+        <p class="note">
+          Do not uninstall anything first. This installs <em>over</em> your current version and
+          keeps the same shop data, in the same place. You will not be asked to set the shop up
+          again, and nothing needs importing.
+        </p>
+        <p>
+          Open the till and check the bottom of the settings screen says <b>1.2.0</b>. Your
+          articles, sales, repairs and used devices should all be exactly as you left them.
+        </p>
+        <div class="warn">
+          If anything at all looks missing after this step, stop and call us before you sell
+          anything. Do not re-run the installer.
+        </div>
+      </div>
+    </li>
+
+    <li class="step">
+      <div class="num">3</div>
+      <div>
+        <h2>Create your account</h2>
+        <p>
+          On a computer or a phone, open the address below and choose
+          <kbd>Crear una cuenta</kbd>. You will need an email address you can open right now,
+          a password of at least 8 characters, and the name of your shop.
+        </p>
+        <p>
+          We will send you a confirmation email. Open it and follow the link — the account is not
+          active until you do.
+        </p>
+        <p class="note">
+          This login is completely separate from the PIN you use at the counter. The PIN stays on
+          the till and never leaves the shop.
+        </p>
+      </div>
+    </li>
+
+    <li class="step">
+      <div class="num">4</div>
+      <div>
+        <h2>Generate the code that links your till</h2>
+        <p>
+          Signed in, go to <kbd>Tills</kbd> in the menu and press <kbd>Link a till</kbd>. Give it a
+          name you will recognise later — "counter", "upstairs" — and press
+          <kbd>Generate the code</kbd>.
+        </p>
+        <p>
+          You will get a code that looks like <code>2YA7-AGBG-C4ZQ</code>. Keep that page open, or
+          copy the code somewhere, and go to the till.
+        </p>
+        <div class="warn">
+          The code is shown <b>once</b>. We do not store it and we cannot look it up for you. If
+          you lose it, nothing is broken — just press the button again for a new one. It stops
+          working after 7 days, and after the first till uses it.
+        </div>
+      </div>
+    </li>
+
+    <li class="step">
+      <div class="num">5</div>
+      <div>
+        <h2>Enter it on the till</h2>
+        <p>
+          In the till, open <kbd>Ajustes</kbd> → <kbd>Nube</kbd>. There are two boxes.
+        </p>
+        <p>
+          In <kbd>Dirección</kbd>, replace whatever is there with the address below — exactly, with
+          no slash at the end. In <kbd>Código de enlace</kbd>, paste the code from step 4. Then press
+          <kbd>Enlazar la caja</kbd>.
+        </p>
+        <div class="ok">
+          When it works the card shows <kbd>ENLAZADA</kbd> and a time under
+          <kbd>Último envío</kbd>. Everything the shop has already sold starts going up on its own.
+          There is nothing to wait for and nothing else to press.
+        </div>
+      </div>
+    </li>
+
+    <li class="step">
+      <div class="num">6</div>
+      <div>
+        <h2>Check it from your phone</h2>
+        <p>
+          Open the same address on your phone and sign in. Within a minute or two you should see
+          today's takings, your articles, and anything in the workshop.
+        </p>
+        <p class="note">
+          Add it to your home screen and it behaves like an app. It is only ever a window onto the
+          shop — nothing you do there can change the till.
+        </p>
+      </div>
+    </li>
+
+  </ol>
+
+  <div class="url-box">
+    <span class="lead">Your address</span>
+    <a href="https://arkom-pos.vercel.app">https://arkom-pos.vercel.app</a>
+  </div>
+
+  <div class="after">
+    <h3>If something does not look right</h3>
+    <dl class="qa">
+
+      <dt>The till says it could not link</dt>
+      <dd>
+        Nearly always the address. It must be typed exactly as above, starting with
+        <code>https://</code> and with nothing after <code>.app</code> — no slash, no spaces. If the
+        address is right, the code may have expired: generate a new one.
+      </dd>
+
+      <dt>The dashboard is empty, or is missing recent sales</dt>
+      <dd>
+        The till sends in the background every few minutes. Press <kbd>Enviar ahora</kbd> on the
+        <kbd>Nube</kbd> card to push immediately. If it still looks behind, check the shop's
+        internet — the till will catch up by itself once it is back, and no sale is ever lost
+        waiting.
+      </dd>
+
+      <dt>The internet goes down</dt>
+      <dd>
+        Keep selling. The till does not use the internet to work — it only uses it to send a copy
+        upstairs. Everything you ring up while it is down is queued and goes up when the line
+        returns.
+      </dd>
+
+      <dt>The confirmation email never arrived</dt>
+      <dd>
+        Check the spam folder first. If it is not there, tell us the address you used and we will
+        look.
+      </dd>
+
+    </dl>
+  </div>
+
+  <div class="after">
+    <h3>What this changes, and what it does not</h3>
+    <dl class="qa">
+      <dt>Nothing about how you sell</dt>
+      <dd>
+        The counter works exactly as it did. No new step, no waiting for a network, no change to
+        tickets or to the printer.
+      </dd>
+      <dt>What leaves the shop</dt>
+      <dd>
+        Sales, stock movements, repairs and used-device records — the figures the dashboard shows.
+        Staff PINs, device unlock codes and the photographs you take of phones and ID documents
+        stay on the till and are never sent.
+      </dd>
+      <dt>Unlinking</dt>
+      <dd>
+        <kbd>Desenlazar</kbd> on the same card stops the till sending. It removes that till's
+        credential and nothing else — your shop's data stays on the till either way.
+      </dd>
+    </dl>
+  </div>
+
+  <p class="signoff">
+    Arkom POS 1.2.0 · If any step does not match what you see on screen, stop there and send us a
+    photo of it rather than guessing — it is quicker for both of us.
+  </p>
+
+</div>
