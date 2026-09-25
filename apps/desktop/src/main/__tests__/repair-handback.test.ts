@@ -537,3 +537,61 @@ describe("who may close a ticket unrepaired", () => {
     ).toBe("OK");
   });
 });
+
+/**
+ * A date on the wire is epoch millis, and the cloud found out the hard way.
+ *
+ * Every writer in this repo logs `now.getTime()`. Two — `markReady` and
+ * `markNotRepaired` — logged `now.toISOString()` instead, and nothing noticed,
+ * because the till never reads its own oplog back: it reads the COLUMN, which
+ * drizzle wrote correctly from the same Date. The shape only mattered once
+ * something else read the payload, and then it mattered as a 500 on the cloud's
+ * repairs screen — `(row->>'readyAt')::bigint` on "2026-09-24T23:08:42.180Z".
+ *
+ * So this walks the payloads rather than checking the two fields that were
+ * wrong: the next writer to reach for toISOString() fails here instead of on a
+ * shop's dashboard.
+ */
+describe("the dates a till queues", () => {
+  const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
+  const offenders = () =>
+    env.db
+      .select()
+      .from(s.oplog)
+      .all()
+      .flatMap((entry) =>
+        [entry.before, entry.after].flatMap((payload) =>
+          Object.entries((payload ?? {}) as Record<string, unknown>)
+            .filter(([key, value]) => key.endsWith("At") && typeof value === "string" && ISO.test(value))
+            .map(([key, value]) => `${entry.entity}/${entry.action}.${key} = ${String(value)}`),
+        ),
+      );
+
+  it("are numbers, through a whole repair from intake to ready", async () => {
+    const ticket = await createTicket(env.db, ctxOf(), intake());
+    addLine(env.db, ctxOf(), {
+      ticketId: ticket.ticketId,
+      kind: "labor",
+      description: "Mano de obra",
+      chargeCents: 3500,
+    });
+    recordApproval(env.db, ctxOf(), ticket.ticketId, "in_person");
+    markReady(env.db, ctxOf(), ticket.ticketId);
+
+    expect(offenders()).toEqual([]);
+  });
+
+  it("are numbers when a repair is given up on, too", async () => {
+    const ticket = await createTicket(env.db, ctxOf(), intake());
+    markNotRepaired(env.db, ctxOf(), {
+      ticketId: ticket.ticketId,
+      reason: "unrepairable",
+      resolutions: [],
+      depositAction: "refund",
+      chargeDiagnosisFee: false,
+    });
+
+    expect(offenders()).toEqual([]);
+  });
+});

@@ -134,6 +134,9 @@ beforeAll(async () => {
     }),
     entry("used_purchase", "cost", PURCHASE_B, { refurbCostCents: 2500 }),
 
+    /* --- the shape that took the repairs screen down ------------------- */
+    entry("repair_ticket", "ready", TICKET_B, { readyAt: "2026-09-24T23:08:42.180Z" }),
+
     /* --- a field CLEARED by a later op, which is not the same as absent  */
     entry("customer", "create", TICKET_A, { id: TICKET_A, name: "Marta Ruiz", email: "m@x.es" }),
     entry("customer", "update", TICKET_A, { email: null }),
@@ -218,5 +221,33 @@ describe.runIf(ready)("the screens that read through it", () => {
     // and the cost op raised the refurb figure without resending the price
     expect(byId.get(PURCHASE_B)?.refurbCostCents).toBe(2500);
     expect(byId.get(PURCHASE_B)?.buyPriceCents).toBe(7000);
+  });
+});
+
+/**
+ * Two writers on the till sent `readyAt` as an ISO string while every other date
+ * in the stream is epoch millis. The till is fixed, but seventeen rows had
+ * already gone up and an oplog cannot be rewritten, so the reader has to cope
+ * with both — and `(row->>'readyAt')::bigint` on an ISO string is not a wrong
+ * figure, it is a 500 where the repairs list should be.
+ */
+describe.runIf(ready)("a date the till spelled differently", () => {
+  it("folds an ISO string into millis, so the cast downstream still works", async () => {
+    const tickets = await rowsOf("repair_ticket");
+    const b = tickets.find((t) => t.id === TICKET_B);
+    expect(typeof b?.row.readyAt).toBe("number");
+    expect(b?.row.readyAt).toBe(Date.parse("2026-09-24T23:08:42.180Z"));
+  });
+
+  it("leaves a plain date alone, because promisedDate is a day and not an instant", async () => {
+    const tickets = await rowsOf("repair_ticket");
+    const a = tickets.find((t) => t.id === TICKET_A);
+    expect(a?.row.promisedDate).toBe("2026-10-09");
+  });
+
+  it("lets the repairs screen render the ticket it used to choke on", async () => {
+    const repairs = await repairsForAccount(ACCOUNT);
+    const b = repairs.find((r) => r.id === TICKET_B);
+    expect(b?.readyAt?.toISOString()).toBe("2026-09-24T23:08:42.180Z");
   });
 });

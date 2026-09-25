@@ -12,7 +12,7 @@
  * Scoped by account through `tenants`, like every other query in this app.
  */
 import { sql } from "drizzle-orm";
-import { folded } from "./fold";
+import { epochMs, folded } from "./fold";
 import { db as defaultDb, type CloudDb } from "./client";
 
 export interface ProductRow {
@@ -123,11 +123,11 @@ export async function recentMovements(
            e.after->>'movementType'                                as movement_type,
            (e.after->>'qty')::bigint                               as qty,
            (e.after->>'unitCostCents')::bigint                     as unit_cost_cents,
-           to_timestamp((e.after->>'createdAt')::bigint / 1000.0)  as created_at
+           to_timestamp(${epochMs("e.after->>'createdAt'")} / 1000.0)  as created_at
     from sync_entries e
     left join products p on p.id = e.after->>'productId'
     where e.tenant_id in (select id from mine) and e.entity = 'stock_movement'
-    order by (e.after->>'createdAt')::bigint desc
+    order by ${epochMs("e.after->>'createdAt'")} desc
     limit ${limit}
   `);
 

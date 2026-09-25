@@ -20,6 +20,16 @@
  * op that carried it. Last write wins per key, which is what an append-only log
  * of changes means. A row that was always pushed whole folds to exactly what it
  * always was, so nothing that worked before changes.
+ *
+ * The fold also NORMALISES dates, because it is the one place every row passes
+ * through. Every `*At` in the stream is epoch millis except two writers that
+ * sent `readyAt` and `notRepairedAt` as ISO strings; the till has been corrected
+ * but the rows already pushed cannot be — an oplog is append-only, and
+ * `(row->>'readyAt')::bigint` on "2026-09-24T23:08:42.180Z" is not a wrong
+ * answer, it is a 500 on the repairs screen. So a string that looks like an
+ * ISO timestamp becomes millis here, once, and the twenty-seven places
+ * downstream that cast to bigint stay as they are. Inside a folded row a date
+ * is always a number.
  */
 import { sql, type SQL } from "drizzle-orm";
 
@@ -47,7 +57,20 @@ export function folded(accountId: string, entity: string): SQL {
         min(e.seq) over (partition by e.entity_id) as first_seq,
         max(e.seq) over (partition by e.entity_id) as last_seq
       from sync_entries e
-      cross join lateral jsonb_each(coalesce(e.after, '{}'::jsonb)) as kv(key, value)
+      cross join lateral jsonb_each(coalesce(e.after, '{}'::jsonb)) as raw(key, value)
+      /* a date in a folded row is ALWAYS epoch millis — see the note above */
+      cross join lateral (
+        select raw.key as key,
+               case
+                 when jsonb_typeof(raw.value) = 'string'
+                  and raw.key ~ 'At$'
+                  and (raw.value #>> '{}') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T'
+                 then to_jsonb(
+                   (extract(epoch from (raw.value #>> '{}')::timestamptz) * 1000)::bigint
+                 )
+                 else raw.value
+               end as value
+      ) as kv
       where e.tenant_id in (select t.id from tenants t where t.account_id = ${accountId})
         and e.entity = ${entity}
       /* newest op that mentioned this field, for this row */
@@ -63,3 +86,17 @@ export function folded(accountId: string, entity: string): SQL {
  */
 export const foldedAs = (accountId: string, entity: string, alias: string): SQL =>
   sql`${sql.raw(alias)} as (${folded(accountId, entity)})`;
+
+/**
+ * A date read straight from `sync_entries`, rather than from a folded row.
+ *
+ * Only for entities that are insert-only and therefore never folded — a stock
+ * movement is never updated, so there is nothing to fold and no normalising
+ * pass to hide behind. Same tolerance, same reason.
+ */
+export const epochMs = (expr: string): SQL =>
+  sql.raw(`case
+    when ${expr} is null then null
+    when ${expr} ~ '^-?[0-9]+$' then (${expr})::bigint
+    else (extract(epoch from (${expr})::timestamptz) * 1000)::bigint
+  end`);

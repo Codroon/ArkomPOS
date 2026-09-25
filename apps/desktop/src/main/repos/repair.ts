@@ -1527,7 +1527,7 @@ export function markReady(db: ArkomDb, ctx: MutationCtx, ticketId: string): Repa
       entityId: ticket.id,
       action: "ready",
       before: { readyAt: null },
-      after: { readyAt: now.toISOString() },
+      after: { readyAt: now.getTime() },
     });
     syncStatus(tx, ticket.id, log);
     return getDetail(tx, ctx, ticket.id);
@@ -1884,7 +1884,7 @@ export function markNotRepaired(
       action: "not_repaired",
       before: { notRepairedAt: null },
       after: {
-        notRepairedAt: now.toISOString(),
+        notRepairedAt: now.getTime(),
         reason: input.reason,
         diagnosisFeeCents: feeCents,
         depositAppliedCents: depositApplied,
