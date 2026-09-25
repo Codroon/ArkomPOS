@@ -22,6 +22,7 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { uuidv7 } from "@arkom/core";
+import { lastDays } from "../../lib/range";
 import { accounts, devices, syncEntries, tenants } from "../schema";
 import {
   documentsInPeriod,
@@ -179,7 +180,7 @@ describe.skipIf(!ready)("the period totals", () => {
   it("counts completed documents only, refunds included as negatives", async () => {
     /* 25,80 + 12,00 − 12,90 = 24,90. The draft's 99,99 is not money, and last
        week's 50,00 is not today. */
-    const { current } = await periodTotals(ACCOUNT, 1);
+    const { current } = await periodTotals(ACCOUNT, lastDays(1));
 
     expect(current.netCents).toBe(2490);
     expect(current.documents).toBe(3);
@@ -189,7 +190,7 @@ describe.skipIf(!ready)("the period totals", () => {
   });
 
   it("works out the average sale in whole cents", async () => {
-    const { current } = await periodTotals(ACCOUNT, 1);
+    const { current } = await periodTotals(ACCOUNT, lastDays(1));
     // 2490 / 3, rounded once, in the query rather than in a component
     expect(current.averageCents).toBe(830);
   });
@@ -197,7 +198,7 @@ describe.skipIf(!ready)("the period totals", () => {
   it("compares against the period before, which is what a percentage means", async () => {
     /* a 7-day window ends today and starts six days back, so last week's 50,00
        lands in the PREVIOUS window — takings halved, and the dashboard says so */
-    const { current, previous, delta } = await periodTotals(ACCOUNT, 7);
+    const { current, previous, delta } = await periodTotals(ACCOUNT, lastDays(7));
 
     expect(current.netCents).toBe(2490);
     expect(previous.netCents).toBe(5000);
@@ -207,7 +208,7 @@ describe.skipIf(!ready)("the period totals", () => {
   it("says nothing rather than infinity when there was nothing before", async () => {
     /* today against yesterday, and yesterday was empty. A percentage change
        from zero is not a number anybody should be shown. */
-    const { delta } = await periodTotals(ACCOUNT, 1);
+    const { delta } = await periodTotals(ACCOUNT, lastDays(1));
     expect(delta.net).toBeNull();
     expect(delta.documents).toBeNull();
   });
@@ -217,7 +218,7 @@ describe.skipIf(!ready)("the chart", () => {
   it("has a bar for every day, including the ones nothing happened on", async () => {
     /* a chart with the quiet days dropped lies about the shape of a week:
        Sunday closed has to look like Sunday closed */
-    const days = await takingsByDay(ACCOUNT, 10);
+    const days = await takingsByDay(ACCOUNT, lastDays(10));
 
     expect(days).toHaveLength(10);
     expect(days[days.length - 1]).toMatchObject({ netCents: 2490, documents: 3 });
@@ -226,14 +227,14 @@ describe.skipIf(!ready)("the chart", () => {
   });
 
   it("is in calendar order, oldest first, so a chart reads left to right", async () => {
-    const days = await takingsByDay(ACCOUNT, 10);
+    const days = await takingsByDay(ACCOUNT, lastDays(10));
     expect([...days].sort((a, b) => a.day.localeCompare(b.day))).toEqual(days);
   });
 });
 
 describe.skipIf(!ready)("the document list", () => {
   it("shows each completed document once, at its latest figure", async () => {
-    const docs = await documentsInPeriod(ACCOUNT, 30);
+    const docs = await documentsInPeriod(ACCOUNT, lastDays(30));
 
     expect(docs).toHaveLength(4);
     expect(docs.map((d) => d.docNumber)).toContain("D1-000001");
@@ -241,15 +242,15 @@ describe.skipIf(!ready)("the document list", () => {
   });
 
   it("is newest first", async () => {
-    const docs = await documentsInPeriod(ACCOUNT, 30);
+    const docs = await documentsInPeriod(ACCOUNT, lastDays(30));
     const times = docs.map((d) => d.completedAt.getTime());
     expect([...times].sort((a, b) => b - a)).toEqual(times);
   });
 
   it("narrows by number and by type, in SQL", async () => {
-    expect(await documentsInPeriod(ACCOUNT, 30, { search: "D1" })).toHaveLength(1);
-    expect(await documentsInPeriod(ACCOUNT, 30, { docType: "refund" })).toHaveLength(1);
-    expect(await documentsInPeriod(ACCOUNT, 30, { docType: "ticket" })).toHaveLength(3);
+    expect(await documentsInPeriod(ACCOUNT, lastDays(30), { search: "D1" })).toHaveLength(1);
+    expect(await documentsInPeriod(ACCOUNT, lastDays(30), { docType: "refund" })).toHaveLength(1);
+    expect(await documentsInPeriod(ACCOUNT, lastDays(30), { docType: "ticket" })).toHaveLength(3);
   });
 });
 
@@ -257,7 +258,7 @@ describe.skipIf(!ready)("how the shop was paid", () => {
   it("counts tenders on completed documents, never on a draft", async () => {
     /* the draft carried a 99,99 tender. Somebody tendered and walked away; the
        drawer never closed on it and it is not takings. */
-    const mix = await paymentMix(ACCOUNT, 30);
+    const mix = await paymentMix(ACCOUNT, lastDays(30));
 
     expect(mix).toEqual([
       { method: "cash", amountCents: 2580, count: 1 },
@@ -268,7 +269,7 @@ describe.skipIf(!ready)("how the shop was paid", () => {
 
 describe.skipIf(!ready)("what sells", () => {
   it("ranks lines on completed documents by value, and ignores the draft's", async () => {
-    const top = await topProducts(ACCOUNT, 30);
+    const top = await topProducts(ACCOUNT, lastDays(30));
 
     expect(top.map((row) => row.description)).toEqual(["Funda", "Cable USB-C"]);
     expect(top[0]).toMatchObject({ qty: 2, totalCents: 2580 });
@@ -278,7 +279,7 @@ describe.skipIf(!ready)("what sells", () => {
 
 describe.skipIf(!ready)("the Z history", () => {
   it("reads the close, with what was counted against what was expected", async () => {
-    const shifts = await recentShifts(ACCOUNT, 5);
+    const shifts = await recentShifts(ACCOUNT, lastDays(30), 5);
 
     expect(shifts).toHaveLength(1);
     expect(shifts[0]).toMatchObject({
@@ -301,15 +302,15 @@ describe.skipIf(!ready)("another account's shop", () => {
     });
 
     try {
-      const totals = await periodTotals(stranger, 30);
+      const totals = await periodTotals(stranger, lastDays(30));
       expect(totals.current.netCents).toBe(0);
       expect(totals.current.documents).toBe(0);
-      expect(await documentsInPeriod(stranger, 30)).toEqual([]);
-      expect(await paymentMix(stranger, 30)).toEqual([]);
-      expect(await topProducts(stranger, 30)).toEqual([]);
-      expect(await recentShifts(stranger)).toEqual([]);
+      expect(await documentsInPeriod(stranger, lastDays(30))).toEqual([]);
+      expect(await paymentMix(stranger, lastDays(30))).toEqual([]);
+      expect(await topProducts(stranger, lastDays(30))).toEqual([]);
+      expect(await recentShifts(stranger, lastDays(30))).toEqual([]);
       // the calendar still comes back, empty — a chart with no bars, not no chart
-      const days = await takingsByDay(stranger, 7);
+      const days = await takingsByDay(stranger, lastDays(7));
       expect(days).toHaveLength(7);
       expect(days.every((day) => day.netCents === 0)).toBe(true);
     } finally {

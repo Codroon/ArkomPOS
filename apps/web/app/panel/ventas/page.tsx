@@ -16,7 +16,7 @@
 import { requireAccount } from "../../../src/auth/session";
 import { getT } from "../../../src/i18n/server";
 import { labelFor, plural } from "../../../src/i18n";
-import { parseRange } from "../../../src/lib/range";
+import { parseRange, rangeParams } from "../../../src/lib/range";
 import { documentsInPeriod } from "../../../src/db/dashboard-queries";
 import { dateTime, euros } from "../../../src/lib/format";
 import {
@@ -36,13 +36,23 @@ import { Filters } from "../../../src/ui/filters";
 
 export const dynamic = "force-dynamic";
 
-const TYPES = ["ticket", "refund", "repair", "used_purchase"];
+/**
+ * The four a till writes to this list.
+ *
+ * `used_purchase` used to be here and is not a document type any till has ever
+ * produced — the value is `purchase` (schema.ts, DOC_TYPES). So the filter had
+ * an option that matched nothing and the twenty rows it should have matched
+ * were labelled with their raw code. `invoice`, `credit_note` and `shift` are
+ * real types this screen never sees: the first two are not built (CLAUDE.md)
+ * and a Z is not a transaction.
+ */
+const TYPES = ["ticket", "refund", "repair", "purchase"];
 
 const TONE: Record<string, "neutral" | "ok" | "warn" | "bad" | "info"> = {
   ticket: "ok",
   refund: "bad",
   repair: "info",
-  used_purchase: "warn",
+  purchase: "warn",
 };
 
 export default async function SalesPage({
@@ -53,14 +63,14 @@ export default async function SalesPage({
   const account = await requireAccount();
   const { t } = await getT();
   const params = await searchParams;
-  const period = parseRange(params.range);
+  const period = parseRange(params.range, params.from, params.to);
 
   const search = typeof params.q === "string" ? params.q : "";
   const docType = typeof params.type === "string" ? params.type : "";
 
-  const documents = await documentsInPeriod(account.id, period.days, { search, docType });
+  const documents = await documentsInPeriod(account.id, period, { search, docType });
 
-  const exportQuery = new URLSearchParams({ range: period.key });
+  const exportQuery = new URLSearchParams(rangeParams(period));
   if (search) exportQuery.set("q", search);
   if (docType) exportQuery.set("type", docType);
 
@@ -124,7 +134,11 @@ export default async function SalesPage({
         active={(search ? 1 : 0) + (docType ? 1 : 0)}
         summary={plural(t, "sales.count", documents.length)}
       >
-        <input type="hidden" name="range" value={period.key} />
+        {/* the filter form is a GET: without these the window resets to the
+            default the moment somebody searches inside a custom range */}
+        {Object.entries(rangeParams(period)).map(([name, value]) => (
+          <input key={name} type="hidden" name={name} value={value} />
+        ))}
         <Field label={t("sales.search")} className="md:w-[260px]">
           <input
             className={inputClass}

@@ -527,6 +527,7 @@ export const en: Record<TKey, string> = {
   /* typed errors */
   "setup.defaultFooter": "Clear prices. No small print.",
   "setup.defaultTerminal": "Till 1",
+  "setup.defaultLocation": "Shop",
   "common.number": "No.",
   "groups.title": "Groups",
   "groups.manage": "Groups",

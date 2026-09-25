@@ -25,7 +25,7 @@ import { ShiftChip } from "../screens/cash/shift-chip";
 import { SettingsScreen } from "../screens/settings/settings-screen";
 import { UsersScreen } from "../screens/users/users-screen";
 import { FirstRunChecklist } from "./first-run-checklist";
-import { useTillName } from "../lib/till-name";
+import { useLocationName, useTillName } from "../lib/till-name";
 
 /**
  * `needs` hides the row entirely when the session lacks it (handoff/auth.md,
@@ -129,6 +129,7 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
      to its root when the section is chosen again — clicking "05" while reading
      one device should land on the list, not on the same device */
   const tillName = useTillName();
+  const locationName = useLocationName();
   const [navTick, setNavTick] = useState(0);
   const [now, setNow] = useState(() => new Date());
 
@@ -214,7 +215,9 @@ export function AppShell({ context }: { context: MetaContextResponse | null }) {
           )}
           <div className="flex-1" />
           <div className="border-t border-line px-3 py-2.5 text-[10px] leading-normal text-subtle">
-            {context ? `${context.location.name} · ${tillName(context.terminal.name)}` : t("shell.noContext")}
+            {context
+              ? `${locationName(context.location.name)} · ${tillName(context.terminal.name)}`
+              : t("shell.noContext")}
           </div>
         </aside>
 

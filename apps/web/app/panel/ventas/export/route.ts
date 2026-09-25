@@ -28,12 +28,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const account = await accountForUser(user.id);
   if (!account) return NextResponse.json({ error: "NO_ACCOUNT" }, { status: 403 });
 
-  const { t } = await getT();
+  const { t, locale } = await getT();
   const params = request.nextUrl.searchParams;
-  const { parseRange } = await import("../../../../src/lib/range");
-  const period = parseRange(params.get("range") ?? undefined);
+  const { describePeriod, parseRange } = await import("../../../../src/lib/range");
+  const period = parseRange(params.get("range") ?? undefined, params.get("from") ?? undefined, params.get("to") ?? undefined);
 
-  const rows = await documentsInPeriod(account.id, period.days, {
+  const rows = await documentsInPeriod(account.id, period, {
     search: params.get("q") ?? "",
     docType: params.get("type") ?? "",
     limit: 5000,
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     rows,
     /* the filters travel with the file: a report nobody can tell the period of
        is a report somebody will misread next quarter */
-    preamble: [`${t("sales.title")} — ${account.name}`, `${t("range.label")}: ${period.key}`],
+    preamble: [`${t("sales.title")} — ${account.name}`, `${t("range.label")}: ${describePeriod(period, locale)}`],
   });
 
   return new NextResponse(body, {

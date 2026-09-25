@@ -13,6 +13,8 @@
  */
 import { sql } from "drizzle-orm";
 import { epochMs, folded } from "./fold";
+import { groupName } from "./group-name";
+import type { Locale } from "../i18n";
 import { db as defaultDb, type CloudDb } from "./client";
 
 export interface ProductRow {
@@ -31,6 +33,7 @@ export interface ProductRow {
 
 export async function productsForAccount(
   accountId: string,
+  locale: Locale = "es",
   handle?: CloudDb,
 ): Promise<ProductRow[]> {
   const db = handle ?? defaultDb();
@@ -63,7 +66,7 @@ export async function productsForAccount(
       from p0
     ),
     g0 as (${folded(accountId, "product_group")}),
-    groups as (select id, row->>'name' as name from g0),
+    groups as (select id, ${groupName("row", locale)} as name from g0),
     stock as (
       select e.after->>'productId' as product_id, sum((e.after->>'qty')::bigint) as on_hand
       from sync_entries e

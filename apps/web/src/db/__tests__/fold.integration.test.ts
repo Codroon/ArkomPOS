@@ -120,19 +120,20 @@ beforeAll(async () => {
       depositCents: 0, createdAt: NOW - 2 * 3600_000,
     }),
 
-    /* --- two used purchases, both with id-less follow-ups -------------- */
+    /* Two used purchases, in the shape the till really sends: NO `id` in the
+       payload at all, which is the whole point — identity is the oplog's
+       `entity_id` column, and keying on the payload collapsed twenty devices
+       into one NULL group. Their follow-ups are id-less too. */
     entry("used_purchase", "create", PURCHASE_A, {
-      id: PURCHASE_A, brand: "Apple", model: "iPhone 12", storage: "128GB", color: "Azul",
-      grade: "B", buyPriceCents: 18000, refurbCostCents: 0, needsReview: true,
-      sellerName: "Imran Ali", purchasedAt: NOW - 86_400_000,
+      docNumber: "C-000001", device: "Apple iPhone 12", grade: "B",
+      buyPriceCents: 18000, payout: "cash", action: "hold", needsReview: true,
     }),
-    entry("used_purchase", "review", PURCHASE_A, { needsReview: false }),
+    entry("used_purchase", "clear_review", PURCHASE_A, { needsReview: false }),
     entry("used_purchase", "create", PURCHASE_B, {
-      id: PURCHASE_B, brand: "Xiaomi", model: "Redmi Note 11", storage: "64GB", color: "Gris",
-      grade: "C", buyPriceCents: 7000, refurbCostCents: 0, needsReview: true,
-      sellerName: "Sara Gómez", purchasedAt: NOW - 43_200_000,
+      docNumber: "C-000002", device: "Xiaomi Redmi Note 11", grade: "C",
+      buyPriceCents: 7000, payout: "store_credit", action: "hold",
     }),
-    entry("used_purchase", "cost", PURCHASE_B, { refurbCostCents: 2500 }),
+    entry("used_purchase", "set_refurb_cost", PURCHASE_B, { refurbCostCents: 2500 }),
 
     /* --- the shape that took the repairs screen down ------------------- */
     entry("repair_ticket", "ready", TICKET_B, { readyAt: "2026-09-24T23:08:42.180Z" }),
@@ -217,7 +218,7 @@ describe.runIf(ready)("the screens that read through it", () => {
     const byId = new Map(used.map((u) => [u.id, u]));
     // the review op cleared the flag without resending the device
     expect(byId.get(PURCHASE_A)?.needsReview).toBe(false);
-    expect(byId.get(PURCHASE_A)?.device).toBe("Apple iPhone 12 128GB Azul");
+    expect(byId.get(PURCHASE_A)?.device).toBe("Apple iPhone 12");
     // and the cost op raised the refurb figure without resending the price
     expect(byId.get(PURCHASE_B)?.refurbCostCents).toBe(2500);
     expect(byId.get(PURCHASE_B)?.buyPriceCents).toBe(7000);

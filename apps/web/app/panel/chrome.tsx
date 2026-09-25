@@ -30,6 +30,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import {
   ArrowLeftRight,
+  CalendarDays,
   BarChart3,
   Boxes,
   FileText,
@@ -47,9 +48,14 @@ import { cn, quietClass } from "../../src/ui";
 import { BrandMark } from "../../src/ui/brand-mark";
 import { LOCALE_COOKIE, type Locale } from "../../src/i18n";
 import { RAIL_COOKIE } from "../../src/lib/prefs";
+import { shopToday } from "../../src/lib/range";
 
 export interface ChromeLabels {
   brand: string;
+  custom: string;
+  from: string;
+  to: string;
+  apply: string;
   signOut: string;
   language: string;
   period: string;
@@ -121,8 +127,17 @@ const IN_SHEET: NavKey[] = ["inventory", "used", "transfers", "reports", "tills"
  */
 const RANGE_SCREENS = ["/panel", "/panel/ventas", "/panel/informes"];
 
+/**
+ * Within Informes only the SALES report is a period.
+ *
+ * Valuation, dead stock and what the workshop is holding are "as of now" — the
+ * till draws the same line (ADR-0016). Leaving the control up on those tabs
+ * offers a change that changes nothing, which teaches people not to trust it.
+ */
+const PERIODLESS_REPORTS = ["repairs", "used", "valuation", "dead"];
+
 const RANGES = ["today", "7d", "30d", "90d"] as const;
-export type RangeKey = (typeof RANGES)[number];
+export type RangeKey = (typeof RANGES)[number] | "custom";
 
 export function PanelChrome({
   labels,
@@ -147,12 +162,23 @@ export function PanelChrome({
 
   const [collapsed, setCollapsed] = useState(railCollapsed);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const range = (params.get("range") ?? "30d") as RangeKey;
-  const showRange = RANGE_SCREENS.includes(path);
+  /* short, because it sits in a 56px bar next to four other controls */
+  const customLabel =
+    params.get("from") && params.get("to")
+      ? `${(params.get("from") ?? "").slice(5)} → ${(params.get("to") ?? "").slice(5)}`
+      : labels.custom;
+  const showRange =
+    RANGE_SCREENS.includes(path) &&
+    !(path === "/panel/informes" && PERIODLESS_REPORTS.includes(params.get("report") ?? ""));
 
-  /* a route change closes the sheet; otherwise it covers the page you asked for */
-  useEffect(() => setSheetOpen(false), [path]);
+  /* a route change closes both; otherwise they cover the page you asked for */
+  useEffect(() => {
+    setSheetOpen(false);
+    setPickerOpen(false);
+  }, [path]);
 
   useEffect(() => {
     if (!sheetOpen) return;
@@ -174,6 +200,21 @@ export function PanelChrome({
   const setRange = (next: RangeKey) => {
     const query = new URLSearchParams(params.toString());
     query.set("range", next);
+    /* a preset has no from/to, and leaving yesterday's behind in the URL is how
+       a link opens on a window nobody chose */
+    query.delete("from");
+    query.delete("to");
+    setPickerOpen(false);
+    startTransition(() => router.push(`${path}?${query.toString()}`));
+  };
+
+  const setCustom = (from: string, to: string) => {
+    if (!from || !to) return;
+    const query = new URLSearchParams(params.toString());
+    query.set("range", "custom");
+    query.set("from", from);
+    query.set("to", to);
+    setPickerOpen(false);
     startTransition(() => router.push(`${path}?${query.toString()}`));
   };
 
@@ -278,32 +319,125 @@ export function PanelChrome({
             of a 844px screen before a single figure appeared */}
         <header className="sticky top-0 z-20 flex h-[56px] shrink-0 items-center gap-3 border-b border-line bg-canvas/95 px-4 backdrop-blur sm:px-6">
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
-            <BrandMark className="h-[14px] shrink-0 text-ink lg:hidden" height={13} />
+            {/* Below sm there is not room for both: a 390px bar holding the
+                period, a custom window's dates and a wordmark pushes one of
+                them over another, and the one that matters is the window. The
+                bottom tab bar is the identity on a phone anyway. */}
+            <BrandMark className="hidden h-[14px] shrink-0 text-ink sm:block lg:hidden" height={13} />
             <h1 className="truncate text-[14px] font-semibold text-ink lg:text-[15px]">{title}</h1>
           </div>
 
           {showRange ? (
-            <div
-              className="flex shrink-0 items-center gap-0.5 rounded-card bg-surface/70 p-0.5"
-              role="group"
-              aria-label={labels.period}
-            >
-              {RANGES.map((key) => (
+            <div className="relative shrink-0">
+              <div
+                className="flex items-center gap-0.5 rounded-card bg-surface/70 p-0.5"
+                role="group"
+                aria-label={labels.period}
+              >
+                {/* the presets scroll out of the way on a narrow phone rather
+                    than pushing the custom button off the bar */}
+                <div className="flex max-w-[38vw] items-center gap-0.5 overflow-x-auto sm:max-w-none">
+                  {RANGES.map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setRange(key)}
+                      aria-pressed={range === key}
+                      className={cn(
+                        "h-10 shrink-0 rounded-[2px] px-2.5 text-[12px] whitespace-nowrap sm:px-3",
+                        range === key
+                          ? "bg-card font-semibold text-ink shadow-[0_1px_2px_rgba(21,24,27,0.06)]"
+                          : "text-muted hover:text-ink-2",
+                      )}
+                    >
+                      {labels.ranges[key]}
+                    </button>
+                  ))}
+                </div>
                 <button
-                  key={key}
                   type="button"
-                  onClick={() => setRange(key)}
-                  aria-pressed={range === key}
+                  onClick={() => setPickerOpen((open) => !open)}
+                  aria-pressed={range === "custom"}
+                  aria-expanded={pickerOpen}
+                  aria-label={labels.custom}
+                  title={labels.custom}
                   className={cn(
-                    "h-10 rounded-[2px] px-2.5 text-[12px] whitespace-nowrap sm:px-3",
-                    range === key
+                    "flex h-10 shrink-0 items-center gap-1.5 rounded-[2px] px-2.5 text-[12px] whitespace-nowrap",
+                    range === "custom"
                       ? "bg-card font-semibold text-ink shadow-[0_1px_2px_rgba(21,24,27,0.06)]"
                       : "text-muted hover:text-ink-2",
                   )}
                 >
-                  {labels.ranges[key]}
+                  <CalendarDays size={15} strokeWidth={1.75} aria-hidden />
+                  {/* on a phone the word is hidden to save the bar, but the
+                      DATES are not: a figure with no window is a figure you
+                      cannot check */}
+                  <span
+                    className={cn(
+                      "max-w-[120px] truncate",
+                      range === "custom" ? undefined : "hidden sm:inline",
+                    )}
+                  >
+                    {range === "custom" ? customLabel : labels.custom}
+                  </span>
                 </button>
-              ))}
+              </div>
+
+              {pickerOpen ? (
+                <>
+                  {/* a click anywhere else puts it away, which is what a
+                      popover has to do to stop being a trap */}
+                  <button
+                    type="button"
+                    aria-label={labels.close}
+                    onClick={() => setPickerOpen(false)}
+                    className="fixed inset-0 z-30 cursor-default"
+                  />
+                  <form
+                    className="absolute top-[calc(100%+6px)] right-0 z-40 w-[min(92vw,300px)] rounded-card border border-line bg-card p-3 shadow-[0_8px_28px_rgba(21,24,27,0.16)]"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      const data = new FormData(event.currentTarget);
+                      setCustom(String(data.get("from") ?? ""), String(data.get("to") ?? ""));
+                    }}
+                  >
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="block">
+                        <span className="mb-1 block text-[11px] font-semibold tracking-[0.07em] text-muted uppercase">
+                          {labels.from}
+                        </span>
+                        <input
+                          type="date"
+                          name="from"
+                          required
+                          max={shopToday()}
+                          defaultValue={params.get("from") ?? ""}
+                          className="h-10 w-full rounded-card border border-line-strong bg-card px-2 text-[13px] text-ink"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="mb-1 block text-[11px] font-semibold tracking-[0.07em] text-muted uppercase">
+                          {labels.to}
+                        </span>
+                        <input
+                          type="date"
+                          name="to"
+                          required
+                          max={shopToday()}
+                          defaultValue={params.get("to") ?? ""}
+                          className="h-10 w-full rounded-card border border-line-strong bg-card px-2 text-[13px] text-ink"
+                        />
+                      </label>
+                    </div>
+                    <button
+                      type="submit"
+                      className="mt-3 h-10 w-full rounded-card bg-accent text-[13.5px] font-semibold text-accent-ink"
+                    >
+                      {labels.apply}
+                    </button>
+                  </form>
+                </>
+              ) : null}
             </div>
           ) : null}
 

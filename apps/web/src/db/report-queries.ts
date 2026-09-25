@@ -17,7 +17,10 @@
  */
 import { sql } from "drizzle-orm";
 import { folded } from "./fold";
+import { groupName } from "./group-name";
+import type { Locale } from "../i18n";
 import { db as defaultDb, type CloudDb } from "./client";
+import type { Period as Window } from "../lib/range";
 
 const ZONE = "Europe/Madrid";
 
@@ -29,7 +32,7 @@ const mine = (accountId: string) => sql`
 const latest = (accountId: string, entity: string) => folded(accountId, entity);
 
 /** Completed documents in the window, latest state each. */
-const completedIn = (accountId: string, days: number) => sql`
+const completedIn = (accountId: string, period: Window) => sql`
   select * from (
     select f.id,
       f.row->>'docType'                 as doc_type,
@@ -42,7 +45,7 @@ const completedIn = (accountId: string, days: number) => sql`
       and f.row->>'completedAt' is not null
   ) d
   where (d.completed_at at time zone ${ZONE})::date
-        > (now() at time zone ${ZONE})::date - ${days}::int
+        between ${period.from}::date and ${period.to}::date
 `;
 
 /* ---------------------------------------------------------------- sales -- */
@@ -62,7 +65,7 @@ export interface SalesSummary {
 
 export async function salesSummary(
   accountId: string,
-  days: number,
+  period: Window,
   handle?: CloudDb,
 ): Promise<SalesSummary> {
   const db = handle ?? defaultDb();
@@ -75,7 +78,7 @@ export async function salesSummary(
     refund_count: number;
     used_cents: string | null;
   }>(sql`
-    with docs as (${completedIn(accountId, days)}),
+    with docs as (${completedIn(accountId, period)}),
     rebu as (
       select x.row->>'documentId'           as document_id,
              (x.row->>'totalCents')::bigint as total_cents,
@@ -125,7 +128,8 @@ export interface SalesRow {
 /** Sales broken down by the shelf they came off, like the till's. */
 export async function salesByGroup(
   accountId: string,
-  days: number,
+  period: Window,
+  locale: Locale = "es",
   handle?: CloudDb,
 ): Promise<SalesRow[]> {
   const db = handle ?? defaultDb();
@@ -138,7 +142,7 @@ export async function salesByGroup(
     tax_cents: string;
     gross_cents: string;
   }>(sql`
-    with docs as (${completedIn(accountId, days)}),
+    with docs as (${completedIn(accountId, period)}),
     lines as (
       select x.row->>'documentId'           as document_id,
              x.row->>'productId'            as product_id,
@@ -152,8 +156,8 @@ export async function salesByGroup(
     products as (${latest(accountId, "product")}),
     groups as (${latest(accountId, "product_group")})
     select
-      coalesce(g.row->>'id', 'sin-grupo')   as key,
-      coalesce(g.row->>'name', '—')         as label,
+      coalesce(g.id, 'sin-grupo')                  as key,
+      coalesce(${groupName("g.row", locale)}, '—') as label,
       count(*)::int                         as count,
       coalesce(sum(l.qty), 0)               as qty,
       coalesce(sum(l.base_cents), 0)        as net_cents,
@@ -161,8 +165,8 @@ export async function salesByGroup(
       coalesce(sum(l.total_cents), 0)       as gross_cents
     from lines l
     join docs d on d.id = l.document_id
-    left join products p on p.row->>'id' = l.product_id
-    left join groups g on g.row->>'id' = p.row->>'groupId'
+    left join products p on p.id = l.product_id
+    left join groups g on g.id = p.row->>'groupId'
     group by 1, 2
     order by sum(l.total_cents) desc
   `);
@@ -189,7 +193,7 @@ export interface TaxRow {
 /** Base and IVA per regime — REBU on its own row, never averaged in. */
 export async function taxByRegime(
   accountId: string,
-  days: number,
+  period: Window,
   handle?: CloudDb,
 ): Promise<TaxRow[]> {
   const db = handle ?? defaultDb();
@@ -200,7 +204,7 @@ export async function taxByRegime(
     total_cents: string;
     lines: number;
   }>(sql`
-    with docs as (${completedIn(accountId, days)}),
+    with docs as (${completedIn(accountId, period)}),
     lines as (
       select x.row->>'documentId'                   as document_id,
              coalesce(x.row->>'taxRegime', 'IVA21') as regime,
@@ -265,7 +269,7 @@ export async function repairsOpen(accountId: string, handle?: CloudDb): Promise<
     with tickets as (${latest(accountId, "repair_ticket")}),
     customers as (${latest(accountId, "customer")})
     select
-      t.row->>'id'                               as ticket_id,
+      t.id                               as ticket_id,
       c.row->>'name'                             as customer_name,
       coalesce(t.row->>'deviceDescription', '—') as device,
       coalesce(t.row->>'status', 'received')     as status,
@@ -273,7 +277,7 @@ export async function repairsOpen(accountId: string, handle?: CloudDb): Promise<
                                                  as days_since_intake,
       t.row->>'promisedDate'                     as promised_date
     from tickets t
-    left join customers c on c.row->>'id' = t.row->>'customerId'
+    left join customers c on c.id = t.row->>'customerId'
     where coalesce(t.row->>'status', 'received') in (${openStatusList})
     order by (t.row->>'createdAt')::bigint asc
   `);
@@ -334,7 +338,7 @@ export async function repairsClosed(
     customers as (${latest(accountId, "customer")}),
     lines as (${latest(accountId, "repair_line")})
     select
-      t.row->>'id'                               as ticket_id,
+      t.id                               as ticket_id,
       c.row->>'name'                             as customer_name,
       coalesce(t.row->>'deviceDescription', '—') as device,
       coalesce(t.row->>'status', '—')            as status,
@@ -343,15 +347,15 @@ export async function repairsClosed(
       case when t.row->>'updatedAt' is null then null
            else to_timestamp((t.row->>'updatedAt')::bigint / 1000.0) end as closed_at,
       (select coalesce(sum((l.row->>'unitCostCents')::bigint * (l.row->>'qty')::bigint), 0)
-         from lines l where l.row->>'ticketId' = t.row->>'id'
+         from lines l where l.row->>'ticketId' = t.id
                         and l.row->>'kind' <> 'labor')            as parts_cost_cents,
       (select coalesce(sum((l.row->>'chargeCents')::bigint), 0)
-         from lines l where l.row->>'ticketId' = t.row->>'id'
+         from lines l where l.row->>'ticketId' = t.id
                         and l.row->>'kind' = 'labor')             as labour_cents,
       (select coalesce(sum((l.row->>'chargeCents')::bigint), 0)
-         from lines l where l.row->>'ticketId' = t.row->>'id')    as charged_cents
+         from lines l where l.row->>'ticketId' = t.id)    as charged_cents
     from tickets t
-    left join customers c on c.row->>'id' = t.row->>'customerId'
+    left join customers c on c.id = t.row->>'customerId'
     where coalesce(t.row->>'status', '') in ('collected', 'not_repaired')
     order by (t.row->>'updatedAt')::bigint desc nulls last
   `);
@@ -407,22 +411,24 @@ export async function usedHolding(
     with purchases as (${latest(accountId, "used_purchase")}),
     units as (${latest(accountId, "unit")})
     select
-      p.row->>'id'                                                           as purchase_id,
-      trim(both ' ' from concat_ws(' ', p.row->>'brand', p.row->>'model',
-                                        p.row->>'storage', p.row->>'color')) as model,
-      p.row->>'grade'                                                        as grade,
+      p.id                                                                   as purchase_id,
+      p.row->>'device'                                                       as model,
+      coalesce(p.row->>'grade', u.row->>'grade')                             as grade,
       coalesce(u.row->>'status',
-               case when (p.row->>'needsReview')::boolean then 'needs_review' else 'held' end)
-                                                                             as state,
+               case when coalesce((p.row->>'needsReview')::boolean, false)
+                    then 'needs_review' else 'held' end)                     as state,
       coalesce((p.row->>'buyPriceCents')::bigint, 0)
         + coalesce((p.row->>'refurbCostCents')::bigint, 0)                   as cost_cents,
       (u.row->>'salePriceCents')::bigint                                     as sale_price_cents,
-      greatest(0, extract(day from now() - to_timestamp((p.row->>'purchasedAt')::bigint / 1000.0))::int)
-                                                                             as days_held
+      greatest(0, extract(day from now()
+        - to_timestamp((u.row->>'createdAt')::bigint / 1000.0))::int)        as days_held
     from purchases p
-    left join units u on u.row->>'id' = p.row->>'unitId'
+    /* the unit points at the purchase; see usedForAccount for the long version.
+       purchasedAt and the brand/model/storage/color fields do not travel — the
+       till composes one device string and keeps the seller to itself. */
+    left join units u on u.row->>'purchaseId' = p.id
     where coalesce(u.row->>'status', 'held') <> 'sold'
-    order by (p.row->>'purchasedAt')::bigint asc
+    order by (u.row->>'createdAt')::bigint asc nulls last
   `);
 
   return rows.map((r) => ({
@@ -446,7 +452,11 @@ export interface ValuationRow {
   atRetailCents: number;
 }
 
-export async function valuation(accountId: string, handle?: CloudDb): Promise<ValuationRow[]> {
+export async function valuation(
+  accountId: string,
+  locale: Locale = "es",
+  handle?: CloudDb,
+): Promise<ValuationRow[]> {
   const db = handle ?? defaultDb();
   const rows = await db.execute<{
     group_name: string | null;
@@ -463,16 +473,20 @@ export async function valuation(accountId: string, handle?: CloudDb): Promise<Va
       where e.tenant_id in ${mine(accountId)} and e.entity = 'stock_movement'
       group by 1
     )
-    select g.row->>'name'                        as group_name,
+    select ${groupName("g.row", locale)}        as group_name,
            count(*)::int                         as items,
            coalesce(sum(s.on_hand), 0)           as units,
            coalesce(sum(s.on_hand * (p.row->>'costCents')::bigint), 0)  as at_cost_cents,
            coalesce(sum(s.on_hand * (p.row->>'priceCents')::bigint), 0) as at_retail_cents
     from products p
-    left join groups g on g.row->>'id' = p.row->>'groupId'
-    join stock s on s.product_id = p.row->>'id'
+    left join groups g on g.id = p.row->>'groupId'
+    join stock s on s.product_id = p.id
     where coalesce((p.row->>'active')::boolean, true) and s.on_hand > 0
-    group by g.row->>'name'
+    /* by the group's ID, not its name. Grouping by the name broke the moment
+       the SELECT became a locale-dependent expression — Postgres wants the
+       thing it is grouping on — and two shelves that happened to share a name
+       would have been merged into one row before that. */
+    group by g.id, ${groupName("g.row", locale)}
     order by coalesce(sum(s.on_hand * (p.row->>'costCents')::bigint), 0) desc
   `);
 
@@ -505,6 +519,7 @@ export interface DeadStockRow {
 export async function deadStock(
   accountId: string,
   days = 90,
+  locale: Locale = "es",
   handle?: CloudDb,
 ): Promise<DeadStockRow[]> {
   const db = handle ?? defaultDb();
@@ -528,14 +543,14 @@ export async function deadStock(
       group by 1
     )
     select p.row->>'name'                                    as name,
-           g.row->>'name'                                    as group_name,
+           ${groupName("g.row", locale)}                      as group_name,
            m.on_hand                                         as on_hand,
            m.on_hand * (p.row->>'costCents')::bigint         as at_cost_cents,
            case when m.last_sold_ms is null then null
                 else to_timestamp(m.last_sold_ms / 1000.0) end as last_sold_at
     from products p
-    join movements m on m.product_id = p.row->>'id'
-    left join groups g on g.row->>'id' = p.row->>'groupId'
+    join movements m on m.product_id = p.id
+    left join groups g on g.id = p.row->>'groupId'
     where coalesce((p.row->>'active')::boolean, true)
       and m.on_hand > 0
       and (
@@ -582,7 +597,7 @@ export async function outstandingCredit(
     created_at: string | null;
   }>(sql`
     with vouchers as (${latest(accountId, "store_credit_voucher")})
-    select v.row->>'id'                       as id,
+    select v.id                       as id,
            (v.row->>'amountCents')::bigint    as amount_cents,
            (v.row->>'remainingCents')::bigint as remaining_cents,
            coalesce(v.row->>'status', '—')    as status,

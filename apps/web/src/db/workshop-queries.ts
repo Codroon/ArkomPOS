@@ -63,7 +63,7 @@ export async function repairsForAccount(
     customers as (${latest(accountId, "customer")}),
     lines as (${latest(accountId, "repair_line")})
     select
-      t.row->>'id'                                  as id,
+      t.id                                  as id,
       c.row->>'name'                                as customer_name,
       coalesce(t.row->>'deviceDescription', '—')    as device,
       t.row->>'imei'                                as imei,
@@ -75,11 +75,11 @@ export async function repairsForAccount(
            else to_timestamp((t.row->>'createdAt')::bigint / 1000.0) end as created_at,
       case when t.row->>'readyAt' is null then null
            else to_timestamp((t.row->>'readyAt')::bigint / 1000.0) end   as ready_at,
-      (select count(*)::int from lines l where l.row->>'ticketId' = t.row->>'id')          as parts,
+      (select count(*)::int from lines l where l.row->>'ticketId' = t.id)          as parts,
       (select coalesce(sum((l.row->>'chargeCents')::bigint), 0)
-         from lines l where l.row->>'ticketId' = t.row->>'id')                             as quoted_cents
+         from lines l where l.row->>'ticketId' = t.id)                             as quoted_cents
     from tickets t
-    left join customers c on c.row->>'id' = t.row->>'customerId'
+    left join customers c on c.id = t.row->>'customerId'
     order by (t.row->>'createdAt')::bigint desc nulls last
   `);
 
@@ -160,17 +160,34 @@ export async function repairDetail(
 
 /* -------------------------------------------------------- used devices -- */
 
+/**
+ * What a used device looks like FROM THE STREAM, which is not what the till's
+ * own table looks like.
+ *
+ * The `used_purchase/create` payload is deliberately narrow — docNumber, device,
+ * imei, grade, buyPriceCents, payout, action — because the seller block is
+ * personal data and the oplog is readable by anyone who can read the file. The
+ * till's comment says it outright: "the entry records the purchase, not the
+ * person". So there is no seller here and there never will be; a column for one
+ * would have been an empty column forever.
+ *
+ * `device` is ONE string the till composed (`brand model`), not four fields.
+ * Battery, shelf state and asking price live on the UNIT, which points at the
+ * purchase through `purchaseId` — the purchase does not point back.
+ */
 export interface UsedRow {
   id: string;
   device: string;
   imei: string | null;
   grade: string | null;
   batteryPct: number | null;
-  sellerName: string | null;
   buyPriceCents: number;
   refurbCostCents: number;
+  /** when the unit was created, which is when the device was taken in */
   purchasedAt: Date | null;
   needsReview: boolean;
+  /** what the shop did with it at the counter: `hold` or `inventory` */
+  action: string | null;
   /** the unit's own state: held, in_stock, reserved or sold */
   unitStatus: string | null;
   salePriceCents: number | null;
@@ -180,51 +197,55 @@ export async function usedForAccount(accountId: string, handle?: CloudDb): Promi
   const db = handle ?? defaultDb();
   const rows = await db.execute<{
     id: string;
-    device: string;
+    device: string | null;
     imei: string | null;
     grade: string | null;
     battery_pct: string | null;
-    seller_name: string | null;
     buy_price_cents: string | null;
     refurb_cost_cents: string | null;
     purchased_at: string | null;
     needs_review: boolean | null;
+    action: string | null;
     unit_status: string | null;
     sale_price_cents: string | null;
   }>(sql`
     with purchases as (${latest(accountId, "used_purchase")}),
     units as (${latest(accountId, "unit")})
     select
-      p.row->>'id'                                                          as id,
-      trim(both ' ' from concat_ws(' ', p.row->>'brand', p.row->>'model',
-                                        p.row->>'storage', p.row->>'color')) as device,
-      p.row->>'imei'                                                        as imei,
-      p.row->>'grade'                                                       as grade,
-      p.row->>'batteryPct'                                                  as battery_pct,
-      p.row->>'sellerName'                                                  as seller_name,
-      (p.row->>'buyPriceCents')::bigint                                     as buy_price_cents,
-      (p.row->>'refurbCostCents')::bigint                                   as refurb_cost_cents,
-      case when p.row->>'purchasedAt' is null then null
-           else to_timestamp((p.row->>'purchasedAt')::bigint / 1000.0) end  as purchased_at,
-      (p.row->>'needsReview')::boolean                                      as needs_review,
-      u.row->>'status'                                                      as unit_status,
-      (u.row->>'salePriceCents')::bigint                                    as sale_price_cents
+      p.id                                                                 as id,
+      p.row->>'device'                                                     as device,
+      coalesce(p.row->>'imei', u.row->>'imei')                             as imei,
+      coalesce(p.row->>'grade', u.row->>'grade')                           as grade,
+      u.row->>'batteryPct'                                                 as battery_pct,
+      (p.row->>'buyPriceCents')::bigint                                    as buy_price_cents,
+      coalesce((p.row->>'refurbCostCents')::bigint, 0)                     as refurb_cost_cents,
+      case when u.row->>'createdAt' is null then null
+           else to_timestamp((u.row->>'createdAt')::bigint / 1000.0) end   as purchased_at,
+      coalesce((p.row->>'needsReview')::boolean, false)                    as needs_review,
+      p.row->>'action'                                                     as action,
+      u.row->>'status'                                                     as unit_status,
+      (u.row->>'salePriceCents')::bigint                                   as sale_price_cents
     from purchases p
-    left join units u on u.row->>'id' = p.row->>'unitId'
-    order by (p.row->>'purchasedAt')::bigint desc nulls last
+    /* The UNIT points at the purchase, not the other way round. Joining on
+       u.id = p.unitId finds nothing at all, because no used_purchase payload
+       has ever carried a unitId — which is why this screen showed a column of
+       dashes where the shelf state should be. (No backticks in here: this is
+       inside a template literal and one would end the string.) */
+    left join units u on u.row->>'purchaseId' = p.id
+    order by (u.row->>'createdAt')::bigint desc nulls last, p.id desc
   `);
 
   return rows.map((r) => ({
     id: r.id,
-    device: r.device || "—",
+    device: r.device?.trim() || "—",
     imei: r.imei,
     grade: r.grade,
     batteryPct: r.battery_pct === null ? null : Number(r.battery_pct),
-    sellerName: r.seller_name,
     buyPriceCents: Number(r.buy_price_cents ?? 0),
     refurbCostCents: Number(r.refurb_cost_cents ?? 0),
     purchasedAt: r.purchased_at ? new Date(r.purchased_at) : null,
     needsReview: Boolean(r.needs_review),
+    action: r.action,
     unitStatus: r.unit_status,
     salePriceCents: r.sale_price_cents === null ? null : Number(r.sale_price_cents),
   }));
@@ -275,7 +296,7 @@ export async function transfersForAccount(
   }>(sql`
     with t as (${latest(accountId, "transfer")})
     select
-      t.row->>'id'                    as id,
+      t.id                    as id,
       coalesce(t.row->>'kind', '—')   as kind,
       coalesce(t.row->>'status', '—') as status,
       t.row->>'mtcn'                  as mtcn,

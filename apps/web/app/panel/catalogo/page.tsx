@@ -42,14 +42,14 @@ export default async function CataloguePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const account = await requireAccount();
-  const { t } = await getT();
+  const { t, locale } = await getT();
   const params = await searchParams;
 
   const search = (typeof params.q === "string" ? params.q : "").trim().toLowerCase();
   const lowOnly = params.low === "1";
   const group = typeof params.group === "string" ? params.group : "";
 
-  const all = await productsForAccount(account.id);
+  const all = await productsForAccount(account.id, locale);
 
   /* the groups the shop actually uses, in the order they read on screen */
   const groups = [...new Set(all.map((product) => product.group).filter((g): g is string => Boolean(g)))]

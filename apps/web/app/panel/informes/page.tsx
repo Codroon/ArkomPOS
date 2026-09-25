@@ -17,7 +17,7 @@ import Link from "next/link";
 import { requireAccount } from "../../../src/auth/session";
 import { getT } from "../../../src/i18n/server";
 import { labelFor, plural } from "../../../src/i18n";
-import { parseRange } from "../../../src/lib/range";
+import { parseRange, rangeParams, type Period } from "../../../src/lib/range";
 import {
   deadStock,
   outstandingCredit,
@@ -54,14 +54,26 @@ export default async function ReportsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const account = await requireAccount();
-  const { t } = await getT();
+  const { t, locale } = await getT();
   const params = await searchParams;
-  const period = parseRange(params.range);
+  const period = parseRange(params.range, params.from, params.to);
 
   const asked = typeof params.report === "string" ? params.report : "";
   const tab: Tab = (TABS as readonly string[]).includes(asked) ? (asked as Tab) : "sales";
 
-  const href = (next: Tab) => `/panel/informes?range=${period.key}&report=${next}`;
+  /* a preset is one parameter, a custom window is three — `rangeParams` keeps
+     tab links and the export on the SAME window the screen is showing */
+  const carry = new URLSearchParams(rangeParams(period));
+  const href = (next: Tab) => {
+    const query = new URLSearchParams(carry);
+    query.set("report", next);
+    return `/panel/informes?${query.toString()}`;
+  };
+  const exportHref = (next: Tab) => {
+    const query = new URLSearchParams(carry);
+    query.set("report", next);
+    return `/panel/informes/export?${query.toString()}`;
+  };
 
   return (
     <div className="space-y-4">
@@ -92,7 +104,7 @@ export default async function ReportsPage({
             TWICE on a phone. twMerge drops the loser. */}
         <a
           className={cn(ghostClass, "mb-1.5 hidden shrink-0 sm:inline-flex")}
-          href={`/panel/informes/export?report=${tab}&range=${period.key}`}
+          href={exportHref(tab)}
         >
           {t("sales.export")}
         </a>
@@ -100,29 +112,40 @@ export default async function ReportsPage({
 
       <a
         className={cn(ghostClass, "flex w-full sm:hidden")}
-        href={`/panel/informes/export?report=${tab}&range=${period.key}`}
+        href={exportHref(tab)}
       >
         {t("sales.export")}
       </a>
 
-      {tab === "sales" ? <SalesReport accountId={account.id} days={period.days} t={t} /> : null}
+      {tab === "sales" ? <SalesReport accountId={account.id} period={period} t={t} locale={locale} /> : null}
       {tab === "repairs" ? <RepairsReport accountId={account.id} t={t} /> : null}
       {tab === "used" ? <UsedReport accountId={account.id} t={t} /> : null}
-      {tab === "valuation" ? <ValuationReport accountId={account.id} t={t} /> : null}
-      {tab === "dead" ? <DeadStockReport accountId={account.id} t={t} /> : null}
+      {tab === "valuation" ? <ValuationReport accountId={account.id} t={t} locale={locale} /> : null}
+      {tab === "dead" ? <DeadStockReport accountId={account.id} t={t} locale={locale} /> : null}
     </div>
   );
 }
 
 type T = Awaited<ReturnType<typeof getT>>["t"];
+type L = Awaited<ReturnType<typeof getT>>["locale"];
 
 /* ---------------------------------------------------------------- sales -- */
 
-async function SalesReport({ accountId, days, t }: { accountId: string; days: number; t: T }) {
+async function SalesReport({
+  accountId,
+  period,
+  t,
+  locale,
+}: {
+  accountId: string;
+  period: Period;
+  t: T;
+  locale: L;
+}) {
   const [summary, groups, tax] = await Promise.all([
-    salesSummary(accountId, days),
-    salesByGroup(accountId, days),
-    taxByRegime(accountId, days),
+    salesSummary(accountId, period),
+    salesByGroup(accountId, period, locale),
+    taxByRegime(accountId, period),
   ]);
 
   if (summary.tickets === 0 && summary.refundCount === 0) {
@@ -401,8 +424,8 @@ async function UsedReport({ accountId, t }: { accountId: string; t: T }) {
 
 /* ------------------------------------------------------------ valuation -- */
 
-async function ValuationReport({ accountId, t }: { accountId: string; t: T }) {
-  const [stock, vouchers] = await Promise.all([valuation(accountId), outstandingCredit(accountId)]);
+async function ValuationReport({ accountId, t, locale }: { accountId: string; t: T; locale: L }) {
+  const [stock, vouchers] = await Promise.all([valuation(accountId, locale), outstandingCredit(accountId)]);
   const atCost = stock.reduce((sum, row) => sum + row.atCostCents, 0);
   const atRetail = stock.reduce((sum, row) => sum + row.atRetailCents, 0);
   const owed = vouchers.reduce((sum, row) => sum + row.remainingCents, 0);
@@ -477,8 +500,8 @@ async function ValuationReport({ accountId, t }: { accountId: string; t: T }) {
 
 /* ----------------------------------------------------------- dead stock -- */
 
-async function DeadStockReport({ accountId, t }: { accountId: string; t: T }) {
-  const dead = await deadStock(accountId, 90);
+async function DeadStockReport({ accountId, t, locale }: { accountId: string; t: T; locale: L }) {
+  const dead = await deadStock(accountId, 90, locale);
   const stuck = dead.reduce((sum, row) => sum + row.atCostCents, 0);
   const never = dead.filter((row) => !row.lastSoldAt).length;
 

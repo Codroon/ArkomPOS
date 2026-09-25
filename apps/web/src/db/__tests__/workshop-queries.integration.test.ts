@@ -20,6 +20,7 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { uuidv7 } from "@arkom/core";
+import { lastDays } from "../../lib/range";
 import { accounts, devices, syncEntries, tenants } from "../schema";
 import { repairDetail, repairsForAccount, transfersForAccount, usedForAccount } from "../workshop-queries";
 import {
@@ -64,7 +65,17 @@ const NOW = Date.now();
 const LONG_AGO = NOW - 200 * 24 * 60 * 60 * 1000;
 
 let seq = 0;
-const entry = (entity: string, action: string, after: Record<string, unknown>) => ({
+/**
+ * `entityId` is passed EXPLICITLY where the payload has no id of its own —
+ * which is the normal case, not the exception. A `used_purchase` entry carries
+ * no `id` field at all, and identity lives in this column (ADR-0005).
+ */
+const entry = (
+  entity: string,
+  action: string,
+  after: Record<string, unknown>,
+  entityId?: string,
+) => ({
   tenantId: TENANT,
   opId: uuidv7(),
   deviceId: DEVICE,
@@ -72,7 +83,7 @@ const entry = (entity: string, action: string, after: Record<string, unknown>) =
   locationId: "loc",
   terminalId: "term",
   entity,
-  entityId: String(after.id ?? uuidv7()),
+  entityId: entityId ?? String(after.id ?? uuidv7()),
   action,
   before: null,
   after,
@@ -127,14 +138,20 @@ beforeAll(async () => {
       depositCents: 0, createdAt: NOW - 20 * 24 * 60 * 60 * 1000,
     }),
 
-    /* a used device bought and still held */
+    /* A used device bought and put on the shelf, in the shape the till really
+       pushes: ONE composed device string, no seller, no battery, no
+       purchasedAt. The unit carries those, and the unit points at the
+       purchase — `purchaseId`, not the other way round. */
     entry("used_purchase", "create", {
-      id: PURCHASE, unitId: UNIT, brand: "Apple", model: "iPhone 12", storage: "128GB",
-      color: "Azul", grade: "B", batteryPct: 87, imei: "356938035643809",
-      sellerName: "Imran Ali", sellerIdNumber: "Y2841170F",
-      buyPriceCents: 18000, refurbCostCents: 2500, needsReview: false, purchasedAt: NOW - 86400000,
+      docNumber: "C-000001", device: "Apple iPhone 12", imei: "356938035643809",
+      grade: "B", buyPriceCents: 18000, payout: "cash", action: "inventory",
+    }, PURCHASE),
+    entry("used_purchase", "set_refurb_cost", { refurbCostCents: 2500 }, PURCHASE),
+    entry("unit", "create", {
+      id: UNIT, purchaseId: PURCHASE, imei: "356938035643809", grade: "B",
+      batteryPct: 87, status: "in_stock", salePriceCents: 29900, costCents: 20500,
+      createdAt: NOW - 86_400_000,
     }),
-    entry("unit", "create", { id: UNIT, status: "in_stock", salePriceCents: 29900, costCents: 20500 }),
 
     /* transfers: one paid, one cancelled */
     entry("transfer", "create", {
@@ -253,7 +270,7 @@ describe.skipIf(!ready)("used devices", () => {
 
     expect(used).toHaveLength(1);
     expect(used[0]).toMatchObject({
-      device: "Apple iPhone 12 128GB Azul",
+      device: "Apple iPhone 12",
       grade: "B",
       batteryPct: 87,
       buyPriceCents: 18000,
@@ -263,13 +280,22 @@ describe.skipIf(!ready)("used devices", () => {
     });
   });
 
-  it("keeps the seller's name and leaves their ID document out of the list", async () => {
-    /* the row carries it (ADR-0020 §3 syncs seller rows) but a list on a screen
-       is not where an identity document belongs */
+  it("identifies the row by the oplog's entity_id, which is the only id it has", () => {
+    /* `used_purchase` payloads carry NO `id` field. Keying on one gave every
+       device the same NULL identity: twenty rows that React could not tell
+       apart and a screen of dashes. */
+    expect(PURCHASE).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it("cannot show a seller, because the till never sends one", async () => {
+    /* Not an omission on this screen: the oplog is readable by anyone who can
+       read the file, so the entry records the purchase and not the person
+       (used.ts). A column here would have been empty forever. */
     const used = await usedForAccount(ACCOUNT);
     const dump = JSON.stringify(used);
-    expect(dump).toContain("Imran Ali");
+    expect(dump).not.toContain("Imran Ali");
     expect(dump).not.toContain("Y2841170F");
+    expect(Object.keys(used[0] ?? {})).not.toContain("sellerName");
   });
 });
 
@@ -288,7 +314,7 @@ describe.skipIf(!ready)("transfers", () => {
 
 describe.skipIf(!ready)("the reports", () => {
   it("gives REBU its own row instead of averaging it into the general rate", async () => {
-    const tax = await taxByRegime(ACCOUNT, 30);
+    const tax = await taxByRegime(ACCOUNT, lastDays(30));
 
     const rebu = tax.find((row) => row.regime === "REBU");
     const general = tax.find((row) => row.regime === "IVA21");
@@ -327,7 +353,7 @@ describe.skipIf(!ready)("the reports", () => {
 
 describe.skipIf(!ready)("the reports that mirror the till's", () => {
   it("summarises sales the way the till's sales report does", async () => {
-    const summary = await salesSummary(ACCOUNT, 30);
+    const summary = await salesSummary(ACCOUNT, lastDays(30));
 
     expect(summary.tickets).toBe(1);
     expect(summary.grossCents).toBe(31190);
@@ -341,7 +367,7 @@ describe.skipIf(!ready)("the reports that mirror the till's", () => {
   });
 
   it("splits sales by the shelf they came off", async () => {
-    const rows = await salesByGroup(ACCOUNT, 30);
+    const rows = await salesByGroup(ACCOUNT, lastDays(30));
 
     const accesorios = rows.find((row) => row.label === "Accesorios");
     expect(accesorios).toMatchObject({ count: 1, qty: 1, netCents: 1066, grossCents: 1290 });
@@ -375,7 +401,12 @@ describe.skipIf(!ready)("the reports that mirror the till's", () => {
 
     expect(held).toHaveLength(1);
     // 180,00 paid + 25,00 refurbished
-    expect(held[0]).toMatchObject({ state: "in_stock", costCents: 20500, salePriceCents: 29900 });
+    expect(held[0]).toMatchObject({
+      model: "Apple iPhone 12",
+      state: "in_stock",
+      costCents: 20500,
+      salePriceCents: 29900,
+    });
     expect(held[0]?.daysHeld).toBeGreaterThanOrEqual(0);
   });
 
@@ -385,8 +416,8 @@ describe.skipIf(!ready)("the reports that mirror the till's", () => {
       id: stranger, name: "Otra", email: `ws3.${stamp}@codroon.invalid`,
     });
     try {
-      expect((await salesSummary(stranger, 30)).tickets).toBe(0);
-      expect(await salesByGroup(stranger, 30)).toEqual([]);
+      expect((await salesSummary(stranger, lastDays(30))).tickets).toBe(0);
+      expect(await salesByGroup(stranger, lastDays(30))).toEqual([]);
       expect(await repairsOpen(stranger)).toEqual([]);
       expect(await repairsClosed(stranger)).toEqual([]);
       expect(await usedHolding(stranger)).toEqual([]);

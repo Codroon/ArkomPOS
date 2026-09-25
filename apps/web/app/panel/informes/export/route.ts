@@ -17,8 +17,8 @@ import { csvDate, csvDateTime, csvFileName, csvMoney, renderCsv, type CsvColumn 
 import { currentUser } from "../../../../src/auth/supabase";
 import { accountForUser } from "../../../../src/db/pg-accounts";
 import { getT } from "../../../../src/i18n/server";
-import { labelFor, type Translate } from "../../../../src/i18n";
-import { parseRange } from "../../../../src/lib/range";
+import { labelFor, type Locale, type Translate } from "../../../../src/i18n";
+import { describePeriod, parseRange, type Period } from "../../../../src/lib/range";
 import {
   deadStock,
   repairsClosed,
@@ -38,14 +38,17 @@ type Report = (typeof REPORTS)[number];
 async function build(
   report: Report,
   accountId: string,
-  days: number,
+  period: Period,
   t: Translate,
+  /* ADR-0016 A1: the export's WORDS follow the staff language, and a shelf's
+     name is one of its words when the name is the one we shipped */
+  locale: Locale,
 ): Promise<{ slug: string; body: string; title: string }> {
   switch (report) {
     case "sales": {
       const [groups, tax] = await Promise.all([
-        salesByGroup(accountId, days),
-        taxByRegime(accountId, days),
+        salesByGroup(accountId, period, locale),
+        taxByRegime(accountId, period),
       ]);
       /* two tables in one file, separated by a blank line and a heading —
          which is what a gestor gets on paper from the till as well */
@@ -136,7 +139,7 @@ async function build(
     }
 
     case "valuation": {
-      const rows = await valuation(accountId);
+      const rows = await valuation(accountId, locale);
       return {
         slug: "informe-valoracion",
         title: t("inf.tab.valuation"),
@@ -155,7 +158,7 @@ async function build(
     }
 
     case "dead": {
-      const rows = await deadStock(accountId, 90);
+      const rows = await deadStock(accountId, 90, locale);
       return {
         slug: "informe-stock-parado",
         title: t("inf.tab.dead"),
@@ -191,16 +194,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "NO_SUCH_REPORT" }, { status: 404 });
   }
 
-  const { t } = await getT();
-  const period = parseRange(params.get("range") ?? undefined);
-  const report = await build(asked as Report, account.id, period.days, t);
+  const { t, locale } = await getT();
+  const period = parseRange(params.get("range") ?? undefined, params.get("from") ?? undefined, params.get("to") ?? undefined);
+  const report = await build(asked as Report, account.id, period, t, locale);
 
   /* the shop and the period travel with the file: a report nobody can tell the
      period of is one somebody misreads next quarter */
   const header = renderCsv({
     columns: [{ header: report.title, cell: () => "" }],
     rows: [],
-    preamble: [`${report.title} — ${account.name}`, `${t("range.label")}: ${period.key}`,
+    preamble: [`${report.title} — ${account.name}`, `${t("range.label")}: ${describePeriod(period, locale)}`,
                `${csvDateTime(Date.now())}`],
   }).split("\r\n").slice(0, 3).join("\r\n");
 

@@ -47,14 +47,15 @@ export default async function SummaryPage({
 }) {
   const account = await requireAccount();
   const { t } = await getT();
-  const period = parseRange((await searchParams).range);
+  const params = await searchParams;
+  const period = parseRange(params.range, params.from, params.to);
 
   const [totals, byDay, mix, top, shifts, tills] = await Promise.all([
-    periodTotals(account.id, period.days),
-    takingsByDay(account.id, period.days),
-    paymentMix(account.id, period.days),
-    topProducts(account.id, period.days, 8),
-    recentShifts(account.id, 6),
+    periodTotals(account.id, period),
+    takingsByDay(account.id, period),
+    paymentMix(account.id, period),
+    topProducts(account.id, period, 8),
+    recentShifts(account.id, period, 6),
     tillsForAccount(account.id),
   ]);
 

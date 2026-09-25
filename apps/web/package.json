@@ -15,7 +15,8 @@
     "cloud:code": "node --env-file-if-exists=.env.local scripts/issue-code.mts",
     "cloud:delete-tenant": "node --env-file-if-exists=.env.local scripts/delete-tenant.mts",
     "test:db": "vitest run --config vitest.integration.config.ts",
-    "cloud:reconcile": "node --env-file-if-exists=.env.local scripts/reconcile.mjs"
+    "cloud:reconcile": "node --env-file-if-exists=.env.local scripts/reconcile.mjs",
+    "cloud:fields": "node --env-file-if-exists=.env.local scripts/fields.mjs"
   },
   "dependencies": {
     "@arkom/core": "workspace:*",

@@ -13,6 +13,7 @@
  */
 import { requireAccount } from "../../../src/auth/session";
 import { getT } from "../../../src/i18n/server";
+import { labelFor } from "../../../src/i18n";
 import { transfersForAccount } from "../../../src/db/workshop-queries";
 import { dateTime, euros } from "../../../src/lib/format";
 import {
@@ -65,9 +66,12 @@ export default async function TransfersPage() {
       key: "status",
       header: t("tf.status"),
       card: "badge",
+      /* the row's OWN status, labelled. This used to print "Pagada" for
+         anything not cancelled, which for a send that has not been collected
+         yet is a claim the shop cannot make: the real value is `sent`. */
       render: (x) => (
-        <Chip tone={cancelledRow(x) ? "bad" : "ok"}>
-          {cancelledRow(x) ? t("tfs.cancelled") : t("tfs.paid")}
+        <Chip tone={cancelledRow(x) ? "bad" : x.status === "paid" ? "ok" : "info"}>
+          {labelFor(t, "tfs", cancelledRow(x) ? "cancelled" : x.status)}
         </Chip>
       ),
     },

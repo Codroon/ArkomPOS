@@ -23,7 +23,8 @@
     "brand": "node scripts/use-brand.mjs",
     "db:demo": "pnpm --filter arkom-pos db:demo",
     "db:truth": "pnpm --filter arkom-pos db:truth",
-    "cloud:reconcile": "pnpm --filter @arkom/web cloud:reconcile"
+    "cloud:reconcile": "pnpm --filter @arkom/web cloud:reconcile",
+    "cloud:fields": "pnpm --filter @arkom/web cloud:fields"
   },
   "devDependencies": {
     "vitest": "^3.2.7"

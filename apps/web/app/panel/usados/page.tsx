@@ -8,9 +8,11 @@
  * device is deliberately not computed here — CLAUDE.md lists it as not built,
  * and a plausible-looking number would be worse than an absent one.
  *
- * The seller's name is here and their ID number is not. Both arrive in the
- * stream (ADR-0020 §3 syncs the rows), but a list on a screen is not where an
- * identity document belongs; the police register is a separate, later job.
+ * There is no seller column, and there cannot be one. The till's
+ * `used_purchase` entry records the purchase and NOT the person — the oplog is
+ * readable by anyone who can read the file, so the seller block never leaves
+ * the shop. The police register is a separate, later job and belongs on the
+ * till, where the data is.
  */
 import { requireAccount } from "../../../src/auth/session";
 import { getT } from "../../../src/i18n/server";
@@ -51,6 +53,7 @@ export default async function UsedPage() {
   }
 
   /* what is tied up: bought and not yet sold, at what it cost to get there */
+  const onShelf = devices.filter((device) => device.unitStatus === "in_stock");
   const holding = devices.filter((device) => device.unitStatus !== "sold");
   const tiedUp = holding.reduce(
     (sum, device) => sum + device.buyPriceCents + device.refurbCostCents,
@@ -61,10 +64,11 @@ export default async function UsedPage() {
   const columns: Column<(typeof devices)[number]>[] = [
     { key: "device", header: t("us.device"), card: "title", render: (d) => d.device },
     {
-      key: "seller",
-      header: t("us.seller"),
+      key: "imei",
+      header: "IMEI",
       card: "sub",
-      render: (d) => d.sellerName ?? "—",
+      className: "tabular text-muted",
+      render: (d) => d.imei ?? "—",
     },
     {
       key: "state",
@@ -80,13 +84,6 @@ export default async function UsedPage() {
         ) : (
           <>—</>
         ),
-    },
-    {
-      key: "imei",
-      header: "IMEI",
-      card: "meta",
-      className: "tabular text-muted",
-      render: (d) => d.imei ?? "—",
     },
     { key: "grade", header: t("us.grade"), card: "meta", render: (d) => d.grade ?? "—" },
     {
@@ -124,7 +121,7 @@ export default async function UsedPage() {
   return (
     <div className="space-y-4">
       <StatGrid>
-        <Stat label={t("us.holdingCount")} value={String(holding.length)} />
+        <Stat label={t("us.holdingCount")} value={String(onShelf.length)} sub={t("us.onShelfHint")} />
         <Stat label={t("us.tiedUp")} value={euros(tiedUp)} sub={t("us.tiedUpHint")} />
         <Stat label={t("us.review")} value={String(needsReview)} />
         <Stat label={t("us.all")} value={String(devices.length)} />

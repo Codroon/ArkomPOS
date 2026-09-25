@@ -529,6 +529,7 @@ export const es = {
   /* typed errors */
   "setup.defaultFooter": "Precios claros. Sin letra pequeña.",
   "setup.defaultTerminal": "Caja 1",
+  "setup.defaultLocation": "Tienda",
   "common.number": "Nº",
   "groups.title": "Grupos",
   "groups.manage": "Grupos",

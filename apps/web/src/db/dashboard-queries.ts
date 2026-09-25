@@ -28,6 +28,7 @@
 import { sql, type SQL } from "drizzle-orm";
 import { folded } from "./fold";
 import { db as defaultDb, type CloudDb } from "./client";
+import { previousPeriod, type Period as Window } from "../lib/range";
 
 const ZONE = "Europe/Madrid";
 
@@ -45,16 +46,26 @@ const completedDocs = (accountId: string) => sql`
     and d.row->>'completedAt' is not null
 `;
 
-/** Shop-day window: "the last N days, today included", in Madrid. */
-const withinLast = (days: number): SQL => sql`
-  (completed_at at time zone ${ZONE})::date > (now() at time zone ${ZONE})::date - ${days}::int
+/**
+ * The window, as two shop dates.
+ *
+ * `between` on a DATE, not a timestamp comparison: a shop's day runs to
+ * midnight in Madrid, and the inclusive bounds are what "from the 3rd to the
+ * 17th" means to the person who typed it. Resolving the dates once in
+ * `parseRange` is what lets a custom range be the same code path as a preset
+ * rather than a second one through nine queries.
+ */
+const within = (period: Window): SQL => sql`
+  (completed_at at time zone ${ZONE})::date between ${period.from}::date and ${period.to}::date
 `;
 
 /** The window of the same length immediately before it — what we compare to. */
-const withinPrevious = (days: number): SQL => sql`
-  (completed_at at time zone ${ZONE})::date > (now() at time zone ${ZONE})::date - ${days * 2}::int
-  and (completed_at at time zone ${ZONE})::date <= (now() at time zone ${ZONE})::date - ${days}::int
-`;
+const withinPrevious = (period: Window): SQL => {
+  const before = previousPeriod(period);
+  return sql`
+    (completed_at at time zone ${ZONE})::date between ${before.from}::date and ${before.to}::date
+  `;
+};
 
 export interface PeriodTotals {
   netCents: number;
@@ -108,7 +119,7 @@ const change = (now: number, before: number): number | null =>
 
 export async function periodTotals(
   accountId: string,
-  days: number,
+  period: Window,
   handle?: CloudDb,
 ): Promise<PeriodComparison> {
   const db = handle ?? defaultDb();
@@ -129,9 +140,9 @@ export async function periodTotals(
     refunds: number;
   }>(sql`
     with docs as (${completedDocs(accountId)})
-    select 'current' as window, ${totals} from docs where ${withinLast(days)}
+    select 'current' as window, ${totals} from docs where ${within(period)}
     union all
-    select 'previous' as window, ${totals} from docs where ${withinPrevious(days)}
+    select 'previous' as window, ${totals} from docs where ${withinPrevious(period)}
   `);
 
   const current = shape(rows.find((r) => r.window === "current"));
@@ -164,7 +175,7 @@ export interface DayRow {
  */
 export async function takingsByDay(
   accountId: string,
-  days: number,
+  period: Window,
   handle?: CloudDb,
 ): Promise<DayRow[]> {
   const db = handle ?? defaultDb();
@@ -172,8 +183,8 @@ export async function takingsByDay(
     with docs as (${completedDocs(accountId)}),
     calendar as (
       select generate_series(
-        (now() at time zone ${ZONE})::date - (${days}::int - 1),
-        (now() at time zone ${ZONE})::date,
+        ${period.from}::date,
+        ${period.to}::date,
         interval '1 day'
       )::date as day
     ),
@@ -182,7 +193,7 @@ export async function takingsByDay(
              sum(total_cents)                          as net_cents,
              count(*)::int                             as documents
       from docs
-      where ${withinLast(days)}
+      where ${within(period)}
       group by 1
     )
     select to_char(c.day, 'YYYY-MM-DD') as day,
@@ -213,7 +224,7 @@ export interface TenderRow {
  */
 export async function paymentMix(
   accountId: string,
-  days: number,
+  period: Window,
   handle?: CloudDb,
 ): Promise<TenderRow[]> {
   const db = handle ?? defaultDb();
@@ -228,7 +239,7 @@ export async function paymentMix(
     select t.method, sum(t.amount_cents) as amount_cents, count(*)::int as n
     from tenders t
     join docs d on d.id = t.document_id
-    where ${withinLast(days)}
+    where ${within(period)}
     group by t.method
     order by sum(t.amount_cents) desc
   `);
@@ -248,7 +259,7 @@ export interface TopProductRow {
 /** What actually sells, by value. Lines on completed documents, latest state. */
 export async function topProducts(
   accountId: string,
-  days: number,
+  period: Window,
   limit = 8,
   handle?: CloudDb,
 ): Promise<TopProductRow[]> {
@@ -265,7 +276,7 @@ export async function topProducts(
     select l.description, sum(l.qty) as qty, sum(l.total_cents) as total_cents
     from lines l
     join docs d on d.id = l.document_id
-    where ${withinLast(days)} and l.description is not null
+    where ${within(period)} and l.description is not null
     group by l.description
     order by sum(l.total_cents) desc
     limit ${limit}
@@ -289,7 +300,7 @@ export interface DocumentRow {
 /** The document list, with the period and an optional search applied in SQL. */
 export async function documentsInPeriod(
   accountId: string,
-  days: number,
+  period: Window,
   options: { search?: string; docType?: string; limit?: number } = {},
   handle?: CloudDb,
 ): Promise<DocumentRow[]> {
@@ -308,7 +319,7 @@ export async function documentsInPeriod(
     with docs as (${completedDocs(accountId)})
     select id, doc_number, doc_type, total_cents, tax_cents, completed_at
     from docs
-    where ${withinLast(days)}
+    where ${within(period)}
       and (${search === ""} or doc_number ilike ${"%" + search + "%"})
       and (${docType === ""} or doc_type = ${docType})
     order by completed_at desc
@@ -340,7 +351,20 @@ export interface ShiftRow {
  * report yet, and a closed one is immutable, so what arrived is final
  * (ADR-0015 §7–8).
  */
-export async function recentShifts(accountId: string, limit = 8, handle?: CloudDb): Promise<ShiftRow[]> {
+/**
+ * The closes inside the window on screen.
+ *
+ * Period-scoped like everything else on this page. It used to be "the last
+ * eight, whatever you picked", which meant a dashboard set to January 2020
+ * showed 2020's takings of zero beside a Z from last week — a card quietly
+ * disagreeing with the control above it is worse than an empty card.
+ */
+export async function recentShifts(
+  accountId: string,
+  period: Window,
+  limit = 8,
+  handle?: CloudDb,
+): Promise<ShiftRow[]> {
   const db = handle ?? defaultDb();
   const rows = await db.execute<{
     z_doc_number: string | null;
@@ -360,6 +384,8 @@ export async function recentShifts(accountId: string, limit = 8, handle?: CloudD
       x.row->>'varianceCents'                             as variance_cents
     from (${folded(accountId, "shift")}) x
     where x.row->>'closedAt' is not null
+      and (to_timestamp((x.row->>'closedAt')::bigint / 1000.0) at time zone ${ZONE})::date
+          between ${period.from}::date and ${period.to}::date
   `);
 
   return rows
