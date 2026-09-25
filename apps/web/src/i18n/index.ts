@@ -238,7 +238,7 @@ const es = {
   "inf.units": "Unidades",
   "inf.atCost": "A coste",
   "inf.atRetail": "A PVP",
-  "inf.dead": "Stock parado",
+  "inf.dead": "Stock muerto",
   "inf.deadHint": "En stock y sin vender en 90 días. Dinero quieto.",
   "inf.lastSold": "Última venta",
   "inf.never": "Nunca",
@@ -312,11 +312,22 @@ const es = {
   "auth.err.link": "Ese enlace ya no vale. Vuelve a entrar con tu correo y tu contraseña.",
   "auth.notice.confirm": "Te hemos enviado un correo para confirmar la dirección. Ábrelo y sigue el enlace para entrar.",
 
+  /* The name a downloaded file gets. These are the till's own slugs, verbatim
+     (`apps/desktop/src/main/reports-export.ts`), so the same report saved from
+     the counter and from a phone lands as the same filename — and they follow
+     the staff language, like the rest of an export (ADR-0016 A1). */
+  "file.transactions": "transacciones",
+  "file.sales": "informe-ventas",
+  "file.repairs": "informe-reparaciones",
+  "file.used": "informe-dispositivos-usados",
+  "file.valuation": "informe-valoracion",
+  "file.dead": "informe-stock-muerto",
+
   "inf.tab.sales": "Ventas",
   "inf.tab.repairs": "Reparaciones",
   "inf.tab.used": "Usados",
   "inf.tab.valuation": "Valoración",
-  "inf.tab.dead": "Stock parado",
+  "inf.tab.dead": "Stock muerto",
   "inf.sales.tickets": "Tickets",
   "inf.sales.net": "Base",
   "inf.sales.tax": "IVA",
@@ -639,6 +650,13 @@ const en: Record<MessageKey, string> = {
   "auth.err.claimed": "That account already belongs to somebody else. Write to us and we will look.",
   "auth.err.link": "That link is no longer valid. Sign in with your email and password instead.",
   "auth.notice.confirm": "We have sent you an email to confirm the address. Open it and follow the link to get in.",
+
+  "file.transactions": "transactions",
+  "file.sales": "sales-report",
+  "file.repairs": "repairs-report",
+  "file.used": "used-devices-report",
+  "file.valuation": "valuation-report",
+  "file.dead": "dead-stock-report",
 
   "inf.tab.sales": "Sales",
   "inf.tab.repairs": "Repairs",

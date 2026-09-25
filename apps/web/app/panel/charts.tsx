@@ -16,6 +16,7 @@
  * is a `BarList` now — see `src/ui/bar-list.tsx`.
  */
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { axisEuros, euros } from "../../src/lib/format";
 import {
   CHART_HOVER,
   CHART_INK as INK,
@@ -36,10 +37,8 @@ const tooltipStyle = {
 
 export function TakingsChart({
   data,
-  currency,
 }: {
   data: Array<{ day: string; label: string; netCents: number }>;
-  currency: string;
 }) {
   /* One bar per day in the window, quiet days included: a chart with the empty
      days dropped lies about the shape of a week. */
@@ -59,14 +58,16 @@ export function TakingsChart({
             tick={{ fontSize: 11, fill: MUTED }}
             tickLine={false}
             axisLine={false}
-            tickFormatter={(cents: number) => String(Math.round(cents / 100))}
-            width={52}
+            tickFormatter={axisEuros}
+            width={56}
           />
           <Tooltip
             cursor={{ fill: CHART_HOVER }}
             contentStyle={tooltipStyle}
             labelStyle={{ color: MUTED, fontSize: 11 }}
-            formatter={(cents: number) => [`${(cents / 100).toFixed(2)} ${currency}`, ""]}
+            /* `euros`, not toFixed: this printed "549.90 €" with an English
+               decimal point while every other figure on the page said 549,90 € */
+            formatter={(cents: number) => [euros(cents), ""]}
           />
           <Bar dataKey="netCents" fill={INK} radius={[2, 2, 0, 0]} maxBarSize={38} />
         </BarChart>

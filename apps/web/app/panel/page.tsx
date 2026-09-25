@@ -163,7 +163,7 @@ export default async function SummaryPage({
           />
           <CardBody>
             {daysWithSales > 0 ? (
-              <TakingsChart data={chartData} currency="€" />
+              <TakingsChart data={chartData} />
             ) : (
               <EmptyState title={t("empty.noData")} />
             )}

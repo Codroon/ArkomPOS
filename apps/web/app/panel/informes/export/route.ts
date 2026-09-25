@@ -77,7 +77,7 @@ async function build(
       });
       /* the second BOM is stripped: one file, one byte-order mark */
       return {
-        slug: "informe-ventas",
+        slug: t("file.sales"),
         title: t("inf.tab.sales"),
         body: byGroup + "\r\n" + byRegime.replace(/^﻿/, ""),
       };
@@ -112,7 +112,7 @@ async function build(
         preamble: [t("inf.rep.closed"), t("inf.rep.noMargin")],
       });
       return {
-        slug: "informe-reparaciones",
+        slug: t("file.repairs"),
         title: t("inf.tab.repairs"),
         body: openCsv + "\r\n" + closedCsv.replace(/^﻿/, ""),
       };
@@ -121,7 +121,7 @@ async function build(
     case "used": {
       const rows = await usedHolding(accountId);
       return {
-        slug: "informe-usados",
+        slug: t("file.used"),
         title: t("inf.tab.used"),
         body: renderCsv({
           columns: [
@@ -141,7 +141,7 @@ async function build(
     case "valuation": {
       const rows = await valuation(accountId, locale);
       return {
-        slug: "informe-valoracion",
+        slug: t("file.valuation"),
         title: t("inf.tab.valuation"),
         body: renderCsv({
           columns: [
@@ -160,7 +160,7 @@ async function build(
     case "dead": {
       const rows = await deadStock(accountId, 90, locale);
       return {
-        slug: "informe-stock-parado",
+        slug: t("file.dead"),
         title: t("inf.tab.dead"),
         body: renderCsv({
           columns: [

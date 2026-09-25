@@ -60,7 +60,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     status: 200,
     headers: {
       "content-type": "text/csv; charset=utf-8",
-      "content-disposition": `attachment; filename="${csvFileName("ventas")}"`,
+      "content-disposition": `attachment; filename="${csvFileName(t("file.transactions"))}"`,
       "cache-control": "no-store",
     },
   });
