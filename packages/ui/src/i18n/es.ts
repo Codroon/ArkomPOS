@@ -880,7 +880,7 @@ export const es = {
   "set.cloudIntro": "Enlaza esta caja con tu cuenta de Codroon para ver las ventas desde cualquier sitio. La caja sigue funcionando igual sin conexión.",
   "set.cloudUrl": "Dirección",
   "set.cloudCode": "Código de enlace",
-  "set.cloudCodeHint": "Lo genera tu cuenta en pos.codroon.com. Se usa una sola vez.",
+  "set.cloudCodeHint": "Lo genera tu cuenta en el panel web, en Cajas → Enlazar una caja. Se usa una sola vez.",
   "set.cloudLink": "Enlazar la caja",
   "set.cloudLinking": "Enlazando…",
   "set.cloudLinked": "ENLAZADA",

@@ -878,7 +878,7 @@ export const en: Record<TKey, string> = {
   "set.cloudIntro": "Link this till to your Codroon account to see its sales from anywhere. The till works exactly the same with no connection.",
   "set.cloudUrl": "Address",
   "set.cloudCode": "Link code",
-  "set.cloudCodeHint": "Your account generates it at pos.codroon.com. It is used once.",
+  "set.cloudCodeHint": "Your account generates it in the web panel, under Tills → Link a till. It is used once.",
   "set.cloudLink": "Link this till",
   "set.cloudLinking": "Linking…",
   "set.cloudLinked": "LINKED",
