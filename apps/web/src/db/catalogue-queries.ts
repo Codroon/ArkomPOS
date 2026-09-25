@@ -13,7 +13,7 @@
  */
 import { sql } from "drizzle-orm";
 import { epochMs, folded } from "./fold";
-import { groupName } from "./group-name";
+import { groupName, productName } from "./our-words";
 import type { Locale } from "../i18n";
 import { db as defaultDb, type CloudDb } from "./client";
 
@@ -54,7 +54,7 @@ export async function productsForAccount(
     p0 as (${folded(accountId, "product")}),
     products as (
       select id,
-             row->>'name'                        as name,
+             ${productName("row->>'name'", locale)} as name,
              row->>'barcode'                     as barcode,
              row->>'groupId'                     as group_id,
              row->>'itemType'                    as item_type,
@@ -108,7 +108,8 @@ export interface StockMovementRow {
 /** The shelf's history: every movement, newest first. */
 export async function recentMovements(
   accountId: string,
-  limit = 30,
+  locale: Locale = "es",
+  limit = 200,
   handle?: CloudDb,
 ): Promise<StockMovementRow[]> {
   const db = handle ?? defaultDb();
@@ -121,7 +122,7 @@ export async function recentMovements(
   }>(sql`
     with mine as (select t.id from tenants t where t.account_id = ${accountId}),
     p0 as (${folded(accountId, "product")}),
-    products as (select id, row->>'name' as name from p0)
+    products as (select id, ${productName("row->>'name'", locale)} as name from p0)
     select p.name                                                  as product_name,
            e.after->>'movementType'                                as movement_type,
            (e.after->>'qty')::bigint                               as qty,

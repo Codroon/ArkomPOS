@@ -46,7 +46,7 @@ export default async function SummaryPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const account = await requireAccount();
-  const { t } = await getT();
+  const { t, locale } = await getT();
   const params = await searchParams;
   const period = parseRange(params.range, params.from, params.to);
 
@@ -54,9 +54,9 @@ export default async function SummaryPage({
     periodTotals(account.id, period),
     takingsByDay(account.id, period),
     paymentMix(account.id, period),
-    topProducts(account.id, period, 8),
+    topProducts(account.id, period, locale, 8),
     recentShifts(account.id, period, 6),
-    tillsForAccount(account.id),
+    tillsForAccount(account.id, locale),
   ]);
 
   if (tills.length === 0) {

@@ -185,7 +185,7 @@ describe.skipIf(!ready)("what is on the shelf", () => {
   });
 
   it("lists the movements that produced those figures", async () => {
-    const movements = await recentMovements(ACCOUNT, 50);
+    const movements = await recentMovements(ACCOUNT, "es", 50);
 
     expect(movements).toHaveLength(5);
     expect(movements.some((m) => m.movementType === "sale_out" && m.qty === -2)).toBe(true);
@@ -218,7 +218,7 @@ describe.skipIf(!ready)("one document, opened up", () => {
     try {
       expect(await documentDetail(stranger, TICKET)).toBeNull();
       expect(await productsForAccount(stranger)).toEqual([]);
-      expect(await recentMovements(stranger)).toEqual([]);
+      expect(await recentMovements(stranger, "es")).toEqual([]);
     } finally {
       await admin.delete(accounts).where(eq(accounts.id, stranger));
     }

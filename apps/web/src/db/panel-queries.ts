@@ -14,6 +14,8 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db as defaultDb, type CloudDb } from "./client";
 import { devices, syncEntries, tenants } from "./schema";
+import { tillName } from "./our-words";
+import type { Locale } from "../i18n";
 
 export interface ShopSummary {
   id: string;
@@ -52,7 +54,11 @@ export interface TillSummary {
   revoked: boolean;
 }
 
-export async function tillsForAccount(accountId: string, handle?: CloudDb): Promise<TillSummary[]> {
+export async function tillsForAccount(
+  accountId: string,
+  locale: Locale = "es",
+  handle?: CloudDb,
+): Promise<TillSummary[]> {
   const db = handle ?? defaultDb();
   const rows = await db
     .select({
@@ -69,5 +75,9 @@ export async function tillsForAccount(accountId: string, handle?: CloudDb): Prom
     .where(and(eq(devices.accountId, accountId)))
     .orderBy(desc(devices.lastPushAt));
 
-  return rows.map(({ revokedAt, ...rest }) => ({ ...rest, revoked: revokedAt !== null }));
+  return rows.map(({ revokedAt, terminalName, ...rest }) => ({
+    ...rest,
+    terminalName: tillName(terminalName, locale),
+    revoked: revokedAt !== null,
+  }));
 }

@@ -29,6 +29,8 @@ import { sql, type SQL } from "drizzle-orm";
 import { folded } from "./fold";
 import { db as defaultDb, type CloudDb } from "./client";
 import { previousPeriod, type Period as Window } from "../lib/range";
+import { productName } from "./our-words";
+import type { Locale } from "../i18n";
 
 const ZONE = "Europe/Madrid";
 
@@ -260,6 +262,7 @@ export interface TopProductRow {
 export async function topProducts(
   accountId: string,
   period: Window,
+  locale: Locale = "es",
   limit = 8,
   handle?: CloudDb,
 ): Promise<TopProductRow[]> {
@@ -273,11 +276,18 @@ export async function topProducts(
              (x.row->>'totalCents')::bigint as total_cents
       from (${folded(accountId, "document_line")}) x
     )
-    select l.description, sum(l.qty) as qty, sum(l.total_cents) as total_cents
+    /*
+     * Our used-device suffix is translated HERE and not on the document page.
+     * This is a report about what the shop sells; that page is a copy of the
+     * paper a customer was handed, and a receipt says what it said.
+     */
+    select ${productName("l.description", locale)} as description,
+           sum(l.qty)                               as qty,
+           sum(l.total_cents)                       as total_cents
     from lines l
     join docs d on d.id = l.document_id
     where ${within(period)} and l.description is not null
-    group by l.description
+    group by 1
     order by sum(l.total_cents) desc
     limit ${limit}
   `);

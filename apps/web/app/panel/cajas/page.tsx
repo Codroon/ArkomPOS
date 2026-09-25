@@ -24,10 +24,10 @@ export const dynamic = "force-dynamic";
 
 export default async function TillsPage() {
   const account = await requireAccount();
-  const { t } = await getT();
+  const { t, locale } = await getT();
 
   const [tills, shops] = await Promise.all([
-    tillsForAccount(account.id),
+    tillsForAccount(account.id, locale),
     shopsForAccount(account.id),
   ]);
 

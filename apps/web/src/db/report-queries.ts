@@ -17,7 +17,7 @@
  */
 import { sql } from "drizzle-orm";
 import { folded } from "./fold";
-import { groupName } from "./group-name";
+import { groupName, productName } from "./our-words";
 import type { Locale } from "../i18n";
 import { db as defaultDb, type CloudDb } from "./client";
 import type { Period as Window } from "../lib/range";
@@ -542,7 +542,7 @@ export async function deadStock(
       where e.tenant_id in ${mine(accountId)} and e.entity = 'stock_movement'
       group by 1
     )
-    select p.row->>'name'                                    as name,
+    select ${productName("p.row->>'name'", locale)}            as name,
            ${groupName("g.row", locale)}                      as group_name,
            m.on_hand                                         as on_hand,
            m.on_hand * (p.row->>'costCents')::bigint         as at_cost_cents,

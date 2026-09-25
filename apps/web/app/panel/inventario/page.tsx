@@ -24,8 +24,8 @@ export const dynamic = "force-dynamic";
 
 export default async function InventoryPage() {
   const account = await requireAccount();
-  const { t } = await getT();
-  const movements = await recentMovements(account.id, 200);
+  const { t, locale } = await getT();
+  const movements = await recentMovements(account.id, locale, 200);
 
   const columns: Column<(typeof movements)[number]>[] = [
     { key: "item", header: t("cat.item"), card: "title", render: (m) => m.productName },
