@@ -11,6 +11,7 @@
  * session to the next.
  */
 import { createBrowserClient, createServerClient } from "@supabase/ssr";
+import type { CookieList } from "./cookie-list";
 import { cookies } from "next/headers";
 
 /**
@@ -46,7 +47,7 @@ export async function supabaseServer() {
   return createServerClient(url, key, {
     cookies: {
       getAll: () => store.getAll(),
-      setAll: (list) => {
+      setAll: (list: CookieList) => {
         try {
           for (const { name, value, options } of list) store.set(name, value, options);
         } catch {
