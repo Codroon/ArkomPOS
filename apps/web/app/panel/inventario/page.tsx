@@ -11,7 +11,14 @@ import { getT } from "../../../src/i18n/server";
 import { labelFor } from "../../../src/i18n";
 import { recentMovements } from "../../../src/db/catalogue-queries";
 import { dateTime, euros } from "../../../src/lib/format";
-import { Card, CardBody, CardHead, EmptyState, TD, TH, TR, Table } from "../../../src/ui";
+import {
+  Card,
+  CardHead,
+  Chip,
+  DataTable,
+  EmptyState,
+  type Column,
+} from "../../../src/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -20,39 +27,46 @@ export default async function InventoryPage() {
   const { t } = await getT();
   const movements = await recentMovements(account.id, 200);
 
+  const columns: Column<(typeof movements)[number]>[] = [
+    { key: "item", header: t("cat.item"), card: "title", render: (m) => m.productName },
+    { key: "when", header: t("doc.when"), card: "sub", render: (m) => dateTime(m.createdAt) },
+    {
+      key: "reason",
+      header: t("inv.reason"),
+      card: "badge",
+      render: (m) => (
+        <Chip tone={m.qty < 0 ? "bad" : "ok"}>{labelFor(t, "mv", m.movementType)}</Chip>
+      ),
+    },
+    {
+      key: "qty",
+      header: t("inv.qty"),
+      align: "right",
+      card: "figure",
+      render: (m) => (
+        <span className={m.qty < 0 ? "text-danger-ink" : "text-ink"}>
+          {m.qty > 0 ? `+${m.qty}` : m.qty}
+        </span>
+      ),
+    },
+    {
+      key: "cost",
+      header: t("inv.unitCost"),
+      align: "right",
+      card: "figure",
+      render: (m) => euros(m.unitCostCents),
+    },
+  ];
+
   return (
     <Card>
       <CardHead title={t("inv.title")} hint={t("inv.hint")} />
-      {movements.length === 0 ? (
-        <EmptyState title={t("empty.noData")} />
-      ) : (
-        <CardBody className="pt-2">
-          <Table>
-            <thead>
-              <tr>
-                <TH>{t("doc.when")}</TH>
-                <TH>{t("cat.item")}</TH>
-                <TH>{t("inv.reason")}</TH>
-                <TH right>{t("inv.qty")}</TH>
-                <TH right>{t("inv.unitCost")}</TH>
-              </tr>
-            </thead>
-            <tbody>
-              {movements.map((movement, index) => (
-                <TR key={`${movement.createdAt.getTime()}-${index}`}>
-                  <TD>{dateTime(movement.createdAt)}</TD>
-                  <TD>{movement.productName}</TD>
-                  <TD>{labelFor(t, "mv", movement.movementType)}</TD>
-                  <TD right className={movement.qty < 0 ? "text-danger-ink" : "text-ink"}>
-                    {movement.qty > 0 ? `+${movement.qty}` : movement.qty}
-                  </TD>
-                  <TD right>{euros(movement.unitCostCents)}</TD>
-                </TR>
-              ))}
-            </tbody>
-          </Table>
-        </CardBody>
-      )}
+      <DataTable
+        rows={movements}
+        columns={columns}
+        rowKey={(m, i) => `${m.createdAt.getTime()}-${i}`}
+        empty={<EmptyState title={t("empty.noData")} />}
+      />
     </Card>
   );
 }

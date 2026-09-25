@@ -11,7 +11,14 @@ import { requireAccount } from "../../../src/auth/session";
 import { getT } from "../../../src/i18n/server";
 import { shopsForAccount, tillsForAccount } from "../../../src/db/panel-queries";
 import { dateTime } from "../../../src/lib/format";
-import { Card, CardBody, CardHead, Chip, EmptyState, TD, TH, TR, Table } from "../../../src/ui";
+import {
+  Card,
+  CardHead,
+  Chip,
+  DataTable,
+  EmptyState,
+  type Column,
+} from "../../../src/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -34,39 +41,51 @@ export default async function TillsPage() {
 
   const rowsByShop = new Map(shops.map((shop) => [shop.name, shop.rows]));
 
+  const columns: Column<(typeof tills)[number]>[] = [
+    {
+      key: "name",
+      header: t("till.name"),
+      card: "title",
+      className: "font-medium",
+      render: (x) => x.terminalName,
+    },
+    { key: "shop", header: t("till.shop"), card: "sub", render: (x) => x.shop },
+    {
+      key: "state",
+      header: t("till.state"),
+      card: "badge",
+      render: (x) => (
+        <Chip tone={x.revoked ? "neutral" : "ok"}>
+          {x.revoked ? t("till.revoked") : t("till.linked")}
+        </Chip>
+      ),
+    },
+    {
+      key: "version",
+      header: t("till.version"),
+      card: "meta",
+      className: "tabular text-muted",
+      render: (x) => x.appVersion,
+    },
+    {
+      key: "push",
+      header: t("till.lastPush"),
+      card: "figure",
+      render: (x) => dateTime(x.lastPushAt),
+    },
+    {
+      key: "rows",
+      header: t("till.movements"),
+      align: "right",
+      card: "figure",
+      render: (x) => rowsByShop.get(x.shop) ?? 0,
+    },
+  ];
+
   return (
     <Card>
       <CardHead title={t("till.title")} hint={t("till.hint")} />
-      <CardBody className="pt-2">
-        <Table>
-          <thead>
-            <tr>
-              <TH>{t("till.name")}</TH>
-              <TH>{t("till.shop")}</TH>
-              <TH>{t("till.version")}</TH>
-              <TH>{t("till.lastPush")}</TH>
-              <TH right>{t("till.movements")}</TH>
-              <TH>{t("till.state")}</TH>
-            </tr>
-          </thead>
-          <tbody>
-            {tills.map((till) => (
-              <TR key={till.id}>
-                <TD className="font-medium">{till.terminalName}</TD>
-                <TD>{till.shop}</TD>
-                <TD className="tabular text-muted">{till.appVersion}</TD>
-                <TD>{dateTime(till.lastPushAt)}</TD>
-                <TD right>{rowsByShop.get(till.shop) ?? 0}</TD>
-                <TD>
-                  <Chip tone={till.revoked ? "neutral" : "ok"}>
-                    {till.revoked ? t("till.revoked") : t("till.linked")}
-                  </Chip>
-                </TD>
-              </TR>
-            ))}
-          </tbody>
-        </Table>
-      </CardBody>
+      <DataTable rows={tills} columns={columns} rowKey={(x) => x.id} />
     </Card>
   );
 }

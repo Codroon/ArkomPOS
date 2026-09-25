@@ -5,11 +5,18 @@
  * inherits it instead of having to remember it. Copy is resolved here too and
  * handed to the chrome as plain strings: the client bundle carries the words
  * this person is reading, not both dictionaries.
+ *
+ * The rail's collapsed state is read from its cookie HERE, on the server, and
+ * passed down. The chrome could read it after hydration, but then the first
+ * paint is 240px wide and the second is 64px, and a layout that jumps on every
+ * navigation reads as broken however correct it ends up.
  */
+import { cookies } from "next/headers";
 import { Suspense, type ReactNode } from "react";
 import { requireAccount } from "../../src/auth/session";
 import { signOutAction } from "../../src/auth/actions";
 import { getT } from "../../src/i18n/server";
+import { RAIL_COOKIE } from "../../src/lib/prefs";
 import { PanelChrome, type ChromeLabels } from "./chrome";
 
 export const dynamic = "force-dynamic";
@@ -17,12 +24,17 @@ export const dynamic = "force-dynamic";
 export default async function PanelLayout({ children }: { children: ReactNode }) {
   const account = await requireAccount();
   const { t, locale } = await getT();
+  const railCollapsed = (await cookies()).get(RAIL_COOKIE)?.value === "1";
 
   const labels: ChromeLabels = {
     brand: t("app.brand"),
     signOut: t("app.signOut"),
     language: t("app.language"),
     period: t("range.label"),
+    more: t("nav.more"),
+    collapse: t("nav.collapse"),
+    expand: t("nav.expand"),
+    close: t("app.close"),
     nav: {
       summary: t("nav.summary"),
       sales: t("nav.sales"),
@@ -33,6 +45,13 @@ export default async function PanelLayout({ children }: { children: ReactNode })
       transfers: t("nav.transfers"),
       reports: t("nav.reports"),
       tills: t("nav.tills"),
+    },
+    groups: {
+      today: t("navgroup.today"),
+      selling: t("navgroup.selling"),
+      stock: t("navgroup.stock"),
+      workshop: t("navgroup.workshop"),
+      more: t("navgroup.more"),
     },
     ranges: {
       today: t("range.today"),
@@ -57,6 +76,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
         labels={labels}
         locale={locale}
         account={{ name: account.name, email: account.email, licence }}
+        railCollapsed={railCollapsed}
         signOut={signOutAction}
       >
         {children}

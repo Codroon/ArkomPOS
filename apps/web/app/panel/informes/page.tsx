@@ -6,12 +6,17 @@
  * or on a phone. Two reports with the same name and different columns is how a
  * shop learns to trust neither.
  *
+ * The tabs scroll sideways on a phone rather than wrapping onto a second line —
+ * six of them wrapped is two rows of chrome above a fiscal figure, and the one
+ * you are on can end up on the line you are not looking at. Sideways, the
+ * current tab is always the anchor.
+ *
  * The tab lives in the URL so a link opens on the report it was sent about.
  */
 import Link from "next/link";
 import { requireAccount } from "../../../src/auth/session";
 import { getT } from "../../../src/i18n/server";
-import { labelFor } from "../../../src/i18n";
+import { labelFor, plural } from "../../../src/i18n";
 import { parseRange } from "../../../src/lib/range";
 import {
   deadStock,
@@ -27,17 +32,15 @@ import {
 import { dateTime, euros } from "../../../src/lib/format";
 import {
   Card,
-  CardBody,
   CardHead,
   Chip,
+  DataTable,
   EmptyState,
   Stat,
-  TD,
-  TH,
-  TR,
-  Table,
+  StatGrid,
   cn,
   ghostClass,
+  type Column,
 } from "../../../src/ui";
 
 export const dynamic = "force-dynamic";
@@ -62,31 +65,45 @@ export default async function ReportsPage({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line">
-      <nav className="flex flex-wrap gap-1">
-        {TABS.map((key) => (
-          <Link
-            key={key}
-            href={href(key)}
-            className={cn(
-              "-mb-px border-b-2 px-3 py-2 text-[13px]",
-              key === tab
-                ? "border-ink font-semibold text-ink"
-                : "border-transparent text-muted hover:text-ink-2",
-            )}
-          >
-            {t(`inf.tab.${key}` as "inf.tab.sales")}
-          </Link>
-        ))}
-      </nav>
-        {/* re-runs the same query this tab just ran, for the same period */}
+      <div className="flex items-end gap-3 border-b border-line">
+        {/* -mx-4 so the strip bleeds to the screen edge on a phone: a tab that
+            is half cut off at the edge is the affordance that says "scroll me" */}
+        <nav className="-mx-4 flex min-w-0 flex-1 gap-1 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          {TABS.map((key) => (
+            <Link
+              key={key}
+              href={href(key)}
+              aria-current={key === tab ? "page" : undefined}
+              className={cn(
+                "-mb-px shrink-0 border-b-2 px-3 py-3 text-[13px] whitespace-nowrap",
+                key === tab
+                  ? "border-ink font-semibold text-ink"
+                  : "border-transparent text-muted hover:text-ink-2",
+              )}
+            >
+              {t(`inf.tab.${key}` as "inf.tab.sales")}
+            </Link>
+          ))}
+        </nav>
+        {/* re-runs the same query this tab just ran, for the same period.
+            cn() and not a template string: `ghostClass` already sets a display,
+            and two display utilities in one class attribute are resolved by
+            whichever Tailwind emitted last — which is how this button rendered
+            TWICE on a phone. twMerge drops the loser. */}
         <a
-          className={`${ghostClass} mb-1.5`}
+          className={cn(ghostClass, "mb-1.5 hidden shrink-0 sm:inline-flex")}
           href={`/panel/informes/export?report=${tab}&range=${period.key}`}
         >
           {t("sales.export")}
         </a>
       </div>
+
+      <a
+        className={cn(ghostClass, "flex w-full sm:hidden")}
+        href={`/panel/informes/export?report=${tab}&range=${period.key}`}
+      >
+        {t("sales.export")}
+      </a>
 
       {tab === "sales" ? <SalesReport accountId={account.id} days={period.days} t={t} /> : null}
       {tab === "repairs" ? <RepairsReport accountId={account.id} t={t} /> : null}
@@ -116,9 +133,75 @@ async function SalesReport({ accountId, days, t }: { accountId: string; days: nu
     );
   }
 
+  const taxColumns: Column<(typeof tax)[number]>[] = [
+    {
+      key: "regime",
+      header: t("inf.regime"),
+      card: "title",
+      render: (r) => labelFor(t, "regime", r.regime),
+    },
+    { key: "lines", header: t("inf.lines"), align: "right", card: "meta", render: (r) => r.lines },
+    {
+      key: "base",
+      header: t("doc.base"),
+      align: "right",
+      card: "figure",
+      render: (r) => euros(r.baseCents),
+    },
+    {
+      key: "tax",
+      header: t("doc.tax"),
+      align: "right",
+      card: "figure",
+      render: (r) => euros(r.taxCents),
+    },
+    {
+      key: "total",
+      header: t("doc.total"),
+      align: "right",
+      card: "figure",
+      className: "font-semibold",
+      render: (r) => euros(r.totalCents),
+    },
+  ];
+
+  const groupColumns: Column<(typeof groups)[number]>[] = [
+    { key: "group", header: t("cat.group"), card: "title", render: (r) => r.label },
+    {
+      key: "count",
+      header: t("inf.sales.count"),
+      align: "right",
+      card: "meta",
+      render: (r) => r.count,
+    },
+    { key: "qty", header: t("inf.sales.qty"), align: "right", card: "meta", render: (r) => r.qty },
+    {
+      key: "base",
+      header: t("doc.base"),
+      align: "right",
+      card: "figure",
+      render: (r) => euros(r.netCents),
+    },
+    {
+      key: "tax",
+      header: t("doc.tax"),
+      align: "right",
+      card: "figure",
+      render: (r) => euros(r.taxCents),
+    },
+    {
+      key: "total",
+      header: t("doc.total"),
+      align: "right",
+      card: "figure",
+      className: "font-semibold",
+      render: (r) => euros(r.grossCents),
+    },
+  ];
+
   return (
     <div className="space-y-4">
-      <Card className="flex flex-wrap divide-line sm:divide-x">
+      <StatGrid cols={6}>
         <Stat label={t("inf.sales.tickets")} value={String(summary.tickets)} />
         <Stat label={t("inf.sales.net")} value={euros(summary.netCents)} />
         <Stat label={t("inf.sales.tax")} value={euros(summary.taxCents)} />
@@ -127,66 +210,28 @@ async function SalesReport({ accountId, days, t }: { accountId: string; days: nu
         <Stat
           label={t("inf.sales.refunds")}
           value={euros(summary.refundsCents)}
-          sub={`${summary.refundCount}`}
+          sub={plural(t, "inf.sales.refundCount", summary.refundCount)}
+        />
+      </StatGrid>
+
+      <Card>
+        <CardHead title={t("inf.tax")} hint={t("inf.taxHint")} />
+        <DataTable
+          rows={tax}
+          columns={taxColumns}
+          rowKey={(r) => r.regime}
+          empty={<EmptyState title={t("empty.noData")} />}
         />
       </Card>
 
       <Card>
-        <CardHead title={t("inf.tax")} hint={t("inf.taxHint")} />
-        <CardBody className="pt-2">
-          <Table>
-            <thead>
-              <tr>
-                <TH>{t("inf.regime")}</TH>
-                <TH right>{t("inf.lines")}</TH>
-                <TH right>{t("doc.base")}</TH>
-                <TH right>{t("doc.tax")}</TH>
-                <TH right>{t("doc.total")}</TH>
-              </tr>
-            </thead>
-            <tbody>
-              {tax.map((row) => (
-                <TR key={row.regime}>
-                  <TD>{labelFor(t, "regime", row.regime)}</TD>
-                  <TD right>{row.lines}</TD>
-                  <TD right>{euros(row.baseCents)}</TD>
-                  <TD right>{euros(row.taxCents)}</TD>
-                  <TD right className="font-semibold">{euros(row.totalCents)}</TD>
-                </TR>
-              ))}
-            </tbody>
-          </Table>
-        </CardBody>
-      </Card>
-
-      <Card>
         <CardHead title={t("inf.sales.byGroup")} hint={t("inf.sales.byGroupHint")} />
-        <CardBody className="pt-2">
-          <Table>
-            <thead>
-              <tr>
-                <TH>{t("cat.group")}</TH>
-                <TH right>{t("inf.sales.count")}</TH>
-                <TH right>{t("inf.sales.qty")}</TH>
-                <TH right>{t("doc.base")}</TH>
-                <TH right>{t("doc.tax")}</TH>
-                <TH right>{t("doc.total")}</TH>
-              </tr>
-            </thead>
-            <tbody>
-              {groups.map((row) => (
-                <TR key={row.key}>
-                  <TD>{row.label}</TD>
-                  <TD right>{row.count}</TD>
-                  <TD right>{row.qty}</TD>
-                  <TD right>{euros(row.netCents)}</TD>
-                  <TD right>{euros(row.taxCents)}</TD>
-                  <TD right className="font-semibold">{euros(row.grossCents)}</TD>
-                </TR>
-              ))}
-            </tbody>
-          </Table>
-        </CardBody>
+        <DataTable
+          rows={groups}
+          columns={groupColumns}
+          rowKey={(r) => r.key}
+          empty={<EmptyState title={t("empty.noData")} />}
+        />
       </Card>
     </div>
   );
@@ -197,86 +242,97 @@ async function SalesReport({ accountId, days, t }: { accountId: string; days: nu
 async function RepairsReport({ accountId, t }: { accountId: string; t: T }) {
   const [open, closed] = await Promise.all([repairsOpen(accountId), repairsClosed(accountId)]);
 
+  const openColumns: Column<(typeof open)[number]>[] = [
+    { key: "device", header: t("rp.device"), card: "title", render: (r) => r.device },
+    { key: "customer", header: t("rp.customer"), card: "sub", render: (r) => r.customerName },
+    {
+      key: "status",
+      header: t("rp.status"),
+      card: "badge",
+      render: (r) => <Chip>{labelFor(t, "rps", r.status)}</Chip>,
+    },
+    {
+      key: "promised",
+      header: t("rp.promised"),
+      card: "meta",
+      render: (r) =>
+        r.overdue ? <Chip tone="bad">{t("inf.rep.overdue")}</Chip> : (r.promisedDate ?? "—"),
+    },
+    {
+      key: "days",
+      header: t("inf.rep.days"),
+      align: "right",
+      card: "figure",
+      render: (r) => r.daysSinceIntake,
+    },
+  ];
+
+  const closedColumns: Column<(typeof closed)[number]>[] = [
+    { key: "device", header: t("rp.device"), card: "title", render: (r) => r.device },
+    { key: "customer", header: t("rp.customer"), card: "sub", render: (r) => r.customerName },
+    {
+      key: "status",
+      header: t("rp.status"),
+      card: "badge",
+      render: (r) => <Chip>{labelFor(t, "rps", r.status)}</Chip>,
+    },
+    {
+      key: "turnaround",
+      header: t("inf.rep.turnaround"),
+      align: "right",
+      card: "meta",
+      render: (r) => r.turnaroundDays ?? "—",
+    },
+    {
+      key: "parts",
+      header: t("inf.rep.parts"),
+      align: "right",
+      card: "figure",
+      render: (r) => euros(r.partsCostCents),
+    },
+    {
+      key: "labour",
+      header: t("inf.rep.labour"),
+      align: "right",
+      card: "figure",
+      render: (r) => euros(r.labourCents),
+    },
+    {
+      key: "charged",
+      header: t("inf.rep.charged"),
+      align: "right",
+      card: "figure",
+      className: "font-semibold",
+      render: (r) => euros(r.chargedCents),
+    },
+  ];
+
   return (
     <div className="space-y-4">
       <Card>
         <CardHead title={t("inf.rep.open")} hint={t("inf.rep.openHint")} />
-        {open.length === 0 ? (
-          <EmptyState title={t("empty.noData")} />
-        ) : (
-          <CardBody className="pt-2">
-            <Table>
-              <thead>
-                <tr>
-                  <TH>{t("rp.device")}</TH>
-                  <TH>{t("rp.customer")}</TH>
-                  <TH>{t("rp.status")}</TH>
-                  <TH right>{t("inf.rep.days")}</TH>
-                  <TH>{t("rp.promised")}</TH>
-                </tr>
-              </thead>
-              <tbody>
-                {open.map((row) => (
-                  <TR key={row.ticketId}>
-                    <TD>{row.device}</TD>
-                    <TD>{row.customerName}</TD>
-                    <TD>{labelFor(t, "rps", row.status)}</TD>
-                    <TD right>{row.daysSinceIntake}</TD>
-                    <TD>
-                      {row.overdue ? (
-                        <Chip tone="bad">{t("inf.rep.overdue")}</Chip>
-                      ) : (
-                        (row.promisedDate ?? "—")
-                      )}
-                    </TD>
-                  </TR>
-                ))}
-              </tbody>
-            </Table>
-          </CardBody>
-        )}
+        <DataTable
+          rows={open}
+          columns={openColumns}
+          rowKey={(r) => r.ticketId}
+          empty={<EmptyState title={t("empty.noData")} />}
+        />
       </Card>
 
       <Card>
         <CardHead title={t("inf.rep.closed")} hint={t("inf.rep.closedHint")} />
-        {closed.length === 0 ? (
-          <EmptyState title={t("empty.noData")} />
-        ) : (
-          <>
-            <CardBody className="pt-2">
-              <Table>
-                <thead>
-                  <tr>
-                    <TH>{t("rp.device")}</TH>
-                    <TH>{t("rp.customer")}</TH>
-                    <TH>{t("rp.status")}</TH>
-                    <TH right>{t("inf.rep.turnaround")}</TH>
-                    <TH right>{t("inf.rep.parts")}</TH>
-                    <TH right>{t("inf.rep.labour")}</TH>
-                    <TH right>{t("inf.rep.charged")}</TH>
-                  </tr>
-                </thead>
-                <tbody>
-                  {closed.map((row) => (
-                    <TR key={row.ticketId}>
-                      <TD>{row.device}</TD>
-                      <TD>{row.customerName}</TD>
-                      <TD>{labelFor(t, "rps", row.status)}</TD>
-                      <TD right>{row.turnaroundDays ?? "—"}</TD>
-                      <TD right>{euros(row.partsCostCents)}</TD>
-                      <TD right>{euros(row.labourCents)}</TD>
-                      <TD right className="font-semibold">{euros(row.chargedCents)}</TD>
-                    </TR>
-                  ))}
-                </tbody>
-              </Table>
-            </CardBody>
-            {/* said on the screen rather than quietly omitted */}
-            <div className="border-t border-line px-4 py-2.5 text-[11px] text-subtle sm:px-5">
-              {t("inf.rep.noMargin")}
-            </div>
-          </>
-        )}
+        <DataTable
+          rows={closed}
+          columns={closedColumns}
+          rowKey={(r) => r.ticketId}
+          empty={<EmptyState title={t("empty.noData")} />}
+        />
+        {/* said on the screen rather than quietly omitted */}
+        {closed.length > 0 ? (
+          <div className="border-t border-line px-4 py-2.5 text-[11px] text-subtle sm:px-5">
+            {t("inf.rep.noMargin")}
+          </div>
+        ) : null}
       </Card>
     </div>
   );
@@ -287,49 +343,59 @@ async function RepairsReport({ accountId, t }: { accountId: string; t: T }) {
 async function UsedReport({ accountId, t }: { accountId: string; t: T }) {
   const held = await usedHolding(accountId);
   const tiedUp = held.reduce((sum, row) => sum + row.costCents, 0);
+  const oldest = held.reduce((most, row) => Math.max(most, row.daysHeld), 0);
+
+  const columns: Column<(typeof held)[number]>[] = [
+    { key: "device", header: t("us.device"), card: "title", render: (r) => r.model },
+    { key: "grade", header: t("us.grade"), card: "sub", render: (r) => r.grade ?? "—" },
+    {
+      key: "state",
+      header: t("us.state"),
+      card: "badge",
+      render: (r) => <Chip>{labelFor(t, "uss", r.state)}</Chip>,
+    },
+    {
+      key: "days",
+      header: t("inf.used.days"),
+      align: "right",
+      card: "figure",
+      render: (r) => r.daysHeld,
+    },
+    {
+      key: "cost",
+      header: t("inf.used.cost"),
+      align: "right",
+      card: "figure",
+      render: (r) => euros(r.costCents),
+    },
+    {
+      key: "price",
+      header: t("us.price"),
+      align: "right",
+      card: "figure",
+      className: "font-semibold",
+      render: (r) => (r.salePriceCents === null ? "—" : euros(r.salePriceCents)),
+    },
+  ];
 
   return (
-    <Card>
-      <CardHead
-        title={t("inf.used.title")}
-        hint={t("inf.used.hint")}
-        action={
-          <span className="tabular text-[12px] text-muted">
-            {held.length} · {euros(tiedUp)}
-          </span>
-        }
-      />
-      {held.length === 0 ? (
-        <EmptyState title={t("empty.noData")} />
-      ) : (
-        <CardBody className="pt-2">
-          <Table>
-            <thead>
-              <tr>
-                <TH>{t("us.device")}</TH>
-                <TH>{t("us.grade")}</TH>
-                <TH>{t("us.state")}</TH>
-                <TH right>{t("inf.used.days")}</TH>
-                <TH right>{t("inf.used.cost")}</TH>
-                <TH right>{t("us.price")}</TH>
-              </tr>
-            </thead>
-            <tbody>
-              {held.map((row) => (
-                <TR key={row.purchaseId}>
-                  <TD>{row.model}</TD>
-                  <TD>{row.grade ?? "—"}</TD>
-                  <TD>{labelFor(t, "uss", row.state)}</TD>
-                  <TD right>{row.daysHeld}</TD>
-                  <TD right>{euros(row.costCents)}</TD>
-                  <TD right>{row.salePriceCents === null ? "—" : euros(row.salePriceCents)}</TD>
-                </TR>
-              ))}
-            </tbody>
-          </Table>
-        </CardBody>
-      )}
-    </Card>
+    <div className="space-y-4">
+      <StatGrid cols={3}>
+        <Stat label={t("us.holdingCount")} value={String(held.length)} />
+        <Stat label={t("inf.used.cost")} value={euros(tiedUp)} />
+        <Stat label={t("inf.used.days")} value={String(oldest)} sub={t("inf.used.oldestHint")} />
+      </StatGrid>
+
+      <Card>
+        <CardHead title={t("inf.used.title")} hint={t("inf.used.hint")} />
+        <DataTable
+          rows={held}
+          columns={columns}
+          rowKey={(r) => r.purchaseId}
+          empty={<EmptyState title={t("empty.noData")} />}
+        />
+      </Card>
+    </div>
   );
 }
 
@@ -341,75 +407,68 @@ async function ValuationReport({ accountId, t }: { accountId: string; t: T }) {
   const atRetail = stock.reduce((sum, row) => sum + row.atRetailCents, 0);
   const owed = vouchers.reduce((sum, row) => sum + row.remainingCents, 0);
 
+  const stockColumns: Column<(typeof stock)[number]>[] = [
+    { key: "group", header: t("cat.group"), card: "title", render: (r) => r.group },
+    { key: "items", header: t("inf.items"), align: "right", card: "meta", render: (r) => r.items },
+    { key: "units", header: t("inf.units"), align: "right", card: "meta", render: (r) => r.units },
+    {
+      key: "cost",
+      header: t("inf.atCost"),
+      align: "right",
+      card: "figure",
+      render: (r) => euros(r.atCostCents),
+    },
+    {
+      key: "retail",
+      header: t("inf.atRetail"),
+      align: "right",
+      card: "figure",
+      className: "font-semibold",
+      render: (r) => euros(r.atRetailCents),
+    },
+  ];
+
+  const voucherColumns: Column<(typeof vouchers)[number]>[] = [
+    { key: "when", header: t("doc.when"), card: "title", render: (r) => dateTime(r.createdAt) },
+    {
+      key: "issued",
+      header: t("inf.issued"),
+      align: "right",
+      card: "figure",
+      render: (r) => euros(r.amountCents),
+    },
+    {
+      key: "left",
+      header: t("inf.remaining"),
+      align: "right",
+      card: "figure",
+      className: "font-semibold",
+      render: (r) => euros(r.remainingCents),
+    },
+  ];
+
   return (
     <div className="space-y-4">
+      <StatGrid cols={3}>
+        <Stat label={t("inf.atCost")} value={euros(atCost)} />
+        <Stat label={t("inf.atRetail")} value={euros(atRetail)} />
+        <Stat label={t("inf.credit")} value={euros(owed)} sub={t("inf.creditShort")} />
+      </StatGrid>
+
       <Card>
-        <CardHead
-          title={t("inf.valuation")}
-          hint={t("inf.valuationHint")}
-          action={
-            <span className="tabular text-[12px] text-muted">
-              {euros(atCost)} · {euros(atRetail)}
-            </span>
-          }
+        <CardHead title={t("inf.valuation")} hint={t("inf.valuationHint")} />
+        <DataTable
+          rows={stock}
+          columns={stockColumns}
+          rowKey={(r) => r.group}
+          empty={<EmptyState title={t("empty.noData")} />}
         />
-        {stock.length === 0 ? (
-          <EmptyState title={t("empty.noData")} />
-        ) : (
-          <CardBody className="pt-2">
-            <Table>
-              <thead>
-                <tr>
-                  <TH>{t("cat.group")}</TH>
-                  <TH right>{t("inf.items")}</TH>
-                  <TH right>{t("inf.units")}</TH>
-                  <TH right>{t("inf.atCost")}</TH>
-                  <TH right>{t("inf.atRetail")}</TH>
-                </tr>
-              </thead>
-              <tbody>
-                {stock.map((row) => (
-                  <TR key={row.group}>
-                    <TD>{row.group}</TD>
-                    <TD right>{row.items}</TD>
-                    <TD right>{row.units}</TD>
-                    <TD right>{euros(row.atCostCents)}</TD>
-                    <TD right>{euros(row.atRetailCents)}</TD>
-                  </TR>
-                ))}
-              </tbody>
-            </Table>
-          </CardBody>
-        )}
       </Card>
 
       {vouchers.length > 0 ? (
         <Card>
-          <CardHead
-            title={t("inf.credit")}
-            hint={t("inf.creditHint")}
-            action={<span className="tabular text-[12px] text-muted">{euros(owed)}</span>}
-          />
-          <CardBody className="pt-2">
-            <Table>
-              <thead>
-                <tr>
-                  <TH>{t("doc.when")}</TH>
-                  <TH right>{t("inf.issued")}</TH>
-                  <TH right>{t("inf.remaining")}</TH>
-                </tr>
-              </thead>
-              <tbody>
-                {vouchers.map((row) => (
-                  <TR key={row.id}>
-                    <TD>{dateTime(row.createdAt)}</TD>
-                    <TD right>{euros(row.amountCents)}</TD>
-                    <TD right className="font-semibold">{euros(row.remainingCents)}</TD>
-                  </TR>
-                ))}
-              </tbody>
-            </Table>
-          </CardBody>
+          <CardHead title={t("inf.credit")} hint={t("inf.creditHint")} />
+          <DataTable rows={vouchers} columns={voucherColumns} rowKey={(r) => r.id} />
         </Card>
       ) : null}
     </div>
@@ -421,44 +480,56 @@ async function ValuationReport({ accountId, t }: { accountId: string; t: T }) {
 async function DeadStockReport({ accountId, t }: { accountId: string; t: T }) {
   const dead = await deadStock(accountId, 90);
   const stuck = dead.reduce((sum, row) => sum + row.atCostCents, 0);
+  const never = dead.filter((row) => !row.lastSoldAt).length;
+
+  const columns: Column<(typeof dead)[number]>[] = [
+    { key: "item", header: t("cat.item"), card: "title", render: (r) => r.name },
+    { key: "group", header: t("cat.group"), card: "sub", render: (r) => r.group ?? "—" },
+    {
+      key: "last",
+      header: t("inf.lastSold"),
+      card: "badge",
+      render: (r) =>
+        r.lastSoldAt ? (
+          <span className="text-[11.5px] text-muted">{dateTime(r.lastSoldAt)}</span>
+        ) : (
+          <Chip tone="warn">{t("inf.never")}</Chip>
+        ),
+    },
+    {
+      key: "stock",
+      header: t("cat.stock"),
+      align: "right",
+      card: "figure",
+      render: (r) => r.onHand,
+    },
+    {
+      key: "cost",
+      header: t("inf.atCost"),
+      align: "right",
+      card: "figure",
+      className: "font-semibold",
+      render: (r) => euros(r.atCostCents),
+    },
+  ];
 
   return (
-    <Card>
-      <CardHead
-        title={t("inf.dead")}
-        hint={t("inf.deadHint")}
-        action={<span className="tabular text-[12px] text-muted">{euros(stuck)}</span>}
-      />
-      {dead.length === 0 ? (
-        <EmptyState title={t("empty.noData")} />
-      ) : (
-        <CardBody className="pt-2">
-          <Table>
-            <thead>
-              <tr>
-                <TH>{t("cat.item")}</TH>
-                <TH>{t("cat.group")}</TH>
-                <TH right>{t("cat.stock")}</TH>
-                <TH right>{t("inf.atCost")}</TH>
-                <TH>{t("inf.lastSold")}</TH>
-              </tr>
-            </thead>
-            <tbody>
-              {dead.map((row) => (
-                <TR key={row.name}>
-                  <TD>{row.name}</TD>
-                  <TD>{row.group ?? "—"}</TD>
-                  <TD right>{row.onHand}</TD>
-                  <TD right>{euros(row.atCostCents)}</TD>
-                  <TD className={row.lastSoldAt ? undefined : "text-muted"}>
-                    {row.lastSoldAt ? dateTime(row.lastSoldAt) : t("inf.never")}
-                  </TD>
-                </TR>
-              ))}
-            </tbody>
-          </Table>
-        </CardBody>
-      )}
-    </Card>
+    <div className="space-y-4">
+      <StatGrid cols={3}>
+        <Stat label={t("inf.items")} value={String(dead.length)} />
+        <Stat label={t("inf.atCost")} value={euros(stuck)} sub={t("inf.deadShort")} />
+        <Stat label={t("inf.never")} value={String(never)} />
+      </StatGrid>
+
+      <Card>
+        <CardHead title={t("inf.dead")} hint={t("inf.deadHint")} />
+        <DataTable
+          rows={dead}
+          columns={columns}
+          rowKey={(r) => r.name}
+          empty={<EmptyState title={t("empty.noData")} />}
+        />
+      </Card>
+    </div>
   );
 }

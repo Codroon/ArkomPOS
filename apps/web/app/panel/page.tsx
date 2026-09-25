@@ -1,6 +1,12 @@
 /**
  * Resumen — what the shop did, for the period in the top bar.
  *
+ * The question this screen answers is "how did we do, and is that better or
+ * worse than last time". So the four figures come first and each carries its own
+ * comparison — or says plainly that there is nothing to compare against, which
+ * is a fact about the data and not an empty slot. Under them, where the money
+ * came from and what it came from.
+ *
  * Every figure arrives already computed from SQL. Nothing on this page adds up
  * money: that would be a second implementation of it, and the one in
  * `packages/core` is the one with tests (ADR-0016 §3).
@@ -17,9 +23,20 @@ import {
   topProducts,
 } from "../../src/db/dashboard-queries";
 import { tillsForAccount } from "../../src/db/panel-queries";
-import { dateTime, euros  } from "../../src/lib/format";
-import { Card, CardBody, CardHead, Chip, EmptyState, Stat, TD, TH, TR, Table } from "../../src/ui";
-import { MixChart, TakingsChart } from "./charts";
+import { dateTime, euros } from "../../src/lib/format";
+import {
+  Card,
+  CardBody,
+  CardHead,
+  Chip,
+  DataTable,
+  EmptyState,
+  Stat,
+  StatGrid,
+  type Column,
+} from "../../src/ui";
+import { BarList } from "../../src/ui/bar-list";
+import { TakingsChart } from "./charts";
 
 export const dynamic = "force-dynamic";
 
@@ -49,48 +66,102 @@ export default async function SummaryPage({
     );
   }
 
+  /* "frente al periodo anterior" under a blank space promises a comparison
+     nobody made. When there is no previous period, say so. */
+  const sub = (delta: number | null) =>
+    delta === null ? t("kpi.noPrevious") : t("kpi.vsPrevious");
+
   const chartData = byDay.map((row) => ({
     ...row,
     label: `${row.day.slice(8, 10)}/${row.day.slice(5, 7)}`,
   }));
-  const hasMovement = byDay.some((row) => row.documents > 0);
+  const daysWithSales = byDay.filter((row) => row.documents > 0).length;
+
+  const topColumns: Column<(typeof top)[number]>[] = [
+    { key: "what", header: t("doc.concept"), card: "title", render: (r) => r.description },
+    { key: "qty", header: t("doc.qty"), align: "right", card: "figure", render: (r) => r.qty },
+    {
+      key: "total",
+      header: t("doc.total"),
+      align: "right",
+      card: "figure",
+      render: (r) => euros(r.totalCents),
+    },
+  ];
+
+  const shiftColumns: Column<(typeof shifts)[number]>[] = [
+    { key: "z", header: "Z", card: "title", className: "tabular", render: (s) => s.zDocNumber ?? "—" },
+    { key: "when", header: t("doc.when"), card: "sub", render: (s) => dateTime(s.closedAt) },
+    {
+      key: "expected",
+      header: t("shift.expected"),
+      align: "right",
+      card: "figure",
+      render: (s) => euros(s.expectedCashCents),
+    },
+    {
+      key: "counted",
+      header: t("shift.counted"),
+      align: "right",
+      card: "figure",
+      render: (s) => euros(s.countedCashCents),
+    },
+    {
+      key: "variance",
+      header: t("shift.variance"),
+      align: "right",
+      card: "figure",
+      render: (s) =>
+        s.varianceCents === 0 ? (
+          <span className="text-muted">{euros(0)}</span>
+        ) : (
+          <Chip tone="bad">{euros(s.varianceCents)}</Chip>
+        ),
+    },
+  ];
 
   return (
     <div className="space-y-4">
-      {/* ------------------------------------------------------------ kpis */}
-      <Card className="flex flex-wrap divide-line sm:divide-x">
+      <StatGrid>
         <Stat
           label={t("kpi.net")}
           value={euros(totals.current.netCents)}
           delta={totals.delta.net}
-          sub={t("kpi.vsPrevious")}
+          sub={sub(totals.delta.net)}
         />
         <Stat
           label={t("kpi.documents")}
           value={String(totals.current.documents)}
           delta={totals.delta.documents}
-          sub={t("kpi.vsPrevious")}
+          sub={sub(totals.delta.documents)}
         />
         <Stat
           label={t("kpi.average")}
           value={euros(totals.current.averageCents)}
           delta={totals.delta.average}
-          sub={t("kpi.vsPrevious")}
+          sub={sub(totals.delta.average)}
         />
         <Stat
           label={t("kpi.tax")}
           value={euros(totals.current.taxCents)}
           delta={totals.delta.tax}
-          sub={t("kpi.vsPrevious")}
+          sub={sub(totals.delta.tax)}
         />
-      </Card>
+      </StatGrid>
 
-      {/* ---------------------------------------------------------- charts */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid min-w-0 items-start gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardHead title={t("chart.takings")} hint={t("chart.takingsHint")} />
+          <CardHead
+            title={t("chart.takings")}
+            hint={t("chart.takingsHint")}
+            action={
+              daysWithSales > 0 ? (
+                <Chip>{t("chart.activeDays", { n: daysWithSales, of: byDay.length })}</Chip>
+              ) : undefined
+            }
+          />
           <CardBody>
-            {hasMovement ? (
+            {daysWithSales > 0 ? (
               <TakingsChart data={chartData} currency="€" />
             ) : (
               <EmptyState title={t("empty.noData")} />
@@ -102,12 +173,12 @@ export default async function SummaryPage({
           <CardHead title={t("chart.payments")} hint={t("chart.paymentsHint")} />
           <CardBody>
             {mix.length > 0 ? (
-              <MixChart
-                data={mix.map((row) => ({
+              <BarList
+                rows={mix.map((row) => ({
                   label: labelFor(t, "tender", row.method),
-                  amountCents: row.amountCents,
+                  value: row.amountCents,
                 }))}
-                currency="€"
+                format={(cents) => euros(cents)}
               />
             ) : (
               <EmptyState title={t("empty.noData")} />
@@ -116,72 +187,27 @@ export default async function SummaryPage({
         </Card>
       </div>
 
-      {/* --------------------------------------------------- top + shifts */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* items-start: a card with one Z close should be the height of one Z
+          close, not of the eight-row table beside it */}
+      <div className="grid min-w-0 items-start gap-4 lg:grid-cols-2">
         <Card>
           <CardHead title={t("chart.topProducts")} hint={t("chart.topProductsHint")} />
-          {top.length === 0 ? (
-            <EmptyState title={t("empty.noData")} />
-          ) : (
-            <CardBody className="pt-1">
-              <Table>
-                <thead>
-                  <tr>
-                    <TH>{t("doc.concept")}</TH>
-                    <TH right>{t("doc.qty")}</TH>
-                    <TH right>{t("doc.total")}</TH>
-                  </tr>
-                </thead>
-                <tbody>
-                  {top.map((row) => (
-                    <TR key={row.description}>
-                      <TD>{row.description}</TD>
-                      <TD right>{row.qty}</TD>
-                      <TD right>{euros(row.totalCents)}</TD>
-                    </TR>
-                  ))}
-                </tbody>
-              </Table>
-            </CardBody>
-          )}
+          <DataTable
+            rows={top}
+            columns={topColumns}
+            rowKey={(r) => r.description}
+            empty={<EmptyState title={t("empty.noData")} />}
+          />
         </Card>
 
         <Card>
           <CardHead title={t("shift.title")} hint={t("shift.hint")} />
-          {shifts.length === 0 ? (
-            <EmptyState title={t("empty.noData")} />
-          ) : (
-            <CardBody className="pt-1">
-              <Table>
-                <thead>
-                  <tr>
-                    <TH>Z</TH>
-                    <TH>{t("doc.when")}</TH>
-                    <TH right>{t("shift.expected")}</TH>
-                    <TH right>{t("shift.counted")}</TH>
-                    <TH right>{t("shift.variance")}</TH>
-                  </tr>
-                </thead>
-                <tbody>
-                  {shifts.map((shift) => (
-                    <TR key={`${shift.zDocNumber}-${shift.closedAt.getTime()}`}>
-                      <TD className="tabular">{shift.zDocNumber ?? "—"}</TD>
-                      <TD>{dateTime(shift.closedAt)}</TD>
-                      <TD right>{euros(shift.expectedCashCents)}</TD>
-                      <TD right>{euros(shift.countedCashCents)}</TD>
-                      <TD right>
-                        {shift.varianceCents === 0 ? (
-                          <span className="text-muted">{euros(0)}</span>
-                        ) : (
-                          <Chip tone="bad">{euros(shift.varianceCents)}</Chip>
-                        )}
-                      </TD>
-                    </TR>
-                  ))}
-                </tbody>
-              </Table>
-            </CardBody>
-          )}
+          <DataTable
+            rows={shifts}
+            columns={shiftColumns}
+            rowKey={(s) => `${s.zDocNumber}-${s.closedAt.getTime()}`}
+            empty={<EmptyState title={t("empty.noData")} />}
+          />
         </Card>
       </div>
     </div>

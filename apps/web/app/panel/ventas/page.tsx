@@ -1,23 +1,49 @@
 /**
- * Ventas — every completed document in the period.
+ * Transacciones — every completed document in the period.
+ *
+ * The question is "what has been sold, and can I find this one receipt". So the
+ * list is ordered newest first, the number is the thing you scan for, and the
+ * total sits on a shared right edge all the way down. On a phone each document
+ * is a card with its number and time on top and base/IVA/total in a strip — the
+ * figures used to be off-screen behind a sideways scroll, reachable only by
+ * swiping inside a row.
  *
  * The filters are a plain GET form, so the state lives in the URL: a link
  * somebody sends themselves opens on the same rows, the back button does what
  * it should, and the export below re-runs the same query rather than being
  * handed a list that might differ from the one on screen (ADR-0016 §4).
  */
-import Link from "next/link";
 import { requireAccount } from "../../../src/auth/session";
 import { getT } from "../../../src/i18n/server";
-import { labelFor } from "../../../src/i18n";
+import { labelFor, plural } from "../../../src/i18n";
 import { parseRange } from "../../../src/lib/range";
 import { documentsInPeriod } from "../../../src/db/dashboard-queries";
-import { dateTime, euros  } from "../../../src/lib/format";
-import { Card, CardHead, CardBody, EmptyState, TD, TH, TR, Table, ghostClass, inputClass } from "../../../src/ui";
+import { dateTime, euros } from "../../../src/lib/format";
+import {
+  Card,
+  CardHead,
+  Chip,
+  DataTable,
+  EmptyState,
+  Field,
+  Figure,
+  ghostClass,
+  inputClass,
+  selectClass,
+  type Column,
+} from "../../../src/ui";
+import { Filters } from "../../../src/ui/filters";
 
 export const dynamic = "force-dynamic";
 
 const TYPES = ["ticket", "refund", "repair", "used_purchase"];
+
+const TONE: Record<string, "neutral" | "ok" | "warn" | "bad" | "info"> = {
+  ticket: "ok",
+  refund: "bad",
+  repair: "info",
+  used_purchase: "warn",
+};
 
 export default async function SalesPage({
   searchParams,
@@ -38,6 +64,47 @@ export default async function SalesPage({
   if (search) exportQuery.set("q", search);
   if (docType) exportQuery.set("type", docType);
 
+  const total = documents.reduce((sum, doc) => sum + doc.totalCents, 0);
+
+  const columns: Column<(typeof documents)[number]>[] = [
+    {
+      key: "number",
+      header: t("doc.number"),
+      card: "title",
+      className: "tabular",
+      render: (d) => d.docNumber,
+    },
+    {
+      key: "type",
+      header: t("doc.type"),
+      card: "badge",
+      render: (d) => <Chip tone={TONE[d.docType] ?? "neutral"}>{labelFor(t, "docType", d.docType)}</Chip>,
+    },
+    { key: "when", header: t("doc.when"), card: "sub", render: (d) => dateTime(d.completedAt) },
+    {
+      key: "base",
+      header: t("doc.base"),
+      align: "right",
+      card: "figure",
+      render: (d) => euros(d.totalCents - d.taxCents),
+    },
+    {
+      key: "tax",
+      header: t("doc.tax"),
+      align: "right",
+      card: "figure",
+      render: (d) => euros(d.taxCents),
+    },
+    {
+      key: "total",
+      header: t("doc.total"),
+      align: "right",
+      card: "figure",
+      className: "font-semibold",
+      render: (d) => euros(d.totalCents),
+    },
+  ];
+
   return (
     <Card>
       <CardHead
@@ -50,21 +117,25 @@ export default async function SalesPage({
         }
       />
 
-      <CardBody className="border-b border-line">
-        {/* GET, so the filters end up in the address bar where they belong */}
-        <form className="flex flex-wrap items-end gap-2">
-          <input type="hidden" name="range" value={period.key} />
-          <div className="min-w-[180px] flex-1">
-            <input
-              className={inputClass}
-              type="search"
-              name="q"
-              defaultValue={search}
-              placeholder={t("sales.search")}
-              aria-label={t("sales.search")}
-            />
-          </div>
-          <select className={`${inputClass} w-auto`} name="type" defaultValue={docType} aria-label={t("doc.type")}>
+      <Filters
+        label={t("filter.label")}
+        apply={t("filter.apply")}
+        close={t("app.close")}
+        active={(search ? 1 : 0) + (docType ? 1 : 0)}
+        summary={plural(t, "sales.count", documents.length)}
+      >
+        <input type="hidden" name="range" value={period.key} />
+        <Field label={t("sales.search")} className="md:w-[260px]">
+          <input
+            className={inputClass}
+            type="search"
+            name="q"
+            defaultValue={search}
+            placeholder={t("sales.search")}
+          />
+        </Field>
+        <Field label={t("doc.type")} className="md:w-[190px]">
+          <select className={selectClass} name="type" defaultValue={docType}>
             <option value="">{t("sales.allTypes")}</option>
             {TYPES.map((type) => (
               <option key={type} value={type}>
@@ -72,46 +143,25 @@ export default async function SalesPage({
               </option>
             ))}
           </select>
-          <button className={ghostClass} type="submit">
-            {t("sales.search")}
-          </button>
-        </form>
-      </CardBody>
+        </Field>
+        <button className={`${ghostClass} hidden md:inline-flex`} type="submit">
+          {t("filter.apply")}
+        </button>
+      </Filters>
 
-      {documents.length === 0 ? (
-        <EmptyState title={t("sales.empty")} />
-      ) : (
-        <CardBody className="pt-2">
-          <Table>
-            <thead>
-              <tr>
-                <TH>{t("doc.number")}</TH>
-                <TH>{t("doc.type")}</TH>
-                <TH>{t("doc.when")}</TH>
-                <TH right>{t("doc.base")}</TH>
-                <TH right>{t("doc.tax")}</TH>
-                <TH right>{t("doc.total")}</TH>
-              </tr>
-            </thead>
-            <tbody>
-              {documents.map((doc) => (
-                <TR key={doc.id}>
-                  <TD className="tabular">
-                    <Link className="underline underline-offset-2" href={`/panel/ventas/${doc.id}`}>
-                      {doc.docNumber}
-                    </Link>
-                  </TD>
-                  <TD>{labelFor(t, "docType", doc.docType)}</TD>
-                  <TD>{dateTime(doc.completedAt)}</TD>
-                  <TD right>{euros(doc.totalCents - doc.taxCents)}</TD>
-                  <TD right>{euros(doc.taxCents)}</TD>
-                  <TD right className="font-semibold">{euros(doc.totalCents)}</TD>
-                </TR>
-              ))}
-            </tbody>
-          </Table>
-        </CardBody>
-      )}
+      <DataTable
+        rows={documents}
+        columns={columns}
+        rowKey={(d) => d.id}
+        rowHref={(d) => `/panel/ventas/${d.id}`}
+        empty={<EmptyState title={t("sales.empty")} />}
+        footer={
+          <div className="flex items-baseline justify-between gap-4">
+            <span className="text-[12px] text-muted">{plural(t, "sales.count", documents.length)}</span>
+            <Figure size="md">{euros(total)}</Figure>
+          </div>
+        }
+      />
     </Card>
   );
 }

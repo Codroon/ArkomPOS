@@ -1,6 +1,11 @@
 /**
  * Catálogo — what the shop sells and what is on the shelf.
  *
+ * The question is "have we got it, what does it cost and what do we charge". On
+ * a desktop that is a table; on a phone it is a card per article with PVP and
+ * stock in the figure strip, because those two columns were the ones hidden off
+ * the right edge of the old table — the two anybody opens this screen for.
+ *
  * On-hand is computed from the movement history every time this page is asked
  * for, not read from a stored figure. The till keeps a cache and `db:audit`
  * asserts the cache equals the sum; here there is nothing to drift.
@@ -11,22 +16,23 @@
  */
 import { requireAccount } from "../../../src/auth/session";
 import { getT } from "../../../src/i18n/server";
-import { labelFor } from "../../../src/i18n";
+import { labelFor, plural } from "../../../src/i18n";
 import { productsForAccount } from "../../../src/db/catalogue-queries";
 import { euros } from "../../../src/lib/format";
 import {
   Card,
-  CardBody,
   CardHead,
   Chip,
+  DataTable,
   EmptyState,
-  TD,
-  TH,
-  TR,
-  Table,
+  Field,
+  Figure,
   ghostClass,
   inputClass,
+  selectClass,
+  type Column,
 } from "../../../src/ui";
+import { Filters } from "../../../src/ui/filters";
 
 export const dynamic = "force-dynamic";
 
@@ -62,37 +68,84 @@ export default async function CataloguePage({
   const units = products.reduce((sum, product) => sum + product.onHand, 0);
   const atCost = products.reduce((sum, product) => sum + product.onHand * product.costCents, 0);
 
+  const columns: Column<(typeof products)[number]>[] = [
+    {
+      key: "item",
+      header: t("cat.item"),
+      card: "title",
+      render: (p) => (
+        <span className={p.active ? undefined : "text-muted"}>
+          {p.name}
+          {p.active ? null : (
+            <span className="ml-2 align-middle">
+              <Chip>{t("cat.archived")}</Chip>
+            </span>
+          )}
+        </span>
+      ),
+    },
+    { key: "group", header: t("cat.group"), card: "sub", render: (p) => p.group ?? "—" },
+    {
+      key: "code",
+      header: t("cat.code"),
+      card: "meta",
+      className: "tabular text-muted",
+      render: (p) => p.barcode ?? "—",
+    },
+    {
+      key: "regime",
+      header: t("doc.regime"),
+      card: "meta",
+      render: (p) => labelFor(t, "regime", p.taxRegime),
+    },
+    {
+      key: "cost",
+      header: t("cat.cost"),
+      align: "right",
+      card: "figure",
+      render: (p) => euros(p.costCents),
+    },
+    {
+      key: "price",
+      header: t("cat.price"),
+      align: "right",
+      card: "figure",
+      className: "font-semibold",
+      render: (p) => euros(p.priceCents),
+    },
+    {
+      key: "stock",
+      header: t("cat.stock"),
+      align: "right",
+      card: "figure",
+      render: (p) =>
+        p.onHand <= p.lowStockThreshold ? <Chip tone="warn">{p.onHand}</Chip> : p.onHand,
+    },
+  ];
+
   return (
     <Card>
-      <CardHead
-        title={t("cat.title")}
-        hint={t("cat.hint")}
-        action={
-          <span className="text-[12px] text-muted">
-            {t("cat.summary", { n: products.length, units, value: euros(atCost) })}
-          </span>
-        }
-      />
+      <CardHead title={t("cat.title")} hint={t("cat.hint")} />
 
-      <CardBody className="border-b border-line">
-        <form className="flex flex-wrap items-end gap-2">
-          <div className="min-w-[200px] flex-1">
-            <input
-              className={inputClass}
-              type="search"
-              name="q"
-              defaultValue={typeof params.q === "string" ? params.q : ""}
-              placeholder={t("cat.search")}
-              aria-label={t("cat.search")}
-            />
-          </div>
-          {groups.length > 0 ? (
-            <select
-              className={`${inputClass} w-auto`}
-              name="group"
-              defaultValue={group}
-              aria-label={t("cat.group")}
-            >
+      <Filters
+        label={t("filter.label")}
+        apply={t("filter.apply")}
+        close={t("app.close")}
+        active={(search ? 1 : 0) + (group ? 1 : 0) + (lowOnly ? 1 : 0)}
+        summary={plural(t, "cat.count", products.length)}
+      >
+        <Field label={t("cat.search")} className="md:w-[260px]">
+          <input
+            className={inputClass}
+            type="search"
+            name="q"
+            defaultValue={typeof params.q === "string" ? params.q : ""}
+            placeholder={t("cat.search")}
+          />
+        </Field>
+        {groups.length > 0 ? (
+          <Field label={t("cat.group")} className="md:w-[220px]">
+            <select className={selectClass} name="group" defaultValue={group}>
               <option value="">{t("cat.allGroups")}</option>
               {groups.map((name) => (
                 <option key={name} value={name}>
@@ -100,61 +153,39 @@ export default async function CataloguePage({
                 </option>
               ))}
             </select>
-          ) : null}
-          <label className="flex items-center gap-2 px-1 text-[13px] text-ink-2">
-            <input type="checkbox" name="low" value="1" defaultChecked={lowOnly} />
-            {t("cat.lowOnly")}
-          </label>
-          <button className={ghostClass} type="submit">
-            {t("cat.search")}
-          </button>
-        </form>
-      </CardBody>
+          </Field>
+        ) : null}
+        {/* 44px of target, not a 13px box with a label beside it */}
+        <label className="flex h-11 items-center gap-2.5 rounded-card px-1 text-[13.5px] text-ink-2 md:h-10">
+          <input type="checkbox" name="low" value="1" defaultChecked={lowOnly} className="h-4 w-4" />
+          {t("cat.lowOnly")}
+        </label>
+        <button className={`${ghostClass} hidden md:inline-flex`} type="submit">
+          {t("filter.apply")}
+        </button>
+      </Filters>
 
-      {products.length === 0 ? (
-        <EmptyState title={t("cat.empty")} />
-      ) : (
-        <CardBody className="pt-2">
-          <Table>
-            <thead>
-              <tr>
-                <TH>{t("cat.item")}</TH>
-                <TH>{t("cat.group")}</TH>
-                <TH>{t("cat.code")}</TH>
-                <TH>{t("doc.regime")}</TH>
-                <TH right>{t("cat.cost")}</TH>
-                <TH right>{t("cat.price")}</TH>
-                <TH right>{t("cat.stock")}</TH>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map((product) => {
-                const low = product.onHand <= product.lowStockThreshold;
-                return (
-                  <TR key={product.id}>
-                    <TD className={product.active ? undefined : "text-muted"}>
-                      {product.name}
-                      {product.active ? null : (
-                        <span className="ml-2 align-middle">
-                          <Chip>{t("cat.archived")}</Chip>
-                        </span>
-                      )}
-                    </TD>
-                    <TD>{product.group ?? "—"}</TD>
-                    <TD className="tabular text-muted">{product.barcode ?? "—"}</TD>
-                    <TD>{labelFor(t, "regime", product.taxRegime)}</TD>
-                    <TD right>{euros(product.costCents)}</TD>
-                    <TD right>{euros(product.priceCents)}</TD>
-                    <TD right>
-                      {low ? <Chip tone="warn">{product.onHand}</Chip> : product.onHand}
-                    </TD>
-                  </TR>
-                );
-              })}
-            </tbody>
-          </Table>
-        </CardBody>
-      )}
+      <DataTable
+        rows={products}
+        columns={columns}
+        rowKey={(p) => p.id}
+        empty={<EmptyState title={t("cat.empty")} />}
+        footer={
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <span className="text-[12px] text-muted">
+              {products.length === 1
+                ? t("cat.countUnits.one", { units })
+                : t("cat.countUnits", { n: products.length, units })}
+            </span>
+            <span className="flex items-baseline gap-2">
+              <span className="text-[11px] tracking-[0.06em] text-subtle uppercase">
+                {t("inf.atCost")}
+              </span>
+              <Figure size="md">{euros(atCost)}</Figure>
+            </span>
+          </div>
+        }
+      />
     </Card>
   );
 }

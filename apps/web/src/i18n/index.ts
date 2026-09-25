@@ -23,6 +23,16 @@ const es = {
   "app.brand": "ARKOM POS",
   "app.signOut": "Salir",
   "app.language": "Idioma",
+  "app.close": "Cerrar",
+
+  "nav.more": "Más",
+  "nav.collapse": "Contraer el menú",
+  "nav.expand": "Desplegar el menú",
+  "navgroup.today": "Hoy",
+  "navgroup.selling": "Venta",
+  "navgroup.stock": "Almacén",
+  "navgroup.workshop": "Taller",
+  "navgroup.more": "Más",
 
   "nav.summary": "Resumen",
   "nav.sales": "Transacciones",
@@ -45,6 +55,7 @@ const es = {
   "kpi.average": "Ticket medio",
   "kpi.tax": "IVA repercutido",
   "kpi.vsPrevious": "frente al periodo anterior",
+  "kpi.noPrevious": "sin periodo anterior",
 
   "chart.takings": "Ventas por día",
   "chart.takingsHint": "Solo documentos completados, con la hora de la tienda.",
@@ -52,6 +63,7 @@ const es = {
   "chart.paymentsHint": "De dónde salió el dinero, en el periodo elegido.",
   "chart.topProducts": "Lo que más se vende",
   "chart.topProductsHint": "Por importe, en el periodo elegido.",
+  "chart.activeDays": "{n} de {of} días con ventas",
 
   "sales.title": "Transacciones",
   "sales.hint": "Solo transacciones completadas. Un borrador no es dinero.",
@@ -59,6 +71,11 @@ const es = {
   "sales.allTypes": "Todos los tipos",
   "sales.export": "Exportar CSV",
   "sales.empty": "No hay transacciones en este periodo.",
+  "sales.count": "{n} transacciones",
+  "sales.count.one": "1 transacción",
+
+  "filter.label": "Filtrar",
+  "filter.apply": "Aplicar",
 
   "doc.number": "Número",
   "doc.type": "Tipo",
@@ -92,6 +109,10 @@ const es = {
   "cat.archived": "archivado",
   "cat.empty": "Todavía no hay artículos.",
   "cat.summary": "{n} artículos · {units} unidades · {value} a coste",
+  "cat.count": "{n} artículos",
+  "cat.count.one": "1 artículo",
+  "cat.countUnits": "{n} artículos · {units} unidades",
+  "cat.countUnits.one": "1 artículo · {units} unidades",
 
   "inv.title": "Movimientos de stock",
   "inv.hint": "Lo que entró y salió de la estantería.",
@@ -136,6 +157,8 @@ const es = {
   "rp.empty": "Todavía no hay ninguna reparación.",
   "rp.emptyHint": "Cuando la caja dé entrada a un aparato, aparecerá aquí sola.",
   "rp.open": "Abiertas",
+  "rp.all": "Partes en total",
+  "rp.depositHint": "señales en partes abiertos",
   "rp.ready": "Listas para recoger",
   "rp.back": "Volver a reparaciones",
   "rp.lines": "Piezas y mano de obra",
@@ -169,6 +192,10 @@ const es = {
   "us.emptyHint": "Las compras hechas en 04 Comprar usados aparecerán aquí.",
   "us.review": "Revisar",
   "us.holding": "{n} aparatos · {value} invertido",
+  "us.holdingCount": "En stock",
+  "us.tiedUp": "Dinero parado",
+  "us.tiedUpHint": "comprado y todavía sin vender",
+  "us.all": "Comprados en total",
   "uss.held": "Retenido",
   "uss.needs_review": "Pendiente de revisar",
   "uss.in_stock": "En stock",
@@ -183,6 +210,10 @@ const es = {
   "tf.country": "País",
   "tf.principal": "Principal",
   "tf.fee": "Comisión",
+  "tf.feeHint": "esto sí es ingreso de la tienda",
+  "tf.principalHint": "dinero de paso, nunca ingreso",
+  "tf.live": "Vivas",
+  "tf.all": "Registradas",
   "tf.status": "Estado",
   "tf.empty": "Todavía no hay ninguna transferencia.",
   "tf.emptyHint": "El mostrador de Western Union se registra en 08 Transferencias.",
@@ -208,6 +239,8 @@ const es = {
   "inf.never": "Nunca",
   "inf.credit": "Vales pendientes",
   "inf.creditHint": "Dinero ya cobrado por género que aún no se ha entregado.",
+  "inf.creditShort": "vales sin gastar",
+  "inf.deadShort": "sin vender en 90 días",
   "inf.issued": "Emitido",
   "inf.remaining": "Pendiente",
 
@@ -269,6 +302,8 @@ const es = {
   "inf.sales.average": "Ticket medio",
   "inf.sales.used": "Ventas REBU",
   "inf.sales.refunds": "Devuelto",
+  "inf.sales.refundCount": "{n} devoluciones",
+  "inf.sales.refundCount.one": "1 devolución",
   "inf.sales.byGroup": "Por grupo",
   "inf.sales.byGroupHint": "De qué estantería salió el dinero.",
   "inf.sales.count": "Líneas",
@@ -288,6 +323,7 @@ const es = {
   "inf.used.hint": "Comprados y sin vender. Dinero en la estantería.",
   "inf.used.days": "Días retenido",
   "inf.used.cost": "Coste total",
+  "inf.used.oldestHint": "el que lleva más tiempo",
 
   "empty.noData": "Nada que enseñar todavía en este periodo.",
 } as const;
@@ -298,6 +334,16 @@ const en: Record<MessageKey, string> = {
   "app.brand": "ARKOM POS",
   "app.signOut": "Sign out",
   "app.language": "Language",
+  "app.close": "Close",
+
+  "nav.more": "More",
+  "nav.collapse": "Collapse menu",
+  "nav.expand": "Expand menu",
+  "navgroup.today": "Today",
+  "navgroup.selling": "Selling",
+  "navgroup.stock": "Stock",
+  "navgroup.workshop": "Workshop",
+  "navgroup.more": "More",
 
   "nav.summary": "Overview",
   "nav.sales": "Transactions",
@@ -320,6 +366,7 @@ const en: Record<MessageKey, string> = {
   "kpi.average": "Average sale",
   "kpi.tax": "VAT charged",
   "kpi.vsPrevious": "vs the period before",
+  "kpi.noPrevious": "no earlier period",
 
   "chart.takings": "Sales by day",
   "chart.takingsHint": "Completed documents only, on the shop's clock.",
@@ -327,6 +374,7 @@ const en: Record<MessageKey, string> = {
   "chart.paymentsHint": "Where the money came from, over the chosen period.",
   "chart.topProducts": "Best sellers",
   "chart.topProductsHint": "By value, over the chosen period.",
+  "chart.activeDays": "{n} of {of} days with sales",
 
   "sales.title": "Transactions",
   "sales.hint": "Completed transactions only. A draft is not money.",
@@ -334,6 +382,11 @@ const en: Record<MessageKey, string> = {
   "sales.allTypes": "All types",
   "sales.export": "Export CSV",
   "sales.empty": "No transactions in this period.",
+  "sales.count": "{n} transactions",
+  "sales.count.one": "1 transaction",
+
+  "filter.label": "Filter",
+  "filter.apply": "Apply",
 
   "doc.number": "Number",
   "doc.type": "Type",
@@ -367,6 +420,10 @@ const en: Record<MessageKey, string> = {
   "cat.archived": "archived",
   "cat.empty": "No items yet.",
   "cat.summary": "{n} items · {units} units · {value} at cost",
+  "cat.count": "{n} items",
+  "cat.count.one": "1 item",
+  "cat.countUnits": "{n} items · {units} units",
+  "cat.countUnits.one": "1 item · {units} units",
 
   "inv.title": "Stock movements",
   "inv.hint": "What came onto the shelf and what left it.",
@@ -411,6 +468,8 @@ const en: Record<MessageKey, string> = {
   "rp.empty": "No repairs yet.",
   "rp.emptyHint": "When the till books a device in, it will appear here by itself.",
   "rp.open": "Open",
+  "rp.all": "Tickets in total",
+  "rp.depositHint": "deposits on open tickets",
   "rp.ready": "Ready for collection",
   "rp.back": "Back to repairs",
   "rp.lines": "Parts and labour",
@@ -444,6 +503,10 @@ const en: Record<MessageKey, string> = {
   "us.emptyHint": "Purchases made in 04 Comprar usados will show up here.",
   "us.review": "Review",
   "us.holding": "{n} devices · {value} tied up",
+  "us.holdingCount": "In stock",
+  "us.tiedUp": "Money tied up",
+  "us.tiedUpHint": "bought and not yet sold",
+  "us.all": "Bought in total",
   "uss.held": "Held",
   "uss.needs_review": "Needs review",
   "uss.in_stock": "In stock",
@@ -458,6 +521,10 @@ const en: Record<MessageKey, string> = {
   "tf.country": "Country",
   "tf.principal": "Principal",
   "tf.fee": "Fee",
+  "tf.feeHint": "this one IS the shop's income",
+  "tf.principalHint": "money passing through, never income",
+  "tf.live": "Live",
+  "tf.all": "Logged",
   "tf.status": "Status",
   "tf.empty": "No transfers yet.",
   "tf.emptyHint": "The Western Union counter is logged in 08 Transferencias.",
@@ -483,6 +550,8 @@ const en: Record<MessageKey, string> = {
   "inf.never": "Never",
   "inf.credit": "Outstanding vouchers",
   "inf.creditHint": "Money already taken for goods not yet handed over.",
+  "inf.creditShort": "unspent vouchers",
+  "inf.deadShort": "unsold for 90 days",
   "inf.issued": "Issued",
   "inf.remaining": "Remaining",
 
@@ -544,6 +613,8 @@ const en: Record<MessageKey, string> = {
   "inf.sales.average": "Average sale",
   "inf.sales.used": "Margin-scheme sales",
   "inf.sales.refunds": "Refunded",
+  "inf.sales.refundCount": "{n} refunds",
+  "inf.sales.refundCount.one": "1 refund",
   "inf.sales.byGroup": "By group",
   "inf.sales.byGroupHint": "Which shelf the money came off.",
   "inf.sales.count": "Lines",
@@ -563,6 +634,7 @@ const en: Record<MessageKey, string> = {
   "inf.used.hint": "Bought and not yet sold. Money on the shelf.",
   "inf.used.days": "Days held",
   "inf.used.cost": "Total cost",
+  "inf.used.oldestHint": "the one held longest",
 
   "empty.noData": "Nothing to show for this period yet.",
 };
@@ -596,6 +668,23 @@ export function labelFor(t: Translate, prefix: string, code: string | null | und
   const key = `${prefix}.${code}` as MessageKey;
   const word = t(key);
   return word === key ? code : word;
+}
+
+/**
+ * "{n} devoluciones" is wrong when n is 1.
+ *
+ * Spanish and English both need the singular, and a count under a figure is
+ * exactly where a shop notices sloppiness. No plural library for two languages
+ * with one rule between them: a key may declare a `.one` variant, and this uses
+ * it when the count is one. A key without one behaves as before.
+ */
+export function plural(t: Translate, key: MessageKey, n: number): string {
+  if (n === 1) {
+    const one = `${key}.one` as MessageKey;
+    const word = t(one, { n });
+    if (word !== one) return word;
+  }
+  return t(key, { n });
 }
 
 /** For a component that was handed a locale rather than a cookie. */
