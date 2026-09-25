@@ -7,8 +7,18 @@
  * app), so no image dependency is added and the SVG is interpreted exactly as
  * the renderer would. Small sizes come from the reinforced favicon master —
  * the thin bar of the full mark disappears at 16px.
+ *
+ * The output must not depend on the MACHINE that runs this. `capturePage`
+ * returns physical pixels, so on a 125% display a 16px request came back 20px
+ * — and the .ico directory still said 16, which is a malformed file. Browsers
+ * react to that by ignoring the icon and drawing their own globe, and that is
+ * what the cloud's tab was showing. So the scale factor is forced to 1 and
+ * every capture is checked against the size it was asked for.
  */
 const { app, BrowserWindow, nativeImage } = require("electron");
+
+/* before whenReady, or Chromium has already picked the display's scale */
+app.commandLine.appendSwitch("force-device-scale-factor", "1");
 const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
@@ -61,6 +71,14 @@ ${svgText}`;
   await new Promise((r) => setTimeout(r, 80)); // let the SVG paint
   const image = await renderWindow.webContents.capturePage({ x: 0, y: 0, width: size, height: size });
   fs.unlinkSync(file);
+
+  /* belt and braces: if a machine ever gets past the switch above, normalise
+     rather than write a PNG whose bytes disagree with its directory entry */
+  const got = image.getSize();
+  if (got.width !== size || got.height !== size) {
+    console.warn(`  note: ${size}px captured as ${got.width}x${got.height}, resizing`);
+    return image.resize({ width: size, height: size, quality: "best" }).toPNG();
+  }
   return image.toPNG();
 }
 
@@ -100,6 +118,18 @@ app.whenReady().then(async () => {
   // electron-builder's conventional entry point
   fs.copyFileSync(path.join(outDir, "icon-512.png"), path.join(repoRoot, "apps/desktop/build/icon.png"));
 
+  /*
+   * The cloud's home-screen icon comes from here too, and not from
+   * `pnpm brand`, because it is a RASTERISED artifact: the brand script runs
+   * before this one and would copy the previous brand's PNG. Square, not the
+   * rounded tile — iOS applies its own mask, so a pre-rounded icon gets
+   * rounded twice. The tab's favicon is an SVG and `pnpm brand` copies that.
+   */
+  fs.copyFileSync(
+    path.join(outDir, "icon-512.png"),
+    path.join(repoRoot, "apps/web/app/apple-icon.png"),
+  );
+
   const entries = [];
   for (const size of ICO_SIZES) {
     const master = size < REINFORCE_BELOW ? masters.favicon : masters.square;
@@ -107,6 +137,19 @@ app.whenReady().then(async () => {
   }
   const ico = buildIco(entries);
   fs.writeFileSync(path.join(repoRoot, "apps/desktop/build/icon.ico"), ico);
+
+  /*
+   * And the browser tab. An SVG favicon is served beside it and every current
+   * browser prefers that, but Safari only learned SVG favicons recently and an
+   * .ico is what it falls back to.
+   *
+   * The one that was committed here was Codroon's hexagon — wrong brand — and
+   * MALFORMED besides: its directory claimed 16x16 over a 20x20 PNG, which is
+   * why the tab showed a browser's default globe rather than a wrong logo.
+   * This one is assembled above, from the same masters, with the reinforced
+   * mark at the small sizes.
+   */
+  fs.writeFileSync(path.join(repoRoot, "apps/web/app/favicon.ico"), ico);
 
   console.log(`icons written to ${outDir}`);
   console.log(`  PNG: ${PNG_SIZES.join(", ")} (+ rounded 512)`);

@@ -14,7 +14,7 @@
  * What it deliberately does not touch: the appId, anything that prints, and
  * the copyright.
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -163,10 +163,9 @@ for (const lang of ["es", "en"]) {
   write(file, dict);
   edits.push(file);
 
-  let layout = read("apps/web/app/layout.tsx");
-  layout = sub(layout, /(title: )"[^"]+"/, `$1"${brand.productName}"`, "web title");
-  write("apps/web/app/layout.tsx", layout);
-  edits.push("apps/web/app/layout.tsx");
+  /* The tab title is NOT substituted here any more: the root layout reads
+     `BRAND.productName` from `apps/web/src/brand.ts`, which this script
+     generates below. One source, and one fewer literal to keep in step. */
 }
 
 // ---- a module the cloud can import ---------------------------------------
@@ -206,6 +205,27 @@ export const HAS_WORDMARK_SVG = ${brand.key === "codroon"};
   icons = sub(icons, /favicon: svg\("[^"]+"\)/, `favicon: svg("${brand.masters.favicon}.svg")`, "favicon master");
   write(file, icons);
   edits.push(file);
+}
+
+// ---- the cloud's icon, in a browser tab and on a phone's home screen ------
+{
+  /*
+   * Next serves whatever `app/icon.*` and `app/apple-icon.*` are, and writes
+   * the <link> tags itself — so the brand's icon becomes the favicon by being
+   * COPIED here, not by anything referencing it. Which is why it has to happen
+   * in this script: the cloud had no icon at all and browsers drew a globe,
+   * and a file that is only correct because somebody remembered to swap it is
+   * the thing the brand layer exists to abolish.
+   *
+   * The tab gets the FAVICON master — the mark redrawn with a heavier bar so
+   * it survives at 16px. The home-screen icon is a rasterised PNG and comes
+   * from `pnpm icons:build`, which runs after this and has the pixels.
+   */
+  copyFileSync(
+    join(root, `packages/ui/src/brand/${brand.masters.favicon}.svg`),
+    join(root, "apps/web/app/icon.svg"),
+  );
+  edits.push("apps/web/app/icon.svg");
 }
 
 // ---- and the record of what is on -----------------------------------------
