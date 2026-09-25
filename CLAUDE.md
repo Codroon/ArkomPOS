@@ -151,6 +151,13 @@ Schema already anticipates them — build nothing for them.
   by `seq` would make a restored till's next batch a poison pill. Ingest rules live in
   `apps/web/src/sync/` as pure functions over a store interface, so they are tested without a
   Postgres; anything that must be ATOMIC lives in `pg-store.ts` as one statement.
+- **A cloud query folds the stream; it never trusts `after->>'id'`.** The till pushes
+  CHANGES, not rows — `repair_ticket/status` is literally `{status}` — and identity lives in
+  the oplog's `entity_id` COLUMN (ADR-0005). Keying a read on the payload's id collapses every
+  partial payload into one NULL group: twenty used devices displayed as one, while money still
+  agreed to the cent because documents happen to be pushed whole. Read through `folded()` in
+  `apps/web/src/db/fold.ts` — group by `entity_id`, last writer wins per FIELD — and prove it
+  with `pnpm db:truth && pnpm cloud:reconcile`, which is what caught it.
 - **Brand tokens only, and the brand is DATA.** Colours and faces come from
   `packages/ui/src/styles/tokens.css` by meaning (`canvas`, `ink`, `accent`, `warning-bg`…).
   No raw hex in components. Which brand is on comes from `packages/ui/src/brand/brands.ts`,
@@ -179,9 +186,12 @@ Schema already anticipates them — build nothing for them.
 ## Commands
 `pnpm brand <key>` (apply a brand) · `pnpm dev` (desktop app w/ HMR) · `pnpm test` (Vitest: core, desktop, web) · `pnpm db:generate`
 / `db:migrate` (drizzle-kit) · `pnpm db:seed` · `pnpm db:audit [--verify]` · `pnpm build:win`
-(installer) · `pnpm dev:web` (the cloud). Cloud-only, from `apps/web`: `db:generate` /
+(installer) · `pnpm dev:web` (the cloud) · `pnpm db:truth` then `pnpm cloud:reconcile`
+(the till's own SQLite read against the cloud, figure by figure — run it before any deploy).
+Cloud-only, from `apps/web`: `db:generate` /
 `db:migrate` (its own Postgres lineage, never the till's), `cloud:code` (issue an enrolment
-code), `cloud:delete-tenant` (ADR-0020 §4). See `apps/web/README.md`.
+code), `cloud:delete-tenant` (ADR-0020 §4), `test:db` (integration, against real Postgres).
+See `apps/web/README.md`.
 Keep these working at all times. A CLIENT install runs none of them: it migrates on first
 launch and asks the shop who it is (see DEPLOYMENT.md). `db:seed` is a dev convenience that
 calls the same createShop()/insertDemoData() first run uses — keep it that way.

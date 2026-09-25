@@ -16,6 +16,7 @@
  * worse than a missing one, and the missing one gets asked about.
  */
 import { sql } from "drizzle-orm";
+import { folded } from "./fold";
 import { db as defaultDb, type CloudDb } from "./client";
 
 const ZONE = "Europe/Madrid";
@@ -24,30 +25,21 @@ const mine = (accountId: string) => sql`
   (select t.id from tenants t where t.account_id = ${accountId})
 `;
 
-/** Latest state per id for an entity, scoped to one account. */
-const latest = (accountId: string, entity: string) => sql`
-  select distinct on (e.after->>'id') e.after as row, e.seq as seq
-  from sync_entries e
-  where e.tenant_id in ${mine(accountId)} and e.entity = ${entity}
-  order by e.after->>'id', e.seq desc
-`;
+/** The current state of every row of an entity — see `./fold`. */
+const latest = (accountId: string, entity: string) => folded(accountId, entity);
 
 /** Completed documents in the window, latest state each. */
 const completedIn = (accountId: string, days: number) => sql`
   select * from (
-    select distinct on (e.after->>'id')
-      e.after->>'id'                      as id,
-      e.after->>'docType'                 as doc_type,
-      (e.after->>'totalCents')::bigint    as total_cents,
-      (e.after->>'taxCents')::bigint      as tax_cents,
-      (e.after->>'subtotalCents')::bigint as subtotal_cents,
-      to_timestamp((e.after->>'completedAt')::bigint / 1000.0) as completed_at
-    from sync_entries e
-    where e.tenant_id in ${mine(accountId)}
-      and e.entity = 'document'
-      and e.after->>'status' = 'completed'
-      and e.after->>'completedAt' is not null
-    order by e.after->>'id', e.seq desc
+    select f.id,
+      f.row->>'docType'                 as doc_type,
+      (f.row->>'totalCents')::bigint    as total_cents,
+      (f.row->>'taxCents')::bigint      as tax_cents,
+      (f.row->>'subtotalCents')::bigint as subtotal_cents,
+      to_timestamp((f.row->>'completedAt')::bigint / 1000.0) as completed_at
+    from (${folded(accountId, "document")}) f
+    where f.row->>'status' = 'completed'
+      and f.row->>'completedAt' is not null
   ) d
   where (d.completed_at at time zone ${ZONE})::date
         > (now() at time zone ${ZONE})::date - ${days}::int
@@ -85,13 +77,10 @@ export async function salesSummary(
   }>(sql`
     with docs as (${completedIn(accountId, days)}),
     rebu as (
-      select distinct on (e.after->>'id')
-        e.after->>'documentId'           as document_id,
-        (e.after->>'totalCents')::bigint as total_cents,
-        e.after->>'taxRegime'            as regime
-      from sync_entries e
-      where e.tenant_id in ${mine(accountId)} and e.entity = 'document_line'
-      order by e.after->>'id', e.seq desc
+      select x.row->>'documentId'           as document_id,
+             (x.row->>'totalCents')::bigint as total_cents,
+             x.row->>'taxRegime'            as regime
+      from (${folded(accountId, "document_line")}) x
     )
     select
       count(*) filter (where doc_type <> 'refund')::int      as tickets,
@@ -151,17 +140,14 @@ export async function salesByGroup(
   }>(sql`
     with docs as (${completedIn(accountId, days)}),
     lines as (
-      select distinct on (e.after->>'id')
-        e.after->>'documentId'           as document_id,
-        e.after->>'productId'            as product_id,
-        e.after->>'description'          as description,
-        (e.after->>'qty')::bigint        as qty,
-        (e.after->>'baseCents')::bigint  as base_cents,
-        (e.after->>'taxCents')::bigint   as tax_cents,
-        (e.after->>'totalCents')::bigint as total_cents
-      from sync_entries e
-      where e.tenant_id in ${mine(accountId)} and e.entity = 'document_line'
-      order by e.after->>'id', e.seq desc
+      select x.row->>'documentId'           as document_id,
+             x.row->>'productId'            as product_id,
+             x.row->>'description'          as description,
+             (x.row->>'qty')::bigint        as qty,
+             (x.row->>'baseCents')::bigint  as base_cents,
+             (x.row->>'taxCents')::bigint   as tax_cents,
+             (x.row->>'totalCents')::bigint as total_cents
+      from (${folded(accountId, "document_line")}) x
     ),
     products as (${latest(accountId, "product")}),
     groups as (${latest(accountId, "product_group")})
@@ -216,15 +202,12 @@ export async function taxByRegime(
   }>(sql`
     with docs as (${completedIn(accountId, days)}),
     lines as (
-      select distinct on (e.after->>'id')
-        e.after->>'documentId'                   as document_id,
-        coalesce(e.after->>'taxRegime', 'IVA21') as regime,
-        (e.after->>'baseCents')::bigint          as base_cents,
-        (e.after->>'taxCents')::bigint           as tax_cents,
-        (e.after->>'totalCents')::bigint         as total_cents
-      from sync_entries e
-      where e.tenant_id in ${mine(accountId)} and e.entity = 'document_line'
-      order by e.after->>'id', e.seq desc
+      select x.row->>'documentId'                   as document_id,
+             coalesce(x.row->>'taxRegime', 'IVA21') as regime,
+             (x.row->>'baseCents')::bigint          as base_cents,
+             (x.row->>'taxCents')::bigint           as tax_cents,
+             (x.row->>'totalCents')::bigint         as total_cents
+      from (${folded(accountId, "document_line")}) x
     )
     select l.regime,
            coalesce(sum(l.base_cents), 0)  as base_cents,

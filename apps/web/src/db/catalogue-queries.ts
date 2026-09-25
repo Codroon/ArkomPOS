@@ -12,6 +12,7 @@
  * Scoped by account through `tenants`, like every other query in this app.
  */
 import { sql } from "drizzle-orm";
+import { folded } from "./fold";
 import { db as defaultDb, type CloudDb } from "./client";
 
 export interface ProductRow {
@@ -47,29 +48,22 @@ export async function productsForAccount(
     active: boolean;
   }>(sql`
     with mine as (select t.id from tenants t where t.account_id = ${accountId}),
+    p0 as (${folded(accountId, "product")}),
     products as (
-      select distinct on (e.after->>'id')
-        e.after->>'id'                          as id,
-        e.after->>'name'                        as name,
-        e.after->>'barcode'                     as barcode,
-        e.after->>'groupId'                     as group_id,
-        e.after->>'itemType'                    as item_type,
-        (e.after->>'priceCents')::bigint        as price_cents,
-        (e.after->>'costCents')::bigint         as cost_cents,
-        e.after->>'taxRegime'                   as tax_regime,
-        (e.after->>'lowStockThreshold')::bigint as low_stock_threshold,
-        coalesce((e.after->>'active')::boolean, true) as active
-      from sync_entries e
-      where e.tenant_id in (select id from mine) and e.entity = 'product'
-      order by e.after->>'id', e.seq desc
+      select id,
+             row->>'name'                        as name,
+             row->>'barcode'                     as barcode,
+             row->>'groupId'                     as group_id,
+             row->>'itemType'                    as item_type,
+             (row->>'priceCents')::bigint        as price_cents,
+             (row->>'costCents')::bigint         as cost_cents,
+             row->>'taxRegime'                   as tax_regime,
+             (row->>'lowStockThreshold')::bigint as low_stock_threshold,
+             coalesce((row->>'active')::boolean, true) as active
+      from p0
     ),
-    groups as (
-      select distinct on (e.after->>'id')
-        e.after->>'id' as id, e.after->>'name' as name
-      from sync_entries e
-      where e.tenant_id in (select id from mine) and e.entity = 'product_group'
-      order by e.after->>'id', e.seq desc
-    ),
+    g0 as (${folded(accountId, "product_group")}),
+    groups as (select id, row->>'name' as name from g0),
     stock as (
       select e.after->>'productId' as product_id, sum((e.after->>'qty')::bigint) as on_hand
       from sync_entries e
@@ -123,12 +117,8 @@ export async function recentMovements(
     created_at: string;
   }>(sql`
     with mine as (select t.id from tenants t where t.account_id = ${accountId}),
-    products as (
-      select distinct on (e.after->>'id') e.after->>'id' as id, e.after->>'name' as name
-      from sync_entries e
-      where e.tenant_id in (select id from mine) and e.entity = 'product'
-      order by e.after->>'id', e.seq desc
-    )
+    p0 as (${folded(accountId, "product")}),
+    products as (select id, row->>'name' as name from p0)
     select p.name                                                  as product_name,
            e.after->>'movementType'                                as movement_type,
            (e.after->>'qty')::bigint                               as qty,

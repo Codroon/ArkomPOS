@@ -12,6 +12,7 @@
  * has already been printed and handed to somebody.
  */
 import { sql } from "drizzle-orm";
+import { folded } from "./fold";
 import { db as defaultDb, type CloudDb } from "./client";
 
 export interface DocumentHead {
@@ -67,23 +68,22 @@ export async function documentDetail(
     completed_at: string | null;
     shop_name: string;
   }>(sql`
-    select distinct on (e.after->>'id')
-      e.after->>'id'                      as id,
-      e.after->>'docNumber'               as doc_number,
-      e.after->>'docType'                 as doc_type,
-      e.after->>'status'                  as status,
-      (e.after->>'totalCents')::bigint    as total_cents,
-      (e.after->>'taxCents')::bigint      as tax_cents,
-      (e.after->>'subtotalCents')::bigint as subtotal_cents,
-      case when e.after->>'completedAt' is null then null
-           else to_timestamp((e.after->>'completedAt')::bigint / 1000.0) end as completed_at,
-      t.name                              as shop_name
-    from sync_entries e
-    join tenants t on t.id = e.tenant_id
-    where t.account_id = ${accountId}
-      and e.entity = 'document'
-      and e.after->>'id' = ${documentId}
-    order by e.after->>'id', e.seq desc
+    select f.id,
+      f.row->>'docNumber'               as doc_number,
+      f.row->>'docType'                 as doc_type,
+      f.row->>'status'                  as status,
+      (f.row->>'totalCents')::bigint    as total_cents,
+      (f.row->>'taxCents')::bigint      as tax_cents,
+      (f.row->>'subtotalCents')::bigint as subtotal_cents,
+      case when f.row->>'completedAt' is null then null
+           else to_timestamp((f.row->>'completedAt')::bigint / 1000.0) end as completed_at,
+      (select t.name from tenants t
+         join sync_entries e2 on e2.tenant_id = t.id
+        where t.account_id = ${accountId}
+          and e2.entity = 'document' and e2.entity_id = ${documentId}
+        limit 1)                        as shop_name
+    from (${folded(accountId, "document")}) f
+    where f.id = ${documentId}
   `);
 
   const head = heads[0];
@@ -100,34 +100,24 @@ export async function documentDetail(
     tax_regime: string;
     price_overridden: boolean | null;
   }>(sql`
-    select distinct on (e.after->>'id')
-      (e.after->>'lineNo')::bigint          as line_no,
-      e.after->>'description'               as description,
-      (e.after->>'qty')::bigint             as qty,
-      (e.after->>'unitPriceCents')::bigint  as unit_price_cents,
-      (e.after->>'baseCents')::bigint       as base_cents,
-      (e.after->>'taxCents')::bigint        as tax_cents,
-      (e.after->>'totalCents')::bigint      as total_cents,
-      e.after->>'taxRegime'                 as tax_regime,
-      (e.after->>'priceOverridden')::boolean as price_overridden
-    from sync_entries e
-    join tenants t on t.id = e.tenant_id
-    where t.account_id = ${accountId}
-      and e.entity = 'document_line'
-      and e.after->>'documentId' = ${documentId}
-    order by e.after->>'id', e.seq desc
+    select (x.row->>'lineNo')::bigint           as line_no,
+      x.row->>'description'                as description,
+      (x.row->>'qty')::bigint              as qty,
+      (x.row->>'unitPriceCents')::bigint   as unit_price_cents,
+      (x.row->>'baseCents')::bigint        as base_cents,
+      (x.row->>'taxCents')::bigint         as tax_cents,
+      (x.row->>'totalCents')::bigint       as total_cents,
+      x.row->>'taxRegime'                  as tax_regime,
+      (x.row->>'priceOverridden')::boolean as price_overridden
+    from (${folded(accountId, "document_line")}) x
+    where x.row->>'documentId' = ${documentId}
   `);
 
   const tenders = await db.execute<{ method: string; amount_cents: string }>(sql`
-    select distinct on (e.after->>'id')
-      e.after->>'method'                as method,
-      (e.after->>'amountCents')::bigint as amount_cents
-    from sync_entries e
-    join tenants t on t.id = e.tenant_id
-    where t.account_id = ${accountId}
-      and e.entity = 'document_tender'
-      and e.after->>'documentId' = ${documentId}
-    order by e.after->>'id', e.seq desc
+    select x.row->>'method'                as method,
+           (x.row->>'amountCents')::bigint as amount_cents
+    from (${folded(accountId, "document_tender")}) x
+    where x.row->>'documentId' = ${documentId}
   `);
 
   return {

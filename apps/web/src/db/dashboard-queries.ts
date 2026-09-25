@@ -26,26 +26,23 @@
  * setting nobody has been asked for yet.
  */
 import { sql, type SQL } from "drizzle-orm";
+import { folded } from "./fold";
 import { db as defaultDb, type CloudDb } from "./client";
 
 const ZONE = "Europe/Madrid";
 
 /** The latest state of every COMPLETED document belonging to an account. */
 const completedDocs = (accountId: string) => sql`
-  select distinct on (e.after->>'id')
-    e.after->>'id'                                   as id,
-    e.after->>'docNumber'                            as doc_number,
-    e.after->>'docType'                              as doc_type,
-    (e.after->>'totalCents')::bigint                 as total_cents,
-    (e.after->>'taxCents')::bigint                   as tax_cents,
-    (e.after->>'subtotalCents')::bigint              as subtotal_cents,
-    to_timestamp((e.after->>'completedAt')::bigint / 1000.0) as completed_at
-  from sync_entries e
-  where e.tenant_id in (select t.id from tenants t where t.account_id = ${accountId})
-    and e.entity = 'document'
-    and e.after->>'status' = 'completed'
-    and e.after->>'completedAt' is not null
-  order by e.after->>'id', e.seq desc
+  select d.id,
+    d.row->>'docNumber'                                    as doc_number,
+    d.row->>'docType'                                      as doc_type,
+    (d.row->>'totalCents')::bigint                         as total_cents,
+    (d.row->>'taxCents')::bigint                           as tax_cents,
+    (d.row->>'subtotalCents')::bigint                      as subtotal_cents,
+    to_timestamp((d.row->>'completedAt')::bigint / 1000.0) as completed_at
+  from (${folded(accountId, "document")}) d
+  where d.row->>'status' = 'completed'
+    and d.row->>'completedAt' is not null
 `;
 
 /** Shop-day window: "the last N days, today included", in Madrid. */
@@ -223,14 +220,10 @@ export async function paymentMix(
   const rows = await db.execute<{ method: string; amount_cents: string; n: number }>(sql`
     with docs as (${completedDocs(accountId)}),
     tenders as (
-      select distinct on (e.after->>'id')
-        e.after->>'documentId'            as document_id,
-        e.after->>'method'                as method,
-        (e.after->>'amountCents')::bigint as amount_cents
-      from sync_entries e
-      where e.tenant_id in (select t.id from tenants t where t.account_id = ${accountId})
-        and e.entity = 'document_tender'
-      order by e.after->>'id', e.seq desc
+      select x.row->>'documentId'            as document_id,
+             x.row->>'method'                as method,
+             (x.row->>'amountCents')::bigint as amount_cents
+      from (${folded(accountId, "document_tender")}) x
     )
     select t.method, sum(t.amount_cents) as amount_cents, count(*)::int as n
     from tenders t
@@ -263,15 +256,11 @@ export async function topProducts(
   const rows = await db.execute<{ description: string; qty: string; total_cents: string }>(sql`
     with docs as (${completedDocs(accountId)}),
     lines as (
-      select distinct on (e.after->>'id')
-        e.after->>'documentId'           as document_id,
-        e.after->>'description'          as description,
-        (e.after->>'qty')::bigint        as qty,
-        (e.after->>'totalCents')::bigint as total_cents
-      from sync_entries e
-      where e.tenant_id in (select t.id from tenants t where t.account_id = ${accountId})
-        and e.entity = 'document_line'
-      order by e.after->>'id', e.seq desc
+      select x.row->>'documentId'           as document_id,
+             x.row->>'description'          as description,
+             (x.row->>'qty')::bigint        as qty,
+             (x.row->>'totalCents')::bigint as total_cents
+      from (${folded(accountId, "document_line")}) x
     )
     select l.description, sum(l.qty) as qty, sum(l.total_cents) as total_cents
     from lines l
@@ -362,20 +351,15 @@ export async function recentShifts(accountId: string, limit = 8, handle?: CloudD
     expected_cash_cents: string | null;
     variance_cents: string | null;
   }>(sql`
-    select distinct on (e.after->>'id')
-      e.after->>'zDocNumber'                                as z_doc_number,
-      to_timestamp((e.after->>'openedAt')::bigint / 1000.0) as opened_at,
-      to_timestamp((e.after->>'closedAt')::bigint / 1000.0) as closed_at,
-      e.after->>'openingFloatCents'                         as opening_float_cents,
-      e.after->>'countedCashCents'                          as counted_cash_cents,
-      e.after->>'expectedCashCents'                         as expected_cash_cents,
-      e.after->>'varianceCents'                             as variance_cents
-    from sync_entries e
-    where e.tenant_id in (select t.id from tenants t where t.account_id = ${accountId})
-      and e.entity = 'shift'
-      and e.action = 'close'
-      and e.after->>'closedAt' is not null
-    order by e.after->>'id', e.seq desc
+    select x.row->>'zDocNumber'                             as z_doc_number,
+      to_timestamp((x.row->>'openedAt')::bigint / 1000.0) as opened_at,
+      to_timestamp((x.row->>'closedAt')::bigint / 1000.0) as closed_at,
+      x.row->>'openingFloatCents'                         as opening_float_cents,
+      x.row->>'countedCashCents'                          as counted_cash_cents,
+      x.row->>'expectedCashCents'                         as expected_cash_cents,
+      x.row->>'varianceCents'                             as variance_cents
+    from (${folded(accountId, "shift")}) x
+    where x.row->>'closedAt' is not null
   `);
 
   return rows

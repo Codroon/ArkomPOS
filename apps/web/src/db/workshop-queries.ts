@@ -17,16 +17,11 @@
  *    that deliberately does not exist.
  */
 import { sql } from "drizzle-orm";
+import { folded } from "./fold";
 import { db as defaultDb, type CloudDb } from "./client";
 
-/** Latest state per id for an entity, scoped to one account. */
-const latest = (accountId: string, entity: string) => sql`
-  select distinct on (e.after->>'id') e.after as row, e.seq as seq
-  from sync_entries e
-  where e.tenant_id in (select t.id from tenants t where t.account_id = ${accountId})
-    and e.entity = ${entity}
-  order by e.after->>'id', e.seq desc
-`;
+/** The current state of every row of an entity — see `./fold`. */
+const latest = (accountId: string, entity: string) => folded(accountId, entity);
 
 /* ------------------------------------------------------------- repairs -- */
 
@@ -146,7 +141,7 @@ export async function repairDetail(
            else to_timestamp((l.row->>'receivedAt')::bigint / 1000.0) end as received_at
     from lines l
     where l.row->>'ticketId' = ${ticketId}
-    order by l.seq
+    order by l.first_seq
   `);
 
   return {
