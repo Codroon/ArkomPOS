@@ -18,6 +18,7 @@ import { signOutAction } from "../../src/auth/actions";
 import { getT } from "../../src/i18n/server";
 import { RAIL_COOKIE } from "../../src/lib/prefs";
 import { PanelChrome, type ChromeLabels } from "./chrome";
+import { tillsForAccount } from "../../src/db/panel-queries";
 
 export const dynamic = "force-dynamic";
 
@@ -25,12 +26,18 @@ export default async function PanelLayout({ children }: { children: ReactNode })
   const account = await requireAccount();
   const { t, locale } = await getT();
   const railCollapsed = (await cookies()).get(RAIL_COOKIE)?.value === "1";
+  /* the shop's tills, for the per-till filter in the bar (ADR-0022 §10). Read
+     here because the chrome is a client component and this is one query the
+     whole panel shares rather than one per screen. */
+  const tills = await tillsForAccount(account.id, locale);
 
   const labels: ChromeLabels = {
     brand: t("app.brand"),
     signOut: t("app.signOut"),
     language: t("app.language"),
     period: t("range.label"),
+    till: t("till.filter"),
+    allTills: t("till.all"),
     custom: t("range.custom"),
     from: t("range.from"),
     to: t("range.to"),
@@ -81,6 +88,9 @@ export default async function PanelLayout({ children }: { children: ReactNode })
         locale={locale}
         account={{ name: account.name, email: account.email, licence }}
         railCollapsed={railCollapsed}
+        tills={tills
+          .filter((one) => !one.revoked)
+          .map(({ terminalId, terminalName }) => ({ terminalId, terminalName }))}
         signOut={signOutAction}
       >
         {children}

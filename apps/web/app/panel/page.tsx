@@ -49,13 +49,16 @@ export default async function SummaryPage({
   const { t, locale } = await getT();
   const params = await searchParams;
   const period = parseRange(params.range, params.from, params.to);
+  /* one till, or the shop together — ADR-0022 §10. Empty means together, which
+     is what somebody opening the dashboard is asking for. */
+  const till = typeof params.till === "string" && params.till ? params.till : undefined;
 
   const [totals, byDay, mix, top, shifts, tills] = await Promise.all([
-    periodTotals(account.id, period),
-    takingsByDay(account.id, period),
-    paymentMix(account.id, period),
-    topProducts(account.id, period, locale, 8),
-    recentShifts(account.id, period, 6),
+    periodTotals(account.id, period, till),
+    takingsByDay(account.id, period, till),
+    paymentMix(account.id, period, till),
+    topProducts(account.id, period, locale, 8, till),
+    recentShifts(account.id, period, 6, till),
     tillsForAccount(account.id, locale),
   ]);
 

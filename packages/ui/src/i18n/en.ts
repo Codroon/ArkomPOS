@@ -885,6 +885,13 @@ export const en: Record<TKey, string> = {
   "set.cloudBehind": "WAITING TO SEND",
   "set.cloudPending": "Not sent yet",
   "set.cloudLastPush": "Last sent",
+  "set.cloudTills": "Tills in this shop",
+  "set.cloudLastPull": "Last received",
+  "set.cloudInbox": "Waiting to apply",
+  "set.cloudInboxStuck":
+    "Some changes from another till could not be applied. Selling is unaffected: this till carries on with the data it has.",
+  "set.cloudClockSkew":
+    "This till's clock does not match the cloud. Set it in Windows: when two tills edit the same thing, the later clock wins.",
   "set.cloudSyncNow": "Send now",
   "set.cloudSyncing": "Sending…",
   "set.cloudUnlink": "Unlink",

@@ -47,6 +47,8 @@ export async function shopsForAccount(accountId: string, handle?: CloudDb): Prom
 export interface TillSummary {
   id: string;
   shop: string;
+  /** the till's own terminal id — what a per-till filter keys on (ADR-0022 §10) */
+  terminalId: string;
   terminalName: string;
   appVersion: string;
   lastPushAt: Date | null;
@@ -64,6 +66,10 @@ export async function tillsForAccount(
     .select({
       id: devices.id,
       shop: tenants.name,
+      /* the till's OWN id, which is what a per-till filter keys on — the
+         `devices.id` above is the cloud's row, and the stream carries this
+         one (ADR-0022 §10) */
+      terminalId: devices.terminalId,
       terminalName: devices.terminalName,
       appVersion: devices.appVersion,
       lastPushAt: devices.lastPushAt,

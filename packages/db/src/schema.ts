@@ -316,6 +316,61 @@ export const documentTenders = sqliteTable("document_tenders", {
 }, (t) => [index("ix_tender_document").on(t.documentId)]);
 
 /* ---------------- oplog: sync outbox + audit log (ADR-0005) ---------------- */
+/* ------------------------------------------------------------ sync_inbox --
+ * What the cloud handed this till, before this till has believed it.
+ * ADR-0022 §5.
+ *
+ * A pull cannot apply its batch straight into the business tables, and the
+ * reason is not caution — it is foreign keys. `product_codes.product_id` is
+ * NOT NULL REFERENCES products, SQLite runs with `foreign_keys = ON`, and
+ * entries arrive in the order the CLOUD ingested them, which is the order five
+ * tills happened to push and has nothing to do with the order sqlite will
+ * accept. A `unit` can even reference a `used_purchase` this till will never
+ * hold, because ADR-0022 §1 does not replicate purchases.
+ *
+ * So a pull does one thing: it writes rows here and moves its cursor. Applying
+ * is a separate pass, in dependency order, that retries what it could not land.
+ * An entry that arrives before its parent is not an error — it is EARLY, and it
+ * applies on the next pass with nobody told. One that can never apply stays
+ * pending and is counted, which is a diagnostic rather than a crash.
+ *
+ * `op_id` is the primary key, so the same entry pulled twice is stored once and
+ * applying twice is applying once (ADR-0005). This is also what makes resetting
+ * a cursor to 0 a safe way to backfill.
+ *
+ * It is NOT in the oplog and never pushed: these are other tills' decisions,
+ * and this till re-reporting them would be an echo (§6). */
+export const syncInbox = sqliteTable("sync_inbox", {
+  opId: text("op_id").primaryKey(),
+  /** the cloud's arrival order — what the pull cursor is measured in */
+  ingestSeq: integer("ingest_seq").notNull(),
+  tenantId: text("tenant_id").notNull(),
+  locationId: text("location_id").notNull(),
+  /** the till that WROTE it, which is never this one */
+  terminalId: text("terminal_id").notNull(),
+  entity: text("entity").notNull(),
+  entityId: text("entity_id").notNull(),
+  action: text("action").notNull(),
+  before: text("before", { mode: "json" }),
+  after: text("after", { mode: "json" }),
+  /** the author, as a string: their user row lives on their own till (§1) */
+  userId: text("user_id"),
+  authorizedByUserId: text("authorized_by_user_id"),
+  /** the writing till's clock — the comparator for last-writer-wins (§7) */
+  createdAt: ts("created_at").notNull(),
+  receivedAt: ts("received_at").notNull(),
+  /** NULL while pending; set when the row is in the business tables */
+  appliedAt: ts("applied_at"),
+  /** how many passes have tried, so a stuck row is visible rather than silent */
+  attempts: integer("attempts").notNull().default(0),
+  /** why the last attempt did not land — a FK name, usually */
+  lastError: text("last_error"),
+}, (t) => [
+  /* the applier's query: what is still pending, oldest arrival first */
+  index("ix_inbox_pending").on(t.appliedAt, t.ingestSeq),
+  index("ix_inbox_entity").on(t.entity, t.entityId),
+]);
+
 export const oplog = sqliteTable("oplog", {
   seq: integer("seq").primaryKey({ autoIncrement: true }), // local monotonic cursor
   opId: text("op_id").notNull(),                           // UUIDv7, idempotency key in cloud

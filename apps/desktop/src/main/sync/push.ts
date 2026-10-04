@@ -21,6 +21,7 @@ import {
 } from "@arkom/core";
 import { schema, type ArkomDb } from "@arkom/db";
 import { patchLink, readLink, type CloudLink } from "./link";
+import { receiveStatus } from "./receive";
 
 const { oplog } = schema;
 
@@ -51,6 +52,15 @@ export interface SyncStatus {
   lastPushAtMs: number | null;
   lastError: string | null;
   pushing: boolean;
+  /* the other direction — ADR-0022. Reported separately because the two fail
+     independently: a till can be pushing happily while a sibling's batch will
+     not apply, and Ajustes should say which. */
+  tillCount: number;
+  inboxPending: number;
+  inboxStuck: number;
+  lastPullAtMs: number | null;
+  lastPullError: string | null;
+  clockSkewMs: number | null;
 }
 
 let timer: ReturnType<typeof setInterval> | null = null;
@@ -95,6 +105,7 @@ export function pendingCount(db: ArkomDb): number {
 
 export function syncStatus(db: ArkomDb): SyncStatus {
   const link = readLink();
+  const inbox = receiveStatus(db);
   return {
     linked: link !== null,
     url: link?.url ?? null,
@@ -105,6 +116,12 @@ export function syncStatus(db: ArkomDb): SyncStatus {
     lastPushAtMs: link?.lastPushAtMs ?? null,
     lastError: link?.lastError ?? null,
     pushing,
+    tillCount: link?.tillCount ?? 1,
+    inboxPending: inbox.pending,
+    inboxStuck: inbox.stuck,
+    lastPullAtMs: inbox.lastPullAtMs,
+    lastPullError: inbox.lastError,
+    clockSkewMs: inbox.clockSkewMs,
   };
 }
 

@@ -26,6 +26,7 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  bigserial,
 } from "drizzle-orm/pg-core";
 
 /** Server clock, always with a zone: shops are in Spain, the region is Frankfurt. */
@@ -171,11 +172,28 @@ export const syncEntries = pgTable("sync_entries", {
   createdAt: ts("created_at").notNull(),
   /** ours: when we heard about it — the two differ by however long the line was down */
   receivedAt: ts("received_at").notNull().defaultNow(),
+  /**
+   * Arrival order, assigned here, paged against by a till's pull — ADR-0022 §3.
+   *
+   * It exists because nothing else can order a stream merged from five tills.
+   * `seq` is PER TILL (ADR-0005): till 1's 400 and till 2's 400 are unrelated
+   * facts. `received_at` is a clock, and clocks tie. So the cloud assigns a
+   * number no till can influence, and a sibling till pages against that.
+   *
+   * It is an ORDERING, not an identity. Identity is still `(tenant_id, op_id)`,
+   * which is what keeps a restored till's renumbered batch from being a poison
+   * pill, and a till that re-enrols and replays from zero gets fresh
+   * `ingest_seq` values for rows it has already sent — harmless, because the
+   * primary key deduplicates and the ORDER is all this column promises.
+   */
+  ingestSeq: bigserial("ingest_seq", { mode: "number" }).notNull(),
 }, (t) => [
   primaryKey({ columns: [t.tenantId, t.opId] }),
   index("ix_entries_stream").on(t.tenantId, t.deviceId, t.seq),
   index("ix_entries_entity").on(t.tenantId, t.entity, t.entityId),
   index("ix_entries_when").on(t.tenantId, t.createdAt),
+  /* the pull: one tenant's stream, after a cursor, in arrival order */
+  index("ix_entries_ingest").on(t.tenantId, t.ingestSeq),
 ]);
 
 export const accountRelations = relations(accounts, ({ many }) => ({

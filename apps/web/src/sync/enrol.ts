@@ -39,6 +39,13 @@ export async function enrol(
     if (outcome.reason === "tenant") {
       return { status: 409, body: { error: "TENANT_CLAIMED" } };
     }
+    /* 409 as well, and a different code: the account has two shops, so "join
+       the shop" has no referent (ADR-0022 §9). The till shows this as something
+       to resolve rather than something to retry, because retrying cannot help.
+       The ids go back so an owner reading Ajustes can tell support WHICH two. */
+    if (outcome.reason === "ambiguous") {
+      return { status: 409, body: { error: "SHOP_AMBIGUOUS", tenantIds: outcome.tenantIds } };
+    }
     return { status: 404, body: { error: "CODE_INVALID" } };
   }
 
@@ -48,6 +55,11 @@ export async function enrol(
       deviceToken: outcome.deviceToken,
       accountName: outcome.accountName,
       shopName: outcome.shopName,
+      /* the keys the till must adopt — ADR-0022 §9 */
+      tenantId: outcome.tenantId,
+      locationId: outcome.locationId,
+      adopted: outcome.adopted,
+      tillCount: outcome.tillCount,
     },
   };
 }

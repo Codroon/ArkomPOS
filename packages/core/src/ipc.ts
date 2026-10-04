@@ -907,6 +907,22 @@ export const CloudStatusResponseSchema = z.object({
   lastPushAtMs: z.number().int().nullable(),
   lastError: z.string().nullable(),
   pushing: z.boolean(),
+  /* --------------------------------------- the other direction (ADR-0022) --
+   * What the shop's OTHER tills have sent this one. Separate fields rather
+   * than one blended "sync is fine", because the two directions fail
+   * independently and for different reasons: a till can be pushing happily
+   * while something in a sibling's batch will not apply, and an owner reading
+   * Ajustes deserves to be told which. */
+  /** how many tills this shop has, as the cloud counted them at enrolment */
+  tillCount: z.number().int().nonnegative(),
+  /** rows received from the other tills that this one has not applied yet */
+  inboxPending: z.number().int().nonnegative(),
+  /** rows that have been retried and keep failing — a diagnostic, not an alarm */
+  inboxStuck: z.number().int().nonnegative(),
+  lastPullAtMs: z.number().int().nullable(),
+  lastPullError: z.string().nullable(),
+  /** the cloud's clock minus ours; a badly set till clock is visible, not magic */
+  clockSkewMs: z.number().int().nullable(),
 });
 export type CloudStatus = z.infer<typeof CloudStatusResponseSchema>;
 export const CloudEnrolRequestSchema = z.object({

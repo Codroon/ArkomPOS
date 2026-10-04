@@ -67,12 +67,17 @@ export default async function SalesPage({
 
   const search = typeof params.q === "string" ? params.q : "";
   const docType = typeof params.type === "string" ? params.type : "";
+  const till = typeof params.till === "string" && params.till ? params.till : undefined;
 
-  const documents = await documentsInPeriod(account.id, period, { search, docType });
+  const documents = await documentsInPeriod(account.id, period, { search, docType, till });
 
   const exportQuery = new URLSearchParams(rangeParams(period));
   if (search) exportQuery.set("q", search);
   if (docType) exportQuery.set("type", docType);
+  /* the export re-runs the query on screen, so it has to carry the same till
+     (ADR-0016 §4): a CSV that quietly widened to the whole shop would be a
+     different answer from the one somebody was looking at */
+  if (till) exportQuery.set("till", till);
 
   const total = documents.reduce((sum, doc) => sum + doc.totalCents, 0);
 

@@ -887,6 +887,15 @@ export const es = {
   "set.cloudBehind": "PENDIENTE DE ENVIAR",
   "set.cloudPending": "Sin enviar",
   "set.cloudLastPush": "Último envío",
+  /* the other direction — ADR-0022. Only shown on a shop with more than one
+     till, so these never appear on the installs that have one. */
+  "set.cloudTills": "Cajas en la tienda",
+  "set.cloudLastPull": "Última recepción",
+  "set.cloudInbox": "Pendiente de aplicar",
+  "set.cloudInboxStuck":
+    "Hay cambios de otra caja que no se han podido aplicar. No afecta a la venta: esta caja sigue funcionando con los datos que tiene.",
+  "set.cloudClockSkew":
+    "La hora de esta caja no coincide con la de la nube. Ajústela en Windows: si dos cajas editan lo mismo, gana la que tenga la hora más reciente.",
   "set.cloudSyncNow": "Enviar ahora",
   "set.cloudSyncing": "Enviando…",
   "set.cloudUnlink": "Desenlazar",

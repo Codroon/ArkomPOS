@@ -27,6 +27,7 @@ If a decision must change, the ADR is superseded by a new one — never silently
 | [0020](0020-the-till-enrols-with-the-cloud-and-photographs-stay-home.md) | Till enrols once for a device token; oplog pushes up-only; passcodes and photographs never leave the shop; EU region, shop is controller | Accepted |
 
 | [0021](0021-two-identities-one-signup-and-an-admin-that-cannot-read-a-shop.md) | Cloud login and till PIN stay separate, linked never merged; the till owns the fiscal identity; Supabase holds both database and identities; the admin console can read no shop data without a logged, expiring grant | Accepted |
+| [0022](0022-tills-in-a-shop-share-a-catalogue-and-a-stock-ledger.md) | A shop's tills share one catalogue and one stock ledger; the cloud is a courier between them and never authors; a second till JOINS the shop instead of founding one; documents, series, shifts, settings and PINs stay per-till | Accepted |
 
 Constraints common to all: team = one developer + Claude Code · Phase 1 = 2 weeks (sale screen, catalog, inventory) ·
 client = retail mobile shop in Spain (unreliable connectivity, Spanish fiscal rules ahead) · product intent = resell to

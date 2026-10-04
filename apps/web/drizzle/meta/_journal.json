@@ -15,6 +15,13 @@
       "when": 1790272589910,
       "tag": "0001_gorgeous_talkback",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791082486703,
+      "tag": "0002_closed_night_nurse",
+      "breakpoints": true
     }
   ]
 }

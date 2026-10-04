@@ -33,6 +33,22 @@ export interface CloudLink {
   lastPushAtMs: number | null;
   /** the last thing that went wrong, for the Ajustes panel to show honestly */
   lastError: string | null;
+  /* ------------------------------------------- the other direction (ADR-0022)
+   * The pull cursor lives here for the same reason the push cursor does: it is
+   * state about the LINK, and every row of the database is pushed to the
+   * service this token authenticates — so a cursor in a table would be a
+   * cursor uploaded to the thing it is a cursor for.
+   *
+   * It is measured in the cloud's `ingest_seq`, not in any till's `seq`, because
+   * nothing a single till owns can order a stream merged from five of them
+   * (§3). Losing it costs a replay the inbox deduplicates by `op_id`. */
+  lastPulledIngestSeq: number;
+  lastPullAtMs: number | null;
+  lastPullError: string | null;
+  /** this till's own location, adopted from the shop at enrolment (§9) */
+  locationId: string;
+  /** how many tills the shop had when this one joined, for the Ajustes card */
+  tillCount: number;
 }
 
 const FILE = (): string => join(app.getPath("userData"), "cloud-link.json");
@@ -57,6 +73,14 @@ export function readLink(): CloudLink | null {
             lastAckedSeq: parsed.lastAckedSeq ?? 0,
             lastPushAtMs: parsed.lastPushAtMs ?? null,
             lastError: parsed.lastError ?? null,
+            /* a file written before ADR-0022 has none of these: a cursor of 0
+               means "pull from the start", which the inbox's idempotency makes
+               the safe default rather than a lossy one */
+            lastPulledIngestSeq: parsed.lastPulledIngestSeq ?? 0,
+            lastPullAtMs: parsed.lastPullAtMs ?? null,
+            lastPullError: parsed.lastPullError ?? null,
+            locationId: parsed.locationId ?? "",
+            tillCount: parsed.tillCount ?? 1,
           }
         : null;
   } catch {

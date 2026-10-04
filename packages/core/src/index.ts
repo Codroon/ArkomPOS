@@ -329,6 +329,13 @@ export {
   SyncPushResponseSchema,
   SyncEnrolRequestSchema,
   SyncEnrolResponseSchema,
+  SYNC_SETTLE_MS,
+  SYNC_PULL_LIMIT,
+  SyncPullRequestSchema,
+  SyncPulledOpSchema,
+  SyncPullResponseSchema,
+  laterWins,
+  foldEntries,
 } from "./sync";
 export type {
   SyncOp,
@@ -337,7 +344,22 @@ export type {
   SyncEnrolRequest,
   SyncEnrolResponse,
   SyncableOplogRow,
+  SyncPullRequest,
+  SyncPulledOp,
+  SyncPullResponse,
 } from "./sync";
+/* which rows belong to the SHOP rather than the till (ADR-0022 §1) */
+export {
+  SHARED_ENTITIES,
+  NEVER_REPLICATED,
+  CACHE_REBUILD_TRIGGER,
+  applyRank,
+  isSharedEntity,
+} from "./share";
+export type { SharedEntity } from "./share";
+/* writing down what ANOTHER till decided, without logging it (ADR-0022 §5-7) */
+export { absorb, planAbsorb } from "./absorb";
+export type { InboxEntry, AbsorbPlan, AbsorbRunner, AbsorbReport, PlanOutcome } from "./absorb";
 export { STARTER_CASH_CONCEPTS, displayCashConcepts, isStarterCashConcepts } from "./cash-concepts";
 export type { ConceptLocale } from "./cash-concepts";
 export type { PrinterChoices, PrinterLike } from "./printers";

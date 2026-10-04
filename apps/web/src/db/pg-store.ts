@@ -17,7 +17,7 @@
  * rolls back, the route answers 500, the till keeps its cursor, and the next
  * round sends the same rows — which cost one conflict each and nothing else.
  */
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lt, ne, sql } from "drizzle-orm";
 import { uuidv7 } from "@arkom/core";
 import type {
   CloudStore,
@@ -26,6 +26,8 @@ import type {
   EnrolOutcome,
   RecordBatchInput,
   RecordBatchResult,
+  PullInput,
+  PullResult,
 } from "../sync/store";
 import { digest, newDeviceToken } from "../lib/secrets";
 import { db as defaultDb, type CloudDb } from "./client";
@@ -142,6 +144,49 @@ export function pgStore(handle?: CloudDb): CloudStore {
           return { ok: false, reason: "tenant" } as const;
         }
 
+        /* ------------------------------------------------- ADR-0022 §9: join
+         * Which shop is this till joining? Until now the answer was always "the
+         * one it just invented", which is how Arkom ended up with two.
+         *
+         * The account's existing shops decide:
+         *   none  → the till's proposal becomes the shop
+         *   one   → the till ADOPTS it, keys and all
+         *   many  → refused, because "the shop" has no referent and picking the
+         *           busiest would silently strand the other one's history
+         */
+        const shops = await tx
+          .select({ id: tenants.id })
+          .from(tenants)
+          .where(eq(tenants.accountId, code.accountId))
+          .orderBy(tenants.createdAt);
+
+        /* A till that is ALREADY in one of this account's shops stays in it.
+           Re-enrolment rotates a token (see below) and must never be the thing
+           that moves a working till or refuses to let it back in — including in
+           an account that has the two shops this ADR exists to stop happening. */
+        const alreadyIn = shops.some((t) => t.id === input.tenantId);
+
+        if (!alreadyIn && shops.length > 1) {
+          return { ok: false, reason: "ambiguous", tenantIds: shops.map((t) => t.id) } as const;
+        }
+
+        const adopted = !alreadyIn && shops.length === 1;
+        const tenantId = adopted ? shops[0]!.id : input.tenantId;
+
+        /* The location comes from a till that is already in the shop. One shop
+           is one location in Phase 1 (ADR-0009), so any sibling's answer is the
+           shop's answer; without a sibling the till's own proposal stands. */
+        let locationId = input.locationId;
+        if (adopted) {
+          const sibling = await tx
+            .select({ locationId: devices.locationId })
+            .from(devices)
+            .where(eq(devices.tenantId, tenantId))
+            .orderBy(devices.enrolledAt)
+            .limit(1);
+          if (sibling[0]) locationId = sibling[0].locationId;
+        }
+
         /* NOW spend it, and conditionally: two callers who both read the same
            unspent code race here, and the WHERE clause is what makes exactly one
            of them the winner. The loser is told the code is gone, which it is. */
@@ -152,17 +197,28 @@ export function pgStore(handle?: CloudDb): CloudStore {
           .returning({ id: enrolCodes.id });
         if (!spent[0]) return { ok: false, reason: "code" } as const;
 
-        const shopName = input.shopName.trim() || input.terminalName.trim();
+        /* A JOINING till does not get to rename the shop. It is a second
+           counter in somebody's existing business, and its own first-run
+           answer to "who are you" is, by definition, not the shop's. Only a
+           till that FOUNDS the shop names it. */
+        const proposed = input.shopName.trim() || input.terminalName.trim();
 
         await tx
           .insert(tenants)
-          .values({ id: input.tenantId, accountId: code.accountId, name: shopName })
+          .values({ id: tenantId, accountId: code.accountId, name: proposed })
           /* A shop that renames itself renames here; `account_id` is never in the
              update, so no enrolment can move a shop between accounts. */
           .onConflictDoUpdate({
             target: tenants.id,
-            set: { name: shopName, lastSeenAt: input.now },
+            set: adopted ? { lastSeenAt: input.now } : { name: proposed, lastSeenAt: input.now },
           });
+
+        const shopRow = await tx
+          .select({ name: tenants.name })
+          .from(tenants)
+          .where(eq(tenants.id, tenantId))
+          .limit(1);
+        const shopName = shopRow[0]?.name ?? proposed;
 
         const deviceToken = newDeviceToken();
         const enrolled = await tx
@@ -170,8 +226,8 @@ export function pgStore(handle?: CloudDb): CloudStore {
           .values({
             id: uuidv7(),
             accountId: code.accountId,
-            tenantId: input.tenantId,
-            locationId: input.locationId,
+            tenantId,
+            locationId,
             terminalId: input.terminalId,
             terminalName: input.terminalName,
             tokenHash: digest(deviceToken),
@@ -188,7 +244,7 @@ export function pgStore(handle?: CloudDb): CloudStore {
             set: {
               tokenHash: digest(deviceToken),
               terminalName: input.terminalName,
-              locationId: input.locationId,
+              locationId,
               appVersion: input.appVersion,
               enrolledAt: input.now,
               revokedAt: null,
@@ -207,13 +263,105 @@ export function pgStore(handle?: CloudDb): CloudStore {
           .where(eq(accounts.id, code.accountId))
           .limit(1);
 
+        const tills = await tx
+          .select({ n: sql<number>`count(*)::int` })
+          .from(devices)
+          .where(and(eq(devices.tenantId, tenantId), isNull(devices.revokedAt)));
+
         return {
           ok: true,
           deviceToken,
           accountName: account[0]?.name ?? "",
           shopName,
+          tenantId,
+          locationId,
+          adopted,
+          tillCount: tills[0]?.n ?? 1,
         } as const;
       });
+    },
+
+    /**
+     * The entries this till's siblings wrote — ADR-0022 §2–4.
+     *
+     * Two queries, both served by `ix_entries_ingest`:
+     *
+     *  1. **the frontier** — the highest SETTLED `ingest_seq` for this shop.
+     *     It is what lets the cursor advance past rows that were examined and
+     *     not wanted (this till's own writes, a shift, a printer setting), so a
+     *     shop with one till does not rescan its whole stream every tick.
+     *  2. **the batch** — settled, after the cursor, somebody else's, and only
+     *     the entities ADR-0022 §1 calls the shop's.
+     *
+     * `limit + 1` is fetched to learn whether more is waiting without a second
+     * count. When the batch is truncated the cursor moves only as far as the
+     * last row actually RETURNED — never to the frontier — because the rows in
+     * between have not been handed over yet.
+     */
+    async pullBatch({ device, afterIngestSeq, limit, entities, settleBefore }: PullInput): Promise<PullResult> {
+      const handle = db();
+
+      const frontierRow = await handle
+        .select({ seq: sql<number>`coalesce(max(${syncEntries.ingestSeq}), 0)::bigint` })
+        .from(syncEntries)
+        .where(and(eq(syncEntries.tenantId, device.tenantId), lt(syncEntries.receivedAt, settleBefore)));
+      const frontier = Number(frontierRow[0]?.seq ?? 0);
+
+      const rows = await handle
+        .select({
+          ingestSeq: syncEntries.ingestSeq,
+          seq: syncEntries.seq,
+          opId: syncEntries.opId,
+          tenantId: syncEntries.tenantId,
+          locationId: syncEntries.locationId,
+          terminalId: syncEntries.terminalId,
+          entity: syncEntries.entity,
+          entityId: syncEntries.entityId,
+          action: syncEntries.action,
+          before: syncEntries.before,
+          after: syncEntries.after,
+          userId: syncEntries.userId,
+          authorizedByUserId: syncEntries.authorizedByUserId,
+          createdAt: syncEntries.createdAt,
+        })
+        .from(syncEntries)
+        .where(
+          and(
+            eq(syncEntries.tenantId, device.tenantId),
+            gt(syncEntries.ingestSeq, afterIngestSeq),
+            lt(syncEntries.receivedAt, settleBefore),
+            /* never the caller's own rows: a till that re-applied what it wrote
+               would push it again, and the echo would never stop (ADR-0022 §6) */
+            ne(syncEntries.deviceId, device.id),
+            inArray(syncEntries.entity, [...entities]),
+          ),
+        )
+        .orderBy(syncEntries.ingestSeq)
+        .limit(limit + 1);
+
+      const truncated = rows.length > limit;
+      const page = truncated ? rows.slice(0, limit) : rows;
+
+      return {
+        entries: page.map((row) => ({
+          ingestSeq: Number(row.ingestSeq),
+          seq: Number(row.seq),
+          opId: row.opId,
+          tenantId: row.tenantId,
+          locationId: row.locationId,
+          terminalId: row.terminalId,
+          entity: row.entity,
+          entityId: row.entityId,
+          action: row.action,
+          before: row.before ?? null,
+          after: row.after ?? null,
+          userId: row.userId,
+          authorizedByUserId: row.authorizedByUserId,
+          createdAtMs: row.createdAt.getTime(),
+        })),
+        cursor: truncated ? Number(page[page.length - 1]!.ingestSeq) : Math.max(frontier, afterIngestSeq),
+        more: truncated,
+      };
     },
 
     async deleteTenant(tenantId) {

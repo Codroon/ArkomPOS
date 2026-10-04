@@ -2,6 +2,7 @@
 import { bootStep } from "./boot-log";
 import { adoptPreviousUserData } from "./user-data-move";
 import { startSync, stopSync } from "./sync/push";
+import { startReceive, stopReceive } from "./sync/receive";
 import { app, BrowserWindow, screen } from "electron";
 import { join } from "node:path";
 import { initDb } from "./db";
@@ -140,8 +141,11 @@ if (!app.requestSingleInstanceLock()) {
     // the till may not be configured yet, so the context is read per run rather
     // than captured here — first run creates the tenant this depends on
     startNightlyBackups(db, () => tillContext(db).ctx);
-    /* and the cloud, if this till is linked. Nothing waits on it (ADR-0020). */
+    /* and the cloud, if this till is linked. Nothing waits on either of these
+       (ADR-0020, ADR-0022): the push sends what this till did, the receive loop
+       brings what the shop's other tills did, and a sale blocks on neither. */
     startSync(db);
+    startReceive(db);
 
     /* The shop's own idle limit, if it has one. Read defensively: a till that
        has never been configured has no tenant to read settings for, and failing
@@ -168,6 +172,7 @@ if (!app.requestSingleInstanceLock()) {
       quitting = true;
       stopNightlyBackups();
       stopSync();
+      stopReceive();
       stopIdleWatcher();
 
       const guard = new Promise((resolve) => setTimeout(resolve, CLOSE_BACKUP_TIMEOUT_MS));

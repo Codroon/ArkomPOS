@@ -36,6 +36,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const rows = await documentsInPeriod(account.id, period, {
     search: params.get("q") ?? "",
     docType: params.get("type") ?? "",
+    /* the same till the screen was showing — a CSV that quietly widened to the
+       whole shop would be a different answer (ADR-0016 §4, ADR-0022 §10) */
+    till: params.get("till") ?? undefined,
     limit: 5000,
   });
 

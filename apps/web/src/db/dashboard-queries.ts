@@ -26,7 +26,7 @@
  * setting nobody has been asked for yet.
  */
 import { sql, type SQL } from "drizzle-orm";
-import { folded } from "./fold";
+import { folded, type TillFilter } from "./fold";
 import { db as defaultDb, type CloudDb } from "./client";
 import { previousPeriod, type Period as Window } from "../lib/range";
 import { productName } from "./our-words";
@@ -34,8 +34,15 @@ import type { Locale } from "../i18n";
 
 const ZONE = "Europe/Madrid";
 
-/** The latest state of every COMPLETED document belonging to an account. */
-const completedDocs = (accountId: string) => sql`
+/**
+ * The latest state of every COMPLETED document belonging to an account.
+ *
+ * `till` narrows it to one terminal — ADR-0022 §10. Filtering HERE is what
+ * makes every figure on the dashboard agree: the tender mix and the top
+ * products join this CTE, so they follow the same filter rather than each
+ * having their own idea of which till the person asked about.
+ */
+const completedDocs = (accountId: string, till?: TillFilter) => sql`
   select d.id,
     d.row->>'docNumber'                                    as doc_number,
     d.row->>'docType'                                      as doc_type,
@@ -43,7 +50,7 @@ const completedDocs = (accountId: string) => sql`
     (d.row->>'taxCents')::bigint                           as tax_cents,
     (d.row->>'subtotalCents')::bigint                      as subtotal_cents,
     to_timestamp((d.row->>'completedAt')::bigint / 1000.0) as completed_at
-  from (${folded(accountId, "document")}) d
+  from (${folded(accountId, "document", till)}) d
   where d.row->>'status' = 'completed'
     and d.row->>'completedAt' is not null
 `;
@@ -122,6 +129,7 @@ const change = (now: number, before: number): number | null =>
 export async function periodTotals(
   accountId: string,
   period: Window,
+  till?: TillFilter,
   handle?: CloudDb,
 ): Promise<PeriodComparison> {
   const db = handle ?? defaultDb();
@@ -141,7 +149,7 @@ export async function periodTotals(
     refund_cents: string | null;
     refunds: number;
   }>(sql`
-    with docs as (${completedDocs(accountId)})
+    with docs as (${completedDocs(accountId, till)})
     select 'current' as window, ${totals} from docs where ${within(period)}
     union all
     select 'previous' as window, ${totals} from docs where ${withinPrevious(period)}
@@ -178,11 +186,12 @@ export interface DayRow {
 export async function takingsByDay(
   accountId: string,
   period: Window,
+  till?: TillFilter,
   handle?: CloudDb,
 ): Promise<DayRow[]> {
   const db = handle ?? defaultDb();
   const rows = await db.execute<{ day: string; net_cents: string | null; documents: number }>(sql`
-    with docs as (${completedDocs(accountId)}),
+    with docs as (${completedDocs(accountId, till)}),
     calendar as (
       select generate_series(
         ${period.from}::date,
@@ -227,11 +236,12 @@ export interface TenderRow {
 export async function paymentMix(
   accountId: string,
   period: Window,
+  till?: TillFilter,
   handle?: CloudDb,
 ): Promise<TenderRow[]> {
   const db = handle ?? defaultDb();
   const rows = await db.execute<{ method: string; amount_cents: string; n: number }>(sql`
-    with docs as (${completedDocs(accountId)}),
+    with docs as (${completedDocs(accountId, till)}),
     tenders as (
       select x.row->>'documentId'            as document_id,
              x.row->>'method'                as method,
@@ -264,11 +274,12 @@ export async function topProducts(
   period: Window,
   locale: Locale = "es",
   limit = 8,
+  till?: TillFilter,
   handle?: CloudDb,
 ): Promise<TopProductRow[]> {
   const db = handle ?? defaultDb();
   const rows = await db.execute<{ description: string; qty: string; total_cents: string }>(sql`
-    with docs as (${completedDocs(accountId)}),
+    with docs as (${completedDocs(accountId, till)}),
     lines as (
       select x.row->>'documentId'           as document_id,
              x.row->>'description'          as description,
@@ -311,12 +322,13 @@ export interface DocumentRow {
 export async function documentsInPeriod(
   accountId: string,
   period: Window,
-  options: { search?: string; docType?: string; limit?: number } = {},
+  options: { search?: string; docType?: string; limit?: number; till?: TillFilter } = {},
   handle?: CloudDb,
 ): Promise<DocumentRow[]> {
   const db = handle ?? defaultDb();
   const search = options.search?.trim() ?? "";
   const docType = options.docType?.trim() ?? "";
+  const till = options.till;
 
   const rows = await db.execute<{
     id: string;
@@ -326,7 +338,7 @@ export async function documentsInPeriod(
     tax_cents: string;
     completed_at: Date;
   }>(sql`
-    with docs as (${completedDocs(accountId)})
+    with docs as (${completedDocs(accountId, till)})
     select id, doc_number, doc_type, total_cents, tax_cents, completed_at
     from docs
     where ${within(period)}
@@ -373,6 +385,7 @@ export async function recentShifts(
   accountId: string,
   period: Window,
   limit = 8,
+  till?: TillFilter,
   handle?: CloudDb,
 ): Promise<ShiftRow[]> {
   const db = handle ?? defaultDb();
@@ -392,7 +405,7 @@ export async function recentShifts(
       x.row->>'countedCashCents'                          as counted_cash_cents,
       x.row->>'expectedCashCents'                         as expected_cash_cents,
       x.row->>'varianceCents'                             as variance_cents
-    from (${folded(accountId, "shift")}) x
+    from (${folded(accountId, "shift", till)}) x
     where x.row->>'closedAt' is not null
       and (to_timestamp((x.row->>'closedAt')::bigint / 1000.0) at time zone ${ZONE})::date
           between ${period.from}::date and ${period.to}::date

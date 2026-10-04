@@ -51,6 +51,9 @@ import { RAIL_COOKIE } from "../../src/lib/prefs";
 import { shopToday } from "../../src/lib/range";
 
 export interface ChromeLabels {
+  /** the till filter — ADR-0022 §10 */
+  till: string;
+  allTills: string;
   brand: string;
   custom: string;
   from: string;
@@ -144,6 +147,7 @@ export function PanelChrome({
   locale,
   account,
   railCollapsed,
+  tills,
   signOut,
   children,
 }: {
@@ -152,6 +156,14 @@ export function PanelChrome({
   account: { name: string; email: string; licence: string };
   /** what the cookie said, so the first paint is already right */
   railCollapsed: boolean;
+  /**
+   * The shop's tills, for the per-till filter — ADR-0022 §10.
+   *
+   * The selector only appears when there are two or more: a shop with one till
+   * would be offered a choice between "all tills" and its only till, which is
+   * a control that cannot do anything.
+   */
+  tills: { terminalId: string; terminalName: string }[];
   signOut: () => Promise<void>;
   children: ReactNode;
 }) {
@@ -173,6 +185,23 @@ export function PanelChrome({
   const showRange =
     RANGE_SCREENS.includes(path) &&
     !(path === "/panel/informes" && PERIODLESS_REPORTS.includes(params.get("report") ?? ""));
+
+  /*
+   * The till filter rides with the period, and for the same reason: both are
+   * "which slice of the shop am I looking at", both belong in the URL so a link
+   * opens on the same figures, and both are meaningless on the screens about
+   * the catalogue and the stock — after ADR-0022 those are the SHOP's, and
+   * "the stock at till 2" is not a question with an answer (§1).
+   */
+  const till = params.get("till") ?? "";
+  const showTills = showRange && tills.length > 1;
+
+  const setTill = (next: string) => {
+    const query = new URLSearchParams(params.toString());
+    if (next) query.set("till", next);
+    else query.delete("till");
+    startTransition(() => router.replace(`${path}?${query.toString()}`, { scroll: false }));
+  };
 
   /* a route change closes both; otherwise they cover the page you asked for */
   useEffect(() => {
@@ -326,6 +355,22 @@ export function PanelChrome({
             <BrandMark className="hidden h-[14px] shrink-0 text-ink sm:block lg:hidden" height={13} />
             <h1 className="truncate text-[14px] font-semibold text-ink lg:text-[15px]">{title}</h1>
           </div>
+
+          {showTills ? (
+            <select
+              aria-label={labels.till}
+              value={till}
+              onChange={(event) => setTill(event.target.value)}
+              className="h-10 shrink-0 rounded-card border border-line bg-card px-2 text-[12px] text-ink-2 hover:text-ink focus:border-line-strong focus:outline-none"
+            >
+              <option value="">{labels.allTills}</option>
+              {tills.map((one) => (
+                <option key={one.terminalId} value={one.terminalId}>
+                  {one.terminalName}
+                </option>
+              ))}
+            </select>
+          ) : null}
 
           {showRange ? (
             <div className="relative shrink-0">

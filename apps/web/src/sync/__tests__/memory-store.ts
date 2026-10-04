@@ -12,6 +12,8 @@ import type {
   DeviceRow,
   EnrolInput,
   EnrolOutcome,
+  PullInput,
+  PullResult,
   RecordBatchInput,
   RecordBatchResult,
 } from "../store";
@@ -19,9 +21,12 @@ import type {
 let counter = 0;
 const nextId = (prefix: string) => `${prefix}-${(counter += 1)}`;
 
+
 export interface StoredEntry {
   tenantId: string;
   opId: string;
+  /** mirrors `sync_entries.ingest_seq` — assigned here, never sent by a till */
+  ingestSeq: number;
   deviceId: string;
   seq: number;
   terminalId: string;
@@ -30,7 +35,12 @@ export interface StoredEntry {
   action: string;
   before: unknown;
   after: unknown;
+  /* carried because a pull has to hand them back, not because ingest reads them */
+  locationId: string;
+  userId: string | null;
+  authorizedByUserId: string | null;
   createdAt: Date;
+  receivedAt: Date;
 }
 
 interface DeviceRecord extends DeviceRow {
@@ -74,6 +84,11 @@ export interface MemoryStore extends CloudStore {
 const key = (tenantId: string, opId: string) => `${tenantId}\u0000${opId}`;
 
 export function memoryStore(): MemoryStore {
+  /* Arrival order, per store instance — a `bigserial` belongs to a table, and
+     each of these IS a fresh table. Module-level would leak between tests and
+     make a cursor assertion depend on what ran before it. */
+  let ingestCounter = 0;
+
   const store: MemoryStore = {
     accounts: new Map(),
     tenants: new Map(),
@@ -163,6 +178,7 @@ export function memoryStore(): MemoryStore {
         store.entries.set(k, {
           tenantId: op.tenantId,
           opId: op.opId,
+          ingestSeq: (ingestCounter += 1),
           deviceId: device.id,
           seq: op.seq,
           terminalId: op.terminalId,
@@ -171,7 +187,11 @@ export function memoryStore(): MemoryStore {
           action: op.action,
           before: op.before ?? null,
           after: op.after ?? null,
+          locationId: op.locationId,
+          userId: op.userId,
+          authorizedByUserId: op.authorizedByUserId,
           createdAt: new Date(op.createdAtMs),
+          receivedAt: now,
         });
         stored += 1;
       }
@@ -198,30 +218,50 @@ export function memoryStore(): MemoryStore {
       if (existing && existing.accountId !== code.accountId) {
         return { ok: false, reason: "tenant" };
       }
+
+      /* ADR-0022 §9 — which shop does this till join? Same three cases as
+         pg-store, and the same refusal when there is no single answer. */
+      const shops = [...store.tenants.values()].filter((t) => t.accountId === code.accountId);
+      const alreadyIn = shops.some((t) => t.id === input.tenantId);
+      if (!alreadyIn && shops.length > 1) {
+        return { ok: false, reason: "ambiguous", tenantIds: shops.map((t) => t.id) };
+      }
+      const adopted = !alreadyIn && shops.length === 1;
+      const tenantId = adopted ? shops[0]!.id : input.tenantId;
+
+      let locationId = input.locationId;
+      if (adopted) {
+        const sibling = [...store.devices.values()].find((d) => d.tenantId === tenantId);
+        if (sibling) locationId = sibling.locationId;
+      }
+
       code.usedAt = input.now;
 
-      const shopName = input.shopName.trim() || input.terminalName.trim();
-      if (existing) {
-        existing.name = shopName;
-        existing.lastSeenAt = input.now;
+      /* a joining till does not rename somebody else's shop */
+      const proposed = input.shopName.trim() || input.terminalName.trim();
+      const shop = store.tenants.get(tenantId);
+      if (shop) {
+        if (!adopted) shop.name = proposed;
+        shop.lastSeenAt = input.now;
       } else {
-        store.tenants.set(input.tenantId, {
-          id: input.tenantId,
+        store.tenants.set(tenantId, {
+          id: tenantId,
           accountId: code.accountId,
-          name: shopName,
+          name: proposed,
           lastSeenAt: input.now,
         });
       }
+      const shopName = store.tenants.get(tenantId)!.name;
 
       const deviceToken = newDeviceToken();
       const already = [...store.devices.values()].find(
-        (d) => d.tenantId === input.tenantId && d.terminalId === input.terminalId,
+        (d) => d.tenantId === tenantId && d.terminalId === input.terminalId,
       );
       const device: DeviceRecord = already ?? {
         id: nextId("dev"),
         accountId: code.accountId,
-        tenantId: input.tenantId,
-        locationId: input.locationId,
+        tenantId,
+        locationId,
         terminalId: input.terminalId,
         terminalName: input.terminalName,
         tokenHash: "",
@@ -232,7 +272,7 @@ export function memoryStore(): MemoryStore {
       };
       device.tokenHash = digest(deviceToken);
       device.terminalName = input.terminalName;
-      device.locationId = input.locationId;
+      device.locationId = locationId;
       device.appVersion = input.appVersion;
       device.revokedAt = null;
       store.devices.set(device.id, device);
@@ -244,6 +284,60 @@ export function memoryStore(): MemoryStore {
         deviceToken,
         accountName: store.accounts.get(code.accountId)?.name ?? "",
         shopName,
+        tenantId,
+        locationId,
+        adopted,
+        tillCount: [...store.devices.values()].filter(
+          (d) => d.tenantId === tenantId && !d.revokedAt,
+        ).length,
+      };
+    },
+
+    /**
+     * The same three rules as `pg-store.pullBatch`, in a Map.
+     *
+     * Written to match its INVARIANTS rather than to make a test pass: the
+     * caller's own rows are excluded, only shared entities are served, only
+     * settled rows are served, and the cursor jumps to the frontier exactly
+     * when the batch was not truncated.
+     */
+    async pullBatch({ device, afterIngestSeq, limit, entities, settleBefore }: PullInput): Promise<PullResult> {
+      const settled = [...store.entries.values()].filter(
+        (e) => e.tenantId === device.tenantId && e.receivedAt < settleBefore,
+      );
+      const frontier = settled.reduce((max, e) => (e.ingestSeq > max ? e.ingestSeq : max), 0);
+
+      const matching = settled
+        .filter(
+          (e) =>
+            e.ingestSeq > afterIngestSeq &&
+            e.deviceId !== device.id &&
+            entities.includes(e.entity),
+        )
+        .sort((a, b) => a.ingestSeq - b.ingestSeq);
+
+      const truncated = matching.length > limit;
+      const page = truncated ? matching.slice(0, limit) : matching;
+
+      return {
+        entries: page.map((e) => ({
+          ingestSeq: e.ingestSeq,
+          seq: e.seq,
+          opId: e.opId,
+          tenantId: e.tenantId,
+          locationId: e.locationId,
+          terminalId: e.terminalId,
+          entity: e.entity,
+          entityId: e.entityId,
+          action: e.action,
+          before: e.before ?? null,
+          after: e.after ?? null,
+          userId: e.userId,
+          authorizedByUserId: e.authorizedByUserId,
+          createdAtMs: e.createdAt.getTime(),
+        })),
+        cursor: truncated ? page[page.length - 1]!.ingestSeq : Math.max(frontier, afterIngestSeq),
+        more: truncated,
       };
     },
 

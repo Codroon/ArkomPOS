@@ -29,6 +29,10 @@ photographs never leave the shop.
 Since v0.18.2 first run is a four-step wizard (language → shop → owner + recovery code →
 printer, skippable) and the landing screen carries a fact-driven, dismissible checklist
 (`setup:checklist`). `pnpm fresh` archives this machine's dev data and reopens onboarding.
+Since v1.3.0 a shop can run **several tills that agree** (ADR-0022): one catalogue, one stock
+ledger, a second till that joins the shop instead of founding one, and a dashboard that shows
+every till together with a filter by till. Data moves both ways and the counter waits on
+neither direction.
 Since v1.2.0 a till can be **linked to the cloud** (ADR-0020): the owner pastes an enrolment
 code in Ajustes → Nube, the till holds a device token in `userData/cloud-link.json` — never a
 table, because every row is pushed to the service the token authenticates — and a background
@@ -38,9 +42,10 @@ it never writes back.** Nothing in a screen, a sale or a shutdown awaits the net
 Since v0.18.0 the till is handover-clean: the general VAT rate is a SETTING read at snapshot time
 (ADR-0007 A1), Eliminar deletes a row nothing points at and archives one with history, a Used-type
 article can be typed in and sells REBU, an installed build never sees the demo dataset.
-NOT yet: refunds/voids, full invoices, card-terminal SDK, down-sync, the dashboard and its
-projections, the landing page and payment, transfers/agency/SIM
-screens, margin on SOLD used devices, the refurbishment pipeline, the police-register export.
+NOT yet: full invoices, card-terminal SDK, the landing page and payment, margin on SOLD used
+devices, the refurbishment pipeline, the police-register export, repairs/used/vouchers crossing
+tills, documents replicated read-only, true oversell prevention (the cloud flags, it does not
+block), a LAN path that converges with the router unplugged.
 Schema already anticipates them — build nothing for them.
 
 ## Hard rules
@@ -131,12 +136,39 @@ Schema already anticipates them — build nothing for them.
   make last month's margin move when this month's delivery arrives at a different
   price. A NULL means "before v0.14.0": reports fall back to the current cost and
   say so on screen and in the export, never silently (ADR-0016 §2).
-- **Nothing in the till ever waits on the cloud, and the cloud never writes back.** The push
-  is a background timer; `pushOnce()` does not throw, records its failure and is awaited by
-  no screen. A batch is redacted by `redactForSync()` BEFORE it is queued — a device
-  passcode, a PIN hash or a recovery hash on the wire has already left the shop. The cursor
-  moves only on a parsed ack, and what the cloud acks is what it stored, never the cursor it
-  remembers (ADR-0020).
+- **Nothing in the till ever waits on the cloud, and the cloud never AUTHORS.** The push and
+  the pull are background timers; `pushOnce()`/`pullOnce()` do not throw, record their
+  failure and are awaited by no screen. A batch is redacted by `redactForSync()` BEFORE it is
+  queued — a device passcode, a PIN hash or a recovery hash on the wire has already left the
+  shop. The push cursor moves only on a parsed ack, and what the cloud acks is what it
+  stored, never the cursor it remembers (ADR-0020). Since v1.3.0 data moves BOTH ways, and
+  "the cloud never writes back" narrows to: every row it serves was written by one of that
+  shop's own tills, so it is a courier and never a writer (ADR-0022 §2).
+- **A shop's tills share a catalogue and a stock ledger; everything else is per-till.**
+  `SHARED_ENTITIES` in `@arkom/core` is the whole list — product_group, product,
+  product_code, supplier, customer, unit, stock_movement — and a test pins it. Settings are
+  NOT shared (the printer is a setting), nor are users/PINs, documents, series, shifts, the
+  drawer, vouchers, repairs, used purchases or photographs. A till's `Informes` reports that
+  till's own takings and agrees with its Z; the shop's combined figures are the dashboard's
+  job, filtered by till (ADR-0022 §1, §8, §10).
+- **Applying another till's row writes NO oplog entry.** `mutate()` throws when a build logs
+  nothing; `absorb()` throws when a build logs ANYTHING. A logged entry would be pushed,
+  pulled back by the till that wrote it, absorbed and pushed again — an echo that never stops
+  and is completely silent. A test asserts the oplog is unchanged across an absorb.
+- **Received is not applied.** A pull writes `sync_inbox` and moves its cursor; a separate
+  pass drains it in dependency order and RETRIES what would not land. A row that arrives
+  before its parent is early, not broken. Never apply a batch straight into the business
+  tables — `product_codes.product_id` is NOT NULL REFERENCES products and the cloud's
+  ingest order is not the order SQLite accepts (ADR-0022 §5).
+- **The pull serves only SETTLED rows** (`received_at < now() - 5s`). `ingest_seq` is a
+  bigserial, assigned before commit, so two concurrent ingests can commit out of order and a
+  naive cursor would step over the lower one forever — one sale, missing from one till,
+  unreproducible. `seq` is still PER TILL and can never order a merged stream (ADR-0022 §3–4).
+- **A second till JOINS a shop; it never founds one.** The enrolment RESPONSE carries the
+  keys to use. A till with fiscal history is refused (`TILL_HAS_HISTORY`) and an account with
+  two shops is refused (`SHOP_AMBIGUOUS`) rather than guessed at. A joining till parks its
+  push cursor past its own pre-join oplog instead of deleting it: those entries are true, and
+  pushing them would hand the cloud a business that never traded (ADR-0022 §9).
 - **Two identities, never merged (ADR-0021).** A cloud login (Supabase Auth) proves a
   browser belongs to an account; a PIN proves the person at the counter is Ana. The join is
   `users.cloud_user_id`, nullable — a link that grants nothing in either direction, because

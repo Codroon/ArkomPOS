@@ -44,7 +44,24 @@ import { sql, type SQL } from "drizzle-orm";
  * when it was last touched. A caller that wants either has to be given it,
  * because the fold groups the ops away.
  */
-export function folded(accountId: string, entity: string): SQL {
+/**
+ * Narrow a fold to ONE till — ADR-0022 §10.
+ *
+ * Only legitimate for entities a single till writes end to end: a document, its
+ * lines and tenders, a shift, a drawer movement. Those are per-till by
+ * ADR-0008 and ADR-0015, so filtering the ops is the same as filtering the rows.
+ *
+ * It would be WRONG on a shared entity. A product renamed at till 1 and
+ * repriced at till 2 has its ops split across both, so folding one till's ops
+ * alone yields a row with half its fields missing — not a subset of the
+ * catalogue but a corrupted version of it. Which is also why the screens about
+ * the catalogue and the stock have no till selector: after ADR-0022 those are
+ * the SHOP's, and "the stock at till 2" is not a question with an answer.
+ */
+export type TillFilter = string | null | undefined;
+
+export function folded(accountId: string, entity: string, terminalId?: TillFilter): SQL {
+  const till = terminalId ? sql`and e.terminal_id = ${terminalId}` : sql``;
   return sql`
     select f.entity_id as id,
            jsonb_object_agg(f.key, f.value) as row,
@@ -73,6 +90,7 @@ export function folded(accountId: string, entity: string): SQL {
       ) as kv
       where e.tenant_id in (select t.id from tenants t where t.account_id = ${accountId})
         and e.entity = ${entity}
+        ${till}
       /* newest op that mentioned this field, for this row */
       order by e.entity_id, kv.key, e.seq desc
     ) f
@@ -84,8 +102,8 @@ export function folded(accountId: string, entity: string): SQL {
  * Same, but only for rows that have ever been touched — used where a caller
  * needs the id alongside the folded row and does its own filtering.
  */
-export const foldedAs = (accountId: string, entity: string, alias: string): SQL =>
-  sql`${sql.raw(alias)} as (${folded(accountId, entity)})`;
+export const foldedAs = (accountId: string, entity: string, alias: string, terminalId?: TillFilter): SQL =>
+  sql`${sql.raw(alias)} as (${folded(accountId, entity, terminalId)})`;
 
 /**
  * A date read straight from `sync_entries`, rather than from a folded row.

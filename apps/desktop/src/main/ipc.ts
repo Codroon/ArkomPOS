@@ -386,6 +386,7 @@ import {
 } from "./print";
 import { enrol, unlink } from "./sync/enrol";
 import { pushAll, syncStatus } from "./sync/push";
+import { pullAll } from "./sync/receive";
 import { checklist, completeFirstRun, demoStatus, dismissChecklist, isSetupNeeded, removeDemoData } from "./setup";
 import { backupStatus, backupsDir, runBackup } from "./backup";
 import {
@@ -746,11 +747,16 @@ export function registerIpcHandlers(db: ArkomDb): void {
     enrol(db, s.ctx, input),
   );
   guarded("cloud:unlink", "settings.edit", CloudUnlinkRequestSchema, CloudStatusResponseSchema, () => unlink(db));
-  guarded("cloud:syncNow", "settings.edit", CloudSyncNowRequestSchema, CloudStatusResponseSchema, () =>
-    /* everything that is waiting, not the first 200 of it: somebody pressing
-       "Send now" means all of it, and usually after the line came back */
-    pushAll(db, { force: true }),
-  );
+  guarded("cloud:syncNow", "settings.edit", CloudSyncNowRequestSchema, CloudStatusResponseSchema, async () => {
+    /* Everything that is waiting, not the first 200 of it: somebody pressing
+       "Sincronizar ahora" means all of it, and usually after the line came back.
+       Both directions, because since ADR-0022 the button that says "sync" has
+       to mean "and tell me what the other tills did" — which is the half the
+       person pressing it is usually standing there waiting for. */
+    await pushAll(db, { force: true });
+    await pullAll(db, { force: true });
+    return syncStatus(db);
+  });
 
   authed("setup:checklist", SetupChecklistRequestSchema, SetupChecklistResponseSchema, (s) =>
     checklist(db, s.ctx),

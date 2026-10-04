@@ -82,7 +82,46 @@ export function CloudCard() {
               <span className="text-muted">{t("set.cloudLastPush")}</span>
               <span className="font-mono tabular-nums text-ink-2">{stamp(status.lastPushAtMs)}</span>
             </div>
+
+            {/* the other direction — ADR-0022. Only shown when the shop HAS
+                another till: a single-till shop told about "rows received from
+                the other tills" would be told about a thing that cannot
+                happen. */}
+            {status.tillCount > 1 ? (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-muted">{t("set.cloudTills")}</span>
+                  <span className="font-mono tabular-nums text-ink-2">{status.tillCount}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">{t("set.cloudLastPull")}</span>
+                  <span className="font-mono tabular-nums text-ink-2">{stamp(status.lastPullAtMs)}</span>
+                </div>
+                {status.inboxPending > 0 ? (
+                  <div className="flex justify-between">
+                    <span className="text-muted">{t("set.cloudInbox")}</span>
+                    <span className="font-mono tabular-nums">{status.inboxPending}</span>
+                  </div>
+                ) : null}
+              </>
+            ) : null}
           </div>
+
+          {/* A clock that disagrees with the cloud by more than a couple of
+              minutes is worth saying out loud: last-writer-wins compares the
+              WRITING till's clock (ADR-0022 §7), so a badly set one can lose an
+              edit it should have won. Visible beats mysterious. */}
+          {status.clockSkewMs !== null && Math.abs(status.clockSkewMs) > 120_000 ? (
+            <div className="rounded-[3px] border border-warning-ink/25 bg-warning-bg px-2.5 py-2 text-[11px] leading-snug text-warning-ink">
+              {t("set.cloudClockSkew")}
+            </div>
+          ) : null}
+
+          {status.inboxStuck > 0 ? (
+            <div className="rounded-[3px] border border-warning-ink/25 bg-warning-bg px-2.5 py-2 text-[11px] leading-snug text-warning-ink">
+              {t("set.cloudInboxStuck")}
+            </div>
+          ) : null}
 
           {status.lastError ? (
             <div className="rounded-[3px] border border-warning-ink/25 bg-warning-bg px-2.5 py-2 text-[11px] leading-snug text-warning-ink">

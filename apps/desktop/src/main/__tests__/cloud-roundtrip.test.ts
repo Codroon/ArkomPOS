@@ -25,9 +25,11 @@ import { endSession, startSession } from "../auth/session";
 import { resetTillContext, tillContext } from "../context";
 import { resetLinkCache } from "../sync/link";
 import { resetSyncState } from "../sync/push";
+import { resetReceiveState } from "../sync/receive";
 /* the cloud half, imported as itself — not a description of it */
 import { ingest as cloudIngest } from "../../../../web/src/sync/ingest";
 import { enrol as cloudEnrol } from "../../../../web/src/sync/enrol";
+import { pull as cloudPull } from "../../../../web/src/sync/pull";
 import { memoryStore, type MemoryStore } from "../../../../web/src/sync/__tests__/memory-store";
 
 const MIGRATIONS = join(__dirname, "../../../../../packages/db/drizzle");
@@ -81,7 +83,12 @@ function stubCloud(): void {
           ? await cloudEnrol(cloud, body)
           : path === "/api/sync"
             ? await cloudIngest(cloud, { authorization: headers.authorization ?? null, body })
-            : { status: 404, body: { error: "NOT_FOUND" } };
+            : path === "/api/sync/pull"
+              ? await cloudPull(cloud, {
+                  authorization: headers.authorization ?? null,
+                  query: Object.fromEntries(new URL(String(url)).searchParams),
+                })
+              : { status: 404, body: { error: "NOT_FOUND" } };
 
       return {
         ok: result.status >= 200 && result.status < 300,
@@ -118,6 +125,7 @@ beforeEach(() => {
   resetTillContext();
   resetLinkCache();
   resetSyncState();
+  resetReceiveState();
   seen = [];
   cloud = memoryStore();
   const dir = mkdtempSync(join(tmpdir(), "arkom-roundtrip-"));
@@ -163,7 +171,18 @@ describe("a shop links its till and its history goes up", () => {
     await drain();
 
     expect(seen[0]).toBe("POST https://pos.codroon.com/api/enrol");
-    expect(seen.slice(1).every((c) => c === "POST https://pos.codroon.com/api/sync")).toBe(true);
+
+    /*
+     * Both doors, and nothing else. This case exists because the design doc
+     * described `POST /api/sync/push` for a year and a half while the code
+     * served `/api/sync`, and exactly one of those could have been found by a
+     * shop. ADR-0022 added a second door, so it is pinned the same way.
+     */
+    const paths = new Set(seen.slice(1).map((c) => c.replace(/\?.*$/, "")));
+    expect([...paths].sort()).toEqual([
+      "GET https://pos.codroon.com/api/sync/pull",
+      "POST https://pos.codroon.com/api/sync",
+    ]);
   });
 
   it("carries the shop's own rows, so a dashboard would have something to show", async () => {

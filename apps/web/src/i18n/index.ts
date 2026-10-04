@@ -159,6 +159,11 @@ const es = {
   "link.failed": "No se ha podido generar el código. Vuelve a intentarlo.",
 
   "till.none": "Todavía no hay ninguna caja enlazada.",
+  /* the per-till filter — ADR-0022 §10. "Todas las cajas" is the DEFAULT and
+     says so: the shop's figures together is the question somebody opening the
+     dashboard is asking, and one till is the narrowing. */
+  "till.filter": "Caja",
+  "till.all": "Todas las cajas",
   "till.noneHint":
     "En la caja: Ajustes → Nube, pega el código de enlace y pulsa Enlazar la caja. Lo que ya haya vendido subirá solo.",
 
@@ -522,6 +527,8 @@ const en: Record<MessageKey, string> = {
   "link.failed": "The code could not be generated. Please try again.",
 
   "till.none": "No till is linked yet.",
+  "till.filter": "Till",
+  "till.all": "All tills",
   "till.noneHint":
     "On the till: Settings → Cloud, paste the link code and press Link this till. Whatever it has already sold will come up by itself.",
 
