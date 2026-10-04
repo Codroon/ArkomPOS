@@ -27,7 +27,7 @@ import { handlers, app } from "./electron-stub";
 import { registerIpcHandlers } from "../ipc";
 import { endSession, startSession } from "../auth/session";
 import { resetTillContext, tillContext } from "../context";
-import { resetLinkCache, readLink } from "../sync/link";
+import { resetLinkCache, readLink, patchLink } from "../sync/link";
 import { pushAll, resetSyncState } from "../sync/push";
 import { pullAll, resetReceiveState } from "../sync/receive";
 import { enrolSettled } from "../sync/enrol";
@@ -573,6 +573,134 @@ describe("the stock is one number", () => {
     expect(movements).toHaveLength(3);
     expect(sum).toBe(12);
     expect(onHand(two, saved.product.id)).toBe(sum);
+  });
+});
+
+describe("an edit at one till reaches the other", () => {
+  /**
+   * The path through `isStale()`, which the create-only cases above never touch.
+   *
+   * It matters because the failure is SILENT: a staleness guard that is slightly
+   * wrong does not throw, it drops the edit, and the shop finds out when a price
+   * somebody changed on Monday is still the old one at the other counter on
+   * Friday.
+   */
+  async function twoLinkedTills() {
+    const one = await install("Caja 1", "T1-");
+    stubCloud();
+    use(one);
+    await link();
+    const two = await install("Caja 2", "T2-");
+    stubCloud();
+    use(two);
+    await link();
+    return { one, two };
+  }
+
+  async function aProduct(till: Till, name: string) {
+    use(till);
+    const groupId = till.db.select().from(s.productGroups).all()[0]!.id;
+    const saved = await call<{ product: { id: string } }>("catalog:save", {
+      name,
+      barcode: null,
+      groupId,
+      itemType: "stocked",
+      costCents: 500,
+      priceCents: 1500,
+      taxRegime: "IVA21",
+      reorderPoint: 0,
+      lowStockThreshold: 0,
+      active: true,
+    });
+    return saved.product.id;
+  }
+
+  const priceAt = (till: Till, id: string): number | null =>
+    till.db.select().from(s.products).where(eq(s.products.id, id)).all()[0]?.priceCents ?? null;
+
+  it("carries a price change made after the other till already had the row", async () => {
+    const { one, two } = await twoLinkedTills();
+    const id = await aProduct(one, "Cargador 65W");
+
+    await send(one);
+    await receive(two);
+    expect(priceAt(two, id)).toBe(1500);
+
+    /* the shop puts the price up at till 1 */
+    use(one);
+    await call("catalog:save", {
+      id,
+      name: "Cargador 65W",
+      barcode: null,
+      groupId: one.db.select().from(s.productGroups).all()[0]!.id,
+      itemType: "stocked",
+      costCents: 500,
+      priceCents: 1900,
+      taxRegime: "IVA21",
+      reorderPoint: 0,
+      lowStockThreshold: 0,
+      active: true,
+    });
+    expect(priceAt(one, id)).toBe(1900);
+
+    await send(one);
+    await receive(two);
+
+    expect(priceAt(two, id)).toBe(1900);
+  });
+
+  it("does not blank the fields the edit never mentioned (§7)", async () => {
+    /*
+     * The till pushes CHANGES, so an update payload may carry two fields out of
+     * fifteen. Writing it as the whole row would wipe the cost, the tax regime
+     * and the reorder point — and the screen would show a product that needs
+     * fixing rather than one that was repriced.
+     */
+    const { one, two } = await twoLinkedTills();
+    const id = await aProduct(one, "Funda Redmi 13");
+    await send(one);
+    await receive(two);
+
+    use(one);
+    await call("catalog:save", {
+      id,
+      name: "Funda Redmi Note 13",
+      barcode: null,
+      groupId: one.db.select().from(s.productGroups).all()[0]!.id,
+      itemType: "stocked",
+      costCents: 500,
+      priceCents: 1500,
+      taxRegime: "IVA21",
+      reorderPoint: 0,
+      lowStockThreshold: 0,
+      active: true,
+    });
+    await send(one);
+    await receive(two);
+
+    const row = two.db.select().from(s.products).where(eq(s.products.id, id)).all()[0]!;
+    expect(row.name).toBe("Funda Redmi Note 13");
+    expect(row.costCents).toBe(500);
+    expect(row.taxRegime).toBe("IVA21");
+    expect(row.priceCents).toBe(1500);
+  });
+
+  it("applies the same edit twice without changing the answer", async () => {
+    /* the cursor can be replayed — a lost cloud-link.json, a re-enrolment — and
+       `op_id` is what makes that free (ADR-0005) */
+    const { one, two } = await twoLinkedTills();
+    const id = await aProduct(one, "Soporte moto");
+    await send(one);
+    await receive(two);
+
+    const before = priceAt(two, id);
+    use(two);
+    /* rewind this till's cursor and pull the whole stream again */
+    patchLink({ lastPulledIngestSeq: 0 });
+    await receive(two);
+
+    expect(priceAt(two, id)).toBe(before);
+    expect(two.db.select().from(s.products).where(eq(s.products.id, id)).all()).toHaveLength(1);
   });
 });
 
