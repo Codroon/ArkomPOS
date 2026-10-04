@@ -222,7 +222,9 @@ Schema already anticipates them — build nothing for them.
 (the till's own SQLite read against the cloud, figure by figure — run it before any deploy).
 Cloud-only, from `apps/web`: `db:generate` /
 `db:migrate` (its own Postgres lineage, never the till's), `cloud:code` (issue an enrolment
-code), `cloud:delete-tenant` (ADR-0020 §4), `test:db` (integration, against real Postgres).
+code), `cloud:shops` (which shops exist, with ids and what they hold — run it before
+`cloud:delete-tenant`, and `-- --tenant <id>` lists one shop's products and on-hand),
+`cloud:delete-tenant` (ADR-0020 §4), `test:db` (integration, against real Postgres).
 See `apps/web/README.md`.
 Keep these working at all times. A CLIENT install runs none of them: it migrates on first
 launch and asks the shop who it is (see DEPLOYMENT.md). `db:seed` is a dev convenience that

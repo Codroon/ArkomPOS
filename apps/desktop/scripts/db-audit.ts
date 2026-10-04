@@ -537,6 +537,48 @@ check(
   ],
 );
 
+/* ADR-0022: what the other tills sent, and the one thing that must not be true
+ * ---------------------------------------------------------------------------
+ * `sync_inbox` only exists on an install migrated past v1.3.0, so both checks
+ * are SKIPPED rather than failed on an older database — an audit that fails
+ * because a till has not been upgraded tells nobody anything.
+ */
+const hasInbox =
+  q<{ n: number }>("SELECT COUNT(*) n FROM sqlite_master WHERE type='table' AND name='sync_inbox'")[0]!.n > 0;
+
+if (hasInbox) {
+  /**
+   * The echo check, and the sharpest one in this file.
+   *
+   * Absorbing another till's row must write NO oplog entry (ADR-0022 §6). One
+   * that did would be pushed, pulled back by the till that wrote it, absorbed
+   * and pushed again, forever, growing the database until something fell over.
+   * `absorb()` refuses it in core; this is the assertion over the RESULT — an
+   * `op_id` in both tables means an echo has already started.
+   */
+  check(
+    "ningun dato replicado se ha registrado como decision de esta caja",
+    q<{ op_id: string; entity: string }>(
+      "SELECT o.op_id, o.entity FROM oplog o JOIN sync_inbox i ON i.op_id = o.op_id LIMIT 20",
+    ).map((r) => `op ${r.op_id} (${r.entity}) esta en el oplog Y en la bandeja — eco (ADR-0022 §6)`),
+  );
+
+  /**
+   * Rows that keep failing to apply.
+   *
+   * A FAILURE rather than a note: the figure on the shelf is then wrong on this
+   * till and nobody at the counter can see why. A row that is merely EARLY has
+   * few attempts and is not counted here.
+   */
+  check(
+    "nada recibido de otra caja se ha quedado atascado",
+    q<{ entity: string; entity_id: string; attempts: number; last_error: string | null }>(
+      `SELECT entity, entity_id, attempts, last_error FROM sync_inbox
+        WHERE applied_at IS NULL AND attempts >= 5 LIMIT 20`,
+    ).map((r) => `${r.entity} ${r.entity_id}: ${r.attempts} intentos — ${r.last_error ?? "sin motivo"}`),
+  );
+}
+
 console.log(`Auditoría de ${dbPath}\n`);
 console.log(checks.join("\n"));
 const counts = q<{ n: number }>("SELECT COUNT(*) n FROM oplog")[0]!.n;
