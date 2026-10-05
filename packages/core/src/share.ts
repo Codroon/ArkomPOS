@@ -42,6 +42,23 @@ export const SHARED_ENTITIES = [
   "customer",
   "unit",
   "stock_movement",
+  /* ---- ADR-0023: a repair and a voucher follow the customer, not the till ----
+   *
+   *   store_credit_voucher →  nothing (its purchase_id is a reference, §1)
+   *   voucher_redemption   →  store_credit_voucher
+   *   repair_ticket        →  customer  (its document_id is a reference, §1)
+   *   repair_line          →  repair_ticket, product, supplier
+   *   repair_approval      →  repair_ticket
+   *   repair_notification  →  repair_ticket
+   *
+   * The voucher comes before its redemptions and the ticket before its lines,
+   * for the same reason a product comes before its codes: SQLite checks. */
+  "store_credit_voucher",
+  "voucher_redemption",
+  "repair_ticket",
+  "repair_line",
+  "repair_approval",
+  "repair_notification",
 ] as const;
 
 export type SharedEntity = (typeof SHARED_ENTITIES)[number];
@@ -73,14 +90,9 @@ export const NEVER_REPLICATED: Readonly<Record<string, string>> = Object.freeze(
   document_tender: "belongs to a document that stays home",
   shift: "one drawer, one till, one Z — ADR-0015",
   cash_movement: "one drawer, one till — ADR-0015",
-  store_credit_voucher: "a voucher is a tender; double-spend is a loss — ADR-0013",
   used_purchase: "carries ID photographs and a seller's document — ADR-0013",
   purchase_photo: "files stay home — ADR-0020 §3",
-  repair_ticket: "carries a device passcode — ADR-0014 §10",
-  repair_line: "belongs to a ticket that stays home",
-  repair_approval: "belongs to a ticket that stays home",
   repair_photo: "files stay home — ADR-0020 §3",
-  repair_notification: "belongs to a ticket that stays home",
   transfer: "the WU counter is one terminal's shadow log — ADR-0018",
   backup: "a machine's own housekeeping",
   printer: "the till's own hardware",
@@ -96,3 +108,25 @@ export const NEVER_REPLICATED: Readonly<Record<string, string>> = Object.freeze(
  * `pnpm db:audit` a check that replication landed.
  */
 export const CACHE_REBUILD_TRIGGER: readonly string[] = ["stock_movement", "unit"];
+
+/**
+ * Entities whose arrival means a DERIVED column has to be recomputed.
+ *
+ * Same rule as the stock cache, and for the same reason: a repair's status and
+ * a voucher's balance are computed from facts, never assigned (ADR-0014 §1,
+ * ADR-0023 §4). A status or a balance on the wire would be a second answer to a
+ * question that already has one, and the two would disagree the first time a
+ * batch arrived out of order.
+ *
+ * So the applier takes the FACTS from the batch and works the answer out
+ * locally, which is also what lets `db:audit` double as the check that
+ * replication landed.
+ */
+export const DERIVED_AFTER_ABSORB: Readonly<Record<string, "repair" | "voucher">> = Object.freeze({
+  repair_ticket: "repair",
+  repair_line: "repair",
+  repair_approval: "repair",
+  repair_notification: "repair",
+  store_credit_voucher: "voucher",
+  voucher_redemption: "voucher",
+});

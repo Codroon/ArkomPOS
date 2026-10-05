@@ -47,6 +47,7 @@ const {
   productStock,
   stockMovements,
   storeCreditVouchers,
+  voucherRedemptions,
   units,
   numberSeries,
 } = schema;
@@ -870,6 +871,16 @@ function redeemVoucher(
   const remainingAfter = voucher.remainingCents - amountCents;
   const spent = remainingAfter === 0;
 
+  /*
+   * The conditional UPDATE first, because it is still the cheapest guard there
+   * is: the row must still be issued AND still hold what we are about to take.
+   * Two sales on THIS till spending the same voucher cannot both match.
+   *
+   * It is no longer the whole story. Two TILLS cannot see each other's rows, so
+   * nothing in a WHERE clause can stop both of them matching — which is why the
+   * ledger below exists and why `remaining_cents` is now a cache rather than
+   * the truth (ADR-0023 §4).
+   */
   const result = tx
     .update(storeCreditVouchers)
     .set({
@@ -878,9 +889,6 @@ function redeemVoucher(
       ...(spent ? { redeemedDocumentId: documentId, redeemedAt: now } : {}),
       updatedAt: now,
     })
-    /* The guarantee, unchanged and now doing more work: the row must still be
-       issued AND still hold what we are about to take. Two tills spending the
-       same 50 € voucher on 40 € each cannot both match. */
     .where(
       and(
         eq(storeCreditVouchers.id, voucherId),
@@ -894,6 +902,43 @@ function redeemVoucher(
     throw appError("VALIDATION", "Ese vale acaba de usarse en otra venta.", "voucherId");
   }
 
+  /*
+   * The FACT, insert-only, and the thing that replicates — ADR-0023 §4.
+   *
+   * `remaining_cents` used to be the only record that a voucher had been spent,
+   * and a mutable balance cannot survive two tills: last-writer-wins on a
+   * number means two tills each taking €20 from a €30 voucher end with one of
+   * those €20 simply absent from the record. A row per redemption cannot be
+   * overwritten by another row, so the sum is always every redemption there
+   * has ever been — and a double spend becomes arithmetic rather than a
+   * suspicion.
+   *
+   * It also answers "where did this €30 go" with a date, a document and a till,
+   * which the balance never could.
+   */
+  const redemption = {
+    id: uuidv7(),
+    tenantId: ctx.tenantId,
+    voucherId,
+    documentId,
+    amountCents,
+    terminalId: ctx.terminalId,
+    userId: ctx.userId ?? null,
+    createdAt: now,
+  };
+  tx.insert(voucherRedemptions).values(redemption).run();
+  log({
+    entity: "voucher_redemption",
+    entityId: redemption.id,
+    action: "create",
+    before: null,
+    after: toOplogJson(redemption),
+  });
+
+  /* The voucher's own entry still goes out, because `void_reason` and the
+     document it finished on are facts too. The receiving till RECOMPUTES
+     `remaining_cents` and `status` from its own ledger and ignores what arrives
+     in them — the same way it rebuilds the stock cache from the movements. */
   log({
     entity: "store_credit_voucher",
     entityId: voucherId,

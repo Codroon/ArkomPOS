@@ -29,10 +29,11 @@ photographs never leave the shop.
 Since v0.18.2 first run is a four-step wizard (language → shop → owner + recovery code →
 printer, skippable) and the landing screen carries a fact-driven, dismissible checklist
 (`setup:checklist`). `pnpm fresh` archives this machine's dev data and reopens onboarding.
-Since v1.3.0 a shop can run **several tills that agree** (ADR-0022): one catalogue, one stock
-ledger, a second till that joins the shop instead of founding one, and a dashboard that shows
-every till together with a filter by till. Data moves both ways and the counter waits on
-neither direction.
+Since v1.3.0 a shop can run **several tills that agree** (ADR-0022, ADR-0023): one catalogue,
+one stock ledger, one set of repairs and one pot of store credit; a second till that joins the
+shop instead of founding one; and a dashboard that shows every till together with a filter by
+till. A phone left at one counter is collected at another and a voucher is spent at either.
+Data moves both ways and the counter waits on neither direction.
 Since v1.2.0 a till can be **linked to the cloud** (ADR-0020): the owner pastes an enrolment
 code in Ajustes → Nube, the till holds a device token in `userData/cloud-link.json` — never a
 table, because every row is pushed to the service the token authenticates — and a background
@@ -43,9 +44,10 @@ Since v0.18.0 the till is handover-clean: the general VAT rate is a SETTING read
 (ADR-0007 A1), Eliminar deletes a row nothing points at and archives one with history, a Used-type
 article can be typed in and sells REBU, an installed build never sees the demo dataset.
 NOT yet: full invoices, card-terminal SDK, the landing page and payment, margin on SOLD used
-devices, the refurbishment pipeline, the police-register export, repairs/used/vouchers crossing
-tills, documents replicated read-only, true oversell prevention (the cloud flags, it does not
-block), a LAN path that converges with the router unplugged.
+devices, the refurbishment pipeline, the police-register export, used purchases crossing tills,
+repair PHOTOGRAPHS crossing tills, documents replicated read-only, true oversell or
+double-redemption prevention (the cloud flags, it does not block), a LAN path that converges
+with the router unplugged.
 Schema already anticipates them — build nothing for them.
 
 ## Hard rules
@@ -144,13 +146,37 @@ Schema already anticipates them — build nothing for them.
   stored, never the cursor it remembers (ADR-0020). Since v1.3.0 data moves BOTH ways, and
   "the cloud never writes back" narrows to: every row it serves was written by one of that
   shop's own tills, so it is a courier and never a writer (ADR-0022 §2).
-- **A shop's tills share a catalogue and a stock ledger; everything else is per-till.**
-  `SHARED_ENTITIES` in `@arkom/core` is the whole list — product_group, product,
-  product_code, supplier, customer, unit, stock_movement — and a test pins it. Settings are
-  NOT shared (the printer is a setting), nor are users/PINs, documents, series, shifts, the
-  drawer, vouchers, repairs, used purchases or photographs. A till's `Informes` reports that
-  till's own takings and agrees with its Z; the shop's combined figures are the dashboard's
-  job, filtered by till (ADR-0022 §1, §8, §10).
+- **A shop's tills share a catalogue, a stock ledger, its repairs and its store credit;
+  everything else is per-till.** `SHARED_ENTITIES` in `@arkom/core` is the whole list —
+  product_group, product, product_code, supplier, customer, unit, stock_movement,
+  store_credit_voucher, voucher_redemption, repair_ticket, repair_line, repair_approval,
+  repair_notification — and a test pins it. Settings are NOT shared (the printer is a
+  setting), nor are users/PINs, documents, series, shifts, the drawer, used purchases or any
+  photograph. A till's `Informes` reports that till's own takings and agrees with its Z; the
+  shop's combined figures are the dashboard's job, filtered by till (ADR-0022 §1, §8, §10).
+- **A document id on a non-document row is a reference, never a foreign key.** Documents are
+  per-till, so any row that points at one and is not itself a document must be able to exist
+  on a till that does not hold it — `stock_movements.document_id` has been a bare column since
+  ADR-0004, which is the single reason stock replication was nearly free.
+  `repair_tickets.document_id` and `store_credit_vouchers.purchase_id` joined it in v1.3.0;
+  `db:audit` carries what the constraints used to (ADR-0023 §1).
+- **A voucher's balance is a cache of an insert-only ledger.** `voucher_redemptions` is the
+  truth and `remaining_cents` is recomputed from it, because last-writer-wins on a BALANCE is
+  not a conflict resolution — two tills each taking €20 from a €30 voucher would leave one of
+  those €20 absent from the record. A double redemption is therefore arithmetic
+  (`sum > faceValue`), reported by `db:audit` and the dashboard, not prevented: asking the
+  cloud first would stop a customer spending their own credit when the line is down
+  (ADR-0023 §4–5).
+- **A repair's passcode and photographs stay on the till that took the phone.** The ticket,
+  its parts, its approvals and its calls replicate; the unlock code is stripped by
+  `redactForSync()` and the pictures are files the cloud holds none of. The receiving till
+  says where they are rather than pretending. Collection happens wherever the customer is and
+  the invoice is numbered from THAT till's series, in that till's shift; the deposit stays in
+  the drawer that took it and only the balance changes hands (ADR-0023 §2–3).
+- **An applier UPDATEs an existing row and INSERTs a new one — never an upsert.** SQLite
+  evaluates the INSERT half first, so a one-field payload fails `NOT NULL` before the conflict
+  clause can rescue it. The till pushes CHANGES, so a payload of one field is normal. A
+  partial payload for a row this till has never seen is EARLY, not broken: it defers.
 - **Applying another till's row writes NO oplog entry.** `mutate()` throws when a build logs
   nothing; `absorb()` throws when a build logs ANYTHING. A logged entry would be pushed,
   pulled back by the till that wrote it, absorbed and pushed again — an echo that never stops

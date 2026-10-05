@@ -353,9 +353,14 @@ export {
   SHARED_ENTITIES,
   NEVER_REPLICATED,
   CACHE_REBUILD_TRIGGER,
+  DERIVED_AFTER_ABSORB,
   applyRank,
   isSharedEntity,
 } from "./share";
+/* a voucher's balance is derived from an insert-only ledger (ADR-0023 §4) */
+export { voucherState, canRedeem } from "./voucher";
+/* `VoucherStatus` is already exported from the IPC contract — one spelling */
+export type { VoucherFacts, VoucherState } from "./voucher";
 export type { SharedEntity } from "./share";
 /* our words for a till and a shop, generated at display time (ADR-0011) */
 export {

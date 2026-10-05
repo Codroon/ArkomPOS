@@ -28,6 +28,7 @@ If a decision must change, the ADR is superseded by a new one — never silently
 
 | [0021](0021-two-identities-one-signup-and-an-admin-that-cannot-read-a-shop.md) | Cloud login and till PIN stay separate, linked never merged; the till owns the fiscal identity; Supabase holds both database and identities; the admin console can read no shop data without a logged, expiring grant | Accepted |
 | [0022](0022-tills-in-a-shop-share-a-catalogue-and-a-stock-ledger.md) | A shop's tills share one catalogue and one stock ledger; the cloud is a courier between them and never authors; a second till JOINS the shop instead of founding one; documents, series, shifts, settings and PINs stay per-till | Accepted |
+| [0023](0023-repairs-and-store-credit-cross-the-counter.md) | A repair and a voucher follow the customer, not the till; a document id on a non-document row is a reference, not a constraint; a voucher's balance becomes a cache of an insert-only redemption ledger | Accepted |
 
 Constraints common to all: team = one developer + Claude Code · Phase 1 = 2 weeks (sale screen, catalog, inventory) ·
 client = retail mobile shop in Spain (unreliable connectivity, Spanish fiscal rules ahead) · product intent = resell to

@@ -150,7 +150,23 @@ describe("what comes back", () => {
   });
 
   it("serves only the entities ADR-0022 §1 calls the shop's", async () => {
-    const notShared = ["setting", "document", "shift", "user", "repair_ticket", "store_credit_voucher"];
+    /*
+     * ADR-0023 moved `repair_ticket` and `store_credit_voucher` onto the shared
+     * list, so they are no longer examples here. What remains is the set whose
+     * exclusion is the POINT: a printer setting, a fiscal document, a drawer, a
+     * PIN, and the photographs the cloud holds no files for.
+     */
+    const notShared = [
+      "setting",
+      "document",
+      "document_tender",
+      "shift",
+      "cash_movement",
+      "user",
+      "used_purchase",
+      "repair_photo",
+      "transfer",
+    ];
     const { store, me } = await shopWithTwoTills([
       op({ entity: "product" }),
       op({ entity: "stock_movement" }),

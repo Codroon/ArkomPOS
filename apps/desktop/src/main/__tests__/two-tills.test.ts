@@ -24,6 +24,7 @@ import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { openDb, runMigrations, schema as s, type ArkomDb } from "@arkom/db";
 import { handlers, app } from "./electron-stub";
+import { keyNames, leafValues } from "./leaks";
 import { registerIpcHandlers } from "../ipc";
 import { endSession, startSession } from "../auth/session";
 import { resetTillContext, tillContext } from "../context";
@@ -801,5 +802,509 @@ describe("what a till refuses to be told", () => {
 
     const pending = two.db.select().from(s.syncInbox).all().filter((r) => r.appliedAt === null);
     expect(pending.map((r) => `${r.entity}: ${String(r.lastError)}`)).toEqual([]);
+  });
+});
+
+describe("a repair crosses the counter (ADR-0023)", () => {
+  async function twoTills() {
+    const one = await install("Caja 1", "T1-");
+    stubCloud();
+    use(one);
+    await link();
+    const two = await install("Caja 2", "T2-");
+    stubCloud();
+    use(two);
+    await link();
+    return { one, two };
+  }
+
+  /** A phone left at a counter, optionally with a deposit and a passcode. */
+  async function takeInAPhone(till: Till, opts: { depositCents?: number; passcode?: string | null } = {}) {
+    use(till);
+    const customer = await call<{ id: string }>("customer:upsert", {
+      name: "Lucia Ferrer",
+      phone: "600111222",
+    });
+    if (opts.depositCents) await call("cash:open", { floatCents: 10000, breakdown: null });
+
+    const ticket = await call<{ ticketId: string }>("repair:create", {
+      customerId: customer.id,
+      deviceDescription: "Apple iPhone 13",
+      imei: null,
+      reportedFault: "Pantalla rota",
+      conditionAtIntake: null,
+      damage: { screen: true, back: false, dents: false, water: false },
+      damageNote: null,
+      accessories: null,
+      devicePasscode: opts.passcode ?? null,
+      photos: [],
+      promisedDate: null,
+      promisedHalf: null,
+      depositCents: opts.depositCents ?? 0,
+      depositMethod: "cash",
+      authorizedCapCents: null,
+      assignedUserId: null,
+    });
+    return { ticketId: ticket.ticketId, customerId: customer.id };
+  }
+
+  /** Quote it, get it agreed, and mark it done. */
+  async function quoteAndFinish(till: Till, ticketId: string, chargeCents = 8900) {
+    use(till);
+    await call("repair:addLine", {
+      ticketId,
+      kind: "labor",
+      description: "Cambio de pantalla",
+      qty: 1,
+      chargeCents,
+    });
+    await call("repair:recordApproval", { ticketId, method: "in_person", approvedTotalCents: chargeCents });
+    await call("repair:markReady", { ticketId });
+  }
+
+  it("is visible, quoted and ready at the other till", async () => {
+    const { one, two } = await twoTills();
+    const { ticketId } = await takeInAPhone(one);
+    await quoteAndFinish(one, ticketId);
+
+    await send(one);
+    await receive(two);
+
+    const ticket = two.db.select().from(s.repairTickets).where(eq(s.repairTickets.id, ticketId)).all()[0];
+    expect(ticket?.deviceDescription).toBe("Apple iPhone 13");
+    expect(ticket?.reportedFault).toBe("Pantalla rota");
+
+    /* the work and the agreement travelled with it */
+    expect(two.db.select().from(s.repairLines).where(eq(s.repairLines.ticketId, ticketId)).all()).toHaveLength(1);
+    expect(
+      two.db.select().from(s.repairApprovals).where(eq(s.repairApprovals.ticketId, ticketId)).all(),
+    ).toHaveLength(1);
+
+    /* and the status was DERIVED here, not copied: "ready" is what these facts
+       mean, and ADR-0014 section 1 forbids assigning it (ADR-0023 section 2) */
+    expect(ticket?.status).toBe("ready");
+  });
+
+  it("arrives without the customer's passcode, ever", async () => {
+    const { one, two } = await twoTills();
+    const { ticketId } = await takeInAPhone(one, { passcode: "4821" });
+
+    await send(one);
+    await receive(two);
+
+    const ticket = two.db.select().from(s.repairTickets).where(eq(s.repairTickets.id, ticketId)).all()[0];
+    expect(ticket).toBeDefined();
+    /* the phone is here; the code to open it is not (ADR-0014 section 10) */
+    expect(ticket?.devicePasscode).toBeNull();
+
+    /* and it is nowhere in what crossed the wire, at any depth */
+    const inbox = two.db.select().from(s.syncInbox).all();
+    expect(keyNames(inbox)).not.toContain("devicePasscode");
+    expect(leafValues(inbox)).not.toContain("4821");
+
+    /* while the till that took it still has it, because its technician needs it */
+    use(one);
+    const mine = one.db.select().from(s.repairTickets).where(eq(s.repairTickets.id, ticketId)).all()[0];
+    expect(mine?.devicePasscode).toBe("4821");
+  });
+
+  it("is collected at the other till, and the money lands there", async () => {
+    const { one, two } = await twoTills();
+    const { ticketId } = await takeInAPhone(one);
+    await quoteAndFinish(one, ticketId);
+
+    await send(one);
+    await receive(two);
+
+    /* the customer walks to the other counter */
+    use(two);
+    await call("cash:open", { floatCents: 10000, breakdown: null });
+    const collected = await call<{ docId: string; docNumber: string; totalCents: number }>("repair:collect", {
+      ticketId,
+      tenders: [{ method: "cash", amountCents: 8900 }],
+    });
+
+    expect(collected.totalCents).toBe(8900);
+    /* numbered from TILL 2's series, because till 2 took the money - ADR-0008
+       is not reopened by any of this (ADR-0023 section 3) */
+    expect(collected.docNumber.startsWith("T2-")).toBe(true);
+
+    /* the invoice is till 2's row, inside till 2's shift */
+    const invoice = two.db.select().from(s.documents).where(eq(s.documents.id, collected.docId)).all()[0];
+    expect(invoice?.shiftId).not.toBeNull();
+
+    /* till 1 never sees the invoice: documents stay home (ADR-0022 section 8) */
+    await send(two);
+    await receive(one);
+    expect(one.db.select().from(s.documents).where(eq(s.documents.id, collected.docId)).all()).toHaveLength(0);
+
+    /* but it does learn the phone was handed back */
+    use(one);
+    const backAtOne = one.db.select().from(s.repairTickets).where(eq(s.repairTickets.id, ticketId)).all()[0];
+    expect(backAtOne?.status).toBe("collected");
+    expect(backAtOne?.collectionDocumentId).toBe(collected.docId);
+  });
+
+  it("leaves the deposit in the drawer that took it, and collects the balance", async () => {
+    /*
+     * The thing to explain to staff once, and the only honest arrangement: the
+     * deposit is physically in till 1 and counted by till 1's Z. Moving it
+     * would mean inventing a transfer between two drawers that never happened
+     * (ADR-0023 section 3).
+     */
+    const { one, two } = await twoTills();
+    const { ticketId } = await takeInAPhone(one, { depositCents: 2000 });
+    await quoteAndFinish(one, ticketId);
+
+    await send(one);
+    await receive(two);
+
+    use(two);
+    await call("cash:open", { floatCents: 10000, breakdown: null });
+    const collected = await call<{ totalCents: number; depositAppliedCents: number }>("repair:collect", {
+      ticketId,
+      tenders: [{ method: "cash", amountCents: 6900 }],
+    });
+
+    /* the deposit is applied once, and only the balance changes hands here */
+    expect(collected.depositAppliedCents).toBe(2000);
+    expect(collected.totalCents).toBe(8900);
+  });
+});
+
+describe("store credit crosses the counter (ADR-0023)", () => {
+  async function twoTillsWithCredit() {
+    const one = await install("Caja 1", "T1-");
+    stubCloud();
+    use(one);
+    await link();
+    const two = await install("Caja 2", "T2-");
+    stubCloud();
+    use(two);
+    await link();
+
+    /*
+     * A voucher issued at till 1.
+     *
+     * Written directly rather than through a used-device purchase, because the
+     * purchase path needs photographs and an identity document and none of that
+     * is what these cases are about. The oplog entry beside it is the one the
+     * issuing path writes, so the replication under test is the real thing.
+     */
+    use(one);
+    const ctx = tillContext(one.db).ctx;
+    const voucher = {
+      id: "voucher-1",
+      tenantId: ctx.tenantId,
+      locationId: ctx.locationId,
+      purchaseId: null,
+      refundDocumentId: null,
+      amountCents: 5000,
+      remainingCents: 5000,
+      status: "issued" as const,
+      redeemedDocumentId: null,
+      redeemedAt: null,
+      voidReason: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    one.db.insert(s.storeCreditVouchers).values(voucher).run();
+    one.db
+      .insert(s.oplog)
+      .values({
+        opId: `op-voucher-${String(Date.now())}`,
+        tenantId: ctx.tenantId,
+        locationId: ctx.locationId,
+        terminalId: ctx.terminalId,
+        entity: "store_credit_voucher",
+        entityId: voucher.id,
+        action: "issue",
+        before: null,
+        after: {
+          ...voucher,
+          createdAt: voucher.createdAt.getTime(),
+          updatedAt: voucher.updatedAt.getTime(),
+        },
+        userId: one.owner.id,
+        authorizedByUserId: null,
+        createdAt: new Date(),
+      })
+      .run();
+
+    return { one, two, voucherId: voucher.id };
+  }
+
+  /** Sell a service for `priceCents` at `till`, paying with the voucher. */
+  async function spendCredit(till: Till, voucherId: string, priceCents: number) {
+    use(till);
+    const groupId = till.db.select().from(s.productGroups).all()[0]!.id;
+    const saved = await call<{ product: { id: string } }>("catalog:save", {
+      name: `Funda ${String(priceCents)}`,
+      barcode: null,
+      groupId,
+      itemType: "stocked",
+      costCents: 100,
+      priceCents,
+      taxRegime: "IVA21",
+      reorderPoint: 0,
+      lowStockThreshold: 0,
+      active: true,
+    });
+    const open = till.db.select().from(s.shifts).all().some((row) => row.closedAt === null);
+    if (!open) await call("cash:open", { floatCents: 10000, breakdown: null });
+
+    /* a real thing on a real shelf, so the sale is a sale and not a special
+       case — the credit is what is being tested, not the stock */
+    const supplier = await call<{ id: string }>("supplier:create", { name: `Prov ${String(priceCents)}` });
+    await call("stock:add", {
+      entries: [{ productId: saved.product.id, supplierId: supplier.id, qty: 1, unitCostCents: 100, imeis: [] }],
+    });
+
+    const lined = await call<{ state: { docId: string; totalCents: number } }>("sale:addLine", {
+      productId: saved.product.id,
+      qty: 1,
+    });
+    return call<{ docId: string }>("sale:complete", {
+      docId: lined.state.docId,
+      tenders: [{ method: "store_credit", amountCents: lined.state.totalCents, voucherId }],
+    });
+  }
+
+  const voucherAt = (till: Till, id: string) =>
+    till.db.select().from(s.storeCreditVouchers).where(eq(s.storeCreditVouchers.id, id)).all()[0];
+
+  const ledgerAt = (till: Till, id: string) =>
+    till.db.select().from(s.voucherRedemptions).where(eq(s.voucherRedemptions.voucherId, id)).all();
+
+  it("is spendable at the till that did not issue it", async () => {
+    const { one, two, voucherId } = await twoTillsWithCredit();
+
+    await send(one);
+    await receive(two);
+
+    /* it arrived, with its face value intact */
+    expect(voucherAt(two, voucherId)?.amountCents).toBe(5000);
+    expect(voucherAt(two, voucherId)?.remainingCents).toBe(5000);
+
+    /* and it pays for something here */
+    await spendCredit(two, voucherId, 2000);
+    expect(voucherAt(two, voucherId)?.remainingCents).toBe(3000);
+  });
+
+  it("tells the issuing till what is left, as a ledger rather than a number", async () => {
+    const { one, two, voucherId } = await twoTillsWithCredit();
+    await send(one);
+    await receive(two);
+    await spendCredit(two, voucherId, 2000);
+
+    use(two);
+    const spenderTerminal = tillContext(two.db).ctx.terminalId;
+
+    await send(two);
+    await receive(one);
+
+    /* the FACT travelled, and it says which counter took it */
+    const ledger = ledgerAt(one, voucherId);
+    expect(ledger).toHaveLength(1);
+    expect(ledger[0]?.amountCents).toBe(2000);
+    expect(ledger[0]?.terminalId).toBe(spenderTerminal);
+
+    /* and the balance was DERIVED from it, not copied off the wire */
+    expect(voucherAt(one, voucherId)?.remainingCents).toBe(3000);
+    expect(voucherAt(one, voucherId)?.status).toBe("issued");
+  });
+
+  it("spends to zero and says so on both tills", async () => {
+    const { one, two, voucherId } = await twoTillsWithCredit();
+    await send(one);
+    await receive(two);
+
+    await spendCredit(two, voucherId, 5000);
+    await send(two);
+    await receive(one);
+
+    for (const till of [one, two]) {
+      use(till);
+      expect(voucherAt(till, voucherId)?.remainingCents, till.name).toBe(0);
+      expect(voucherAt(till, voucherId)?.status, till.name).toBe("redeemed");
+    }
+  });
+
+  it("makes a double redemption VISIBLE instead of losing the money", async () => {
+    /*
+     * The case the whole ledger exists for. Both tills hold the same 50 EUR
+     * voucher and neither has heard of the other's sale yet, which is exactly
+     * the few seconds ADR-0023 section 5 accepts. Each takes 40 EUR.
+     *
+     * Under the old mutable balance one of those 40 would simply vanish:
+     * last-writer-wins on `remaining_cents` keeps one number and discards the
+     * other, with nothing anywhere to say a second sale happened. With a
+     * ledger the sum is 80 against a 50 EUR voucher, which is arithmetic, and
+     * arithmetic can be shown to somebody.
+     */
+    const { one, two, voucherId } = await twoTillsWithCredit();
+    await send(one);
+    await receive(two);
+
+    await spendCredit(one, voucherId, 4000);
+    await spendCredit(two, voucherId, 4000);
+
+    /* each till was happy, because each only ever saw its own */
+    expect(voucherAt(one, voucherId)?.remainingCents).toBe(1000);
+    expect(voucherAt(two, voucherId)?.remainingCents).toBe(1000);
+
+    await send(one);
+    await send(two);
+    await receive(one);
+    await receive(two);
+
+    for (const till of [one, two]) {
+      use(till);
+      const ledger = ledgerAt(till, voucherId);
+
+      /* BOTH redemptions are on the record - neither overwrote the other */
+      expect(ledger, till.name).toHaveLength(2);
+      expect(
+        ledger.reduce((sum, row) => sum + row.amountCents, 0),
+        till.name,
+      ).toBe(8000);
+
+      /* the balance is clamped, so no screen offers a negative as spendable */
+      expect(voucherAt(till, voucherId)?.remainingCents, till.name).toBe(0);
+      expect(voucherAt(till, voucherId)?.status, till.name).toBe("redeemed");
+    }
+  });
+});
+
+describe("a payload that carries one field", () => {
+  /**
+   * The till pushes CHANGES, not rows. `repair_ticket/collect` is literally
+   * `{collectionDocumentId, docNumber}` — no tenant, no customer, no device.
+   *
+   * ADR-0022 shipped an applier that could not take one. It used an upsert, and
+   * SQLite evaluates the INSERT half FIRST, so a one-field payload failed on
+   * `NOT NULL constraint failed: repair_tickets.tenant_id` before the conflict
+   * clause could rescue it. Nothing caught it, because every entity shared at
+   * the time happened to be pushed WHOLE: `catalog:save` logs the full row and
+   * a stock movement is insert-only. The first partial payload to cross the
+   * wire was a phone being handed back, and it failed silently on every pass
+   * with the reason sitting in the inbox nobody was reading.
+   *
+   * So this case sends a deliberately minimal payload for a row the other till
+   * already has, which is the shape the whole design rests on.
+   */
+  it("updates just that field and leaves the rest of the row alone", async () => {
+    const one = await install("Caja 1", "T1-");
+    stubCloud();
+    use(one);
+    await link();
+    const two = await install("Caja 2", "T2-");
+    stubCloud();
+    use(two);
+    await link();
+
+    use(one);
+    const groupId = one.db.select().from(s.productGroups).all()[0]!.id;
+    const saved = await call<{ product: { id: string } }>("catalog:save", {
+      name: "Cargador 45W",
+      barcode: null,
+      groupId,
+      itemType: "stocked",
+      costCents: 700,
+      priceCents: 2200,
+      taxRegime: "IVA21",
+      reorderPoint: 0,
+      lowStockThreshold: 0,
+      active: true,
+    });
+    await send(one);
+    await receive(two);
+    expect(two.db.select().from(s.products).where(eq(s.products.id, saved.product.id)).all()[0]?.priceCents).toBe(2200);
+
+    /* a change to ONE column, written to the oplog the way a focused writer
+       does it rather than by re-logging the whole row */
+    use(one);
+    const ctx = tillContext(one.db).ctx;
+    one.db
+      .update(s.products)
+      .set({ priceCents: 2500, updatedAt: new Date() })
+      .where(eq(s.products.id, saved.product.id))
+      .run();
+    one.db
+      .insert(s.oplog)
+      .values({
+        opId: `op-partial-${String(Date.now())}`,
+        tenantId: ctx.tenantId,
+        locationId: ctx.locationId,
+        terminalId: ctx.terminalId,
+        entity: "product",
+        entityId: saved.product.id,
+        action: "update",
+        before: { priceCents: 2200 },
+        after: { priceCents: 2500 },
+        userId: one.owner.id,
+        authorizedByUserId: null,
+        createdAt: new Date(),
+      })
+      .run();
+
+    await send(one);
+    await receive(two);
+
+    const row = two.db.select().from(s.products).where(eq(s.products.id, saved.product.id)).all()[0];
+    expect(row?.priceCents).toBe(2500);
+    /* and nothing the payload never mentioned was blanked */
+    expect(row?.name).toBe("Cargador 45W");
+    expect(row?.costCents).toBe(700);
+    expect(row?.taxRegime).toBe("IVA21");
+    expect(row?.tenantId).toBe(ctx.tenantId);
+
+    /* and it landed rather than sitting in the inbox with an error nobody reads */
+    const stuck = two.db.select().from(s.syncInbox).all().filter((r) => r.appliedAt === null);
+    expect(stuck.map((r) => `${r.entity}: ${String(r.lastError)}`)).toEqual([]);
+  });
+
+  it("defers a partial payload for a row it has never seen, rather than failing", async () => {
+    /* early, not broken: the create that would give it a tenant has not
+       arrived. It must not land as a half-row and must not be dropped. */
+    const one = await install("Caja 1", "T1-");
+    stubCloud();
+    use(one);
+    await link();
+    const two = await install("Caja 2", "T2-");
+    stubCloud();
+    use(two);
+    await link();
+
+    use(one);
+    const ctx = tillContext(one.db).ctx;
+    one.db
+      .insert(s.oplog)
+      .values({
+        opId: `op-orphan-${String(Date.now())}`,
+        tenantId: ctx.tenantId,
+        locationId: ctx.locationId,
+        terminalId: ctx.terminalId,
+        entity: "product",
+        entityId: "a-product-nobody-created",
+        action: "update",
+        before: null,
+        after: { priceCents: 999 },
+        userId: null,
+        authorizedByUserId: null,
+        createdAt: new Date(),
+      })
+      .run();
+
+    await send(one);
+    await receive(two);
+
+    /* no half-built product */
+    expect(two.db.select().from(s.products).where(eq(s.products.id, "a-product-nobody-created")).all()).toHaveLength(0);
+    /* and the row is still pending with a reason, not thrown away */
+    const pending = two.db.select().from(s.syncInbox).all().filter((r) => r.appliedAt === null);
+    expect(pending).toHaveLength(1);
+    expect(pending[0]?.attempts).toBeGreaterThan(0);
+    expect(pending[0]?.lastError).toBeTruthy();
   });
 });

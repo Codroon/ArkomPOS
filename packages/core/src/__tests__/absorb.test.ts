@@ -201,15 +201,12 @@ describe("a delete is the latest word, not a fold (§5)", () => {
 
 describe("apply order is the order sqlite will accept (§1)", () => {
   it("lands a parent before the row that references it", () => {
-    const plans = planAbsorb([
-      entry({ entity: "stock_movement", entityId: "mv-1" }),
-      entry({ entity: "product_code", entityId: "code-1" }),
-      entry({ entity: "product", entityId: "prod-1" }),
-      entry({ entity: "product_group", entityId: "grp-1" }),
-      entry({ entity: "unit", entityId: "unit-1" }),
-      entry({ entity: "supplier", entityId: "sup-1" }),
-      entry({ entity: "customer", entityId: "cus-1" }),
-    ]);
+    /* shuffled on purpose, and built FROM the list so a new shared entity
+       cannot be added without this case covering it */
+    const shuffled = [...SHARED_ENTITIES].reverse();
+    const plans = planAbsorb(
+      shuffled.map((entity, i) => entry({ entity, entityId: `${entity}-${i}` })),
+    );
 
     expect(plans.map((p) => p.entity)).toEqual([...SHARED_ENTITIES]);
   });

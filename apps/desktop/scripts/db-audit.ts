@@ -537,6 +537,72 @@ check(
   ],
 );
 
+/* ADR-0023: a voucher's balance is a cache of its ledger
+ * ---------------------------------------------------------------------------
+ * The same assertion this file already makes about `product_stock`, for the
+ * same reason and caught by the same command. `remaining_cents` stopped being
+ * the truth in v1.3.0; the truth is `voucher_redemptions`, insert-only, because
+ * a mutable balance cannot survive two tills.
+ *
+ * Skipped on a database that predates the table, so an un-upgraded till is not
+ * reported as broken.
+ */
+const hasRedemptions =
+  q<{ n: number }>(
+    "SELECT COUNT(*) n FROM sqlite_master WHERE type='table' AND name='voucher_redemptions'",
+  )[0]!.n > 0;
+
+if (hasRedemptions) {
+  check(
+    "el saldo de cada vale coincide con su libro de usos",
+    q<{ id: string; remaining: number; derived: number }>(`
+      SELECT v.id, v.remaining_cents AS remaining,
+             v.amount_cents - COALESCE((
+               SELECT SUM(r.amount_cents) FROM voucher_redemptions r WHERE r.voucher_id = v.id
+             ), 0) AS derived
+      FROM store_credit_vouchers v
+      WHERE v.remaining_cents <> MAX(0, v.amount_cents - COALESCE((
+              SELECT SUM(r.amount_cents) FROM voucher_redemptions r WHERE r.voucher_id = v.id
+            ), 0))
+    `).map((r) => `vale ${r.id}: saldo ${r.remaining} vs libro ${r.derived}`),
+  );
+
+  /**
+   * Spent past its face value — ADR-0023 §5.
+   *
+   * Only reachable when two tills redeemed inside the replication window. It is
+   * reported rather than prevented, which only works if somebody can find out,
+   * so it is a FAILURE here and not a note. The figure is the shop's loss, in
+   * cents, bounded by one voucher.
+   */
+  check(
+    "ningun vale se ha usado por encima de su valor",
+    q<{ id: string; amount: number; spent: number }>(`
+      SELECT v.id, v.amount_cents AS amount,
+             COALESCE((SELECT SUM(r.amount_cents) FROM voucher_redemptions r WHERE r.voucher_id = v.id), 0) AS spent
+      FROM store_credit_vouchers v
+      WHERE spent > v.amount_cents
+    `).map((r) => `vale ${r.id}: valor ${r.amount}, usado ${r.spent} (dos cajas a la vez, ADR-0023 §5)`),
+  );
+
+  /**
+   * A ticket written by THIS till must still hold its own custody receipt.
+   *
+   * The constraint was dropped in 0016 so a ticket can live on a till that does
+   * not hold the document (ADR-0023 §1), which means SQLite no longer checks
+   * this. On the till that WROTE the ticket there is no excuse, so the check
+   * moved here rather than disappearing.
+   */
+  check(
+    "cada ficha propia conserva su documento de entrada",
+    q<{ id: string; document_id: string }>(`
+      SELECT t.id, t.document_id FROM repair_tickets t
+      WHERE t.terminal_id = (SELECT id FROM terminals ORDER BY created_at LIMIT 1)
+        AND NOT EXISTS (SELECT 1 FROM documents d WHERE d.id = t.document_id)
+    `).map((r) => `ficha ${r.id} apunta al documento ${r.document_id}, que no está`),
+  );
+}
+
 /* ADR-0022: what the other tills sent, and the one thing that must not be true
  * ---------------------------------------------------------------------------
  * `sync_inbox` only exists on an install migrated past v1.3.0, so both checks

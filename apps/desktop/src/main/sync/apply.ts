@@ -28,6 +28,8 @@ import {
   absorb,
   isSharedEntity,
   planAbsorb,
+  repairStatus,
+  voucherState,
   NEVER_REPLICATED,
   type AbsorbPlan,
   type AbsorbReport,
@@ -36,6 +38,7 @@ import {
 } from "@arkom/core";
 import { schema, type ArkomDb } from "@arkom/db";
 import type { DbTx } from "../mutate-runner";
+import { loadFacts } from "../repos/repair";
 
 const { syncInbox, oplog, productStock, stockMovements } = schema;
 
@@ -56,6 +59,13 @@ const TABLES = {
   customer: schema.customers,
   unit: schema.units,
   stock_movement: schema.stockMovements,
+  /* ADR-0023 — a repair and a voucher follow the customer, not the till */
+  store_credit_voucher: schema.storeCreditVouchers,
+  voucher_redemption: schema.voucherRedemptions,
+  repair_ticket: schema.repairTickets,
+  repair_line: schema.repairLines,
+  repair_approval: schema.repairApprovals,
+  repair_notification: schema.repairNotifications,
 } as const;
 
 type SharedTable = (typeof TABLES)[keyof typeof TABLES];
@@ -191,21 +201,53 @@ function write(tx: DbTx, plan: AbsorbPlan): void {
   if (isStale(tx, table, plan.entityId, plan.asOfMs)) return;
 
   /* the till that wrote it has to exist before a row can name it */
-  if (plan.entity === "stock_movement") ensureTerminal(tx, plan);
+  if (plan.entity === "stock_movement" || plan.entity === "repair_ticket") ensureTerminal(tx, plan);
 
   /* `id` is the oplog's entity_id COLUMN, never the payload's — the payload may
      not carry one at all (ADR-0005, and the bug `cloud:reconcile` caught). */
-  const row: Record<string, unknown> = { ...rowFor(table, plan.fields), id: plan.entityId };
+  const fields = rowFor(table, plan.fields);
+  const columns = Object.keys(fields);
 
-  const columns = Object.keys(row).filter((key) => key !== "id");
-  tx.insert(table)
-    .values(row as never)
-    .onConflictDoUpdate({
-      target: sql`id`,
+  /**
+   * UPDATE an existing row, INSERT a new one — never an upsert.
+   *
+   * An upsert reads well and is wrong here. SQLite evaluates the INSERT half
+   * FIRST, so `insert({id, collectionDocumentId}).onConflictDoUpdate(...)` on a
+   * table whose `tenant_id` is NOT NULL fails on the constraint before the
+   * conflict clause can save it. The till pushes CHANGES, so a payload of one
+   * field is normal: `repair_ticket/collect` is literally
+   * `{collectionDocumentId, docNumber}`.
+   *
+   * This went unnoticed through ADR-0022 because every entity shared then
+   * happened to be pushed WHOLE — `catalog:save` logs the full row and a stock
+   * movement is insert-only. The first partial payload to cross the wire was a
+   * repair being collected, and it failed on every pass with
+   * `NOT NULL constraint failed`, visible only in the inbox's `last_error`.
+   *
+   * A partial payload for a row this till has never seen is not an error, it is
+   * EARLY: the create that would have given it a tenant has not arrived yet.
+   * The insert fails, the row defers, and the next pass has both.
+   */
+  const exists =
+    tx
+      .select({ id: sql<string>`id` })
+      .from(table)
+      .where(sql`id = ${plan.entityId}`)
+      .all().length > 0;
+
+  if (exists) {
+    if (columns.length === 0) return; // nothing this batch has to say about it
+    tx.update(table)
       /* only the fields this batch actually mentioned: an update that touched
          one column must not blank the others (ADR-0022 §7) */
-      set: Object.fromEntries(columns.map((key) => [key, row[key]])) as never,
-    })
+      .set(fields as never)
+      .where(sql`id = ${plan.entityId}`)
+      .run();
+    return;
+  }
+
+  tx.insert(table)
+    .values({ ...fields, id: plan.entityId } as never)
     .run();
 }
 
@@ -257,6 +299,93 @@ function rebuildCache(db: ArkomDb, productIds: readonly string[]): void {
       }
     }
   });
+}
+
+/**
+ * Recompute what is DERIVED, from the facts this till now holds.
+ *
+ * A repair's status is computed from its own facts and never assigned
+ * (ADR-0014 §1); a voucher's balance is the face value minus an insert-only
+ * ledger (ADR-0023 §4). Both arrive in the batch as columns, and both are
+ * IGNORED in favour of the local answer — exactly as `product_stock` is
+ * rebuilt from the movements rather than taken from the wire.
+ *
+ * Why it matters more than it looks: a batch can arrive with a ticket's status
+ * but not yet the approval that justifies it, or with a voucher's remainder
+ * from a till that had not yet seen this till's redemption. Taking either at
+ * face value would write a number that disagrees with the rows sitting beside
+ * it, and `db:audit` would be right to fail. Deriving locally is what makes an
+ * out-of-order batch a non-event.
+ *
+ * No oplog entry, by construction: this is arithmetic over replicated facts,
+ * not a decision this till made (ADR-0022 §6).
+ */
+function rederive(db: ArkomDb, repairIds: readonly string[], voucherIds: readonly string[]): void {
+  const now = new Date();
+
+  for (const ticketId of repairIds) {
+    try {
+      db.transaction((tx) => {
+        /* `loadFacts` + `repairStatus` are the SAME pair the till uses on its
+           own writes. A second implementation here would be a second answer. */
+        const next = repairStatus(loadFacts(tx, ticketId));
+        tx.update(schema.repairTickets)
+          .set({ status: next, updatedAt: now })
+          .where(eq(schema.repairTickets.id, ticketId))
+          .run();
+      });
+    } catch {
+      /* the ticket itself has not landed yet — its lines were early. The next
+         pass will have both, and the status with it. */
+    }
+  }
+
+  for (const voucherId of voucherIds) {
+    try {
+      db.transaction((tx) => {
+        const voucher = tx
+          .select()
+          .from(schema.storeCreditVouchers)
+          .where(eq(schema.storeCreditVouchers.id, voucherId))
+          .all()[0];
+        if (!voucher) return;
+
+        const redemptions = tx
+          .select({ amountCents: schema.voucherRedemptions.amountCents })
+          .from(schema.voucherRedemptions)
+          .where(eq(schema.voucherRedemptions.voucherId, voucherId))
+          .all()
+          .map((row) => row.amountCents);
+
+        const state = voucherState({
+          amountCents: voucher.amountCents,
+          redemptions,
+          voidReason: voucher.voidReason,
+        });
+
+        tx.update(schema.storeCreditVouchers)
+          .set({ remainingCents: state.remainingCents, status: state.status, updatedAt: now })
+          .where(eq(schema.storeCreditVouchers.id, voucherId))
+          .run();
+
+        if (state.overdrawnCents > 0) {
+          /*
+           * Two tills redeemed inside the replication window (ADR-0023 §5).
+           * Both sales stand and both customers have left; this is reported
+           * rather than prevented, so the one thing that must happen is that
+           * somebody can find out. `db:audit` fails on it and the dashboard
+           * shows it; this line is what makes it findable in a log too.
+           */
+          console.warn(
+            `[sync] voucher ${voucherId} is overdrawn by ${state.overdrawnCents} cents — ` +
+              `redeemed at more than one till (ADR-0023 §5)`,
+          );
+        }
+      });
+    } catch {
+      /* the voucher has not landed yet; its redemption was early */
+    }
+  }
 }
 
 /** `AbsorbRunner` over this database. `oplogCount` is the §6 guarantee. */
@@ -334,16 +463,48 @@ export function applyInbox(db: ArkomDb, limit = APPLY_BATCH): ApplyResult {
       .run();
   }
 
-  /* the cache, once, from the ledger */
+  /* the caches, once each, from the facts that just landed */
   const touched = new Set<string>();
+  const repairs = new Set<string>();
+  const vouchers = new Set<string>();
+
   for (const plan of plans) {
     if (failed.has(plan.opIds[0]!)) continue;
-    if (plan.entity === "stock_movement") {
-      const productId = plan.fields.productId;
-      if (typeof productId === "string") touched.add(productId);
+    const field = (key: string): string | undefined =>
+      typeof plan.fields[key] === "string" ? (plan.fields[key] as string) : undefined;
+
+    switch (plan.entity) {
+      case "stock_movement": {
+        const productId = field("productId");
+        if (productId) touched.add(productId);
+        break;
+      }
+      /* a ticket is its own subject; its children name it */
+      case "repair_ticket":
+        repairs.add(plan.entityId);
+        break;
+      case "repair_line":
+      case "repair_approval":
+      case "repair_notification": {
+        const ticketId = field("ticketId");
+        if (ticketId) repairs.add(ticketId);
+        break;
+      }
+      case "store_credit_voucher":
+        vouchers.add(plan.entityId);
+        break;
+      case "voucher_redemption": {
+        const voucherId = field("voucherId");
+        if (voucherId) vouchers.add(voucherId);
+        break;
+      }
+      default:
+        break;
     }
   }
+
   rebuildCache(db, [...touched]);
+  rederive(db, [...repairs], [...vouchers]);
 
   const pending = Number(
     db
