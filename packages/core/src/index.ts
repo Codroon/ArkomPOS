@@ -357,6 +357,15 @@ export {
   isSharedEntity,
 } from "./share";
 export type { SharedEntity } from "./share";
+/* our words for a till and a shop, generated at display time (ADR-0011) */
+export {
+  displayTillName,
+  displayLocationName,
+  isOurTillName,
+  OUR_TILL_PREFILL,
+  OUR_SHOP_PREFILL,
+} from "./our-words";
+export type { NameLocale } from "./our-words";
 /* writing down what ANOTHER till decided, without logging it (ADR-0022 §5-7) */
 export { absorb, planAbsorb } from "./absorb";
 export type { InboxEntry, AbsorbPlan, AbsorbRunner, AbsorbReport, PlanOutcome } from "./absorb";

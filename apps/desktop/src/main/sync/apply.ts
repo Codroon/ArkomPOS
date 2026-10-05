@@ -121,9 +121,20 @@ function isStale(tx: DbTx, table: SharedTable, id: string, asOfMs: number): bool
  *
  * Replicating terminals properly means logging their creation, which existing
  * installs never did and cannot retroactively. So the row is created on demand
- * from what the entry itself carries. The NAME is a placeholder: the shop's
- * other till is a real thing with a real name, and this till has not been told
- * it — saying so is better than inventing "Caja 1" and being wrong.
+ * from what the entry itself carries.
+ *
+ * The NAME is the terminal's own id, and deliberately not a sentence. The first
+ * version of this wrote `Otra caja (…)` — a Spanish literal, in code, into a
+ * column — which is the exact mistake ADR-0011 exists to prevent: our words
+ * must be GENERATED at display time, never stored, or they appear in Spanish on
+ * an English screen and no translator can reach them. The same bug had already
+ * shipped twice elsewhere.
+ *
+ * An id is honest. This till genuinely has not been told what the other one is
+ * called; nothing displays this column today, and if something ever does, an id
+ * reads as "unknown till" rather than as a name in the wrong language. Carrying
+ * the author's real name would mean adding it to the pull response — worth
+ * doing, not worth doing here.
  *
  * It is a structural row, not shop data, so it is created here rather than
  * replicated, and no oplog entry is written for it (§6).
@@ -144,8 +155,8 @@ function ensureTerminal(tx: DbTx, plan: AbsorbPlan): void {
       id: terminalId,
       tenantId: plan.tenantId,
       locationId: plan.locationId,
-      /* "another till in this shop", in the Spanish the rest of the UI speaks */
-      name: `Otra caja (${terminalId.slice(0, 8)})`,
+      /* language-neutral by construction — see the note above */
+      name: terminalId.slice(0, 8),
       createdAt: new Date(),
     })
     .onConflictDoNothing()

@@ -675,6 +675,58 @@ describe("a fresh install", () => {
     }
   });
 
+  /**
+   * The wizard offers no demo-data choice AT ALL — not a ticked box, not an
+   * unticked one.
+   *
+   * The refusal above is the backstop and it is not enough on its own, because
+   * it only started existing in v0.18.0 (3 September 2026). The pilot's first
+   * till was installed on 25 August, three weeks earlier, on a build where the
+   * choice was live — somebody took it, and thirty sample products have been
+   * sitting in that shop's catalogue ever since. Upgrading does not remove
+   * them: the database is kept, which is the whole point of an upgrade.
+   *
+   * So the real cost of that option was not a bad afternoon, it was a shop
+   * running on sample data for six weeks and two tills that disagreed about
+   * what was on the shelf. The option is gone from the screen and a test says
+   * so, because "the handler would refuse it anyway" is an argument that was
+   * already true and still let it happen.
+   */
+  it("gives the wizard no way to ask for demo data", () => {
+    const { readFileSync } = require("node:fs") as typeof import("node:fs");
+    const wizard = readFileSync(
+      new URL("../../renderer/src/screens/setup/first-run-dialog.tsx", import.meta.url),
+      "utf8",
+    );
+
+    /* the only mention is the constant it sends */
+    expect(wizard).toContain("loadDemo: false,");
+    const mentions = wizard.match(/loadDemo/g) ?? [];
+    expect(mentions).toHaveLength(1);
+
+    /* and nothing wires it to a control the shop could click */
+    expect(wizard).not.toMatch(/loadDemo["']?\s*[:=]\s*(?:true|draft|!)/);
+    expect(wizard).not.toMatch(/set\(\s*["']loadDemo/);
+  });
+
+  /**
+   * The till's own name is prefilled FROM THE DICTIONARY, never as a literal.
+   *
+   * "Caja 1" written into this file would be a Spanish string entering the
+   * database through a shop that chose English, and no display-time translator
+   * can reach a name once it is stored. That is the same mistake ADR-0011 has
+   * now caught five times.
+   */
+  it("prefills the till and shop names from the dictionary", () => {
+    const { readFileSync } = require("node:fs") as typeof import("node:fs");
+    const wizard = readFileSync(
+      new URL("../../renderer/src/screens/setup/first-run-dialog.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(wizard).toContain('t("setup.defaultTerminal")');
+    expect(wizard).not.toMatch(/terminalName:\s*["']Caja/);
+  });
+
   it("refuses `db:seed` on an installed build and writes nothing", () => {
     const fresh = freshDb();
     expect(() => seed(fresh, { packaged: true })).toThrow(/development step/);

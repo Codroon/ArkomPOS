@@ -23,6 +23,7 @@
  */
 import { sql, type SQL } from "drizzle-orm";
 import type { Locale } from "../i18n";
+import { displayTillName as displayTill } from "@arkom/core";
 
 /**
  * A shelf's name.
@@ -64,24 +65,18 @@ export function productName(expr: string, locale: Locale): SQL {
 }
 
 /**
- * What a till is called.
+ * What a till is called — delegated to `@arkom/core`.
  *
- * "Caja 1" is our prefill, written into the setup wizard before the shop typed
- * anything, and the till itself already translates it (`useTillName`) while it
- * is still the one we suggested. The cloud was showing the stored string raw,
- * so an English dashboard listed a till called "Caja 1" under a column headed
- * "Till". Same rule, second half of the product.
+ * The rule used to live here AND in the till's renderer, and both copies held
+ * our prefill as a literal pair, so neither recognised "Caja 2". A test in this
+ * folder asserted the two lists matched, which kept two wrong implementations
+ * in step. One implementation cannot drift from itself, so there is one.
  *
- * Both spellings are checked because a shop set up in English has "Till 1" in
- * the column, and switching the dashboard to Spanish should move it back.
- * Anything else — "Mostrador", "Taller" — is the shop's word and is returned
- * untouched, in every language, forever.
+ * The export below stays for the callers that already use it.
  */
-export const OUR_TILL_NAMES = ["Caja 1", "Till 1"] as const;
+export { displayTillName, displayLocationName } from "@arkom/core";
 
+/** @deprecated Prefer `displayTillName`. Kept so existing callers compile. */
 export function tillName(stored: string, locale: Locale): string {
-  const given = stored.trim();
-  const ours = OUR_TILL_NAMES.some((name) => name.toLowerCase() === given.toLowerCase());
-  if (!ours) return stored;
-  return locale === "en" ? "Till 1" : "Caja 1";
+  return displayTill(stored, locale);
 }

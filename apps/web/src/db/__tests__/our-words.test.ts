@@ -23,7 +23,8 @@
  * middle of a name. `tillName` is plain TypeScript and is exercised directly.
  */
 import { describe, expect, it } from "vitest";
-import { groupName, productName, tillName, OUR_TILL_NAMES } from "../our-words";
+import { groupName, productName, tillName } from "../our-words";
+import { OUR_TILL_PREFILL } from "@arkom/core";
 
 /** what the fragment will put into the query */
 const raw = (fragment: { queryChunks?: unknown[] }) =>
@@ -79,28 +80,92 @@ describe("a used device's catalogue name", () => {
 });
 
 describe("what a till is called", () => {
-  it("translates the name WE prefilled, in both directions", () => {
+  /**
+   * The fifth crossing of this line, and the first one a TEST had blessed.
+   *
+   * The case below used to read `expect(tillName("Caja 2", "en")).toBe("Caja 2")`
+   * — "Caja 2" was filed under "a name the shop chose". It is not. It is our own
+   * word with the number the shop happened to need, and the client saw it in
+   * Spanish on an English screen. The old implementation held our prefill as two
+   * LITERALS, and a prefill is only ever number one, so every till after the
+   * first fell through.
+   *
+   * The lesson is in the test as much as the code: a case that pins the current
+   * behaviour of a thing nobody has checked is not a test, it is a record of an
+   * assumption. "Caja 2" should have looked wrong sitting in that list.
+   */
+  it("translates our word, keeping the number, in both directions", () => {
     expect(tillName("Caja 1", "en")).toBe("Till 1");
     expect(tillName("Till 1", "es")).toBe("Caja 1");
     expect(tillName("Caja 1", "es")).toBe("Caja 1");
     expect(tillName("Till 1", "en")).toBe("Till 1");
   });
 
-  it("matches our prefill however it was typed", () => {
+  it("works for the SECOND till, and the ninth — the bug the client reported", () => {
+    expect(tillName("Caja 2", "en")).toBe("Till 2");
+    expect(tillName("Caja 9", "en")).toBe("Till 9");
+    expect(tillName("Caja 12", "en")).toBe("Till 12");
+    expect(tillName("Till 2", "es")).toBe("Caja 2");
+    /* and never renumbers one: the till's own copy used to answer "Till 1" to
+       everything it recognised, which is the right language and the wrong till */
+    expect(tillName("Caja 4", "en")).not.toBe("Till 1");
+  });
+
+  it("matches our word however it was typed", () => {
     expect(tillName("caja 1", "en")).toBe("Till 1");
     expect(tillName("  Caja 1  ", "en")).toBe("Till 1");
+    expect(tillName("Caja-2", "en")).toBe("Till 2");
+    expect(tillName("Caja  3", "en")).toBe("Till 3");
+    /* a single counter a shop calls just "Caja" is still our word */
+    expect(tillName("Caja", "en")).toBe("Till");
   });
 
   it("never touches a name the shop chose", () => {
-    for (const theirs of ["Mostrador", "Taller", "Caja 2", "Caja principal", "TPV 1"]) {
-      expect(tillName(theirs, "en")).toBe(theirs);
-      expect(tillName(theirs, "es")).toBe(theirs);
+    for (const theirs of [
+      "Mostrador",
+      "Taller",
+      "Caja principal",
+      "TPV 1",
+      "Planta 1",
+      /* the anchors earn their keep here: both contain one of our words */
+      "Caja de seguridad",
+      "Untill 2",
+      "Cajas",
+    ]) {
+      expect(tillName(theirs, "en"), theirs).toBe(theirs);
+      expect(tillName(theirs, "es"), theirs).toBe(theirs);
     }
   });
 
-  it("agrees with the till about which names are ours", () => {
-    /* `apps/desktop/src/renderer/src/lib/till-name.ts` holds the same pair;
-       if one side grows a spelling the other has to as well */
-    expect([...OUR_TILL_NAMES]).toEqual(["Caja 1", "Till 1"]);
+  it("is the SAME code the till runs, not a copy that agrees with it", () => {
+    /*
+     * This replaces a case that asserted the till's list and the cloud's list
+     * held the same pair. That was the right worry — the two halves drifting —
+     * answered the wrong way: it kept two implementations and checked they
+     * matched. Both were wrong, identically, and the check passed.
+     *
+     * `tillName` now delegates to `@arkom/core`, which the till's renderer also
+     * imports, so there is nothing left to keep in step.
+     */
+    const { readFileSync } = require("node:fs") as typeof import("node:fs");
+    const source = readFileSync(new URL("../our-words.ts", import.meta.url), "utf8");
+    expect(source).toContain('from "@arkom/core"');
+
+    const till = readFileSync(
+      new URL("../../../../desktop/src/renderer/src/lib/till-name.ts", import.meta.url),
+      "utf8",
+    );
+    expect(till).toContain("displayTillName");
+    expect(till).toContain('from "@arkom/core"');
+    /* neither half may hold its own list of our words any more */
+    expect(till).not.toMatch(/\[\s*"Caja 1"/);
+    expect(source).not.toMatch(/\[\s*"Caja 1"/);
+  });
+
+  it("agrees with the wizard about what it prefills", () => {
+    expect(OUR_TILL_PREFILL.es).toBe("Caja 1");
+    expect(OUR_TILL_PREFILL.en).toBe("Till 1");
+    /* and the prefill is, by construction, one of our own names */
+    expect(tillName(OUR_TILL_PREFILL.es, "en")).toBe(OUR_TILL_PREFILL.en);
   });
 });
