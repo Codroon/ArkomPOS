@@ -118,9 +118,13 @@ and every table row is pushed to the service the token authenticates.
 ### 5. Received is not applied, and the inbox is what makes that safe
 
 A pull cannot apply its batch straight into the business tables. `product_code.product_id`
-is `NOT NULL REFERENCES products`, `unit.purchase_id` references a `used_purchases` row that
-§1 does not replicate, and entries arrive in the order they were ingested, not the order
-SQLite's foreign keys demand.
+is `NOT NULL REFERENCES products`, and entries arrive in the order they were ingested, not the
+order SQLite's foreign keys demand.
+
+*(An earlier draft of this paragraph also cited `unit.purchase_id` as a foreign key into
+`used_purchases`. It is not one — it has been a bare reference since ADR-0013, which is why
+serialised units replicate without trouble. The example was wrong; the reason stands on
+`product_code` alone, and ADR-0023 §1 turns the observation into a rule.)*
 
 So a pull does one thing: it writes the batch into a local **`sync_inbox`** table and advances
 the cursor. Application is a separate pass that:

@@ -26,7 +26,7 @@
  *   product_code   →  product
  *   supplier       →  nothing
  *   customer       →  nothing
- *   unit           →  product  (and used_purchases, which is NOT shared — §5)
+ *   unit           →  product  (its purchase_id is a bare reference, not an FK)
  *   stock_movement →  product, unit, supplier
  *
  * `stock_movement.document_id` is deliberately a bare text column and not a

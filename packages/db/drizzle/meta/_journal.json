@@ -113,6 +113,13 @@
       "when": 1791082953451,
       "tag": "0015_rapid_longshot",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1791242404241,
+      "tag": "0016_loose_thanos",
+      "breakpoints": true
     }
   ]
 }

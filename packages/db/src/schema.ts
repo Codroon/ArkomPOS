@@ -535,7 +535,15 @@ export const storeCreditVouchers = sqliteTable("store_credit_vouchers", {
   id: text("id").primaryKey(),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   locationId: text("location_id").notNull().references(() => locations.id),
-  purchaseId: text("purchase_id").references(() => usedPurchases.id),
+  /**
+   * The used-device purchase that funded this credit, when one did.
+   *
+   * A reference, not a constraint (ADR-0023 §1): a purchase carries the
+   * seller's identity document and photographs, so ADR-0022 §1 keeps it on
+   * the till that took it — while the voucher has to be spendable at any
+   * counter in the shop.
+   */
+  purchaseId: text("purchase_id"),
   /** the refund that issued it, when it came from a return rather than a buy */
   refundDocumentId: text("refund_document_id"),
   amountCents: integer("amount_cents").notNull(),
@@ -550,6 +558,48 @@ export const storeCreditVouchers = sqliteTable("store_credit_vouchers", {
 }, (t) => [
   index("ix_voucher_status").on(t.tenantId, t.status),
   index("ix_voucher_purchase").on(t.purchaseId),
+]);
+
+/* ---------------------------------------------------- voucher_redemptions --
+ * Every time a voucher paid for something. ADR-0023 §4.
+ *
+ * `store_credit_vouchers.remaining_cents` used to BE the truth, and a mutable
+ * balance cannot survive two tills. ADR-0022 §7 resolves concurrent edits by
+ * last-writer-wins per field, which applied to a balance is not a conflict
+ * resolution but a money loss: two tills each redeem €20 of a €30 voucher, each
+ * writes its own remainder, and whichever arrives second becomes the shop's
+ * answer. The other €20 is gone from the record with nothing to show it ever
+ * existed.
+ *
+ * So this is ADR-0004 applied to money instead of stock. The ledger is
+ * insert-only and replicates; `remaining_cents` becomes a CACHE recomputed as
+ * face value minus the sum of these rows, in the same transaction; and
+ * `db:audit` asserts the two agree, exactly as it does for `product_stock`.
+ *
+ * What that buys beyond safety: "where did this €30 go" now has an answer with
+ * a date, a document and a till on it. The mutable balance never had one.
+ *
+ * `document_id` is a reference, not a foreign key (§1) — the sale that spent
+ * the credit belongs to whichever till took the money. */
+export const voucherRedemptions = sqliteTable("voucher_redemptions", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  voucherId: text("voucher_id").notNull().references(() => storeCreditVouchers.id),
+  /** the sale this credit paid for; a reference, because it may be another till's */
+  documentId: text("document_id").notNull(),
+  /** always positive — a redemption spends, it never tops up */
+  amountCents: integer("amount_cents").notNull(),
+  /** which counter took it, for the audit trail and for the dashboard's filter */
+  terminalId: text("terminal_id").notNull(),
+  userId: text("user_id"),
+  createdAt: ts("created_at").notNull(),
+}, (t) => [
+  index("ix_redemption_voucher").on(t.voucherId),
+  index("ix_redemption_when").on(t.tenantId, t.createdAt),
+  /* one redemption per voucher per document: completing the same sale twice
+     must not spend the credit twice, and this says so in the schema rather
+     than in whichever code path happens to check */
+  uniqueIndex("ux_redemption_voucher_doc").on(t.voucherId, t.documentId),
 ]);
 
 /* ==================== repairs (ADR-0014) ==================== */
@@ -604,8 +654,19 @@ export const repairTickets = sqliteTable("repair_tickets", {
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   locationId: text("location_id").notNull().references(() => locations.id),
   terminalId: text("terminal_id").notNull().references(() => terminals.id),
-  /** the numbered R- document handed to the customer at intake */
-  documentId: text("document_id").notNull().references(() => documents.id),
+  /**
+   * The numbered `R-` custody receipt handed to the customer at intake.
+   *
+   * A REFERENCE, not a foreign key — ADR-0023 §1. Documents are per-till
+   * (ADR-0008, ADR-0015) and a phone left at one counter has to be
+   * collectable at another, so the row this points at may live on a different
+   * till. Exactly the shape `stock_movements.document_id` has had since
+   * ADR-0004 — the decision that made stock replication nearly free — and the
+   * shape `collection_document_id` already has, nine columns below.
+   *
+   * Still NOT NULL: the id is always known. Only the ROW travels.
+   */
+  documentId: text("document_id").notNull(),
   customerId: text("customer_id").notNull().references(() => customers.id),
 
   /* ---- the device, as described. No unit, no stock, no valuation. ---- */
