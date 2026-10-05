@@ -45,6 +45,26 @@ import { sql, type SQL } from "drizzle-orm";
  * because the fold groups the ops away.
  */
 /**
+ * Demo rows are not the shop's stock.
+ *
+ * Every install before v0.18.0 could be told to load a sample catalogue, and
+ * the pilot's first till was — on 25 August, three weeks before the option was
+ * taken away. Thirty sample products have been in that shop's data ever since,
+ * because an upgrade keeps the database.
+ *
+ * They are excluded HERE rather than deleted, for one reason: after the till
+ * holding them is reset, **no till holds them at all**, and a dashboard showing
+ * products that exist on no counter is a dashboard that disagrees with every
+ * counter. The rows stay in the stream, which is append-only and not ours to
+ * rewrite; the screens just stop presenting sample data as if it were stock.
+ *
+ * `coalesce`, not a bare comparison: `isDemo` is absent from a partial payload
+ * and from every row written before the flag existed, and absent means real.
+ */
+export const notDemo = (alias = "row"): SQL =>
+  sql.raw(`coalesce(${alias}->>'isDemo', 'false') <> 'true'`);
+
+/**
  * Narrow a fold to ONE till — ADR-0022 §10.
  *
  * Only legitimate for entities a single till writes end to end: a document, its

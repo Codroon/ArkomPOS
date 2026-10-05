@@ -1,6 +1,6 @@
 # Consolidating Arkom's two tills
 
-**Status:** ready to run, waiting on one confirmation from the shop
+**Status:** ready to run; steps 5 to 9 are one sitting, with the shop present
 **Written:** 2026-10-04 · ADR-0022 §9 · read from production, nothing changed
 
 Everything in ADR-0022 works for a till enrolling from now on. Arkom's existing pair is a
@@ -51,114 +51,129 @@ On the dashboard — and this works now, because the till filter crosses both sh
 
 - **If they are test sales against the demo products** (fundas, protectores): nothing of
   value, proceed.
-- **If any of them is a real sale of `Copias B/N`**: it is real revenue on a real day. Keep
-  the CSV from step 2 and tell the shop's accountant it lives there, because after the reset
-  it will not be in caja 1's `Informes`. It stays in the cloud until step 5 deletes that
-  tenant, and in the backup file forever.
+- **If any of them is a real sale of `Copias B/N`**: it is real revenue on a real day. It
+  survives the merge and stays on the dashboard, under the till filter, with the combined
+  figures including it — which is why the plan merges rather than deletes. It will no longer
+  be in caja 1's own `Informes` after the reset, because that screen reports the till it is
+  running on; the CSV from step 2 and the backup from step 1 are the local copies.
 
-Either way the plan is the same. This is about telling the shop the truth, not about choosing
-a different route.
+Either way the plan is the same. This is about telling the shop the truth rather than
+choosing a different route.
 
 ## The plan
 
-**Reset caja 1 and let it join caja 2's shop.** It uses the path that is built and tested,
-it does not touch caja 2, and it ends with one shop, one catalogue, one stock figure.
+**Merge the two shops in the cloud, then reset caja 1 so it joins the surviving one.**
+Nothing is deleted: caja 1's history stays on the dashboard, under the till filter, and the
+combined figures include it.
 
-Cost: the demo dataset (worthless), caja 1's 5 documents as rows on that machine (backed up
-twice by step 1 and 2), and `Copias B/N` — which step 8 re-creates in about thirty seconds,
-on either till, and which then replicates to both.
+Cost: the demo dataset (which the dashboard no longer shows as stock), caja 1's 5 documents
+as rows on that machine (backed up twice by steps 1 and 2, and still in the cloud after the
+merge), and `Copias B/N` — which step 9 re-creates in about thirty seconds, on either till,
+and which then replicates to both.
 
-### The order matters
+### The two steps are ONE sitting
 
-Delete the stale tenant **before** caja 1 re-enrols. While both shops exist in the account,
-any new till is refused with `SHOP_AMBIGUOUS` — including caja 1's fresh install. That
-refusal is correct and is there so nobody's history gets silently stranded; it is not a bug
-to work around.
+Between the merge and the re-enrolment, caja 1 cannot push: its database still names the old
+shop, the cloud no longer has one, and its next attempt is refused with `DEVICE_MISMATCH`.
+That refusal is visible in Ajustes → Nube and harmless on its own — **but anything sold on
+caja 1 in that window reaches no cloud and is then discarded by the reset in step 7.**
+
+Caja 1 has not pushed since 3 October, so the window is almost certainly empty. Do not rely
+on that: run steps 5 to 9 together, with the shop told not to use caja 1 until they are done.
+
+Caja 2 is untouched throughout and keeps selling.
 
 ## Runbook
 
-Nothing here touches caja 2. Steps 1–3 are reversible; step 5 is not.
+Steps 1 to 4 change nothing. Step 5 writes a rollback file before it acts.
 
 1. **On caja 1, copy the database off the machine.**
    `%APPDATA%\Codroon POS\arkom-pos.db`, plus the `photos/` folder beside it. Put it
-   somewhere that is not that PC. This is the fiscal record of those 5 documents and the only
-   step that cannot be recovered from later if it is skipped.
+   somewhere that is not that PC.
 
 2. **Export caja 1's transactions as a CSV.** Dashboard → **Caja: caja 1** → Transacciones →
-   **Exportar**, range 90 días. A readable copy beside the database file. (The export carries
-   the till filter, so this really is caja 1's five and not the shop's.)
+   **Exportar**, range 90 días. The export carries the till filter, so this really is caja
+   1's five.
 
-3. **Write down what `Copias B/N` is at.** Its price, its VAT regime and the figure the
-   counter shows today. 5,020 as of 2026-10-04, but check — it moves.
+3. **Write down what `Copias B/N` is at.** Its price, its VAT regime and today's count —
+   5,020 as of 2026-10-04, but check.
 
-4. **Confirm the two tenants are still what this document says:**
+4. **Confirm the two shops are still what this document says:**
    ```
    cd apps/web
    pnpm cloud:shops
-   pnpm cloud:shops -- --tenant 01a0397a-140d-7000-b701-d9bb73bbf96c   # the demo one
    ```
-   Expect 32 products and the demo names. **If the counts have moved a lot, stop** — somebody
-   has been working on caja 1 and this document is out of date.
+   Expect `Arkom` with ~398 products and `ARKOM` with ~32. **If the counts have moved a lot,
+   stop** — somebody has been working on caja 1 and this document is out of date.
 
-5. **Delete the stale tenant.** It shows what it is about to remove and does nothing until
-   told twice (ADR-0020 §4):
+5. **Merge, reading the dry run first.**
    ```
-   pnpm cloud:delete-tenant -- --tenant 01a0397a-140d-7000-b701-d9bb73bbf96c
-   # read what it prints, then:
-   pnpm cloud:delete-tenant -- --tenant 01a0397a-140d-7000-b701-d9bb73bbf96c --yes
+   pnpm cloud:merge-shops -- --from 01a0397a-140d-7000-b701-d9bb73bbf96c \
+                             --into 01a0ee1a-675a-7000-972c-8b0d5dd281ca
    ```
-   The dashboard now shows one shop. Caja 1 is unlinked as far as the cloud is concerned and
-   **still selling**, because nothing about the cloud affects whether a till works.
-
-6. **Reset caja 1.** With the backup from step 1 somewhere else: delete
-   `%APPDATA%\Codroon POS\arkom-pos.db` and restart the app. It opens the first-run wizard.
-   Answer with the shop's real details and set the printer. **Do not tick "Cargar datos de
-   ejemplo"** — that is what put us here. The shop NAME does not matter: a joining till does
-   not get to rename the shop (ADR-0022 §9).
-
-7. **Issue a code and link it.** Dashboard → Cajas → **Enlazar una caja**. Then on caja 1:
-   Ajustes → Nube → paste it. It reports the shop's name as caja 2 typed it, and Ajustes
-   shows **Cajas en la tienda: 2**.
-
-   Wait about a minute. Caja 1's Inventario should fill with caja 2's 398 products at caja 2's
-   figures.
-
-8. **Re-create `Copias B/N`** on either till, with the figures from step 3. It replicates to
-   the other within half a minute, which is also the first proof that this works.
-
-9. **Verify, do not assume.** On caja 1:
+   It prints what it would move — about 473 rows and one till — and changes nothing. Read it,
+   then add `--yes`. It writes `rollback-01a0397a-….json` **before** the first write; keep
+   that file until step 10 has passed. To undo:
    ```
-   pnpm db:audit --verify
+   pnpm cloud:merge-shops -- --undo rollback-01a0397a-….json --yes
    ```
-   The two that matter here are `ningun dato replicado se ha registrado como decision de esta
-   caja` (no echo) and `nada recibido de otra caja se ha quedado atascado`. Then spot-check
-   three products by hand against caja 2's screen.
+   The dashboard now shows one shop, with both tills' history in it and a filter to look at
+   either. The 30 demo products are in the stream but no longer counted as stock or shown in
+   the catalogue — after step 7 no till holds them, and a dashboard listing products that
+   exist on no counter would disagree with every counter.
 
-10. **Prove the loop both ways.** Sell one accessory on caja 1 and watch the figure drop on
-    caja 2 within half a minute. Then the reverse. This is the thing the shop actually asked
-    for, so it is worth watching once with both screens visible.
+6. **Issue an enrolment code**, before touching the till so nobody is waiting.
+   Dashboard → Cajas → **Enlazar una caja** → copy it. It is valid for seven days.
 
-### If step 7 says `SHOP_AMBIGUOUS`
+7. **Reset caja 1.** With the backup from step 1 somewhere else: close the app, delete
+   `%APPDATA%\Codroon POS\arkom-pos.db`, and restart. The first-run wizard opens. Answer with
+   the shop's real details and set the printer. There is no demo-data option any more.
 
-Step 5 did not take effect, or there is a third shop nobody expected. Run `pnpm cloud:shops`
-and **look** before doing anything else. Do not delete tenants until the error stops.
+8. **Link it.** On caja 1: Ajustes → Nube → paste the code from step 6 → Enlazar. It reports
+   the shop's name as caja 2 typed it, and Ajustes shows **Cajas en la tienda: 2**.
 
-### If step 7 shows no products after a few minutes
+   Wait about a minute. Caja 1's Inventario fills with caja 2's catalogue at caja 2's figures.
+
+9. **Re-create `Copias B/N`** on either till, with the figures from step 3. It appears on the
+   other within half a minute, which is also the first proof the loop works.
+
+10. **Verify, do not assume.** On caja 1:
+    ```
+    pnpm db:audit --verify
+    ```
+    The ones that matter here: `ningun dato replicado se ha registrado como decision de esta
+    caja` (no echo), `nada recibido de otra caja se ha quedado atascado`, and
+    `el saldo de cada vale coincide con su libro de usos`. Then spot-check three products by
+    hand against caja 2's screen.
+
+11. **Prove the loop both ways, with both screens visible.** Sell one accessory on caja 1 and
+    watch the figure drop on caja 2 within half a minute. Then the reverse. Then leave a phone
+    for repair on caja 1 and find it on caja 2 — that is new in v1.3.0 and worth seeing once.
+
+### If step 8 says `SHOP_AMBIGUOUS`
+
+The merge in step 5 did not take effect, or there is a third shop nobody expected. Run
+`pnpm cloud:shops` and **look** before doing anything else.
+
+### If step 8 shows no products after a few minutes
 
 In order of likelihood: the till is pointed at the wrong address (Ajustes → Nube shows it);
 the deployed cloud predates ADR-0022 and serves no pull route, in which case the till backs
-off quietly and keeps pushing exactly as before — check that `cloud.arkom.es` is on the
-current build; or rows are in the inbox unapplied, which `pnpm db:audit --verify` names and
-`Ajustes → Nube → Pendiente de aplicar` shows.
+off quietly and keeps pushing exactly as before — check `cloud.arkom.es` is on the current
+build; or rows are sitting in the inbox unapplied, which `pnpm db:audit --verify` names and
+Ajustes → Nube → **Pendiente de aplicar** shows.
 
 ## What this does NOT fix, and nobody should expect it to
 
-- **Repairs and used purchases stay per-till** (ADR-0022 §1). A phone left at caja 1 is
-  collected at caja 1. Phase 2.
-- **Store credit stays per-till.** A voucher issued at caja 2 cannot be spent at caja 1,
-  because a replicated voucher with no central redemption can be spent twice.
+- **Used-device purchases stay per-till.** The seller's identity document and photographs are
+  the point of that record.
+- **Repair photographs stay on the till that took them.** The ticket crosses; the pictures are
+  files the cloud holds none of. The other till says where they are.
+- **A device passcode stays on the till that was told it.** Same reason, stronger: it is the
+  customer's.
 - **A till's `Informes` reports that till**, and agrees with that till's Z. Shop-wide figures
   are the dashboard's, with the filter by till.
-- **Two tills can still oversell the last phone** in the same second. The cloud shows the
-  discrepancy; it does not prevent it, because preventing it means the counter waits on a
-  lock (ADR-0022 §11).
+- **Two tills can still oversell the last phone, or spend one voucher twice**, inside a few
+  seconds of each other. Both are shown — `db:audit` fails and the dashboard says so — and
+  neither is blocked, because blocking means the counter waits on a lock (ADR-0022 §11,
+  ADR-0023 §5).

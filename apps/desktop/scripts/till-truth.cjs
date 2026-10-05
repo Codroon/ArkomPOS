@@ -62,6 +62,19 @@ const truth = {
   db: dbPath,
   readAt: new Date().toISOString(),
 
+  /**
+   * WHICH SHOP this is, and which counter.
+   *
+   * Absent until now, and its absence quietly broke the reconciler: with
+   * nothing to scope by, `cloud:reconcile` compared this till against every
+   * row in the database. That was the same answer while one shop existed and
+   * became nonsense the moment a second one enrolled — 682 rows here against
+   * 2077 there, which is three shops added together. A pre-deploy gate that
+   * still runs and still prints and is wrong is worse than one that is missing.
+   */
+  tenant_id: one("select id from tenants limit 1"),
+  terminal_id: one("select id from terminals order by created_at limit 1"),
+
   oplog: one("select count(*) as n from oplog"),
   groups: one("select count(*) as n from product_groups"),
   products_all: one("select count(*) as n from products"),

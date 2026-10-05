@@ -16,7 +16,7 @@
  * worse than a missing one, and the missing one gets asked about.
  */
 import { sql } from "drizzle-orm";
-import { folded } from "./fold";
+import { folded, notDemo } from "./fold";
 import { groupName, productName } from "./our-words";
 import type { Locale } from "../i18n";
 import { db as defaultDb, type CloudDb } from "./client";
@@ -482,6 +482,9 @@ export async function valuation(
     left join groups g on g.id = p.row->>'groupId'
     join stock s on s.product_id = p.id
     where coalesce((p.row->>'active')::boolean, true) and s.on_hand > 0
+      /* sample data is not stock: after the till holding it is reset, no till
+         holds it at all, and a valuation of products nobody has is not one */
+      and ${notDemo("p.row")}
     /* by the group's ID, not its name. Grouping by the name broke the moment
        the SELECT became a locale-dependent expression — Postgres wants the
        thing it is grouping on — and two shelves that happened to share a name
@@ -552,6 +555,7 @@ export async function deadStock(
     join movements m on m.product_id = p.id
     left join groups g on g.id = p.row->>'groupId'
     where coalesce((p.row->>'active')::boolean, true)
+      and ${notDemo("p.row")}
       and m.on_hand > 0
       and (
         m.last_sold_ms is null

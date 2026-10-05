@@ -44,6 +44,32 @@ console.log(`
 const sql = postgres(process.env.DIRECT_URL, { prepare: false, max: 3 });
 
 /**
+ * WHICH SHOP we are reconciling.
+ *
+ * Every query below used to run against the whole table. With one shop in the
+ * database that is the same answer; with two it is nonsense, and it failed
+ * SILENTLY in the worst way available to a pre-deploy gate — it still ran, it
+ * still printed, and it compared one till's 682 rows against three shops'
+ * 2077. The scope is now required, so a truth file written by an older
+ * `db:truth` is refused rather than quietly mis-measured.
+ */
+if (!truth.tenant_id) {
+  console.error(
+    "  This truth file does not say which shop it describes.\n" +
+      "  Re-run `pnpm db:truth` (it records tenant_id since v1.3.0) and try again.\n",
+  );
+  process.exit(2);
+}
+const TENANT = truth.tenant_id;
+
+const [shop] = await sql`select name from tenants where id = ${TENANT}`;
+if (!shop) {
+  console.error(`  The cloud holds no shop ${TENANT}. Has this till ever pushed?\n`);
+  process.exit(1);
+}
+console.log(`  shop: ${shop.name}  (${TENANT})\n`);
+
+/**
  * The current state of every row of an entity.
  *
  * Identity lives in `entity_id`, NOT in the payload: an update op carries only
@@ -58,7 +84,7 @@ const latest = (entity) => sql`
     select distinct on (e.entity_id, kv.key) e.entity_id, kv.key, kv.value
     from sync_entries e
     cross join lateral jsonb_each(coalesce(e.after, '{}'::jsonb)) as kv(key, value)
-    where e.entity = ${entity}
+    where e.entity = ${entity} and e.tenant_id = ${TENANT}
     order by e.entity_id, kv.key, e.seq desc
   ) f
   group by f.entity_id`;
@@ -76,12 +102,20 @@ function check(label, mine, theirs, note = "") {
 }
 
 /* ---------------------------------------------------------------- volume */
-const [{ n: entries }] = await sql`select count(*)::int as n from sync_entries`;
+const [{ n: entries }] = await sql`
+  select count(*)::int as n from sync_entries where tenant_id = ${TENANT}`;
 check("oplog rows delivered", entries, truth.oplog);
 
+/*
+ * `seq` is PER TILL (ADR-0005), so a gap only means anything within one
+ * device's stream. Ordering a shop's merged rows by `seq` and looking for
+ * breaks counts every interleaving as a gap — 1155 of them, in a stream with
+ * none.
+ */
 const [{ n: gaps }] = await sql`
   select count(*)::int as n from (
-    select seq, lag(seq) over (order by seq) as prev from sync_entries
+    select seq, lag(seq) over (partition by device_id order by seq) as prev
+    from sync_entries where tenant_id = ${TENANT}
   ) t where prev is not null and seq <> prev + 1`;
 check("gaps in the stream", gaps, 0);
 
@@ -96,7 +130,7 @@ check("products (active)", active.length, truth.products_active);
 
 const [{ total }] = await sql`
   select coalesce(sum((after->>'qty')::bigint), 0)::bigint as total
-  from sync_entries where entity = 'stock_movement'`;
+  from sync_entries where entity = 'stock_movement' and tenant_id = ${TENANT}`;
 check("stock on hand (sum of movements)", num(total), truth.on_hand_total,
   truth.on_hand_total === truth.movement_sum ? "(till cache agrees with its own movements)" : "*** till cache disagrees ***");
 
@@ -110,14 +144,14 @@ const perProduct = await sql`
       select distinct on (e.entity_id, kv.key) e.entity_id, kv.key, kv.value
       from sync_entries e
       cross join lateral jsonb_each(coalesce(e.after, '{}'::jsonb)) as kv(key, value)
-      where e.entity = 'product'
+      where e.entity = 'product' and e.tenant_id = ${TENANT}
       order by e.entity_id, kv.key, e.seq desc
     ) f
     group by f.entity_id
   ),
   m as (
     select after->>'productId' as product_id, sum((after->>'qty')::bigint) as on_hand
-    from sync_entries where entity = 'stock_movement' group by 1
+    from sync_entries where entity = 'stock_movement' and tenant_id = ${TENANT} group by 1
   )
   select p.name, coalesce(m.on_hand, 0)::int as on_hand
   from p left join m on m.product_id = p.id
@@ -191,7 +225,9 @@ check("voucher debt (cents)", owing.reduce((s, v) => s + num(v.row.remainingCent
 
 /* ------------------------------------------------ what must NOT be there */
 console.log("\n  secrets, which must be absent whatever the till holds:");
-const dump = JSON.stringify(await sql`select before, after from sync_entries`);
+const dump = JSON.stringify(
+  await sql`select before, after from sync_entries where tenant_id = ${TENANT}`,
+);
 for (const word of ["devicePasscode", "passcode", "pinHash", "pinSalt", "recoveryCodeHash", "argon2", "scrypt$"]) {
   const present = dump.includes(word);
   if (present) failures += 1;

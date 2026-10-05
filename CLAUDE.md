@@ -245,12 +245,17 @@ Schema already anticipates them — build nothing for them.
 `pnpm brand <key>` (apply a brand) · `pnpm dev` (desktop app w/ HMR) · `pnpm test` (Vitest: core, desktop, web) · `pnpm db:generate`
 / `db:migrate` (drizzle-kit) · `pnpm db:seed` · `pnpm db:audit [--verify]` · `pnpm build:win`
 (installer) · `pnpm dev:web` (the cloud) · `pnpm db:truth` then `pnpm cloud:reconcile`
-(the till's own SQLite read against the cloud, figure by figure — run it before any deploy).
+(the till's own SQLite read against the cloud, figure by figure — run it before any deploy;
+`db:truth` records the till's `tenant_id` and the reconciler REFUSES a file without one,
+because comparing a till against every shop in the database is the same answer with one shop
+and nonsense with two).
 Cloud-only, from `apps/web`: `db:generate` /
 `db:migrate` (its own Postgres lineage, never the till's), `cloud:code` (issue an enrolment
 code), `cloud:shops` (which shops exist, with ids and what they hold — run it before
-`cloud:delete-tenant`, and `-- --tenant <id>` lists one shop's products and on-hand),
-`cloud:delete-tenant` (ADR-0020 §4), `test:db` (integration, against real Postgres).
+`cloud:delete-tenant` or `cloud:merge-shops`, and `-- --tenant <id>` lists one shop's products
+and on-hand), `cloud:merge-shops` (fold a pre-ADR-0022 duplicate shop into the real one; dry
+run by default, writes a rollback file, `--undo` puts it back), `cloud:delete-tenant`
+(ADR-0020 §4), `test:db` (integration, against real Postgres).
 See `apps/web/README.md`.
 Keep these working at all times. A CLIENT install runs none of them: it migrates on first
 launch and asks the shop who it is (see DEPLOYMENT.md). `db:seed` is a dev convenience that

@@ -12,7 +12,7 @@
  * Scoped by account through `tenants`, like every other query in this app.
  */
 import { sql } from "drizzle-orm";
-import { epochMs, folded } from "./fold";
+import { epochMs, folded, notDemo } from "./fold";
 import { groupName, productName } from "./our-words";
 import type { Locale } from "../i18n";
 import { db as defaultDb, type CloudDb } from "./client";
@@ -64,9 +64,10 @@ export async function productsForAccount(
              (row->>'lowStockThreshold')::bigint as low_stock_threshold,
              coalesce((row->>'active')::boolean, true) as active
       from p0
+      where ${notDemo()}
     ),
     g0 as (${folded(accountId, "product_group")}),
-    groups as (select id, ${groupName("row", locale)} as name from g0),
+    groups as (select id, ${groupName("row", locale)} as name from g0 where ${notDemo()}),
     stock as (
       select e.after->>'productId' as product_id, sum((e.after->>'qty')::bigint) as on_hand
       from sync_entries e
@@ -122,20 +123,22 @@ export async function recentMovements(
   }>(sql`
     with mine as (select t.id from tenants t where t.account_id = ${accountId}),
     p0 as (${folded(accountId, "product")}),
-    products as (select id, ${productName("row->>'name'", locale)} as name from p0)
+    products as (select id, ${productName("row->>'name'", locale)} as name from p0 where ${notDemo()})
     select p.name                                                  as product_name,
            e.after->>'movementType'                                as movement_type,
            (e.after->>'qty')::bigint                               as qty,
            (e.after->>'unitCostCents')::bigint                     as unit_cost_cents,
            to_timestamp(${epochMs("e.after->>'createdAt'")} / 1000.0)  as created_at
     from sync_entries e
-    left join products p on p.id = e.after->>'productId'
+    join products p on p.id = e.after->>'productId'
     where e.tenant_id in (select id from mine) and e.entity = 'stock_movement'
     order by ${epochMs("e.after->>'createdAt'")} desc
     limit ${limit}
   `);
 
   return rows.map((r) => ({
+    /* an inner join above, so a movement for a sample product (or one nobody
+       holds any more) is not listed rather than listed as a dash */
     productName: r.product_name ?? "—",
     movementType: r.movement_type,
     qty: Number(r.qty),
