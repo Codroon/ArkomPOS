@@ -82,7 +82,7 @@ interface Rollback {
   when: string;
   /** op_ids that were moved, so the undo moves back exactly those and no others */
   opIds: string[];
-  devices: { id: string; tenantId: string; locationId: string }[];
+  devices: { id: string; tenantId: string; locationId: string; revokedAt: string | null }[];
   tenant: { id: string; accountId: string; name: string; createdAt: string | null; lastSeenAt: string | null };
 }
 
@@ -122,7 +122,9 @@ if (undo) {
 
     for (const device of plan.devices) {
       await tx`
-        update devices set tenant_id = ${device.tenantId}, location_id = ${device.locationId}
+        update devices
+        set tenant_id = ${device.tenantId}, location_id = ${device.locationId},
+            revoked_at = ${device.revokedAt}
         where id = ${device.id}`;
     }
   });
@@ -181,7 +183,9 @@ console.log(`  moving    ${counts!.rows} row(s), ${counts!.tills} till(s)`);
 for (const row of perEntity) console.log(`              ${String(row.n).padStart(5)}  ${row.entity}`);
 console.log("");
 console.log(`  the shop "${losing.name}" then stops existing; "${surviving.name}" keeps its name.`);
-console.log("  every moved till is refused on its next push until it re-enrols.");
+console.log("  every moved till is REVOKED: its token is already dead (its database names");
+console.log("  a shop that will not exist), and a live row for a machine about to be reset");
+console.log("  would make the shop read as having one more till than it has.");
 console.log("");
 
 if (counts!.clashes > 0) {
@@ -204,8 +208,8 @@ if (!confirmed) {
 const opIds = (await sql<{ op_id: string }[]>`
   select op_id from sync_entries where tenant_id = ${from!}`).map((row) => row.op_id);
 
-const devices = await sql<{ id: string; tenant_id: string; location_id: string }[]>`
-  select id, tenant_id, location_id from devices where tenant_id = ${from!}`;
+const devices = await sql<{ id: string; tenant_id: string; location_id: string; revoked_at: Date | null }[]>`
+  select id, tenant_id, location_id, revoked_at from devices where tenant_id = ${from!}`;
 
 const rollback: Rollback = {
   kind: "merge-shops",
@@ -213,7 +217,12 @@ const rollback: Rollback = {
   into: surviving.id,
   when: new Date().toISOString(),
   opIds,
-  devices: devices.map((d) => ({ id: d.id, tenantId: d.tenant_id, locationId: d.location_id })),
+  devices: devices.map((d) => ({
+    id: d.id,
+    tenantId: d.tenant_id,
+    locationId: d.location_id,
+    revokedAt: d.revoked_at ? d.revoked_at.toISOString() : null,
+  })),
   tenant: {
     id: losing.id,
     accountId: losing.account_id,
@@ -237,20 +246,36 @@ await sql.begin(async (tx) => {
   const [shopLocation] = await tx<{ location_id: string }[]>`
     select location_id from devices where tenant_id = ${into!} order by enrolled_at limit 1`;
 
+  /**
+   * And the moved till is REVOKED, which is the part that is easy to miss.
+   *
+   * Its database still names the shop that no longer exists, so its token is
+   * already dead in practice — every push it attempts is refused. Leaving the
+   * row alive says otherwise: when the till is reset and re-enrols it mints a
+   * NEW terminal id, so the shop ends up with a dead till row beside a live
+   * one, `Cajas en la tienda` reads 3 for a shop with 2, and a wiped machine
+   * keeps a working credential on the record.
+   *
+   * Revoking rather than deleting keeps the history — the Tills page shows it
+   * as cut off, which is what happened — while `tillCount` and the dashboard's
+   * till filter both ignore it, so the shop's own figures stay honest.
+   */
   await tx`
     update devices
-    set tenant_id = ${into!}${shopLocation ? tx`, location_id = ${shopLocation.location_id}` : tx``}
+    set tenant_id = ${into!}${shopLocation ? tx`, location_id = ${shopLocation.location_id}` : tx``},
+        revoked_at = coalesce(revoked_at, now())
     where tenant_id = ${from!}`;
 
   await tx`delete from tenants where id = ${from!}`;
 });
 
 const [after] = await sql<{ rows: number; tills: number }[]>`
-  select (select count(*)::int from sync_entries where tenant_id = ${into!}) as rows,
-         (select count(*)::int from devices where tenant_id = ${into!})      as tills`;
+  select (select count(*)::int from sync_entries where tenant_id = ${into!})  as rows,
+         (select count(*)::int from devices
+           where tenant_id = ${into!} and revoked_at is null)                as tills`;
 
 console.log("");
-console.log(`  done      "${surviving.name}" now holds ${after!.rows} row(s) and ${after!.tills} till(s)`);
+console.log(`  done      "${surviving.name}" now holds ${after!.rows} row(s) and ${after!.tills} live till(s)`);
 console.log(`  undo      pnpm cloud:merge-shops -- --undo ${file} --yes`);
 console.log("");
 
