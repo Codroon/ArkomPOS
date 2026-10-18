@@ -95,16 +95,19 @@ Steps 1 to 4 change nothing. Step 5 writes a rollback file before it acts.
    **Exportar**, range 90 días. The export carries the till filter, so this really is caja
    1's five.
 
-3. **Write down what `Copias B/N` is at.** Its price, its VAT regime and today's count —
-   5,020 as of 2026-10-04, but check.
+3. **Write down the two products the shop typed in itself**, with price, VAT regime and
+   today's count: `Copias B/N` (5,020 on 2026-10-10) and `Cargador` (988). Everything else on
+   caja 1 is the demo set. An earlier version of this document named only the first; the
+   second was hidden by a check that matched "Cargador" inside the demo names.
 
 4. **Confirm the two shops are still what this document says:**
    ```
    cd apps/web
    pnpm cloud:shops
    ```
-   Expect `Arkom` with ~398 products and `ARKOM` with ~32. **If the counts have moved a lot,
-   stop** — somebody has been working on caja 1 and this document is out of date.
+   Expect `Arkom` with ~550 products (it is being added to daily) and `ARKOM` with ~32 and a
+   last sale on 19 September. **If caja 1 shows a sale after that date, stop** — somebody has
+   been working on it and this document is out of date.
 
 5. **Merge, reading the dry run first.**
    ```
@@ -125,17 +128,31 @@ Steps 1 to 4 change nothing. Step 5 writes a rollback file before it acts.
 6. **Issue an enrolment code**, before touching the till so nobody is waiting.
    Dashboard → Cajas → **Enlazar una caja** → copy it. It is valid for seven days.
 
-7. **Reset caja 1.** With the backup from step 1 somewhere else: close the app, delete
-   `%APPDATA%\Codroon POS\arkom-pos.db`, and restart. The first-run wizard opens. Answer with
-   the shop's real details and set the printer. There is no demo-data option any more.
+7. **Reset caja 1.** With the backup from step 1 somewhere else:
+   - In the app first: Ajustes → Nube → **Desvincular**. Otherwise the old link file survives
+     the reset and the Nube card shows the till as still linked, with nowhere to paste a code.
+   - Close the app and delete `%APPDATA%\Arkom POS\arkom-pos.db` (and `arkom-pos.db-wal` /
+     `arkom-pos.db-shm` if they are there). The folder is named after the brand that is
+     INSTALLED: the pilot build is `Arkom POS`, so it is not `Codroon POS`, which is what an
+     earlier version of this document said.
+   - Restart. The first-run wizard opens. Answer with the shop's real details and set the
+     printer. There is no demo-data option any more.
+   - **Change all five number prefixes.** Caja 2 already uses the defaults (`T1-`, `D1-`,
+     `R-`, `C-`, `Z1-`), the wizard offers the same defaults again, and they can never be
+     changed afterwards. Two tills in one shop on the same prefix print the same receipt
+     numbers. Type `T2-`, `D2-`, `R2-`, `C2-`, `Z2-`. Nothing checks this yet.
+   - **Do not add an item to a sale, open a shift, take in a repair or buy a used phone
+     before step 8.** Any of them gives the till history, and a till with history is refused
+     (`TILL_HAS_HISTORY`). Looking at the screens is fine.
 
 8. **Link it.** On caja 1: Ajustes → Nube → paste the code from step 6 → Enlazar. It reports
    the shop's name as caja 2 typed it, and Ajustes shows **Cajas en la tienda: 2**.
 
    Wait about a minute. Caja 1's Inventario fills with caja 2's catalogue at caja 2's figures.
 
-9. **Re-create `Copias B/N`** on either till, with the figures from step 3. It appears on the
-   other within half a minute, which is also the first proof the loop works.
+9. **Re-create `Copias B/N` and `Cargador`** on either till, with the figures from step 3.
+   They appear on the other within half a minute, which is also the first proof the loop
+   works.
 
 10. **Verify, do not assume.** On caja 1:
     ```

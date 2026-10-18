@@ -24,6 +24,7 @@ import { patchLink, readLink, type CloudLink } from "./link";
 import { receiveStatus } from "./receive";
 
 const { oplog } = schema;
+/* the heal below reads which shops this till still holds */
 
 /** How often a linked till looks for something to send. */
 const INTERVAL_MS = 60_000;
@@ -69,14 +70,53 @@ let pushing = false;
 
 /** Rows waiting to go, oldest first. */
 function unsentRows(db: ArkomDb, link: CloudLink): SyncableOplogRow[] {
-  return db
+  /*
+   * Rows labelled with a shop this till no longer has.
+   *
+   * Only one thing produces them: a till that JOINED a shop (ADR-0022 §9) and
+   * then, before v1.3.1, kept its old identity cached until a restart. Every
+   * row it wrote in that window carries the tenant `adopt()` deleted. The
+   * cloud is right to refuse a row for a tenant the device does not belong to
+   * (ADR-0020 §1), and a refusal leaves the cursor where it was, so one such
+   * row blocked everything behind it — on the pilot's machine, a backup note
+   * written as the app closed.
+   *
+   * Relabelling is correct, not a convenience: the push cursor was parked at
+   * the join, so every row past it was written after this till belonged to
+   * the link's shop. Only rows whose tenant no longer EXISTS here are touched;
+   * a row naming a tenant this till does hold goes out exactly as written, so
+   * a genuinely confused row is still refused loudly rather than laundered.
+   */
+  const knownTenants = new Set(db.select({ id: schema.tenants.id }).from(schema.tenants).all().map((t) => t.id));
+  const knownLocations = new Set(
+    db.select({ id: schema.locations.id }).from(schema.locations).all().map((l) => l.id),
+  );
+  let healed = 0;
+
+  const rows = db
     .select()
     .from(oplog)
     .where(and(gt(oplog.seq, link.lastAckedSeq)))
     .orderBy(asc(oplog.seq))
     .limit(SYNC_BATCH_SIZE)
     .all()
-    .map((r) => ({
+    .map((r) => {
+      const orphanTenant = r.tenantId !== link.tenantId && !knownTenants.has(r.tenantId);
+      const orphanLocation =
+        Boolean(link.locationId) && r.locationId !== link.locationId && !knownLocations.has(r.locationId);
+      if (orphanTenant || orphanLocation) healed += 1;
+      return {
+        ...r,
+        tenantId: orphanTenant ? link.tenantId : r.tenantId,
+        locationId: orphanLocation ? link.locationId : r.locationId,
+      };
+    });
+
+  if (healed > 0) {
+    console.info(`[sync] relabelled ${healed} row(s) written under this till's pre-join shop`);
+  }
+
+  return rows.map((r) => ({
       seq: r.seq,
       opId: r.opId,
       tenantId: r.tenantId,

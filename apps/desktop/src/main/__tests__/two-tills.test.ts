@@ -21,7 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { openDb, runMigrations, schema as s, type ArkomDb } from "@arkom/db";
 import { handlers, app } from "./electron-stub";
 import { keyNames, leafValues } from "./leaks";
@@ -61,6 +61,8 @@ interface Till {
 }
 
 let cloud: MemoryStore;
+/** the database of whichever till `install`/`use` last bound */
+const handlersDb = (): ArkomDb => current!.db;
 let accountId: string;
 let current: Till | null = null;
 
@@ -1306,5 +1308,221 @@ describe("a payload that carries one field", () => {
     expect(pending).toHaveLength(1);
     expect(pending[0]?.attempts).toBeGreaterThan(0);
     expect(pending[0]?.lastError).toBeTruthy();
+  });
+});
+
+describe("a till that joins and carries on WITHOUT a restart (v1.3.1)", () => {
+  /**
+   * Found on the pilot shop, and missed here for a reason worth writing down.
+   *
+   * After joining, the till kept the identity of the shop it founded at first
+   * run cached in memory, and `adopt()` had deleted that shop. The product list
+   * came up empty, and the backup the app writes on its way out was logged
+   * under the dead shop. The cloud refused every batch that began with that
+   * row, so nothing the till did after joining ever left it.
+   *
+   * Every case above calls `use()`, which resets the cached identity. That is
+   * what a restart does, so it hid the bug completely. The cases below link and
+   * then keep working in the same process, the way a shop does.
+   */
+  async function joinWithoutRestart() {
+    const one = await install("Caja 1", "T1-");
+    stubCloud();
+    use(one);
+    await link();
+
+    const two = await install("Caja 2", "T2-");
+    stubCloud();
+    use(two);
+    await link(); /* joins one's shop; deliberately no use(two) afterwards */
+    return { one, two };
+  }
+
+  it("sees the shop's products straight after linking", async () => {
+    /* the product exists BEFORE two joins, so nothing between the join and the
+       list call may touch the cached identity: no use(), no reset */
+    const one = await install("Caja 1", "T1-");
+    stubCloud();
+    use(one);
+    await link();
+    const groupId = one.db.select().from(s.productGroups).all()[0]!.id;
+    await call("catalog:save", {
+      name: "Funda Galaxy S24",
+      barcode: null,
+      groupId,
+      itemType: "stocked",
+      costCents: 300,
+      priceCents: 1500,
+      taxRegime: "IVA21",
+      reorderPoint: 0,
+      lowStockThreshold: 0,
+      active: true,
+    });
+    await send(one);
+
+    const two = await install("Caja 2", "T2-");
+    stubCloud();
+    use(two);
+    await link(); /* joins, and the join pulls the catalogue */
+
+    /* same process, same cache: exactly the shop's screen after Link */
+    const listed = await call<{ rows?: { name: string }[] } | { name: string }[]>("catalog:list", {});
+    const names = (Array.isArray(listed) ? listed : (listed.rows ?? [])).map((r) => r.name);
+    expect(names).toContain("Funda Galaxy S24");
+  });
+
+  it("can write, and what it writes reaches the other till", async () => {
+    const { one, two } = await joinWithoutRestart();
+
+    /* still on two, cache untouched since the join */
+    const groupId = two.db.select().from(s.productGroups).all()[0]?.id ?? null;
+    const saved = await call<{ product: { id: string } }>("catalog:save", {
+      name: "Cable USB-C 2m",
+      barcode: null,
+      groupId,
+      itemType: "stocked",
+      costCents: 200,
+      priceCents: 900,
+      taxRegime: "IVA21",
+      reorderPoint: 0,
+      lowStockThreshold: 0,
+      active: true,
+    });
+    for (let round = 0; round < 5; round += 1) {
+      const status = await pushAll(two.db, { force: true });
+      if (status.pending === 0 || status.lastError) break;
+    }
+    expect(readLink()?.lastError ?? null).toBeNull();
+
+    await receive(one);
+    expect(one.db.select().from(s.products).where(eq(s.products.id, saved.product.id)).all()).toHaveLength(1);
+  });
+
+  it("records what it writes after joining under the shop it joined", async () => {
+    await joinWithoutRestart();
+    /* the identity every handler and the backup timer read, untouched since
+       the join: it must already be the shop the link names */
+    const link = readLink();
+    expect(link).not.toBeNull();
+    expect(tillContext(handlersDb()).ctx.tenantId).toBe(link!.tenantId);
+    expect(tillContext(handlersDb()).ctx.locationId).toBe(link!.locationId);
+  });
+});
+
+describe("a till already stuck behind a row from its old shop (healed by v1.3.1)", () => {
+  /**
+   * The pilot's Till 1 as it is right now: joined, then a row written under
+   * the deleted shop sits first in its queue. Without the heal, every push is
+   * refused with TENANT_MISMATCH and the cursor never moves.
+   */
+  it("relabels the row, delivers it, and the queue drains", async () => {
+    const one = await install("Caja 1", "T1-");
+    stubCloud();
+    use(one);
+    await link();
+    const two = await install("Caja 2", "T2-");
+    stubCloud();
+    use(two);
+    await link();
+    use(two);
+
+    const ctx = tillContext(two.db).ctx;
+    const deadShop = "tenant-deleted-by-adopt";
+    const deadLocation = "location-deleted-by-adopt";
+    two.db
+      .insert(s.oplog)
+      .values({
+        opId: `op-stale-backup-${String(Date.now())}`,
+        tenantId: deadShop,
+        locationId: deadLocation,
+        terminalId: ctx.terminalId,
+        entity: "backup",
+        entityId: String(Date.now()),
+        action: "run",
+        before: null,
+        after: { atMs: Date.now(), sizeBytes: 1024 },
+        userId: null,
+        authorizedByUserId: null,
+        createdAt: new Date(),
+      })
+      .run();
+
+    /* and a real write behind it, which is what the shop is waiting for */
+    const groupId = two.db.select().from(s.productGroups).all()[0]?.id ?? null;
+    const saved = await call<{ product: { id: string } }>("catalog:save", {
+      name: "Protector Redmi 14",
+      barcode: null,
+      groupId,
+      itemType: "stocked",
+      costCents: 150,
+      priceCents: 990,
+      taxRegime: "IVA21",
+      reorderPoint: 0,
+      lowStockThreshold: 0,
+      active: true,
+    });
+
+    await send(two);
+    expect(readLink()?.lastError ?? null).toBeNull();
+
+    /* the stale row arrived under the shop, not the dead tenant */
+    const stored = cloud.entriesFor(ctx.tenantId).filter((e) => e.entity === "backup");
+    expect(stored.length).toBeGreaterThan(0);
+    expect(cloud.entriesFor(deadShop)).toHaveLength(0);
+
+    /* and the real write behind it got through to the other till */
+    await receive(one);
+    expect(one.db.select().from(s.products).where(eq(s.products.id, saved.product.id)).all()).toHaveLength(1);
+  });
+
+  it("still refuses a row for a shop this till DOES hold but is not linked to", async () => {
+    /* the heal touches only tenants that no longer exist here; anything else
+       goes out as written and the cloud's refusal stays loud */
+    const one = await install("Caja 1", "T1-");
+    stubCloud();
+    use(one);
+    await link();
+    use(one);
+
+    const ctx = tillContext(one.db).ctx;
+    one.db.insert(s.tenants).values({ id: "tenant-real-but-foreign", name: "Otra", createdAt: new Date() }).run();
+    one.db
+      .insert(s.oplog)
+      .values({
+        opId: `op-foreign-${String(Date.now())}`,
+        tenantId: "tenant-real-but-foreign",
+        locationId: ctx.locationId,
+        terminalId: ctx.terminalId,
+        entity: "backup",
+        entityId: "x",
+        action: "run",
+        before: null,
+        after: {},
+        userId: null,
+        authorizedByUserId: null,
+        createdAt: new Date(),
+      })
+      .run();
+
+    await pushAll(one.db, { force: true });
+    expect(readLink()?.lastError).toMatch(/403/);
+  });
+});
+
+describe("which terminal a till believes it is (v1.3.1)", () => {
+  it("picks its own, even when a sibling's placeholder comes first on disk", async () => {
+    const one = await install("Caja 1", "T1-");
+    use(one);
+    const own = tillContext(one.db).ctx.terminalId;
+    const { tenantId, locationId } = tillContext(one.db).ctx;
+
+    /* a placeholder for another till, forced to sort first by rowid AND by id
+       AND by creation date: the old `limit(1)` would have returned it */
+    one.db.run(sql`
+      insert into terminals (rowid, id, tenant_id, location_id, name, created_at)
+      values (0, '00000000-sibling', ${tenantId}, ${locationId}, '00000000', 0)`);
+
+    resetTillContext();
+    expect(tillContext(one.db).ctx.terminalId).toBe(own);
   });
 });

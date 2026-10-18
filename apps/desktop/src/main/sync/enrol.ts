@@ -18,7 +18,7 @@ import {
   type MutationCtx,
 } from "@arkom/core";
 import type { ArkomDb } from "@arkom/db";
-import { tillContext } from "../context";
+import { resetTillContext, tillContext } from "../context";
 import { getSettings } from "../repos/settings";
 import { clearLink, readLink, writeLink } from "./link";
 import { pushAll, syncStatus, type SyncStatus } from "./push";
@@ -94,6 +94,20 @@ export async function enrol(
       { tenantId: body.tenantId, locationId: body.locationId, shopName: body.shopName },
     );
     parkedAtSeq = moved.parkedAtSeq;
+
+    /*
+     * Forget the identity this process had cached. NOT optional, and found on a
+     * live shop: `adopt()` rewrote the tenant and location in the database, but
+     * every handler and the backup timer read them through `tillContext()`,
+     * which still held the shop this till founded at first run — a shop that
+     * `adopt()` had just deleted. The screens then searched for products under
+     * a tenant that no longer existed and showed none. Worse, the backup the
+     * app writes on its way out logs ONLY an oplog row, with no business table
+     * whose foreign key could refuse it, so it was recorded under the dead
+     * tenant; the cloud then refused every batch that began with it
+     * (TENANT_MISMATCH) and nothing this till did after joining ever left it.
+     */
+    resetTillContext();
     console.info(
       `[sync] joined shop ${moved.toTenantId}: discarded ${moved.discarded} rows of its own, ` +
         `parked the oplog at seq ${moved.parkedAtSeq}`,

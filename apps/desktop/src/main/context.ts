@@ -3,6 +3,7 @@
  * the local DB and reused by every handler as the MutationCtx for mutate().
  */
 import { appError, type MetaContextResponse, type MutationCtx } from "@arkom/core";
+import { asc, eq, sql } from "drizzle-orm";
 import { schema, type ArkomDb } from "@arkom/db";
 
 export interface TillContext {
@@ -20,9 +21,42 @@ export function resetTillContext(): void {
 
 export function tillContext(db: ArkomDb): TillContext {
   if (cached) return cached;
-  const tenant = db.select().from(schema.tenants).limit(1).all()[0];
-  const location = db.select().from(schema.locations).limit(1).all()[0];
-  const terminal = db.select().from(schema.terminals).limit(1).all()[0];
+  /*
+   * Which terminal is THIS till — chosen, not "the first row".
+   *
+   * Until ADR-0022 a till's database held exactly one terminal, so `limit(1)`
+   * was an answer. It no longer is: a till that receives a sibling's stock
+   * movements stores a placeholder row for that sibling (`ensureTerminal` in
+   * sync/apply.ts), and an unordered `limit(1)` returns whichever row SQLite
+   * scans first. Today that is insertion order, which happens to be right —
+   * proved on the pilot's machine before restarting it — but a till that took
+   * another till's identity would number its receipts from nobody's series and
+   * push under somebody else's name.
+   *
+   * The rule: this till's terminal is the one that owns number series, because
+   * first-run setup creates the five series for its own terminal and nothing
+   * ever creates a series for a placeholder. Earliest-created is the fallback,
+   * for a database old enough to predate series. The tenant and location come
+   * from that terminal's own row rather than from separate `limit(1)`s, so the
+   * three can never disagree.
+   */
+  const terminal =
+    db
+      .select()
+      .from(schema.terminals)
+      .where(
+        sql`exists (select 1 from ${schema.numberSeries} s where s.terminal_id = ${schema.terminals.id})`,
+      )
+      .orderBy(asc(schema.terminals.createdAt))
+      .limit(1)
+      .all()[0] ??
+    db.select().from(schema.terminals).orderBy(asc(schema.terminals.createdAt)).limit(1).all()[0];
+  const tenant = terminal
+    ? db.select().from(schema.tenants).where(eq(schema.tenants.id, terminal.tenantId)).all()[0]
+    : undefined;
+  const location = terminal
+    ? db.select().from(schema.locations).where(eq(schema.locations.id, terminal.locationId)).all()[0]
+    : undefined;
   if (!tenant || !location || !terminal) {
     // a packaged install reaches this only before first-run setup completes
     throw appError("VALIDATION", "Esta caja aún no está configurada.");
