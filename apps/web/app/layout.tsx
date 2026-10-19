@@ -25,13 +25,22 @@ const display = Archivo_Black({
 /* the tab title and the description follow the staff language too */
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getT();
-  return { title: BRAND.productName, description: t("meta.description") };
+  return {
+    title: BRAND.productName,
+    description: t("meta.description"),
+    /* <meta name="google" content="notranslate"> — the second half of the
+       translate="no" on <html>, which some Chrome versions check instead */
+    other: { google: "notranslate" },
+  };
 }
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const { locale } = await getT();
   return (
-    <html lang={locale} className={`${sans.variable} ${display.variable}`}>
+    /* translate="no": our ES/EN buttons are the translator. Chrome's machine
+       translation on top of them is what produced "Boxes" and "Go out" — see
+       localeFromAcceptLanguage in src/i18n/server.ts */
+    <html lang={locale} translate="no" className={`${sans.variable} ${display.variable} notranslate`}>
       <body>{children}</body>
     </html>
   );
