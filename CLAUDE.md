@@ -269,7 +269,8 @@ Cloud-only, from `apps/web`: `db:generate` /
 `db:migrate` (its own Postgres lineage, never the till's), `cloud:code` (issue an enrolment
 code), `cloud:audit -- "<account>"` (rebuild one account from its raw stream and check every
 dashboard screen against it; read-only, refuses an account that matches nothing — run it
-beside `cloud:reconcile` before any deploy), `cloud:shops` (which shops exist, with ids and what they hold — run it before
+beside `cloud:reconcile` before any deploy), `cloud:live-probe` (a throwaway shop with two
+fake tills against the deployed cloud: times push → poke → row servable, then deletes itself), `cloud:shops` (which shops exist, with ids and what they hold — run it before
 `cloud:delete-tenant` or `cloud:merge-shops`, and `-- --tenant <id>` lists one shop's products
 and on-hand), `cloud:merge-shops` (fold a pre-ADR-0022 duplicate shop into the real one; dry
 run by default, writes a rollback file, `--undo` puts it back), `cloud:delete-tenant`

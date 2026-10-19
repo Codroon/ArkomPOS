@@ -207,7 +207,16 @@ export function prepareBatch(rows: readonly SyncableOplogRow[], limit = SYNC_BAT
  * hole behind the cursor. The price is a few seconds of lag that nobody
  * standing at a counter can perceive.
  */
-export const SYNC_SETTLE_MS = 5_000;
+/*
+ * ZERO since ADR-0024 §4. `recordBatch` takes a per-shop advisory lock for its
+ * whole transaction, so one shop's rows commit in `ingest_seq` order and a
+ * committed row never has an uncommitted one behind it. The race above cannot
+ * happen any more, so there is nothing to wait out — and at zero the pull
+ * applies no time filter at all, because `received_at` comes from whichever
+ * server took the push and filtering on another machine's clock would reopen
+ * the hole from the other side. Kept as a constant so the history reads.
+ */
+export const SYNC_SETTLE_MS = 0;
 
 /** How many entries one pull may carry. Same reasoning as {@link SYNC_BATCH_SIZE}. */
 export const SYNC_PULL_LIMIT = 500;

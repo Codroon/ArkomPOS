@@ -11,8 +11,8 @@
  *     re-pushes them and the echo never stops;
  *   · **only shared entities travel**, or a till is handed another till's
  *     printer, shift or invoice number;
- *   · **only settled rows travel**, or the cursor steps over a row whose
- *     transaction committed late and a sale is silently missing from one till;
+ *   · **nothing committed is ever behind the cursor** — since ADR-0024 §4 by
+ *     a per-shop ingest lock rather than a five-second wait;
  *   · **the cursor is the server's answer**, because only the server knows
  *     whether the batch was cut short by `limit`.
  */
@@ -231,53 +231,39 @@ describe("what comes back", () => {
   });
 });
 
-describe("the settle window (§4) — the cursor must not step over a late commit", () => {
-  it("does not serve a row that arrived a moment ago", async () => {
-    const justNow = new Date(NOW.getTime() - 1_000);
+describe("a row is served the moment it is stored (ADR-0024 §4, superseding ADR-0022 §4)", () => {
+  /*
+   * The five-second settle window existed because two concurrent pushes could
+   * commit out of `ingest_seq` order. `recordBatch` now holds a per-shop lock
+   * until commit, so they cannot — proved against Postgres in
+   * `ingest-order.integration.test.ts`, which fails without the lock. What is
+   * pinned here is that the pull no longer waits, and no longer trusts a clock.
+   */
+  it("has no settle window left", () => {
+    expect(SYNC_SETTLE_MS).toBe(0);
+  });
+
+  it("serves a row that arrived a moment ago", async () => {
+    const justNow = new Date(NOW.getTime() - 50);
     const { store, me } = await shopWithTwoTills([op()], justNow);
 
     const res = await get(store, me.token);
-    expect(res.body.entries).toHaveLength(0);
-    /* and the cursor does NOT move past it, or it would never be served */
-    expect(res.body.cursor).toBe(0);
-  });
-
-  it("serves it once the window has passed", async () => {
-    const edge = new Date(NOW.getTime() - SYNC_SETTLE_MS - 1);
-    const { store, me } = await shopWithTwoTills([op()], edge);
-
-    const res = await get(store, me.token);
     expect(res.body.entries).toHaveLength(1);
+    expect(res.body.cursor).toBe(1);
   });
 
-  it("holds the cursor behind an unsettled row even when later rows are shared", async () => {
+  it("does not let a server whose clock runs ahead hide a row behind the cursor", async () => {
     /*
-     * The real shape of the bug: settled rows exist, and an unsettled one sits
-     * among them. The frontier must stop at the settled ones, never jump past
-     * the row still in flight.
+     * `received_at` is stamped by whichever server took the push. Filtering on
+     * it would let a row stamped "in the future" be withheld while a later row
+     * stamped by a slower clock moved the cursor past it — the very hole the
+     * window was meant to close. So there is no time filter at all.
      */
-    const { store, them, me } = await shopWithTwoTills([op(), op()]);
-    await store.recordBatch({
-      device: them.device,
-      ops: [op()],
-      appVersion: "1.3.0",
-      now: new Date(NOW.getTime() - 500),
-    });
+    const { store, them, me } = await shopWithTwoTills([op()], new Date(NOW.getTime() + 3_000));
+    await store.recordBatch({ device: them.device, ops: [op()], appVersion: "1.4.0", now: new Date(NOW.getTime() - 1_000) });
 
     const res = await get(store, me.token);
-    expect(res.body.entries).toHaveLength(2);
-    /* the frontier is the second row, not the third */
-    expect(res.body.cursor).toBe(2);
-    expect(res.body.more).toBe(false);
-
-    /* and the third is served on the next tick, once it has settled */
-    const later = new Date(NOW.getTime() + 10_000);
-    const next = await pull(
-      store,
-      { authorization: `Bearer ${me.token}`, query: ask({ afterIngestSeq: res.body.cursor }) },
-      later,
-    );
-    expect(next.body.entries).toHaveLength(1);
+    expect(res.body.entries.map((e: { ingestSeq: number }) => e.ingestSeq)).toEqual([1, 2]);
   });
 });
 
