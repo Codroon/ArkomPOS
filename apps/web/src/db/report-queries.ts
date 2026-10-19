@@ -600,16 +600,42 @@ export async function outstandingCredit(
     status: string;
     created_at: string | null;
   }>(sql`
-    with vouchers as (${latest(accountId, "store_credit_voucher")})
-    select v.id                       as id,
-           (v.row->>'amountCents')::bigint    as amount_cents,
-           (v.row->>'remainingCents')::bigint as remaining_cents,
-           coalesce(v.row->>'status', '—')    as status,
-           case when v.row->>'createdAt' is null then null
-                else to_timestamp((v.row->>'createdAt')::bigint / 1000.0) end as created_at
-    from vouchers v
-    where coalesce((v.row->>'remainingCents')::bigint, 0) > 0
-    order by (v.row->>'createdAt')::bigint desc nulls last
+    with vouchers as (${latest(accountId, "store_credit_voucher")}),
+    /*
+     * What each voucher has paid for — ADR-0023 §4.
+     *
+     * Since v1.3.0 the redemption ledger is the truth and the voucher's own
+     * remainingCents is a cache each till recomputes. Reading the cache here
+     * would show whichever till pushed last — after two tills each spent part
+     * of one voucher, that is one till's view, not the balance. So the balance
+     * is derived here exactly as the tills derive it: face value minus every
+     * redemption, never below zero. A voucher with no ledger rows predates the
+     * ledger (backfilled on the tills by migration 0017) and keeps its stored
+     * figure until its rows arrive.
+     */
+    spent as (
+      select r.row->>'voucherId' as voucher_id, sum((r.row->>'amountCents')::bigint) as cents
+      from (${latest(accountId, "voucher_redemption")}) r
+      group by 1
+    ),
+    balances as (
+      select v.id,
+             (v.row->>'amountCents')::bigint as amount_cents,
+             case when s.cents is null then coalesce((v.row->>'remainingCents')::bigint, 0)
+                  else greatest(0, (v.row->>'amountCents')::bigint - s.cents) end as remaining_cents,
+             case when v.row->>'voidReason' is not null then 'void'
+                  when s.cents is not null and s.cents >= (v.row->>'amountCents')::bigint then 'redeemed'
+                  else coalesce(v.row->>'status', '—') end as status,
+             v.row->>'createdAt' as created_ms
+      from vouchers v
+      left join spent s on s.voucher_id = v.id
+    )
+    select b.id, b.amount_cents, b.remaining_cents, b.status,
+           case when b.created_ms is null then null
+                else to_timestamp(b.created_ms::bigint / 1000.0) end as created_at
+    from balances b
+    where b.remaining_cents > 0 and b.status <> 'void'
+    order by b.created_ms::bigint desc nulls last
   `);
 
   return rows.map((r) => ({
