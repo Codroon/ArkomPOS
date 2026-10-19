@@ -82,19 +82,62 @@ export type TillFilter = string | null | undefined;
 
 export function folded(accountId: string, entity: string, terminalId?: TillFilter): SQL {
   const till = terminalId ? sql`and e.terminal_id = ${terminalId}` : sql``;
+  /*
+   * Two rules this function got wrong, both found on the pilot shop.
+   *
+   * 1. **A deletion is a fact.** The till records one as an op with no `after`:
+   *    a line taken out of the cart, a product removed, a barcode dropped, a
+   *    part taken off a repair. The first version folded only the keys of each
+   *    `after`, so a deletion contributed nothing and the row lived on under its
+   *    old values. A receipt for one phone showed every item the cashier had
+   *    scanned and taken back out; its total, read from the receipt itself, was
+   *    right the whole time, which is why no check of totals ever caught it.
+   *    Now the newest op decides whether the row exists, and a row deleted and
+   *    later re-created takes its fields only from after the deletion.
+   *
+   * 2. **"Newest" means by time, not by a till's own counter.** `seq` is per
+   *    till (ADR-0005), so ordering by it was right while one till wrote each
+   *    row and silently wrong once two tills edit the same product (ADR-0022).
+   *    The till's clock orders across tills; `seq` breaks ties inside one till's
+   *    transaction, where every op shares the same instant. This is the same
+   *    last-writer-wins rule the tills apply to each other (`laterWins`).
+   */
   return sql`
+    with ops as (
+      select e.entity_id, e.seq, e.after,
+             row_number() over (
+               partition by e.entity_id order by e.created_at desc, e.seq desc
+             ) as recency
+      from sync_entries e
+      where e.tenant_id in (select t.id from tenants t where t.account_id = ${accountId})
+        and e.entity = ${entity}
+        ${till}
+    ),
+    /* the most recent deletion of each row: everything older is history */
+    cut as (
+      select entity_id, min(recency) as deleted_rank
+      from ops
+      where after is null or jsonb_typeof(after) = 'null'
+      group by entity_id
+    ),
+    alive as (
+      select o.*
+      from ops o
+      left join cut c using (entity_id)
+      where c.deleted_rank is null or o.recency < c.deleted_rank
+    )
     select f.entity_id as id,
            jsonb_object_agg(f.key, f.value) as row,
            f.first_seq,
            f.last_seq
     from (
-      select distinct on (e.entity_id, kv.key)
-        e.entity_id, kv.key, kv.value,
-        /* windows are computed before DISTINCT ON, so these see every op */
-        min(e.seq) over (partition by e.entity_id) as first_seq,
-        max(e.seq) over (partition by e.entity_id) as last_seq
-      from sync_entries e
-      cross join lateral jsonb_each(coalesce(e.after, '{}'::jsonb)) as raw(key, value)
+      select distinct on (a.entity_id, kv.key)
+        a.entity_id, kv.key, kv.value,
+        /* windows are computed before DISTINCT ON, so these see every live op */
+        min(a.seq) over (partition by a.entity_id) as first_seq,
+        max(a.seq) over (partition by a.entity_id) as last_seq
+      from alive a
+      cross join lateral jsonb_each(coalesce(a.after, '{}'::jsonb)) as raw(key, value)
       /* a date in a folded row is ALWAYS epoch millis — see the note above */
       cross join lateral (
         select raw.key as key,
@@ -108,11 +151,8 @@ export function folded(accountId: string, entity: string, terminalId?: TillFilte
                  else raw.value
                end as value
       ) as kv
-      where e.tenant_id in (select t.id from tenants t where t.account_id = ${accountId})
-        and e.entity = ${entity}
-        ${till}
-      /* newest op that mentioned this field, for this row */
-      order by e.entity_id, kv.key, e.seq desc
+      /* newest live op that mentioned this field, for this row */
+      order by a.entity_id, kv.key, a.recency asc
     ) f
     group by f.entity_id, f.first_seq, f.last_seq
   `;
