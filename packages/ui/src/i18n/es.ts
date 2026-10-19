@@ -160,6 +160,8 @@ export const es = {
 
   /* inventory */
   "inv.title": "Inventario",
+  /* a movement made by a person who works at the shop's other till */
+  "inv.otherTill": "Otra caja",
   "inv.valuation": "Valoración total",
   "inv.valuationSuffix": "(a coste)",
   "inv.belowMinOne": "1 artículo bajo mínimo",

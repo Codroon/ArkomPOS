@@ -158,6 +158,7 @@ export const en: Record<TKey, string> = {
 
   /* inventory */
   "inv.title": "Inventory",
+  "inv.otherTill": "Another till",
   "inv.valuation": "Total valuation",
   "inv.valuationSuffix": "(at cost)",
   "inv.belowMinOne": "1 item below minimum",

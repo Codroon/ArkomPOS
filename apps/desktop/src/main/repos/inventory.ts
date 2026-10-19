@@ -29,7 +29,7 @@ import { schema, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner } from "../mutate-runner";
 import { resolveScanCode } from "./scan";
 
-const { products, productGroups, productStock, stockMovements, units, documents } = schema;
+const { products, productGroups, productStock, stockMovements, units, documents, users } = schema;
 
 const MOVEMENTS_PAGE = 50;
 
@@ -98,10 +98,13 @@ export function listMovements(
       documentType: documents.docType,
       imei: units.imei,
       userId: stockMovements.userId,
+      userName: users.name,
+      terminalId: stockMovements.terminalId,
     })
     .from(stockMovements)
     .leftJoin(documents, eq(stockMovements.documentId, documents.id))
     .leftJoin(units, eq(stockMovements.unitId, units.id))
+    .leftJoin(users, eq(stockMovements.userId, users.id))
     .where(and(...conds))
     .orderBy(desc(stockMovements.id))
     .limit(MOVEMENTS_PAGE + 1)
@@ -119,6 +122,8 @@ export function listMovements(
     documentType: r.documentType,
     imei: r.imei,
     userId: r.userId,
+    userName: r.userName ?? null,
+    otherTill: r.terminalId !== ctx.terminalId,
   }));
   return { rows, nextCursor: hasMore ? rows[rows.length - 1]!.id : null };
 }

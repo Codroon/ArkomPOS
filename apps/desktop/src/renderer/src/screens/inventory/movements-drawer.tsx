@@ -165,7 +165,9 @@ export function MovementsDrawer({ product, onClose }: { product: InventoryRow; o
                           <span className="text-muted">{t("common.dash")}</span>
                         )}
                       </td>
-                      <td className="px-1.5 py-1.5 text-subtle">{m.userId ?? t("common.dash")}</td>
+                      <td className="px-1.5 py-1.5 text-subtle">
+                        {m.userName ?? (m.otherTill ? t("inv.otherTill") : t("common.dash"))}
+                      </td>
                     </tr>
                   );
                 })}

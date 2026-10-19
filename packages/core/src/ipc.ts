@@ -484,6 +484,14 @@ export const MovementRowSchema = z.object({
   documentType: z.string().nullable(),
   imei: z.string().nullable(),
   userId: z.string().nullable(), // "—" until auth (ADR-0010)
+  /**
+   * Who did it, as a person reads it. The panel used to print `userId` itself —
+   * a UUID where a cashier expected a name — and nobody noticed until a second
+   * till made it obvious. NULL when this till does not know the person.
+   */
+  userName: z.string().nullable(),
+  /** written by a sibling till (ADR-0022): its staff and its receipts live there */
+  otherTill: z.boolean(),
 });
 export type MovementRow = z.infer<typeof MovementRowSchema>;
 export const InventoryMovementsResponseSchema = z.object({

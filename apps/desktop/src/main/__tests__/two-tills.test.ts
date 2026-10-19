@@ -1526,3 +1526,64 @@ describe("which terminal a till believes it is (v1.3.1)", () => {
     expect(tillContext(one.db).ctx.terminalId).toBe(own);
   });
 });
+
+describe("who moved the stock, as a person reads it", () => {
+  /**
+   * The stock-movements panel printed the staff member's internal ID — a UUID
+   * where a cashier expected a name. It did so on every movement, on every till,
+   * since the panel was written; a second till only made it impossible to miss.
+   */
+  it("shows the name on the till where it happened, and 'another till' elsewhere", async () => {
+    const one = await install("Caja 1", "T1-");
+    stubCloud();
+    use(one);
+    await link();
+    const two = await install("Caja 2", "T2-");
+    stubCloud();
+    use(two);
+    await link();
+
+    use(one);
+    const groupId = one.db.select().from(s.productGroups).all()[0]!.id;
+    const saved = await call<{ product: { id: string } }>("catalog:save", {
+      name: "Funda Pixel 9",
+      barcode: null,
+      groupId,
+      itemType: "stocked",
+      costCents: 300,
+      priceCents: 1200,
+      taxRegime: "IVA21",
+      reorderPoint: 0,
+      lowStockThreshold: 0,
+      active: true,
+    });
+    const supplier = await call<{ id: string }>("supplier:create", { name: "Distribuidora" });
+    await call("stock:add", {
+      entries: [{ productId: saved.product.id, supplierId: supplier.id, qty: 4, unitCostCents: 300, imeis: [] }],
+    });
+
+    type Moves = { rows: { userId: string | null; userName: string | null; otherTill: boolean }[] };
+    const here = await call<Moves>("inventory:movements", { productId: saved.product.id });
+    expect(here.rows[0]?.userName).toBe("Ahmer");
+    expect(here.rows[0]?.otherTill).toBe(false);
+
+    await send(one);
+    await receive(two);
+
+    const there = await call<Moves>("inventory:movements", { productId: saved.product.id });
+    expect(there.rows).toHaveLength(1);
+    expect(there.rows[0]?.otherTill).toBe(true);
+    /* nobody called Ahmer works on this till's records, so no name is invented */
+    expect(there.rows[0]?.userName).toBeNull();
+  });
+
+  it("never puts an ID where the panel shows a person", () => {
+    const { readFileSync } = require("node:fs") as typeof import("node:fs");
+    const drawer = readFileSync(
+      new URL("../../renderer/src/screens/inventory/movements-drawer.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(drawer).not.toMatch(/\{\s*m\.userId\b/);
+    expect(drawer).toContain("m.userName");
+  });
+});
