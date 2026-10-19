@@ -82,6 +82,8 @@ try {
 
   const b = live ? await listen(live.topic) : null;
 
+  const productId = id();
+  let served = [];
   const t0 = Date.now();
   const push = await fetch(new URL("/api/sync", BASE), {
     method: "POST",
@@ -90,14 +92,20 @@ try {
       tenantId: tenant,
       terminalId: termA,
       appVersion: "1.4.0",
-      ops: [{ seq: 1, opId: id(), tenantId: tenant, locationId: "loc", terminalId: termA, entity: "product", entityId: id(),
-              action: "create", before: null, after: { name: "Probe product", priceCents: 100 }, userId: null,
-              authorizedByUserId: null, createdAtMs: Date.now() }],
+      ops: [
+        { seq: 1, opId: id(), tenantId: tenant, locationId: "loc", terminalId: termA, entity: "product", entityId: productId,
+          action: "create", before: null, after: { name: "Probe product", priceCents: 100 }, userId: null,
+          authorizedByUserId: null, createdAtMs: Date.now() },
+        /* a pin (ADR-0025) must travel like the catalogue it points into */
+        { seq: 2, opId: id(), tenantId: tenant, locationId: "loc", terminalId: termA, entity: "product_favourite", entityId: productId,
+          action: "pin", before: null, after: { id: productId, tenantId: tenant, productId, position: 1 }, userId: null,
+          authorizedByUserId: null, createdAtMs: Date.now() },
+      ],
     }),
   });
   const ack = await push.json();
   const tPushed = Date.now();
-  check(push.status === 200 && ack.ackedSeq === 1, `push stored and acked (${push.status}, ackedSeq ${ack.ackedSeq})`);
+  check(push.status === 200 && ack.ackedSeq === 2, `push stored and acked (${push.status}, ackedSeq ${ack.ackedSeq})`);
   check(typeof ack.pokeTag === "string", "push answer names its poke");
 
   /* when does B hear it, and when can B actually pull the row? */
@@ -107,7 +115,10 @@ try {
     if (heardAt === null && b?.pokes.length) heardAt = b.pokes[0].at;
     if (servedAt === null) {
       const p = await pull(tokB, termB, first.body.cursor);
-      if (p.body.entries?.length) servedAt = Date.now();
+      if (p.body.entries?.length) {
+        servedAt = Date.now();
+        served = p.body.entries;
+      }
     }
     await new Promise((r) => setTimeout(r, 150));
   }
@@ -115,6 +126,7 @@ try {
   console.log(`  push sent -> poke heard:     ${heardAt ? heardAt - t0 + " ms" : "never"}`);
   console.log(`  push sent -> row servable:   ${servedAt ? servedAt - t0 + " ms" : "never (15 s)"}`);
   check(heardAt !== null, "the other till heard the poke");
+  check(served.some((e) => e.entity === "product_favourite"), "a pin travels to the other till");
   check(b?.pokes[0]?.tag === ack.pokeTag, "the poke carries the push's tag and nothing else");
   b?.ws.close();
 } catch (err) {
