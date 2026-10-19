@@ -71,6 +71,9 @@ business rows + `product_stock` cache + `oplog` entry → typed result back.
 | `print:savePdf` | {docId, kind, what?, copy} → saved \| cancelled | v0.17.0; save dialog; nothing is filed per sale any more |
 | `print:testDrawer` | — → {ok} | `settings.edit`; a pulse through the configured command set |
 | `docs:list` | filters → rows | read-only flat list of completed documents |
+| `sale:quickPicks` | — → {favourites, bestSellers, days} | v1.5.0; `sale.create`; favourites in the shop's order; best sellers computed from the shared stock ledger, 30 days, top 20 (ADR-0025) |
+| `favourites:toggle` | {productId, pinned} → quickPicks | v1.5.0; `authed` — anybody signed in, by the owner's decision; oplog names who (ADR-0025) |
+| `favourites:reorder` | {productIds} → quickPicks | v1.5.0; `authed`; writes only the pins whose position moved |
 | `terminal:rename` | {name} → {name} | v1.4.0; `settings.edit`; the till's NAME through `mutate()` — the series is untouched and has no write channel (ADR-0024 §1) |
 | `shop:changed` (event, main → renderer) | {entities} | v1.4.0; sent when a sibling's rows land, so screens showing them read again through their own guarded channels. Carries entity names only (ADR-0024 §3) |
 | `settings:series` | — → series + regimes | DISPLAY ONLY for the series; the general rate shown is `settings.vatRateBp` (ADR-0007 A1) and is saved through `settings:save` like any setting. There is no series write channel and there must not be |

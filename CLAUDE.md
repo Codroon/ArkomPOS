@@ -29,6 +29,9 @@ photographs never leave the shop.
 Since v0.18.2 first run is a four-step wizard (language → shop → owner + recovery code →
 printer, skippable) and the landing screen carries a fact-driven, dismissible checklist
 (`setup:checklist`). `pnpm fresh` archives this machine's dev data and reopens onboarding.
+Since v1.5.0 the Sale screen opens on **Favourites** (anybody signed in pins with the star and
+drags to reorder; the shop's, on every till) and **Best sellers** (top 20 over 30 days, computed
+from the shared stock ledger, never stored) — ADR-0025.
 Since v1.4.0 a till can be **renamed** (never renumbered), the other till's people and till
 show by NAME, a repair taken at one counter can be found and opened at the other (its `R-`
 number travels with it), and a sale reaches the other counter and the dashboard in about a
@@ -152,7 +155,7 @@ Schema already anticipates them — build nothing for them.
   shop's own tills, so it is a courier and never a writer (ADR-0022 §2).
 - **A shop's tills share a catalogue, a stock ledger, its repairs and its store credit;
   everything else is per-till.** `SHARED_ENTITIES` in `@arkom/core` is the whole list —
-  product_group, product, product_code, supplier, customer, unit, stock_movement,
+  product_group, product, product_code, product_favourite (ADR-0025), supplier, customer, unit, stock_movement,
   store_credit_voucher, voucher_redemption, repair_ticket, repair_line, repair_approval,
   repair_notification — and a test pins it. Settings are NOT shared (the printer is a
   setting), nor are users/PINs, documents, series, shifts, the drawer, used purchases or any
