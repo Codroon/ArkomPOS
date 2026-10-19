@@ -667,6 +667,19 @@ export const repairTickets = sqliteTable("repair_tickets", {
    * Still NOT NULL: the id is always known. Only the ROW travels.
    */
   documentId: text("document_id").notNull(),
+  /**
+   * The `R-` number on that receipt, carried on the ticket — v1.4.0, ADR-0024 §5.
+   *
+   * The document stays on the till that printed it (ADR-0023 §2), so every
+   * screen that joined it to show the number found NOTHING on the shop's other
+   * till: its repair list was empty and opening the ticket said it did not
+   * exist, which made "collect it at the other counter" impossible from the
+   * screens. The number is what the customer reads off their receipt and what
+   * staff search by, so it travels with the ticket. Named `intake_` because a
+   * collection's payload already carries a `docNumber` — the T- invoice's.
+   * NULL on a sibling's ticket written before v1.4.0.
+   */
+  intakeDocNumber: text("intake_doc_number"),
   customerId: text("customer_id").notNull().references(() => customers.id),
 
   /* ---- the device, as described. No unit, no stock, no valuation. ---- */

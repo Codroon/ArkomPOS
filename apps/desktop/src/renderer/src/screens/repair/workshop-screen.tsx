@@ -20,6 +20,7 @@ import { SelectInput, Switch, cn, useT } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
 import { openRepairTicket } from "../../lib/screen-bus";
 import { OverdueChip, STATUS_KEYS, formatPromised } from "./status-chip";
+import { useShopChanged } from "../../lib/use-shop-changed";
 
 const TERMINAL: RepairStatus[] = ["collected", "not_repaired"];
 
@@ -58,6 +59,8 @@ export function WorkshopScreen() {
       setError(errorMessage(t, err));
     }
   }, [technicianId, t]);
+  /* a sibling till's change lands here too, not only on the next visit (ADR-0024 §3) */
+  useShopChanged(refresh, ["repair_ticket", "repair_line", "repair_approval", "repair_notification"]);
 
   useEffect(() => {
     void refresh();

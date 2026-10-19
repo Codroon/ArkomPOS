@@ -18,7 +18,9 @@ import { signOutAction } from "../../src/auth/actions";
 import { getT } from "../../src/i18n/server";
 import { RAIL_COOKIE } from "../../src/lib/prefs";
 import { PanelChrome, type ChromeLabels } from "./chrome";
-import { tillsForAccount } from "../../src/db/panel-queries";
+import { shopIdsForAccount, tillsForAccount } from "../../src/db/panel-queries";
+import { liveConfig, liveFor } from "../../src/sync/live";
+import { LiveRefresh } from "./live-refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +32,10 @@ export default async function PanelLayout({ children }: { children: ReactNode })
      here because the chrome is a client component and this is one query the
      whole panel shares rather than one per screen. */
   const tills = await tillsForAccount(account.id, locale);
+  /* where this account's tills announce a push, so an open page redraws within
+     a second or two instead of when somebody reloads it (ADR-0024 §3) */
+  const live = liveConfig();
+  const channels = (await shopIdsForAccount(account.id)).flatMap((id) => liveFor(live, id) ?? []);
 
   const labels: ChromeLabels = {
     brand: t("app.brand"),
@@ -95,6 +101,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
       >
         {children}
       </PanelChrome>
+      <LiveRefresh channels={channels} />
     </Suspense>
   );
 }

@@ -5,13 +5,20 @@
  */
 import { schema, type ArkomDb } from "@arkom/db";
 import type { MutateRunner, OplogEntry } from "@arkom/core";
+import { localWriteHappened } from "./sync/outbox-signal";
 
 /** The transaction handle drizzle passes to better-sqlite3 transaction callbacks. */
 export type DbTx = Parameters<Parameters<ArkomDb["transaction"]>[0]>[0];
 
 export function makeMutateRunner(db: ArkomDb): MutateRunner<DbTx> {
   return {
-    transaction: (fn) => db.transaction((tx) => fn(tx)),
+    transaction: (fn) => {
+      const result = db.transaction((tx) => fn(tx));
+      /* committed: the outbox may send it now (ADR-0024 §3). After, never
+         inside — a push that read the oplog mid-transaction would find nothing. */
+      localWriteHappened();
+      return result;
+    },
     writeOplog: (tx, entries: OplogEntry[]) => {
       for (const e of entries) {
         tx.insert(schema.oplog)

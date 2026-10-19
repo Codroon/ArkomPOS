@@ -66,8 +66,10 @@ function link(over: Partial<ReturnType<typeof readLink> & object> = {}) {
     lastAckedSeq: 0,
     lastPushAtMs: null,
     lastError: null,
+    directory: { tills: [], staff: [] },
+    live: null,
     ...over,
-  });
+  } as Parameters<typeof writeLink>[0]);
 }
 
 /** A cloud that answers however the case needs it to. */

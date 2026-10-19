@@ -54,7 +54,7 @@ export function pgStore(handle?: CloudDb): CloudStore {
       return (rows[0] as DeviceRow | undefined) ?? null;
     },
 
-    async recordBatch({ device, ops, appVersion, now }: RecordBatchInput): Promise<RecordBatchResult> {
+    async recordBatch({ device, ops, appVersion, now, terminalName }: RecordBatchInput): Promise<RecordBatchResult> {
       if (ops.length === 0) {
         return { stored: 0, duplicates: 0, ackedSeq: device.lastAckedSeq };
       }
@@ -84,6 +84,20 @@ export function pgStore(handle?: CloudDb): CloudStore {
       }));
 
       return db().transaction(async (tx) => {
+        /*
+         * One shop's ingests, one at a time — ADR-0024 §4.
+         *
+         * `ingest_seq` is taken at INSERT and becomes visible at COMMIT, so two
+         * concurrent pushes from one shop could commit out of order and a pull
+         * between the two commits would step over the lower row for ever. That
+         * is why the pull used to wait five seconds. Held until commit, this
+         * lock means the next push for the shop cannot take a number until this
+         * one's rows are visible — so a committed row never has a hole behind
+         * it, and the pull can serve the moment it lands. Other shops are not
+         * held up: the key is the tenant.
+         */
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${device.tenantId}, 0))`);
+
         const inserted = await tx
           .insert(syncEntries)
           .values(values)
@@ -99,6 +113,7 @@ export function pgStore(handle?: CloudDb): CloudStore {
             lastAckedSeq: Math.max(device.lastAckedSeq, ackedSeq),
             lastPushAt: now,
             appVersion,
+            ...(terminalName ? { terminalName } : {}),
           })
           .where(eq(devices.id, device.id));
 
@@ -304,7 +319,12 @@ export function pgStore(handle?: CloudDb): CloudStore {
       const frontierRow = await handle
         .select({ seq: sql<number>`coalesce(max(${syncEntries.ingestSeq}), 0)::bigint` })
         .from(syncEntries)
-        .where(and(eq(syncEntries.tenantId, device.tenantId), lt(syncEntries.receivedAt, settleBefore)));
+        .where(
+          and(
+            eq(syncEntries.tenantId, device.tenantId),
+            settleBefore ? lt(syncEntries.receivedAt, settleBefore) : undefined,
+          ),
+        );
       const frontier = Number(frontierRow[0]?.seq ?? 0);
 
       const rows = await handle
@@ -329,7 +349,7 @@ export function pgStore(handle?: CloudDb): CloudStore {
           and(
             eq(syncEntries.tenantId, device.tenantId),
             gt(syncEntries.ingestSeq, afterIngestSeq),
-            lt(syncEntries.receivedAt, settleBefore),
+            settleBefore ? lt(syncEntries.receivedAt, settleBefore) : undefined,
             /* never the caller's own rows: a till that re-applied what it wrote
                would push it again, and the echo would never stop (ADR-0022 §6) */
             ne(syncEntries.deviceId, device.id),
@@ -361,6 +381,27 @@ export function pgStore(handle?: CloudDb): CloudStore {
         })),
         cursor: truncated ? Number(page[page.length - 1]!.ingestSeq) : Math.max(frontier, afterIngestSeq),
         more: truncated,
+      };
+    },
+
+    async directory(tenantId) {
+      const handle = db();
+      const tills = await handle
+        .select({ terminalId: devices.terminalId, name: devices.terminalName })
+        .from(devices)
+        .where(eq(devices.tenantId, tenantId));
+      /* a person's latest name, folded from the stream by entity id — never by
+         the payload's own id, which a partial update does not carry (fold.ts) */
+      const staff = await handle.execute<{ userId: string; name: string }>(sql`
+        select distinct on (e.entity_id) e.entity_id as "userId", e.after->>'name' as name
+        from ${syncEntries} e
+        where e.tenant_id = ${tenantId}
+          and e.entity = 'user'
+          and jsonb_typeof(e.after->'name') = 'string'
+        order by e.entity_id, e.created_at desc, e.seq desc`);
+      return {
+        tills: tills.filter((t) => t.name.trim() !== ""),
+        staff: [...staff].filter((p) => p.name.trim() !== "").map((p) => ({ userId: p.userId, name: p.name })),
       };
     },
 

@@ -57,6 +57,7 @@ import { saveRepairPhotos, discardRepairPhotos, readPhotos } from "../photos";
 import { postMovement } from "./stock-ledger";
 import { currentShiftId, requireOpenShift } from "./shift";
 import { getSettings } from "./settings";
+import { staffName } from "../people";
 
 const {
   cashMovements,
@@ -74,6 +75,13 @@ const {
   documentTenders,
   users,
 } = schema;
+
+/**
+ * A ticket's R- number: its own receipt's when this till printed it, otherwise
+ * the copy the ticket carries. Joining the receipt alone found nothing for a
+ * phone taken in at the other till — ADR-0024 §5.
+ */
+const intakeNumber = sql<string | null>`coalesce(${documents.docNumber}, ${repairTickets.intakeDocNumber})`;
 
 type Reader = ArkomDb | DbTx;
 
@@ -371,6 +379,8 @@ export async function createTicket(
         locationId: ctx.locationId,
         terminalId: ctx.terminalId,
         documentId: docRow.id,
+        /* travels with the ticket; the receipt does not (ADR-0024 §5) */
+        intakeDocNumber: allocation.docNumber,
         customerId: customer.id,
         deviceDescription: input.deviceDescription,
         imei,
@@ -479,9 +489,10 @@ export async function createTicket(
 /** The ticket rows the intake confirmation and (from slice 4) the list need. */
 export function getTicketRow(db: Reader, ctx: MutationCtx, ticketId: string) {
   const row = db
-    .select({ ticket: repairTickets, docNumber: documents.docNumber })
+    .select({ ticket: repairTickets, docNumber: intakeNumber })
     .from(repairTickets)
-    .innerJoin(documents, eq(documents.id, repairTickets.documentId))
+    /* the R- receipt may be on the till that printed it (ADR-0024 §5) */
+    .leftJoin(documents, eq(documents.id, repairTickets.documentId))
     .where(and(eq(repairTickets.tenantId, ctx.tenantId), eq(repairTickets.id, ticketId)))
     .limit(1)
     .all()[0];
@@ -492,9 +503,10 @@ export function getTicketRow(db: Reader, ctx: MutationCtx, ticketId: string) {
 /** Newest first — used by slice 4's list and by the intake screen's "recent". */
 export function recentTickets(db: ArkomDb, ctx: MutationCtx, limit = 20) {
   return db
-    .select({ ticket: repairTickets, docNumber: documents.docNumber, customerName: customers.name })
+    .select({ ticket: repairTickets, docNumber: intakeNumber, customerName: customers.name })
     .from(repairTickets)
-    .innerJoin(documents, eq(documents.id, repairTickets.documentId))
+    /* the R- receipt may be on the till that printed it (ADR-0024 §5) */
+    .leftJoin(documents, eq(documents.id, repairTickets.documentId))
     .innerJoin(customers, eq(customers.id, repairTickets.customerId))
     .where(eq(repairTickets.tenantId, ctx.tenantId))
     .orderBy(desc(repairTickets.createdAt))
@@ -520,11 +532,12 @@ export function getDetail(db: Reader, ctx: MutationCtx, ticketId: string, now: D
   const row = db
     .select({
       ticket: repairTickets,
-      docNumber: documents.docNumber,
+      docNumber: intakeNumber,
       customer: customers,
     })
     .from(repairTickets)
-    .innerJoin(documents, eq(documents.id, repairTickets.documentId))
+    /* the R- receipt may be on the till that printed it (ADR-0024 §5) */
+    .leftJoin(documents, eq(documents.id, repairTickets.documentId))
     .innerJoin(customers, eq(customers.id, repairTickets.customerId))
     .where(and(eq(repairTickets.tenantId, ctx.tenantId), eq(repairTickets.id, ticketId)))
     .limit(1)
@@ -616,7 +629,7 @@ export function getDetail(db: Reader, ctx: MutationCtx, ticketId: string, now: D
     promisedAt: t.promisedDate?.getTime() ?? null,
     promisedHalf: t.promisedHalf,
     assignedUserId: t.assignedUserId,
-    assignedUserName: assignee?.name ?? null,
+    assignedUserName: assignee?.name ?? staffName(t.assignedUserId),
 
     depositCents: t.depositCents,
     authorizedCapCents: t.authorizedCapCents,
@@ -650,14 +663,14 @@ export function getDetail(db: Reader, ctx: MutationCtx, ticketId: string, now: D
       id: a.approval.id,
       method: a.approval.method,
       approvedTotalCents: a.approval.approvedTotalCents,
-      userName: a.userName,
+      userName: a.userName ?? staffName(a.approval.userId),
       createdAt: a.approval.createdAt.getTime(),
     })),
     notifications: notifications.map((n) => ({
       id: n.notification.id,
       method: n.notification.method,
       note: n.notification.note,
-      userName: n.userName,
+      userName: n.userName ?? staffName(n.notification.userId),
       createdAt: n.notification.createdAt.getTime(),
     })),
     photos,
@@ -1101,13 +1114,14 @@ export function partsToOrder(db: ArkomDb, ctx: MutationCtx, now: Date = new Date
     .select({
       line: repairLines,
       ticket: repairTickets,
-      docNumber: documents.docNumber,
+      docNumber: intakeNumber,
       customerName: customers.name,
       supplierName: suppliers.name,
     })
     .from(repairLines)
     .innerJoin(repairTickets, eq(repairTickets.id, repairLines.ticketId))
-    .innerJoin(documents, eq(documents.id, repairTickets.documentId))
+    /* the R- receipt may be on the till that printed it (ADR-0024 §5) */
+    .leftJoin(documents, eq(documents.id, repairTickets.documentId))
     .innerJoin(customers, eq(customers.id, repairTickets.customerId))
     .leftJoin(suppliers, eq(suppliers.id, repairLines.supplierId))
     .where(
@@ -1183,13 +1197,14 @@ function ticketRows(db: Reader, ctx: MutationCtx) {
   return db
     .select({
       ticket: repairTickets,
-      docNumber: documents.docNumber,
+      docNumber: intakeNumber,
       customerName: customers.name,
       customerPhone: customers.phone,
       technicianName: users.name,
     })
     .from(repairTickets)
-    .innerJoin(documents, eq(documents.id, repairTickets.documentId))
+    /* the R- receipt may be on the till that printed it (ADR-0024 §5) */
+    .leftJoin(documents, eq(documents.id, repairTickets.documentId))
     .innerJoin(customers, eq(customers.id, repairTickets.customerId))
     .leftJoin(users, eq(users.id, repairTickets.assignedUserId))
     .where(eq(repairTickets.tenantId, ctx.tenantId))
@@ -1248,7 +1263,7 @@ export function listTickets(
     deviceDescription: r.ticket.deviceDescription,
     imei: r.ticket.imei,
     reportedFault: r.ticket.reportedFault,
-    technicianName: r.technicianName,
+    technicianName: r.technicianName ?? staffName(r.ticket.assignedUserId),
     promisedAt: r.ticket.promisedDate?.getTime() ?? null,
     promisedHalf: r.ticket.promisedHalf,
     createdAt: r.ticket.createdAt.getTime(),
@@ -1320,7 +1335,7 @@ export function board(
           deviceDescription: r.ticket.deviceDescription,
           reportedFault: r.ticket.reportedFault,
           customerName: r.customerName,
-          technicianName: r.technicianName,
+          technicianName: r.technicianName ?? staffName(r.ticket.assignedUserId),
           promisedAt: r.ticket.promisedDate?.getTime() ?? null,
           promisedHalf: r.ticket.promisedHalf,
           overdue: isOverdue(r.ticket.promisedDate, r.ticket.status, now),

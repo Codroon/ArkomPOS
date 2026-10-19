@@ -8,6 +8,7 @@ import { OwnerStep } from "./screens/auth/owner-step";
 import { AuthFrame } from "./screens/auth/login-screen";
 import { PrinterStep } from "./screens/setup/printer-step";
 import { SessionProvider, useActivityReporter, useSession } from "./lib/use-session";
+import { onContextChanged } from "./lib/context-changed";
 
 /**
  * Boot order, and it matters:
@@ -58,6 +59,9 @@ function Boot() {
   useEffect(() => {
     void evaluate();
   }, [evaluate]);
+
+  /* a rename in Ajustes reaches every header without a restart */
+  useEffect(() => onContextChanged(loadContext), [loadContext]);
 
   // a live session takes precedence over whatever the boot check concluded
   useEffect(() => {

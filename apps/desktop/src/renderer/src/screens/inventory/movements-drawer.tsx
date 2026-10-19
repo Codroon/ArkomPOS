@@ -9,6 +9,8 @@ import type { InventoryRow, MovementRow } from "@arkom/core";
 import { Chip, cn, MoneyText, useT, type ChipVariant, type TKey, useDataLabel } from "@arkom/ui";
 import { TicketPeekModal } from "../../components/ticket-peek-modal";
 import { PurchasePeekModal } from "../../components/purchase-peek-modal";
+import { useShopChanged } from "../../lib/use-shop-changed";
+import { useTillName } from "../../lib/till-name";
 
 const TYPE_KEYS: Record<string, TKey> = {
   purchase_in: "mov.entrada",
@@ -31,6 +33,7 @@ function formatShort(ms: number): string {
 
 export function MovementsDrawer({ product, onClose }: { product: InventoryRow; onClose: () => void }) {
   const t = useT();
+  const tillName = useTillName();
   const dataLabel = useDataLabel();
   const [rows, setRows] = useState<MovementRow[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -56,6 +59,8 @@ export function MovementsDrawer({ product, onClose }: { product: InventoryRow; o
     },
     [product.productId],
   );
+  /* a sibling till's change lands here too, not only on the next visit (ADR-0024 §3) */
+  useShopChanged(() => loadPage(null), ["stock_movement"]);
 
   useEffect(() => {
     setRows([]);
@@ -166,7 +171,13 @@ export function MovementsDrawer({ product, onClose }: { product: InventoryRow; o
                         )}
                       </td>
                       <td className="px-1.5 py-1.5 text-subtle">
-                        {m.userName ?? (m.otherTill ? t("inv.otherTill") : t("common.dash"))}
+                        {/* "Ahmer · Caja 1" for a movement made at the other counter
+                            (ADR-0024 §2); the till alone when the person is not known */}
+                        {m.otherTill
+                          ? [m.userName, m.tillName ? tillName(m.tillName) : t("inv.otherTill")]
+                              .filter(Boolean)
+                              .join(" · ")
+                          : (m.userName ?? t("common.dash"))}
                       </td>
                     </tr>
                   );

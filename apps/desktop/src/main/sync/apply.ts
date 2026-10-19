@@ -38,6 +38,7 @@ import {
 } from "@arkom/core";
 import { schema, type ArkomDb } from "@arkom/db";
 import type { DbTx } from "../mutate-runner";
+import { announceShopChanged } from "../shop-changed";
 import { loadFacts } from "../repos/repair";
 
 const { syncInbox, oplog, productStock, stockMovements } = schema;
@@ -505,6 +506,9 @@ export function applyInbox(db: ArkomDb, limit = APPLY_BATCH): ApplyResult {
 
   rebuildCache(db, [...touched]);
   rederive(db, [...repairs], [...vouchers]);
+
+  /* and the screens showing any of it read again (ADR-0024 §3) */
+  announceShopChanged(plans.filter((plan) => !failed.has(plan.opIds[0]!)).map((plan) => plan.entity));
 
   const pending = Number(
     db

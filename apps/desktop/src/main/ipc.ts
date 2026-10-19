@@ -124,6 +124,8 @@ import {
   DocsListRequestSchema,
   DocsListResponseSchema,
   SettingsSeriesRequestSchema,
+  TerminalRenameRequestSchema,
+  TerminalRenameResponseSchema,
   SettingsSeriesResponseSchema,
   SetupStatusRequestSchema,
   SetupStatusResponseSchema,
@@ -302,6 +304,7 @@ import { resolveScanCode } from "./repos/scan";
 import { addStock, listInventory, listMovements } from "./repos/inventory";
 import { createSupplier, listSuppliers } from "./repos/suppliers";
 import { getSettings, requireConfiguredPrinter, saveSettings } from "./repos/settings";
+import { renameTerminal } from "./repos/terminal";
 import {
   checkImei,
   getUsedDevice,
@@ -1013,6 +1016,10 @@ export function registerIpcHandlers(db: ArkomDb): void {
      be one: a series' next number is the gap-free guarantee (ADR-0008). */
   guarded("settings:series", "settings.edit", SettingsSeriesRequestSchema, SettingsSeriesResponseSchema, (s) =>
     seriesOverview(db, s.ctx),
+  );
+  /* the till's NAME; its series stays exactly as it is (ADR-0024 §1) */
+  guarded("terminal:rename", "settings.edit", TerminalRenameRequestSchema, TerminalRenameResponseSchema, (s, { name }) =>
+    renameTerminal(db, s.ctx, name),
   );
 
   /* ---- users administration ---- */

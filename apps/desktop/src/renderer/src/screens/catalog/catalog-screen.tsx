@@ -24,6 +24,7 @@ import {
   type DraftErrors,
   type ErrorText,
 } from "./model";
+import { useShopChanged } from "../../lib/use-shop-changed";
 
 interface Filters {
   groupId: string;
@@ -115,6 +116,8 @@ export function CatalogScreen() {
     // the archive filter shows the archive, not everything plus the archive
     setRows(filters.archived ? list.filter((r) => !r.active) : list);
   }, [search, filters]);
+  /* a sibling till's change lands here too, not only on the next visit (ADR-0024 §3) */
+  useShopChanged(refresh, ["product", "product_code", "product_group", "stock_movement", "unit"]);
 
   useEffect(() => {
     refresh().catch((err) => console.error("catalog:list failed", err));

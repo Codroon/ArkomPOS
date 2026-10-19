@@ -26,4 +26,15 @@ contextBridge.exposeInMainWorld("arkom", {
     ipcRenderer.on("auth:changed", listener);
     return () => ipcRenderer.removeListener("auth:changed", listener);
   },
+
+  /**
+   * The shop's shared data moved under this window — a sibling till's sale,
+   * delivery or repair just landed (ADR-0024 §3). Carries entity names only;
+   * the screen reads the data again through its own guarded channel.
+   */
+  onShopChanged: (fn: (change: { entities: string[] }) => void): (() => void) => {
+    const listener = (_e: unknown, change: { entities: string[] }) => fn(change);
+    ipcRenderer.on("shop:changed", listener);
+    return () => ipcRenderer.removeListener("shop:changed", listener);
+  },
 });

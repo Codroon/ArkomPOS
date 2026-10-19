@@ -32,6 +32,25 @@ function issues(error: { issues: ReadonlyArray<{ path: PropertyKey[]; code: stri
   return error.issues.slice(0, 8).map((i) => ({ path: i.path.join("."), code: i.code }));
 }
 
+/**
+ * The name the till gave ITSELF in this batch, if it did — ADR-0024 §1.
+ *
+ * Only a rename of the device's own terminal counts: a till restored from a
+ * sibling's backup could carry that sibling's rename in its history, and the
+ * dashboard row for THIS device must not take another till's name from it.
+ * The latest by when it happened, because a batch can hold two renames.
+ */
+export function ownTerminalName(ops: readonly SyncOp[], device: DeviceRow): string | undefined {
+  let latest: { at: number; name: string } | undefined;
+  for (const op of ops) {
+    if (op.entity !== "terminal" || op.entityId !== device.terminalId) continue;
+    const name = (op.after as { name?: unknown } | null)?.name;
+    if (typeof name !== "string" || !name.trim()) continue;
+    if (!latest || op.createdAtMs >= latest.at) latest = { at: op.createdAtMs, name: name.trim() };
+  }
+  return latest?.name;
+}
+
 /** The batch may only carry rows belonging to the tenant the token was issued for. */
 function foreignOp(ops: readonly SyncOp[], device: DeviceRow): SyncOp | undefined {
   return ops.find((op) => op.tenantId !== device.tenantId);
@@ -41,6 +60,13 @@ export async function ingest(
   store: CloudStore,
   request: { authorization: string | null; body: unknown },
   now: Date = new Date(),
+  /**
+   * Called once the batch is durable AND held something new — ADR-0024 §3.
+   * The route pokes the shop's other tills here. Awaited so it runs before a
+   * serverless function freezes, and bounded by the poke's own timeout; it
+   * must never throw, and a failure here never un-acks a batch.
+   */
+  onStored?: (tenantId: string) => Promise<unknown>,
 ): Promise<HttpResult> {
   const token = bearerToken(request.authorization);
   /* 401 before 400: an unauthenticated caller gets no work done on its behalf,
@@ -100,13 +126,21 @@ export async function ingest(
     ops,
     appVersion: push.appVersion,
     now,
+    terminalName: ownTerminalName(ops, device),
   });
+
+  if (result.stored > 0 && onStored) {
+    await onStored(device.tenantId).catch(() => undefined);
+  }
 
   return {
     status: 200,
     body: {
       ackedSeq: result.ackedSeq,
       duplicates: result.duplicates,
+      /* the route tells the shop's other tills something new is waiting
+         (ADR-0024 §3) — only when it is, so a replay wakes nobody */
+      stored: result.stored,
       serverTimeMs: now.getTime(),
     },
   };

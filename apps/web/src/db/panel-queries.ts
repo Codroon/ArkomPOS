@@ -87,3 +87,10 @@ export async function tillsForAccount(
     revoked: revokedAt !== null,
   }));
 }
+
+/** The account's shops, for the live channel the panel listens on (ADR-0024 §3). */
+export async function shopIdsForAccount(accountId: string, handle?: CloudDb): Promise<string[]> {
+  const db = handle ?? defaultDb();
+  const rows = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.accountId, accountId));
+  return rows.map((r) => r.id);
+}

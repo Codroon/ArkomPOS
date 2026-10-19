@@ -158,7 +158,7 @@ export function memoryStore(): MemoryStore {
       return found ? { ...found } : null;
     },
 
-    async recordBatch({ device, ops, appVersion, now }: RecordBatchInput): Promise<RecordBatchResult> {
+    async recordBatch({ device, ops, appVersion, now, terminalName }: RecordBatchInput): Promise<RecordBatchResult> {
       const live = store.devices.get(device.id);
       if (!live) throw new Error("no such device");
       if (ops.length === 0) return { stored: 0, duplicates: 0, ackedSeq: live.lastAckedSeq };
@@ -199,6 +199,7 @@ export function memoryStore(): MemoryStore {
       live.lastAckedSeq = Math.max(live.lastAckedSeq, ackedSeq);
       live.lastPushAt = now;
       live.appVersion = appVersion;
+      if (terminalName) live.terminalName = terminalName;
       const tenant = store.tenants.get(device.tenantId);
       if (tenant) tenant.lastSeenAt = now;
 
@@ -303,7 +304,7 @@ export function memoryStore(): MemoryStore {
      */
     async pullBatch({ device, afterIngestSeq, limit, entities, settleBefore }: PullInput): Promise<PullResult> {
       const settled = [...store.entries.values()].filter(
-        (e) => e.tenantId === device.tenantId && e.receivedAt < settleBefore,
+        (e) => e.tenantId === device.tenantId && (settleBefore === null || e.receivedAt < settleBefore),
       );
       const frontier = settled.reduce((max, e) => (e.ingestSeq > max ? e.ingestSeq : max), 0);
 
@@ -339,6 +340,25 @@ export function memoryStore(): MemoryStore {
         cursor: truncated ? page[page.length - 1]!.ingestSeq : Math.max(frontier, afterIngestSeq),
         more: truncated,
       };
+    },
+
+    async directory(tenantId) {
+      const tills = [...store.devices.values()]
+        .filter((d) => d.tenantId === tenantId && d.terminalName.trim() !== "")
+        .map((d) => ({ terminalId: d.terminalId, name: d.terminalName }));
+      /* the latest name per person, by when it happened — the same fold as Postgres */
+      const latest = new Map<string, { at: number; seq: number; name: string }>();
+      for (const e of store.entries.values()) {
+        const name = (e.after as { name?: unknown } | null)?.name;
+        if (e.tenantId !== tenantId || e.entity !== "user" || typeof name !== "string") continue;
+        const at = e.createdAt.getTime();
+        const seen = latest.get(e.entityId);
+        if (!seen || at > seen.at || (at === seen.at && e.seq > seen.seq)) latest.set(e.entityId, { at, seq: e.seq, name });
+      }
+      const staff = [...latest.entries()]
+        .filter(([, v]) => v.name.trim() !== "")
+        .map(([userId, v]) => ({ userId, name: v.name }));
+      return { tills, staff };
     },
 
     async deleteTenant(tenantId) {

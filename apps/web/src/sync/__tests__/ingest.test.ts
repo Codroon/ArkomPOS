@@ -281,3 +281,39 @@ describe("deleting a shop", () => {
     expect(await store.deviceByToken(theirs.token)).not.toBeNull();
   });
 });
+
+describe("what the dashboard calls a till (ADR-0024 §1)", () => {
+  const rename = (terminalId: string, name: string, atMs: number, seq: number) =>
+    op({ entity: "terminal", entityId: terminalId, action: "rename", after: { name }, createdAtMs: atMs, seq });
+
+  it("takes the till's new name from its own rename", async () => {
+    const { store, token } = setup();
+    const device = [...store.devices.values()][0]!;
+
+    const res = await send(store, token, push([rename(device.terminalId, "Caja 1", NOW.getTime(), 1)]));
+
+    expect(res.status).toBe(200);
+    expect(store.devices.get(device.id)!.terminalName).toBe("Caja 1");
+  });
+
+  it("keeps the latest of two renames in one batch, whatever order they arrive in", async () => {
+    const { store, token } = setup();
+    const device = [...store.devices.values()][0]!;
+    const t = NOW.getTime();
+
+    await send(store, token, push([rename(device.terminalId, "Mostrador", t + 1000, 2), rename(device.terminalId, "Caja 1", t, 1)]));
+
+    expect(store.devices.get(device.id)!.terminalName).toBe("Mostrador");
+  });
+
+  it("does not take another till's name from history it happens to carry", async () => {
+    /* a till restored from a sibling's backup pushes that sibling's rename too */
+    const { store, token } = setup();
+    const device = [...store.devices.values()][0]!;
+    const before = device.terminalName;
+
+    await send(store, token, push([rename("term-somebody-else", "Taller", NOW.getTime(), 1)]));
+
+    expect(store.devices.get(device.id)!.terminalName).toBe(before);
+  });
+});

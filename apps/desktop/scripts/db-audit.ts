@@ -601,6 +601,27 @@ if (hasRedemptions) {
         AND NOT EXISTS (SELECT 1 FROM documents d WHERE d.id = t.document_id)
     `).map((r) => `ficha ${r.id} apunta al documento ${r.document_id}, que no está`),
   );
+
+  /**
+   * The R- number a ticket carries is its receipt's number (ADR-0024 §5).
+   *
+   * The copy exists so the shop's other till can show and search it; where the
+   * receipt is HERE, the two must agree, or the other counter is looking for the
+   * customer under a number their paper does not say. Skipped on a database
+   * from before migration 0018.
+   */
+  const hasIntakeNumber =
+    q<{ n: number }>("SELECT COUNT(*) n FROM pragma_table_info('repair_tickets') WHERE name = 'intake_doc_number'")[0]!.n > 0;
+  if (hasIntakeNumber) {
+    check(
+      "el número R- de cada ficha coincide con su resguardo",
+      q<{ id: string; doc_number: string; intake_doc_number: string | null }>(`
+        SELECT t.id, d.doc_number, t.intake_doc_number FROM repair_tickets t
+        JOIN documents d ON d.id = t.document_id
+        WHERE t.intake_doc_number IS NULL OR t.intake_doc_number <> d.doc_number
+      `).map((r) => `ficha ${r.id}: resguardo ${r.doc_number}, la ficha dice ${r.intake_doc_number ?? "nada"}`),
+    );
+  }
 }
 
 /* ADR-0022: what the other tills sent, and the one thing that must not be true

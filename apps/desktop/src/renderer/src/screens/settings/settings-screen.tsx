@@ -22,6 +22,8 @@ import {
   PrintTicketResponseSchema,
   DemoStatusResponseSchema,
   DemoRemoveResponseSchema,
+  MetaContextResponseSchema,
+  TerminalRenameResponseSchema,
   type DemoStatus,
   type PrinterInfo,
   type Settings,
@@ -49,6 +51,8 @@ import { refreshPrinterReady } from "../../lib/printer-ready";
 import { BackupPanel } from "./backup-panel";
 import { SettingsCard } from "./settings-card";
 import { CloudCard } from "./cloud-card";
+import { useTillName } from "../../lib/till-name";
+import { announceContextChanged } from "../../lib/context-changed";
 
 /** Shown beneath any field the seed left as a placeholder. */
 
@@ -69,6 +73,9 @@ export function SettingsScreen() {
   const [scanProbe, setScanProbe] = useState("");
   const [lastScan, setLastScan] = useState<string | null>(null);
   const [removingDemo, setRemovingDemo] = useState(false);
+  /** what this till is called, as stored; shown through the same rule as the header */
+  const [terminalName, setTerminalName] = useState<string | null>(null);
+  const tillName = useTillName();
   const [toast, setToast] = useState<{ message: string; tone: "neutral" | "danger" } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -95,6 +102,10 @@ export function SettingsScreen() {
       .invoke("settings:series", {})
       .then(setSeries)
       .catch((err) => console.error("settings:series failed", err));
+    window.arkom
+      .invoke("meta:context")
+      .then((raw) => setTerminalName(MetaContextResponseSchema.parse(raw).terminal.name))
+      .catch((err) => console.error("meta:context failed", err));
     return () => {
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
@@ -109,6 +120,21 @@ export function SettingsScreen() {
         /* the screens that refuse without a printer read a shared cache, not
            Ajustes: configuring one here has to reach them without a remount */
         if ("printerName" in patch) void refreshPrinterReady();
+        say(t("set.saved"));
+      } catch (err) {
+        say(errorMessage(t, err), "danger");
+      }
+    },
+    [say, t],
+  );
+
+  /** Rename this till. Its series, and every number already printed, stay put. */
+  const rename = useCallback(
+    async (name: string) => {
+      try {
+        const res = TerminalRenameResponseSchema.parse(await window.arkom.invoke("terminal:rename", { name }));
+        setTerminalName(res.name);
+        announceContextChanged();
         say(t("set.saved"));
       } catch (err) {
         say(errorMessage(t, err), "danger");
@@ -430,6 +456,15 @@ export function SettingsScreen() {
 
           {/* ---------------- the till itself ---------------- */}
           <SettingsCard title={t("set.tillSection")}>
+
+            {terminalName !== null ? (
+              <ShopField
+                label={t("set.tillName")}
+                value={tillName(terminalName)}
+                onCommit={(v) => void rename(v)}
+                hint={t("set.tillNameHint")}
+              />
+            ) : null}
 
             <Field label={t("set.idleLock")} hint={t("set.idleLockHint")}>
               <SelectInput

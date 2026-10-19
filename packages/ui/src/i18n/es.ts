@@ -1260,6 +1260,8 @@ export const es = {
 
 /* till behaviour */
   "set.tillSection": "La caja",
+  "set.tillName": "Nombre de esta caja",
+  "set.tillNameHint": "Aparece en las pantallas, en los tickets nuevos y en el panel. La numeración (T1-, T2-…) no cambia.",
   "set.idleLock": "Bloquear la pantalla tras",
   "set.idleLockHint": "Minutos sin actividad. 0 = no bloquear nunca.",
   "set.idleLockNever": "No bloquear",

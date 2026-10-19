@@ -31,6 +31,7 @@ import { OverdueChip, StatusChip, STATUS_KEYS, formatDateTime, formatPromised } 
 import { QuotePanel } from "./quote-panel";
 import { ApprovalDialog, ReceivePartDialog } from "./repair-dialogs";
 import { CollectDialog, NotifyDialog, NotRepairedDialog } from "./handback-dialogs";
+import { useShopChanged } from "../../lib/use-shop-changed";
 
 const REFUSAL_KEYS: Record<string, TKey> = {
   terminal: "repRefusal.terminal",
@@ -93,6 +94,8 @@ export function RepairDetailPane({
       setError(errorMessage(t, err));
     }
   }, [ticketId, t]);
+  /* a sibling till's change lands here too, not only on the next visit (ADR-0024 §3) */
+  useShopChanged(load, ["repair_ticket", "repair_line", "repair_approval", "repair_notification"]);
 
   useEffect(() => {
     void load();

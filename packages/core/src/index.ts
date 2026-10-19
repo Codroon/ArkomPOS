@@ -334,6 +334,8 @@ export {
   SyncPullRequestSchema,
   SyncPulledOpSchema,
   SyncPullResponseSchema,
+  SyncDirectorySchema,
+  SyncLiveSchema,
   laterWins,
   foldEntries,
 } from "./sync";
@@ -347,6 +349,8 @@ export type {
   SyncPullRequest,
   SyncPulledOp,
   SyncPullResponse,
+  SyncDirectory,
+  SyncLive,
 } from "./sync";
 /* which rows belong to the SHOP rather than the till (ADR-0022 §1) */
 export {
@@ -504,6 +508,8 @@ export {
   DocsListResponseSchema,
   SettingsSeriesRequestSchema,
   SettingsSeriesResponseSchema,
+  TerminalRenameRequestSchema,
+  TerminalRenameResponseSchema,
   SetupStatusRequestSchema,
   SetupStatusResponseSchema,
   CloudStatusRequestSchema,

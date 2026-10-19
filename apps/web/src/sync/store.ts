@@ -10,7 +10,7 @@
  * use. The tests are therefore about the rules, not about having a Postgres,
  * and they run in CI beside the till's.
  */
-import type { SyncOp, SyncPulledOp } from "@arkom/core";
+import type { SyncDirectory, SyncOp, SyncPulledOp } from "@arkom/core";
 
 /** What a token buys: one till, one tenant's stream. */
 export interface DeviceRow {
@@ -30,6 +30,11 @@ export interface RecordBatchInput {
   ops: readonly SyncOp[];
   appVersion: string;
   now: Date;
+  /**
+   * The till renamed ITSELF in this batch (ADR-0024 §1): what the dashboard
+   * should call it from now on. Decided by `ingest()`, stored here.
+   */
+  terminalName?: string;
 }
 
 export interface RecordBatchResult {
@@ -113,8 +118,14 @@ export interface PullInput {
    * `ingest_seq` is taken when a row is written and becomes visible when its
    * transaction commits, so two concurrent ingests can commit out of order and
    * a naive cursor would step over the lower one forever.
+   *
+   * NULL since ADR-0024 §4: `recordBatch` holds a per-shop lock for its whole
+   * transaction, so a shop's rows commit in `ingest_seq` order and a committed
+   * row has no uncommitted row behind it. There is nothing left to wait out —
+   * and a time filter would now be the hazard, because `received_at` comes from
+   * whichever server's clock took the push.
    */
-  settleBefore: Date;
+  settleBefore: Date | null;
 }
 
 export interface PullResult {
@@ -152,6 +163,12 @@ export interface CloudStore {
    * "the cloud never authors" true while the data moves both ways.
    */
   pullBatch(input: PullInput): Promise<PullResult>;
+  /**
+   * The names of a shop's tills and people, for display on its other tills —
+   * ADR-0024 §2. Names only: no role, no PIN material (which the cloud never
+   * holds), nothing a till could sign anybody in with.
+   */
+  directory(tenantId: string): Promise<SyncDirectory>;
   /** ADR-0020 §4: a feature, not a support ticket answered with SQL. */
   deleteTenant(tenantId: string): Promise<{ entries: number; devices: number }>;
 }

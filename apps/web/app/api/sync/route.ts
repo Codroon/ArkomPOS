@@ -12,6 +12,8 @@
  */
 import { ingest } from "../../../src/sync/ingest";
 import { pgStore } from "../../../src/db/pg-store";
+import { randomUUID } from "node:crypto";
+import { liveConfig, poke } from "../../../src/sync/live";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,11 +35,21 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const result = await ingest(pgStore(), {
-      authorization: request.headers.get("authorization"),
-      body,
-    });
-    return Response.json(result.body, { status: result.status });
+    const live = liveConfig();
+    const tag = randomUUID().slice(0, 12);
+    let poked = false;
+    const result = await ingest(
+      pgStore(),
+      { authorization: request.headers.get("authorization"), body },
+      new Date(),
+      /* the shop's other tills, and any dashboard open on it, pull now rather
+         than at their next tick (ADR-0024 §3) */
+      async (tenantId) => {
+        poked = await poke(live, tenantId, tag);
+      },
+    );
+    const answer = poked ? { ...result.body, pokeTag: tag } : result.body;
+    return Response.json(answer, { status: result.status });
   } catch (err) {
     console.error("sync ingest failed:", err instanceof Error ? err.message : "unknown error");
     /* 500 and no ack. The till keeps its cursor and sends the same rows again,

@@ -30,6 +30,7 @@ import {
   redactForSync,
 } from "@arkom/core";
 import { bearerToken } from "../lib/secrets";
+import { liveFor, type LiveConfig } from "./live";
 import type { CloudStore } from "./store";
 import type { HttpResult } from "./ingest";
 
@@ -42,6 +43,8 @@ export async function pull(
   store: CloudStore,
   request: { authorization: string | null; query: unknown },
   now: Date = new Date(),
+  /** where this shop's tills listen for a poke (ADR-0024 §3); null = keep polling */
+  live: LiveConfig | null = null,
 ): Promise<HttpResult> {
   const token = bearerToken(request.authorization);
   /* 401 before 400, exactly as the push does: an unauthenticated caller gets no
@@ -77,9 +80,14 @@ export async function pull(
     limit: ask.limit,
     entities: SHARED_ENTITIES,
     /* ADR-0022 §4 — the settle window, applied here rather than in the store so
-       that the rule is visible in the file about rules */
-    settleBefore: new Date(now.getTime() - SYNC_SETTLE_MS),
+       that the rule is visible in the file about rules. Zero since ADR-0024 §4,
+       when the ingest lock made it unnecessary — and then no time filter at
+       all, because filtering on another server's clock is its own hazard. */
+    settleBefore: SYNC_SETTLE_MS > 0 ? new Date(now.getTime() - SYNC_SETTLE_MS) : null,
   });
+
+  /* the names a screen shows beside a sibling's row — names only (ADR-0024 §2) */
+  const directory = await store.directory(device.tenantId);
 
   /**
    * Redacted on the way out as well as on the way in.
@@ -104,6 +112,8 @@ export async function pull(
       cursor: result.cursor,
       more: result.more,
       serverTimeMs: now.getTime(),
+      directory,
+      live: liveFor(live, device.tenantId),
     },
   };
 }

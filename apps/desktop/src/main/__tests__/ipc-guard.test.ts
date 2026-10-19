@@ -121,6 +121,8 @@ describe("with a session that lacks the permission", () => {
     expect(await callFor("users:list")).toBe("PERMISSION_DENIED");
     expect(await callFor("settings:get")).toBe("PERMISSION_DENIED");
     expect(await callFor("backup:status")).toBe("PERMISSION_DENIED");
+    /* what the till is called is the owner's to decide, not the cashier's */
+    expect(await callFor("terminal:rename", { name: "Mostrador" })).toBe("PERMISSION_DENIED");
   });
 
   it("asks for approval on an approvable one", async () => {

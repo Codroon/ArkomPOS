@@ -63,6 +63,11 @@ export const SyncPushResponseSchema = z.object({
   duplicates: z.number().int().nonnegative().default(0),
   /** the server's clock, so a till with a wrong one can say so on screen */
   serverTimeMs: z.number().int().nonnegative(),
+  /**
+   * The tag on the poke this push caused (ADR-0024 §3), so the till that
+   * pushed can ignore its own echo. Meaningless outside that pairing.
+   */
+  pokeTag: z.string().optional(),
 });
 export type SyncPushResponse = z.infer<typeof SyncPushResponseSchema>;
 
@@ -238,6 +243,36 @@ export const SyncPulledOpSchema = SyncOpSchema.extend({
 });
 export type SyncPulledOp = z.infer<typeof SyncPulledOpSchema>;
 
+/**
+ * Who the shop's other tills and people are — names only, ADR-0024 §2.
+ *
+ * A stock movement or a repair written at the other counter carries a user id
+ * and a terminal id, and this till's own `users` table holds neither: staff are
+ * per-till (ADR-0022 §1), and must stay so, because a user row here is a PIN
+ * that could sign in here. So the names travel as a read-only list beside the
+ * pull, never as rows. Nobody gains a login; a screen gains a name.
+ */
+export const SyncDirectorySchema = z.object({
+  tills: z.array(z.object({ terminalId: z.string(), name: z.string() })),
+  staff: z.array(z.object({ userId: z.string(), name: z.string() })),
+});
+export type SyncDirectory = z.infer<typeof SyncDirectorySchema>;
+
+/**
+ * Where to listen for "something new is waiting" — ADR-0024 §3.
+ *
+ * A Supabase Realtime broadcast channel that carries a poke and nothing else:
+ * no row, no id, no amount. A till that hears it pulls, through the same
+ * authenticated door as always. The topic is derived from a server secret, so
+ * it cannot be guessed from a tenant id; the key is the project's PUBLIC one.
+ */
+export const SyncLiveSchema = z.object({
+  url: z.string().url(),
+  apiKey: z.string().min(1),
+  topic: z.string().min(16),
+});
+export type SyncLive = z.infer<typeof SyncLiveSchema>;
+
 export const SyncPullResponseSchema = z.object({
   entries: z.array(SyncPulledOpSchema),
   /**
@@ -250,6 +285,10 @@ export const SyncPullResponseSchema = z.object({
   more: z.boolean().default(false),
   /** the server's clock, so a till with a wrong one can say so on screen */
   serverTimeMs: z.number().int().nonnegative(),
+  /* v1.4.0 (ADR-0024). Optional both ways: an older cloud sends neither and an
+     older till ignores both. */
+  directory: SyncDirectorySchema.optional(),
+  live: SyncLiveSchema.nullable().optional(),
 });
 export type SyncPullResponse = z.infer<typeof SyncPullResponseSchema>;
 

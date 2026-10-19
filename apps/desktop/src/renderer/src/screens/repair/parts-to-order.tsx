@@ -12,6 +12,7 @@ import { GhostButton, useT, useDataLabel } from "@arkom/ui";
 import { errorMessage } from "../../lib/errors";
 import { ReceivePartDialog } from "./repair-dialogs";
 import { OverdueChip, formatDate } from "./status-chip";
+import { useShopChanged } from "../../lib/use-shop-changed";
 
 export function PartsToOrder({
   onOpenTicket,
@@ -40,6 +41,8 @@ export function PartsToOrder({
       setRows([]);
     }
   }, [t]);
+  /* a sibling till's change lands here too, not only on the next visit (ADR-0024 §3) */
+  useShopChanged(refresh, ["repair_ticket", "repair_line", "repair_approval", "repair_notification"]);
 
   useEffect(() => {
     void refresh();

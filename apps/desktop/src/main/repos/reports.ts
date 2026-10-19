@@ -373,7 +373,8 @@ export function repairsOpen(
   const rows = db
     .select({
       ticketId: repairTickets.id,
-      docNumber: documents.docNumber,
+      /* the receipt may be on the till that printed it (ADR-0024 §5) */
+      docNumber: sql<string | null>`coalesce(${documents.docNumber}, ${repairTickets.intakeDocNumber})`,
       customerName: customers.name,
       device: repairTickets.deviceDescription,
       status: repairTickets.status,
@@ -448,7 +449,8 @@ export function repairsClosed(db: Reader, ctx: MutationCtx, f: { fromMs: number;
   const rows = db
     .select({
       ticketId: repairTickets.id,
-      docNumber: documents.docNumber,
+      /* the receipt may be on the till that printed it (ADR-0024 §5) */
+      docNumber: sql<string | null>`coalesce(${documents.docNumber}, ${repairTickets.intakeDocNumber})`,
       customerName: customers.name,
       device: repairTickets.deviceDescription,
       createdAt: repairTickets.createdAt,

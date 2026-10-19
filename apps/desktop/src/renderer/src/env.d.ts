@@ -122,6 +122,7 @@ declare global {
         rows: Array<{ id: string; docNumber: string; docType: string; completedAtMs: number | null; totalCents: number; userName: string | null }>;
         truncated: boolean;
       }>;
+      invoke(channel: "terminal:rename", payload: { name: string }): Promise<{ name: string }>;
       invoke(channel: "settings:series", payload?: Record<string, never>): Promise<{
         series: Array<{ docType: string; prefix: string; nextNumber: number; nextDocNumber: string }>;
         taxRegimes: Array<{ code: string; rateBp: number }>;
@@ -273,6 +274,7 @@ declare global {
       ): Promise<{ ok: boolean }>;
       /** Session changes are pushed from main; returns an unsubscribe. */
       onSessionChanged(fn: (session: unknown) => void): () => void;
+      onShopChanged(fn: (change: { entities: string[] }) => void): () => void;
       invoke(channel: "backup:status", payload?: undefined): Promise<BackupStatus>;
       invoke(channel: "backup:now", payload?: undefined): Promise<BackupRunResponse>;
       invoke(channel: "backup:openFolder", payload?: undefined): Promise<{ ok: boolean }>;

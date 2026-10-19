@@ -39,6 +39,7 @@ import { useApprovalFlow } from "../../lib/use-approval";
 import { CompletedPanel, PaymentPanel, parseTenders, type TenderEntry } from "./payment-panel";
 import { VoucherFinder } from "./voucher-finder";
 import { OverrideModal, ParkModal, ParkedPopover, UnitPickModal, type UnitPickState } from "./sale-modals";
+import { useShopChanged } from "../../lib/use-shop-changed";
 
 export function SaleScreen({ terminalName }: { terminalName: string }) {
   const t = useT();
@@ -131,6 +132,8 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
       .then((rows) => setProducts(rows.filter((r) => r.active && r.priceCents != null && r.taxRegime != null)))
       .catch((err) => console.error("catalog:list failed", err));
   }, []);
+  /* a sibling till's change lands here too, not only on the next visit (ADR-0024 §3) */
+  useShopChanged(refreshProducts, ["product", "product_code", "product_group", "stock_movement", "unit"]);
 
   // boot: restore the terminal's live draft (power-cut behavior) + catalog + parked
   useEffect(() => {

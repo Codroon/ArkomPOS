@@ -972,6 +972,57 @@ describe("a repair crosses the counter (ADR-0023)", () => {
     expect(collected.depositAppliedCents).toBe(2000);
     expect(collected.totalCents).toBe(8900);
   });
+
+  /**
+   * v1.3.0 replicated the ticket and every screen still joined the R- receipt,
+   * which stays on the till that printed it: the other till's list was empty
+   * and opening the ticket said it did not exist. The collection test above
+   * passed because it called `repair:collect` directly, which no person can do.
+   * This walks the screens a person would (ADR-0024 §5).
+   */
+  it("names the technician who works only at the other till, and gives them no login there", async () => {
+    const { one, two } = await twoTills();
+    const { ticketId } = await takeInAPhone(one);
+    use(one);
+    const rosa = await call<{ user: { id: string } }>("users:create", { name: "Rosa", role: "technician", pin: null });
+    await call("repair:assign", { ticketId, userId: rosa.user.id });
+    await send(one);
+    await receive(two);
+
+    use(two);
+    const all = { status: null, technicianId: null, unassignedOnly: false, overdueOnly: false, search: null };
+    const list = await call<{ rows: { ticketId: string; technicianName: string | null }[] }>("repair:list", all);
+    expect(list.rows.find((r) => r.ticketId === ticketId)?.technicianName).toBe("Rosa");
+    const detail = await call<{ assignedUserName: string | null }>("repair:get", { ticketId });
+    expect(detail.assignedUserName).toBe("Rosa");
+    /* a name on a screen, never a row in this till's users table (ADR-0024 §2) */
+    expect(two.db.select().from(s.users).all().map((u) => u.name)).not.toContain("Rosa");
+  });
+
+  it("is listed, opened, searched and on the board at the other till", async () => {
+    const { one, two } = await twoTills();
+    const { ticketId } = await takeInAPhone(one);
+    const printed = await call<{ docNumber: string }>("repair:get", { ticketId });
+    expect(printed.docNumber.startsWith("R")).toBe(true);
+    await send(one);
+    await receive(two);
+
+    use(two);
+    const all = { status: null, technicianId: null, unassignedOnly: false, overdueOnly: false, search: null };
+    const list = await call<{ rows: { ticketId: string; docNumber: string }[] }>("repair:list", all);
+    expect(list.rows.map((r) => r.ticketId)).toContain(ticketId);
+    expect(list.rows.find((r) => r.ticketId === ticketId)?.docNumber).toBe(printed.docNumber);
+
+    /* the customer reads the number off their receipt */
+    const found = await call<{ rows: { ticketId: string }[] }>("repair:list", { ...all, search: printed.docNumber });
+    expect(found.rows.map((r) => r.ticketId)).toEqual([ticketId]);
+
+    const detail = await call<{ id: string; docNumber: string }>("repair:get", { ticketId });
+    expect(detail.docNumber).toBe(printed.docNumber);
+
+    const board = await call<unknown>("workshop:board", { technicianId: null, unassignedOnly: false });
+    expect(JSON.stringify(board)).toContain(ticketId);
+  });
 });
 
 describe("store credit crosses the counter (ADR-0023)", () => {
@@ -1562,7 +1613,9 @@ describe("who moved the stock, as a person reads it", () => {
       entries: [{ productId: saved.product.id, supplierId: supplier.id, qty: 4, unitCostCents: 300, imeis: [] }],
     });
 
-    type Moves = { rows: { userId: string | null; userName: string | null; otherTill: boolean }[] };
+    type Moves = {
+      rows: { userId: string | null; userName: string | null; otherTill: boolean; tillName: string | null }[];
+    };
     const here = await call<Moves>("inventory:movements", { productId: saved.product.id });
     expect(here.rows[0]?.userName).toBe("Ahmer");
     expect(here.rows[0]?.otherTill).toBe(false);
@@ -1573,8 +1626,11 @@ describe("who moved the stock, as a person reads it", () => {
     const there = await call<Moves>("inventory:movements", { productId: saved.product.id });
     expect(there.rows).toHaveLength(1);
     expect(there.rows[0]?.otherTill).toBe(true);
-    /* nobody called Ahmer works on this till's records, so no name is invented */
-    expect(there.rows[0]?.userName).toBeNull();
+    /* Ahmer has no login on this till and gains none — the name comes from the
+       shop's list that rides with the pull, and so does the till's (ADR-0024 §2) */
+    expect(there.rows[0]?.userName).toBe("Ahmer");
+    expect(there.rows[0]?.tillName).toBe("Caja 1");
+    expect(two.db.select().from(s.users).all().map((u) => u.id)).not.toContain(there.rows[0]?.userId);
   });
 
   it("never puts an ID where the panel shows a person", () => {
@@ -1585,5 +1641,52 @@ describe("who moved the stock, as a person reads it", () => {
     );
     expect(drawer).not.toMatch(/\{\s*m\.userId\b/);
     expect(drawer).toContain("m.userName");
+  });
+});
+
+describe("a till can be renamed, and its numbering cannot (v1.4.0, ADR-0024 §1)", () => {
+  /**
+   * The pilot's two counters were both called "Caja 2": the second install took
+   * the wizard's prefill, and nothing let the shop change it afterwards.
+   */
+  it("renames the till everywhere it is shown, and leaves its series alone", async () => {
+    const one = await install("Caja 2", "T1-");
+    stubCloud();
+    use(one);
+    await link();
+    const seriesBefore = one.db.select().from(s.numberSeries).all();
+
+    expect(await call("terminal:rename", { name: "  Caja 1 " })).toEqual({ name: "Caja 1" });
+
+    /* the header reads the context, and the context is not stale */
+    const meta = await call<{ terminal: { name: string } }>("meta:context");
+    expect(meta.terminal.name).toBe("Caja 1");
+    /* the guarantee behind gap-free numbering is untouched (ADR-0008) */
+    expect(one.db.select().from(s.numberSeries).all()).toEqual(seriesBefore);
+
+    /* a write like any other: one oplog entry, the old name beside the new */
+    const logged = one.db
+      .select()
+      .from(s.oplog)
+      .where(sql`${s.oplog.entity} = 'terminal' and ${s.oplog.action} = 'rename'`)
+      .all();
+    expect(logged).toHaveLength(1);
+    expect(logged[0]!.before).toEqual({ name: "Caja 2" });
+    expect(logged[0]!.after).toEqual({ name: "Caja 1" });
+
+    /* and the dashboard follows on the next push */
+    await send(one);
+    const device = [...cloud.devices.values()].find((d) => d.terminalId === tillContext(one.db).ctx.terminalId);
+    expect(device?.terminalName).toBe("Caja 1");
+  });
+
+  it("writes nothing when the name did not change, and refuses an empty one", async () => {
+    const one = await install("Caja 1", "T1-");
+    use(one);
+    const before = one.db.select().from(s.oplog).all().length;
+    await call("terminal:rename", { name: "Caja 1" });
+    expect(one.db.select().from(s.oplog).all()).toHaveLength(before);
+    await expect(call("terminal:rename", { name: "   " })).rejects.toBeTruthy();
+    expect((await call<{ terminal: { name: string } }>("meta:context")).terminal.name).toBe("Caja 1");
   });
 });

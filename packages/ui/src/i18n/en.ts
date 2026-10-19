@@ -1255,6 +1255,8 @@ export const en: Record<TKey, string> = {
 
 /* till behaviour */
   "set.tillSection": "The till",
+  "set.tillName": "Name of this till",
+  "set.tillNameHint": "Shown on screens, new tickets and the dashboard. Receipt numbering (T1-, T2-…) does not change.",
   "set.idleLock": "Lock the screen after",
   "set.idleLockHint": "Minutes of inactivity. 0 = never lock.",
   "set.idleLockNever": "Never lock",

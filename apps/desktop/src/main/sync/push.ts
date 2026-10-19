@@ -22,6 +22,8 @@ import {
 import { schema, type ArkomDb } from "@arkom/db";
 import { patchLink, readLink, type CloudLink } from "./link";
 import { receiveStatus } from "./receive";
+import { onLocalWrite } from "./outbox-signal";
+import { rememberOwnPoke } from "./listen";
 
 const { oplog } = schema;
 /* the heal below reads which shops this till still holds */
@@ -65,8 +67,16 @@ export interface SyncStatus {
 }
 
 let timer: ReturnType<typeof setInterval> | null = null;
+let soon: ReturnType<typeof setTimeout> | null = null;
+let unhook: (() => void) | null = null;
 let backoffUntil = 0;
 let pushing = false;
+/**
+ * How long after a write the outbox waits before sending — ADR-0024 §3. A sale
+ * is several `mutate()`s in quick succession; this gathers them into one push
+ * without anybody being able to notice the wait.
+ */
+const PUSH_SOON_MS = 300;
 
 /** Rows waiting to go, oldest first. */
 function unsentRows(db: ArkomDb, link: CloudLink): SyncableOplogRow[] {
@@ -214,6 +224,8 @@ export async function pushOnce(db: ArkomDb, { force = false } = {}): Promise<Syn
     }
 
     const ack = SyncPushResponseSchema.parse(await response.json());
+    /* the cloud just poked the shop about these rows; this till need not answer */
+    rememberOwnPoke(ack.pokeTag);
     patchLink({
       lastAckedSeq: Math.max(link.lastAckedSeq, ack.ackedSeq),
       lastPushAtMs: Date.now(),
@@ -260,9 +272,27 @@ export async function pushAll(db: ArkomDb, { force = false } = {}): Promise<Sync
   return status;
 }
 
+/**
+ * Push now-ish: what a committed write calls. Writes inside the window are one
+ * push; a write while a push is in flight is sent straight after it. Stops on an
+ * error — the backoff and the minute timer own a till whose line is down.
+ */
+export function pushSoon(db: ArkomDb): void {
+  if (soon || !readLink()) return;
+  soon = setTimeout(() => {
+    soon = null;
+    void pushAll(db)
+      .then((status) => {
+        if (status.linked && status.pending > 0 && !status.lastError) pushSoon(db);
+      })
+      .catch(() => undefined);
+  }, PUSH_SOON_MS);
+}
+
 /** Start the background loop. Safe to call on a till that is not linked. */
 export function startSync(db: ArkomDb): void {
   if (timer) return;
+  unhook = onLocalWrite(() => pushSoon(db));
   timer = setInterval(() => {
     void pushAll(db).catch(() => undefined);
   }, INTERVAL_MS);
@@ -273,6 +303,10 @@ export function startSync(db: ArkomDb): void {
 export function stopSync(): void {
   if (timer) clearInterval(timer);
   timer = null;
+  if (soon) clearTimeout(soon);
+  soon = null;
+  unhook?.();
+  unhook = null;
 }
 
 /** Test seam: forget the backoff between cases. */

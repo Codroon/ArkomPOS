@@ -16,6 +16,7 @@
  */
 import { pull } from "../../../../src/sync/pull";
 import { pgStore } from "../../../../src/db/pg-store";
+import { liveConfig } from "../../../../src/sync/live";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,10 +25,12 @@ export async function GET(request: Request): Promise<Response> {
   const query = Object.fromEntries(new URL(request.url).searchParams);
 
   try {
-    const result = await pull(pgStore(), {
-      authorization: request.headers.get("authorization"),
-      query,
-    });
+    const result = await pull(
+      pgStore(),
+      { authorization: request.headers.get("authorization"), query },
+      new Date(),
+      liveConfig(),
+    );
     return Response.json(result.body, {
       status: result.status,
       /* a cursor's answer is true for one instant and for one till; nothing

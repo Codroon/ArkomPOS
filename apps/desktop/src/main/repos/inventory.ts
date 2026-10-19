@@ -28,6 +28,7 @@ import {
 import { schema, type ArkomDb } from "@arkom/db";
 import { makeMutateRunner } from "../mutate-runner";
 import { resolveScanCode } from "./scan";
+import { staffName, tillName as siblingTillName } from "../people";
 
 const { products, productGroups, productStock, stockMovements, units, documents, users } = schema;
 
@@ -122,8 +123,10 @@ export function listMovements(
     documentType: r.documentType,
     imei: r.imei,
     userId: r.userId,
-    userName: r.userName ?? null,
+    /* this till's own person, else the shop's list (ADR-0024 §2) */
+    userName: r.userName ?? staffName(r.userId),
     otherTill: r.terminalId !== ctx.terminalId,
+    tillName: r.terminalId !== ctx.terminalId ? siblingTillName(r.terminalId) : null,
   }));
   return { rows, nextCursor: hasMore ? rows[rows.length - 1]!.id : null };
 }

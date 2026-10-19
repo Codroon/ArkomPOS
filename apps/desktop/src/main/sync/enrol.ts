@@ -137,6 +137,9 @@ export async function enrol(
     lastAckedSeq: parkedAtSeq,
     lastPushAtMs: null,
     lastError: null,
+    /* learned from the first pull (ADR-0024 §2-3) */
+    directory: { tills: [], staff: [] },
+    live: null,
     /* from the start of the shop's stream: this till needs the catalogue and
        the ledger it has never seen */
     lastPulledIngestSeq: 0,

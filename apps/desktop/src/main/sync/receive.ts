@@ -25,6 +25,7 @@ import { schema, type ArkomDb } from "@arkom/db";
 import { isNull, sql } from "drizzle-orm";
 import { patchLink, readLink } from "./link";
 import { applyInbox, type ApplyResult } from "./apply";
+import { listenStatus, refreshListening, startListening, stopListening } from "./listen";
 
 const { syncInbox } = schema;
 
@@ -39,6 +40,14 @@ const { syncInbox } = schema;
  * two people can walk between two counters.
  */
 const INTERVAL_MS = 15_000;
+/**
+ * While the live channel is up (ADR-0024 §3), a sibling's change arrives as a
+ * poke within a second, and the timer is only the safety net — so it asks once
+ * a minute instead of four times. When the socket drops, fifteen seconds again.
+ */
+const INTERVAL_WHILE_LISTENING_MS = 60_000;
+/** Pokes in a burst (a sale is several rows, sometimes several pushes) become one pull. */
+const PULL_SOON_MS = 100;
 const MAX_BACKOFF_MS = 10 * 60_000;
 const TIMEOUT_MS = 20_000;
 /** A till back from a week off has thousands waiting; politeness, not correctness. */
@@ -58,6 +67,7 @@ export interface ReceiveStatus {
 }
 
 let timer: ReturnType<typeof setInterval> | null = null;
+let soon: ReturnType<typeof setTimeout> | null = null;
 let backoffUntil = 0;
 let pulling = false;
 let clockSkewMs: number | null = null;
@@ -142,6 +152,17 @@ export async function pullOnce(
 
     const batch = SyncPullResponseSchema.parse(await response.json());
     clockSkewMs = batch.serverTimeMs - Date.now();
+
+    /* the names and the channel ride along (ADR-0024 §2-3); an older cloud
+       sends neither, and what this till already knows stands */
+    const liveChanged = batch.live !== undefined && JSON.stringify(batch.live) !== JSON.stringify(link.live);
+    if (batch.directory || batch.live !== undefined) {
+      patchLink({
+        ...(batch.directory ? { directory: batch.directory } : {}),
+        ...(batch.live !== undefined ? { live: batch.live } : {}),
+      });
+    }
+    if (liveChanged) refreshListening();
 
     /*
      * Stored and the cursor moved in ONE transaction. A crash between the two
@@ -235,12 +256,33 @@ export async function pullAll(db: ArkomDb, { force = false } = {}): Promise<Rece
   return receiveStatus(db);
 }
 
+/**
+ * Pull now-ish: what a poke calls. Several pokes inside the window are one
+ * pull, and a poke during a pull runs another straight after it, because the
+ * row it announced may have committed after that pull read.
+ */
+export function pullSoon(db: ArkomDb): void {
+  if (soon) return;
+  soon = setTimeout(() => {
+    soon = null;
+    if (pulling) {
+      setTimeout(() => pullSoon(db), PULL_SOON_MS);
+      return;
+    }
+    void pullAll(db).catch(() => undefined);
+  }, PULL_SOON_MS);
+}
+
 /** Start the background loop. Safe on a till that is not linked. */
 export function startReceive(db: ArkomDb): void {
   if (timer) return;
   timer = setInterval(() => {
+    /* the safety net, slower while the live channel is doing the work */
+    const lastPull = readLink()?.lastPullAtMs ?? 0;
+    if (listenStatus().connected && Date.now() - lastPull < INTERVAL_WHILE_LISTENING_MS) return;
     void pullAll(db).catch(() => undefined);
   }, INTERVAL_MS);
+  startListening(() => readLink()?.live ?? null, () => pullSoon(db));
   /* soon after boot, not instantly: the till has a window to draw, and a second
      till that has just been adopted wants its catalogue before its first sale */
   setTimeout(() => void pullAll(db).catch(() => undefined), 5_000);
@@ -249,6 +291,9 @@ export function startReceive(db: ArkomDb): void {
 export function stopReceive(): void {
   if (timer) clearInterval(timer);
   timer = null;
+  if (soon) clearTimeout(soon);
+  soon = null;
+  stopListening();
 }
 
 /** Test seam: forget the backoff and the skew between cases. */

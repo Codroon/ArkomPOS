@@ -58,6 +58,7 @@ export const IPC_CHANNELS = [
   "print:testDrawer",
   "docs:list",
   "settings:series",
+  "terminal:rename",
   "setup:status",
   "setup:complete",
   "demo:status",
@@ -492,6 +493,8 @@ export const MovementRowSchema = z.object({
   userName: z.string().nullable(),
   /** written by a sibling till (ADR-0022): its staff and its receipts live there */
   otherTill: z.boolean(),
+  /** that till's name as the shop last set it (ADR-0024 §2); NULL here, or when not known yet */
+  tillName: z.string().nullable(),
 });
 export type MovementRow = z.infer<typeof MovementRowSchema>;
 export const InventoryMovementsResponseSchema = z.object({
@@ -2800,3 +2803,14 @@ export const SettingsSeriesResponseSchema = z.object({
   /** the regimes this till applies, also display-only (ADR-0007) */
   taxRegimes: z.array(z.object({ code: z.string(), rateBp: z.number().int() })),
 });
+
+/**
+ * What this till is called — v1.4.0, ADR-0024 §1.
+ *
+ * The NAME is the shop's to change and the SERIES is not: renaming the till that
+ * prints T1- to "Caja 1" changes what every screen, the dashboard and the next
+ * ticket's header say, and never a document number (ADR-0008). A document
+ * already printed keeps the name it was printed with.
+ */
+export const TerminalRenameRequestSchema = z.object({ name: z.string().trim().min(1).max(40) });
+export const TerminalRenameResponseSchema = z.object({ name: z.string() });

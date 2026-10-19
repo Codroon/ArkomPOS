@@ -14,6 +14,7 @@ import { openCatalogWithBarcode } from "../../lib/screen-bus";
 import { EntradaDrawer } from "./entrada-drawer";
 import { InventoryTable } from "./inventory-table";
 import { MovementsDrawer } from "./movements-drawer";
+import { useShopChanged } from "../../lib/use-shop-changed";
 
 interface Filters {
   groupId: string;
@@ -38,6 +39,8 @@ export function InventoryScreen() {
   const refresh = useCallback(async () => {
     setAllRows(await window.arkom.invoke("inventory:list"));
   }, []);
+  /* a sibling till's change lands here too, not only on the next visit (ADR-0024 §3) */
+  useShopChanged(refresh, ["product", "product_code", "product_group", "stock_movement", "unit"]);
 
   useEffect(() => {
     refresh().catch((err) => console.error("inventory:list failed", err));

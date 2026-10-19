@@ -20,6 +20,7 @@
 import { app } from "electron";
 import { readFileSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import type { SyncDirectory, SyncLive } from "@arkom/core";
 
 export interface CloudLink {
   url: string;
@@ -49,6 +50,15 @@ export interface CloudLink {
   locationId: string;
   /** how many tills the shop had when this one joined, for the Ajustes card */
   tillCount: number;
+  /**
+   * The names of the shop's other tills and people, as of the last pull —
+   * ADR-0024 §2. Here and not in a table for the same reason the token is:
+   * a table is pushed, and this is the cloud's answer, not the shop's fact.
+   * Names only. A person listed here cannot sign in to this till.
+   */
+  directory: SyncDirectory;
+  /** where to listen for "something new is waiting" (ADR-0024 §3); null = poll only */
+  live: SyncLive | null;
 }
 
 const FILE = (): string => join(app.getPath("userData"), "cloud-link.json");
@@ -81,6 +91,9 @@ export function readLink(): CloudLink | null {
             lastPullError: parsed.lastPullError ?? null,
             locationId: parsed.locationId ?? "",
             tillCount: parsed.tillCount ?? 1,
+            /* a file from before v1.4.0: nobody known yet, nothing to listen to */
+            directory: parsed.directory ?? { tills: [], staff: [] },
+            live: parsed.live ?? null,
           }
         : null;
   } catch {
