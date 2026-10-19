@@ -1690,3 +1690,212 @@ describe("a till can be renamed, and its numbering cannot (v1.4.0, ADR-0024 §1)
     expect((await call<{ terminal: { name: string } }>("meta:context")).terminal.name).toBe("Caja 1");
   });
 });
+
+describe("Favourites and Best sellers on the Sale screen (v1.5.0, ADR-0025)", () => {
+  type Picks = { favourites: string[]; bestSellers: { productId: string; qty: number }[]; days: number };
+
+  async function twoLinkedTills() {
+    const one = await install("Caja 1", "T1-");
+    stubCloud();
+    use(one);
+    await link();
+    const two = await install("Caja 2", "T2-");
+    stubCloud();
+    use(two);
+    await link();
+    return { one, two };
+  }
+
+  /** a stocked product with `qty` on the shelf, made at the till in use */
+  async function stocked(till: Till, name: string, qty = 20, priceCents = 1000) {
+    use(till);
+    const groupId = till.db.select().from(s.productGroups).all()[0]!.id;
+    const saved = await call<{ product: { id: string } }>("catalog:save", {
+      name,
+      barcode: null,
+      groupId,
+      itemType: "stocked",
+      costCents: 300,
+      priceCents,
+      taxRegime: "IVA21",
+      reorderPoint: 0,
+      lowStockThreshold: 0,
+      active: true,
+    });
+    const supplier = await call<{ id: string }>("supplier:create", { name: `Proveedor ${name}` });
+    await call("stock:add", {
+      entries: [{ productId: saved.product.id, supplierId: supplier.id, qty, unitCostCents: 300, imeis: [] }],
+    });
+    return saved.product.id;
+  }
+
+  async function sell(till: Till, productId: string, qty: number) {
+    use(till);
+    const lined = await call<{ state: { docId: string; totalCents: number } }>("sale:addLine", { productId, qty });
+    await call("sale:complete", {
+      docId: lined.state.docId,
+      tenders: [{ method: "cash", amountCents: lined.state.totalCents }],
+    });
+    return lined.state.docId;
+  }
+
+  const stuck = (till: Till) => till.db.select().from(s.syncInbox).where(sql`applied_at is null`).all();
+
+  it("anybody signed in may pin, and the pins are the shop's on both counters, in the shop's order", async () => {
+    const { one, two } = await twoLinkedTills();
+    const funda = await stocked(one, "Funda iPhone 15");
+    const cable = await stocked(one, "Cable USB-C");
+    const cristal = await stocked(one, "Cristal templado");
+
+    /* a CASHIER pins: the owner asked for exactly that */
+    use(one);
+    endSession();
+    startSession({ id: "cashier-ana", name: "Ana", role: "cashier", overrides: {} });
+    await call("favourites:toggle", { productId: cable, pinned: true });
+    await call("favourites:toggle", { productId: funda, pinned: true });
+    const mine = await call<Picks>("favourites:toggle", { productId: cristal, pinned: true });
+    expect(mine.favourites).toEqual([cable, funda, cristal]);
+    /* and the record says who */
+    const pins = one.db.select().from(s.oplog).where(eq(s.oplog.entity, "product_favourite")).all();
+    expect(pins.map((p) => p.userId)).toEqual(["cashier-ana", "cashier-ana", "cashier-ana"]);
+
+    await send(one);
+    await receive(two);
+    use(two);
+    expect((await call<Picks>("sale:quickPicks", {})).favourites).toEqual([cable, funda, cristal]);
+
+    /* rearranged at the other counter: the glass dragged to the front */
+    await call("favourites:reorder", { productIds: [cristal, cable, funda] });
+    await send(two);
+    await receive(one);
+    use(one);
+    expect((await call<Picks>("sale:quickPicks", {})).favourites).toEqual([cristal, cable, funda]);
+
+    /* unpinned here, gone there */
+    await call("favourites:toggle", { productId: cable, pinned: false });
+    await send(one);
+    await receive(two);
+    use(two);
+    expect((await call<Picks>("sale:quickPicks", {})).favourites).toEqual([cristal, funda]);
+    expect(stuck(two)).toHaveLength(0);
+  });
+
+  it("two counters pinning the same product at once make one pin, not two and not a stuck row", async () => {
+    const { one, two } = await twoLinkedTills();
+    const funda = await stocked(one, "Funda Galaxy S24");
+    await send(one);
+    await receive(two);
+
+    use(one);
+    await call("favourites:toggle", { productId: funda, pinned: true });
+    use(two);
+    await call("favourites:toggle", { productId: funda, pinned: true });
+    await send(one);
+    await send(two);
+    await receive(one);
+    await receive(two);
+
+    for (const till of [one, two]) {
+      use(till);
+      expect((await call<Picks>("sale:quickPicks", {})).favourites).toEqual([funda]);
+      expect(till.db.select().from(s.productFavourites).all()).toHaveLength(1);
+      expect(stuck(till)).toHaveLength(0);
+    }
+  });
+
+  it("best sellers count BOTH counters' sales, net of refunds back to the shelf, most sold first", async () => {
+    const { one, two } = await twoLinkedTills();
+    const funda = await stocked(one, "Funda iPhone 15");
+    const cable = await stocked(one, "Cable USB-C");
+    const cargador = await stocked(one, "Cargador 20W");
+    await send(one);
+    await receive(two);
+
+    use(one);
+    await call("cash:open", { floatCents: 10000, breakdown: null });
+    await sell(one, cable, 3);
+    const fundaSale = await sell(one, funda, 2);
+    use(two);
+    await call("cash:open", { floatCents: 10000, breakdown: null });
+    await sell(two, funda, 3);
+    await sell(two, cargador, 1);
+
+    /* one funda comes back to the shelf at till 1 */
+    use(one);
+    const line = one.db.select().from(s.documentLines).where(eq(s.documentLines.documentId, fundaSale)).all()[0]!;
+    await call("refund:create", {
+      documentId: fundaSale,
+      reason: "Se arrepintió",
+      method: "cash",
+      lines: [{ lineId: line.id, qty: 1, restock: true }],
+    });
+
+    await send(one);
+    await send(two);
+    await receive(one);
+    await receive(two);
+
+    for (const till of [one, two]) {
+      use(till);
+      const picks = await call<Picks>("sale:quickPicks", {});
+      /* funda 2 + 3 - 1 refunded = 4; cable 3; cargador 1 */
+      expect(picks.bestSellers).toEqual([
+        { productId: funda, qty: 4 },
+        { productId: cable, qty: 3 },
+        { productId: cargador, qty: 1 },
+      ]);
+      expect(picks.days).toBe(30);
+    }
+  });
+
+  it("forgets a sale older than the window", async () => {
+    const { one } = await twoLinkedTills();
+    const funda = await stocked(one, "Funda vieja");
+    use(one);
+    await call("cash:open", { floatCents: 10000, breakdown: null });
+    await sell(one, funda, 5);
+    expect((await call<Picks>("sale:quickPicks", {})).bestSellers).toEqual([{ productId: funda, qty: 5 }]);
+    /* the same sale, as if it had happened in August */
+    one.db
+      .update(s.stockMovements)
+      .set({ createdAt: new Date(Date.now() - 45 * 86_400_000) })
+      .where(sql`${s.stockMovements.movementType} = 'sale_out'`)
+      .run();
+    expect((await call<Picks>("sale:quickPicks", {})).bestSellers).toEqual([]);
+  });
+
+  it("deleting a product at one till deletes it, its codes and its pin at the other, with nothing stuck", async () => {
+    /* found while building this: the codes used to go without an oplog entry,
+       so the sibling's copy of the product could never be deleted */
+    const { one, two } = await twoLinkedTills();
+    use(one);
+    const groupId = one.db.select().from(s.productGroups).all()[0]!.id;
+    const saved = await call<{ product: { id: string } }>("catalog:save", {
+      name: "Articulo de prueba",
+      barcode: null,
+      groupId,
+      itemType: "stocked",
+      costCents: 100,
+      priceCents: 200,
+      taxRegime: "IVA21",
+      reorderPoint: 0,
+      lowStockThreshold: 0,
+      active: true,
+    });
+    await call("catalog:addCode", { productId: saved.product.id, code: "8400000000024" });
+    await call("favourites:toggle", { productId: saved.product.id, pinned: true });
+    await send(one);
+    await receive(two);
+    expect(two.db.select().from(s.productCodes).all().map((c) => c.code)).toContain("8400000000024");
+
+    use(one);
+    await call("catalog:remove", { id: saved.product.id });
+    await send(one);
+    await receive(two);
+
+    expect(two.db.select().from(s.products).where(eq(s.products.id, saved.product.id)).all()).toHaveLength(0);
+    expect(two.db.select().from(s.productCodes).all().map((c) => c.code)).not.toContain("8400000000024");
+    expect(two.db.select().from(s.productFavourites).all()).toHaveLength(0);
+    expect(stuck(two)).toHaveLength(0);
+  });
+});

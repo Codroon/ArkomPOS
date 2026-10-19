@@ -22,6 +22,7 @@ import type {
   SaleAddLineRequest,
   SaleAddLineResponse,
   SaleState,
+  SaleQuickPicks,
   StockAddRequest,
   StockAddResponse,
   TenderDraft,
@@ -123,6 +124,9 @@ declare global {
         truncated: boolean;
       }>;
       invoke(channel: "terminal:rename", payload: { name: string }): Promise<{ name: string }>;
+      invoke(channel: "sale:quickPicks", payload?: Record<string, never>): Promise<SaleQuickPicks>;
+      invoke(channel: "favourites:toggle", payload: { productId: string; pinned: boolean }): Promise<SaleQuickPicks>;
+      invoke(channel: "favourites:reorder", payload: { productIds: string[] }): Promise<SaleQuickPicks>;
       invoke(channel: "settings:series", payload?: Record<string, never>): Promise<{
         series: Array<{ docType: string; prefix: string; nextNumber: number; nextDocNumber: string }>;
         taxRegimes: Array<{ code: string; rateBp: number }>;

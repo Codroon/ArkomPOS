@@ -23,11 +23,13 @@ import {
 } from "../share";
 
 describe("the list itself", () => {
-  it("is exactly these thirteen, in this order", () => {
+  it("is exactly these fourteen, in this order", () => {
     expect([...SHARED_ENTITIES]).toEqual([
       "product_group",
       "product",
       "product_code",
+      /* ADR-0025 — Favourites on the Sale screen are the shop's */
+      "product_favourite",
       "supplier",
       "customer",
       "unit",

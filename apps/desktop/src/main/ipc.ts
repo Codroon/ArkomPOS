@@ -125,6 +125,10 @@ import {
   DocsListResponseSchema,
   SettingsSeriesRequestSchema,
   TerminalRenameRequestSchema,
+  SaleQuickPicksRequestSchema,
+  SaleQuickPicksResponseSchema,
+  FavouritesToggleRequestSchema,
+  FavouritesReorderRequestSchema,
   TerminalRenameResponseSchema,
   SettingsSeriesResponseSchema,
   SetupStatusRequestSchema,
@@ -305,6 +309,7 @@ import { addStock, listInventory, listMovements } from "./repos/inventory";
 import { createSupplier, listSuppliers } from "./repos/suppliers";
 import { getSettings, requireConfiguredPrinter, saveSettings } from "./repos/settings";
 import { renameTerminal } from "./repos/terminal";
+import { quickPicks, reorderFavourites, toggleFavourite } from "./repos/favourites";
 import {
   checkImei,
   getUsedDevice,
@@ -944,6 +949,19 @@ export function registerIpcHandlers(db: ArkomDb): void {
     complete(db, s.ctx, req),
   );
   guarded("sale:peek", "sale.create", SalePeekRequestSchema, TicketPeekSchema, (s, { docId }) => peek(db, s.ctx, docId));
+  /* the Sale screen's Favourites and Best sellers (ADR-0025). Reading them is
+     part of selling; ARRANGING them is open to anybody signed in, because the
+     owner asked for exactly that — so `authed`, with every change in the oplog
+     under the name of whoever made it. */
+  guarded("sale:quickPicks", "sale.create", SaleQuickPicksRequestSchema, SaleQuickPicksResponseSchema, (s) =>
+    quickPicks(db, s.ctx),
+  );
+  authed("favourites:toggle", FavouritesToggleRequestSchema, SaleQuickPicksResponseSchema, (s, { productId, pinned }) =>
+    toggleFavourite(db, s.ctx, productId, pinned),
+  );
+  authed("favourites:reorder", FavouritesReorderRequestSchema, SaleQuickPicksResponseSchema, (s, { productIds }) =>
+    reorderFavourites(db, s.ctx, productIds),
+  );
 
   /* ---- settings, demo, backup: owner territory ---- */
 

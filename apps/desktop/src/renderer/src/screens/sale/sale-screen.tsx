@@ -17,6 +17,7 @@ import {
   centsToInput,
   formatCents,
   uuidv7,
+  type SaleQuickPicks,
 } from "@arkom/core";
 import { cn, GhostButton, ScanInput, Toast, useDataLabel, useT, type ScanInputHandle } from "@arkom/ui";
 import { TicketPeekModal } from "../../components/ticket-peek-modal";
@@ -31,7 +32,7 @@ import { refreshShift } from "../../lib/use-shift";
 import { OpenShiftDialog } from "../cash/open-shift-dialog";
 import { consumePendingVoucher, openCatalogWithBarcode } from "../../lib/screen-bus";
 import { useScanFlow } from "../../lib/use-scan-flow";
-import { ProductGrid } from "./product-grid";
+import { BEST_SELLERS_TAB, FAVOURITES_TAB, ProductGrid } from "./product-grid";
 import { TicketPanel } from "./ticket-panel";
 import { useTicketPrint } from "../../lib/use-ticket-print";
 import { PrintToast } from "../../lib/print-toast";
@@ -69,6 +70,10 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
   const [completed, setCompleted] = useState<CompletedSale | null>(null);
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [activeGroup, setActiveGroup] = useState("");
+  /* Favourites and Best sellers (ADR-0025); the opening tab is chosen once,
+     from the first answer, and after that it is the cashier's */
+  const [picks, setPicks] = useState<SaleQuickPicks | null>(null);
+  const openingTabChosen = useRef(false);
   const [searchText, setSearchText] = useState("");
   const [noMatch, setNoMatch] = useState<string | null>(null);
   const [shake, setShake] = useState(false);
@@ -131,9 +136,43 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
       // sellable only: active with price + tax (incomplete/inactive can't be sold)
       .then((rows) => setProducts(rows.filter((r) => r.active && r.priceCents != null && r.taxRegime != null)))
       .catch((err) => console.error("catalog:list failed", err));
+    /* with the catalogue, because a sale just made moves the best sellers */
+    window.arkom
+      .invoke("sale:quickPicks", {})
+      .then((next) => {
+        setPicks(next);
+        if (!openingTabChosen.current) {
+          openingTabChosen.current = true;
+          /* what the shop chose first, then what it sells most, then everything */
+          setActiveGroup(
+            next.favourites.length > 0 ? FAVOURITES_TAB : next.bestSellers.length > 0 ? BEST_SELLERS_TAB : "",
+          );
+        }
+      })
+      .catch((err) => console.error("sale:quickPicks failed", err));
   }, []);
+
+  /** Pin or unpin. Anybody signed in may (ADR-0025); main records who did. */
+  const togglePin = useCallback((product: ProductRow, pinned: boolean) => {
+    window.arkom
+      .invoke("favourites:toggle", { productId: product.id, pinned })
+      .then(setPicks)
+      .catch((err) => console.error("favourites:toggle failed", err));
+  }, []);
+
+  /** Shown at once, then made so; a refusal puts the shop's order back. */
+  const reorderFavourites = useCallback((productIds: string[]) => {
+    setPicks((prev) => (prev ? { ...prev, favourites: productIds } : prev));
+    window.arkom
+      .invoke("favourites:reorder", { productIds })
+      .then(setPicks)
+      .catch((err) => {
+        console.error("favourites:reorder failed", err);
+        refreshProducts();
+      });
+  }, [refreshProducts]);
   /* a sibling till's change lands here too, not only on the next visit (ADR-0024 §3) */
-  useShopChanged(refreshProducts, ["product", "product_code", "product_group", "stock_movement", "unit"]);
+  useShopChanged(refreshProducts, ["product", "product_code", "product_group", "product_favourite", "stock_movement", "unit"]);
 
   // boot: restore the terminal's live draft (power-cut behavior) + catalog + parked
   useEffect(() => {
@@ -497,6 +536,28 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
 
           {/* group chips */}
           <div className="flex flex-none flex-wrap gap-1.5 border-b border-line bg-surface-2 px-4 py-2">
+            {/* the two quick tabs, then the groups (ADR-0025) */}
+            {(
+              [
+                [FAVOURITES_TAB, `★ ${t("sale.tabFavourites")}`],
+                [BEST_SELLERS_TAB, t("sale.tabBestSellers")],
+              ] as const
+            ).map(([tab, label]) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveGroup(tab)}
+                className={cn(
+                  "h-6 rounded-[3px] border px-2 text-[11px] font-bold",
+                  activeGroup === tab
+                    ? "border-ink bg-ink text-inverse-ink"
+                    : "border-line-strong bg-card text-ink-2 hover:border-muted",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+            <span className="mx-0.5 w-px self-stretch bg-line" aria-hidden />
             <button
               type="button"
               onClick={() => setActiveGroup("")}
@@ -533,6 +594,11 @@ export function SaleScreen({ terminalName }: { terminalName: string }) {
             search={searchText}
             shakeProductId={shakeProductId}
             onAdd={onAddProduct}
+            favourites={picks?.favourites ?? []}
+            bestSellers={picks?.bestSellers ?? []}
+            bestSellerDays={picks?.days ?? 30}
+            onTogglePin={togglePin}
+            onReorder={reorderFavourites}
           />
         </div>
 

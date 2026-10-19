@@ -40,6 +40,8 @@ import { schema, type ArkomDb } from "@arkom/db";
  * to be deleted, and `db:audit` would otherwise be right to complain.
  */
 const DISCARD_IN_ORDER = [
+  /* pins point at the products about to go (ADR-0025); the shop's arrive with its catalogue */
+  schema.productFavourites,
   schema.productStock,
   schema.stockMovements,
   schema.productCodes,

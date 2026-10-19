@@ -24,6 +24,7 @@
  *   product_group  →  nothing else shared
  *   product        →  product_group (nullable: a flagged product has no group)
  *   product_code   →  product
+ *   product_favourite → nothing (its product_id is a reference — ADR-0025)
  *   supplier       →  nothing
  *   customer       →  nothing
  *   unit           →  product  (its purchase_id is a bare reference, not an FK)
@@ -38,6 +39,8 @@ export const SHARED_ENTITIES = [
   "product_group",
   "product",
   "product_code",
+  /* ADR-0025 — the Sale screen's Favourites are the shop's, on every counter */
+  "product_favourite",
   "supplier",
   "customer",
   "unit",

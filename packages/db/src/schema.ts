@@ -146,6 +146,30 @@ export const productCodes = sqliteTable("product_codes", {
   index("ix_product_code_tenant_code").on(t.tenantId, t.code),
 ]);
 
+/**
+ * A product pinned to the Sale screen's Favourites tab — v1.5.0, ADR-0025.
+ *
+ * Its own row, not a column on `products`, because a pin is a different fact
+ * from the product and travels on its own: products resolve concurrent edits by
+ * `updated_at` for the WHOLE row, so a pin stored there would let one till's pin
+ * drop the other till's price change (or the reverse) inside the replication
+ * window. Here a pin and a price never meet.
+ *
+ * The id IS the product's id: one pin per product, and two tills pinning the
+ * same product at the same moment write the same row rather than two. Unpinning
+ * deletes it. `product_id` is a reference, not a foreign key, so deleting a
+ * product never waits on a pin a sibling has not yet heard is gone; the Sale
+ * screen simply shows pins whose product it can sell.
+ */
+export const productFavourites = sqliteTable("product_favourites", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  productId: text("product_id").notNull(),
+  /** left-to-right on the tab; ties (two tills reordering at once) fall back to the name */
+  position: integer("position").notNull(),
+  createdAt: ts("created_at").notNull(),
+}, (t) => [index("ix_product_favourites_tenant").on(t.tenantId, t.position)]);
+
 /* serialized stock: one row per physical phone (ADR-0004) */
 export const units = sqliteTable("units", {
   id: text("id").primaryKey(),

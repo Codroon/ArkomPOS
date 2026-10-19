@@ -33,7 +33,7 @@ import { makeMutateRunner, type DbTx } from "../mutate-runner";
 import { productsHoldingCode } from "./scan";
 import { getSettings } from "./settings";
 
-const { products, productCodes, productGroups, productStock, units, documentLines, stockMovements, repairLines, usedPurchases } =
+const { products, productCodes, productFavourites, productGroups, productStock, units, documentLines, stockMovements, repairLines, usedPurchases } =
   schema;
 
 type Reader = ArkomDb | DbTx;
@@ -501,7 +501,21 @@ export function removeProduct(db: ArkomDb, ctx: MutationCtx, id: string): Catalo
 
     if (removal.kind === "delete") {
       // its own rows only — the history check above is what makes this safe
-      tx.delete(productCodes).where(eq(productCodes.productId, id)).run();
+      /*
+       * Each code and the pin are deleted AS FACTS, with their own entries.
+       * They used to go silently, which was invisible on one till and fatal on
+       * two: the sibling still held the codes, so the product's delete failed
+       * its foreign key there on every pass and sat in the inbox for ever.
+       */
+      for (const code of tx.select().from(productCodes).where(eq(productCodes.productId, id)).all()) {
+        tx.delete(productCodes).where(eq(productCodes.id, code.id)).run();
+        log({ entity: "product_code", entityId: code.id, action: "delete", before: toOplogJson(code), after: null });
+      }
+      const pin = tx.select().from(productFavourites).where(eq(productFavourites.id, id)).all()[0];
+      if (pin) {
+        tx.delete(productFavourites).where(eq(productFavourites.id, id)).run();
+        log({ entity: "product_favourite", entityId: id, action: "unpin", before: toOplogJson(pin), after: null });
+      }
       tx.delete(productStock).where(eq(productStock.productId, id)).run();
       tx.delete(products).where(eq(products.id, id)).run();
       log({ entity: "product", entityId: id, action: "delete", before: toOplogJson(existing), after: null });

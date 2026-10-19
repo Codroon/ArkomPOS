@@ -59,6 +59,9 @@ export const IPC_CHANNELS = [
   "docs:list",
   "settings:series",
   "terminal:rename",
+  "sale:quickPicks",
+  "favourites:toggle",
+  "favourites:reorder",
   "setup:status",
   "setup:complete",
   "demo:status",
@@ -2812,5 +2815,25 @@ export const SettingsSeriesResponseSchema = z.object({
  * ticket's header say, and never a document number (ADR-0008). A document
  * already printed keeps the name it was printed with.
  */
+/**
+ * The Sale screen's two quick tabs — v1.5.0, ADR-0025.
+ *
+ * `favourites` are product ids in the order the shop arranged them; anybody
+ * signed in may pin, unpin and reorder, and the pins are the SHOP's, so both
+ * counters show the same tab. `bestSellers` is computed, never stored: the
+ * products sold most over the last `days`, net of refunds that came back to
+ * the shelf, read from the stock ledger every till shares — so it counts both
+ * counters' sales, not only this one's.
+ */
+export const SaleQuickPicksRequestSchema = z.object({}).optional();
+export const SaleQuickPicksResponseSchema = z.object({
+  favourites: z.array(z.string()),
+  bestSellers: z.array(z.object({ productId: z.string(), qty: z.number().int() })),
+  days: z.number().int(),
+});
+export type SaleQuickPicks = z.infer<typeof SaleQuickPicksResponseSchema>;
+export const FavouritesToggleRequestSchema = z.object({ productId: z.string(), pinned: z.boolean() });
+export const FavouritesReorderRequestSchema = z.object({ productIds: z.array(z.string()).max(500) });
+
 export const TerminalRenameRequestSchema = z.object({ name: z.string().trim().min(1).max(40) });
 export const TerminalRenameResponseSchema = z.object({ name: z.string() });

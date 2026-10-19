@@ -134,6 +134,13 @@
       "when": 1792376098811,
       "tag": "0018_repair_intake_number",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1792378658601,
+      "tag": "0019_product_favourites",
+      "breakpoints": true
     }
   ]
 }

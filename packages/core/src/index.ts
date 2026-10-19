@@ -509,6 +509,10 @@ export {
   SettingsSeriesRequestSchema,
   SettingsSeriesResponseSchema,
   TerminalRenameRequestSchema,
+  SaleQuickPicksRequestSchema,
+  SaleQuickPicksResponseSchema,
+  FavouritesToggleRequestSchema,
+  FavouritesReorderRequestSchema,
   TerminalRenameResponseSchema,
   SetupStatusRequestSchema,
   SetupStatusResponseSchema,
@@ -662,6 +666,7 @@ export {
   RepairMarkNotRepairedRequestSchema,
   RepairMarkNotRepairedResponseSchema,
 } from "./ipc";
+export type { SaleQuickPicks } from "./ipc";
 export type {
   IpcChannel,
   ErrorCode,

@@ -56,6 +56,7 @@ const TABLES = {
   product_group: schema.productGroups,
   product: schema.products,
   product_code: schema.productCodes,
+  product_favourite: schema.productFavourites,
   supplier: schema.suppliers,
   customer: schema.customers,
   unit: schema.units,
