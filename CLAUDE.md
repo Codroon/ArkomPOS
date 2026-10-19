@@ -29,6 +29,10 @@ photographs never leave the shop.
 Since v0.18.2 first run is a four-step wizard (language → shop → owner + recovery code →
 printer, skippable) and the landing screen carries a fact-driven, dismissible checklist
 (`setup:checklist`). `pnpm fresh` archives this machine's dev data and reopens onboarding.
+Since v1.4.0 a till can be **renamed** (never renumbered), the other till's people and till
+show by NAME, a repair taken at one counter can be found and opened at the other (its `R-`
+number travels with it), and a sale reaches the other counter and the dashboard in about a
+second — pushed on write and announced on a Supabase Realtime channel (ADR-0024).
 Since v1.3.0 a shop can run **several tills that agree** (ADR-0022, ADR-0023): one catalogue,
 one stock ledger, one set of repairs and one pot of store credit; a second till that joins the
 shop instead of founding one; and a dashboard that shows every till together with a filter by
@@ -186,10 +190,22 @@ Schema already anticipates them — build nothing for them.
   before its parent is early, not broken. Never apply a batch straight into the business
   tables — `product_codes.product_id` is NOT NULL REFERENCES products and the cloud's
   ingest order is not the order SQLite accepts (ADR-0022 §5).
-- **The pull serves only SETTLED rows** (`received_at < now() - 5s`). `ingest_seq` is a
-  bigserial, assigned before commit, so two concurrent ingests can commit out of order and a
-  naive cursor would step over the lower one forever — one sale, missing from one till,
-  unreproducible. `seq` is still PER TILL and can never order a merged stream (ADR-0022 §3–4).
+- **One shop's ingests are serialized; the pull serves a row the moment it commits.**
+  `ingest_seq` is a bigserial, assigned before commit, so two concurrent ingests could commit
+  out of order and a naive cursor would step over the lower one forever — one sale, missing
+  from one till, unreproducible. ADR-0022 §4 waited five seconds; ADR-0024 §4 takes
+  `pg_advisory_xact_lock` per tenant as the FIRST statement of `recordBatch`, so a shop's rows
+  commit in `ingest_seq` order. Never write `sync_entries` outside `recordBatch`, never drop
+  the lock, and never filter the pull on `received_at` (another server's clock). `seq` is
+  still PER TILL and can never order a merged stream (ADR-0022 §3).
+- **A change is announced, never polled for (ADR-0024 §3).** A committed `mutate()` rings the
+  outbox (push 300 ms later); a push that stored something pokes the shop's Realtime channel
+  with a tag and NOTHING else — no row, id, amount or name; tills and open dashboard pages
+  pull or refresh on the poke. The timers stay underneath as the fallback, and nothing in a
+  sale awaits any of it.
+- **Names cross tills; people do not (ADR-0024 §2).** A sibling's staff and till names arrive
+  as a read-only `directory` with the pull, kept in `cloud-link.json`, looked up through
+  `main/people.ts`. Never insert them into `users` — a user row is a PIN that signs in.
 - **A second till JOINS a shop; it never founds one.** The enrolment RESPONSE carries the
   keys to use. A till with fiscal history is refused (`TILL_HAS_HISTORY`) and an account with
   two shops is refused (`SHOP_AMBIGUOUS`) rather than guessed at. A joining till parks its

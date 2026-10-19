@@ -71,6 +71,8 @@ business rows + `product_stock` cache + `oplog` entry → typed result back.
 | `print:savePdf` | {docId, kind, what?, copy} → saved \| cancelled | v0.17.0; save dialog; nothing is filed per sale any more |
 | `print:testDrawer` | — → {ok} | `settings.edit`; a pulse through the configured command set |
 | `docs:list` | filters → rows | read-only flat list of completed documents |
+| `terminal:rename` | {name} → {name} | v1.4.0; `settings.edit`; the till's NAME through `mutate()` — the series is untouched and has no write channel (ADR-0024 §1) |
+| `shop:changed` (event, main → renderer) | {entities} | v1.4.0; sent when a sibling's rows land, so screens showing them read again through their own guarded channels. Carries entity names only (ADR-0024 §3) |
 | `settings:series` | — → series + regimes | DISPLAY ONLY for the series; the general rate shown is `settings.vatRateBp` (ADR-0007 A1) and is saved through `settings:save` like any setting. There is no series write channel and there must not be |
 | `setup:checklist` | — → {printerConfigured, hasProducts, hasStaff, hasShift, dismissed, done} | v0.18.2; authed, no permission; read from FACTS (a settings row, a product, a second user, a shift) and never from a "seen it" flag |
 | `cloud:status` | — → {linked, pending, lastAckedSeq, lastPushAtMs, lastError, pushing} | v1.2.0; authed, no permission: a cashier seeing "12 pendientes" is how a shop notices its line is down |
@@ -413,7 +415,7 @@ returned once and stored as a SHA-256; the database can hold neither secret in t
 
 ```
 { tenantId, terminalId, appVersion, ops: SyncOp[≤200] }
-  → 200 { ackedSeq, duplicates, serverTimeMs }
+  → 200 { ackedSeq, duplicates, stored, serverTimeMs, pokeTag? }   (pokeTag: v1.4.0, ADR-0024 §3)
   → 401 UNAUTHENTICATED  no token, or one nobody issued
   → 403 DEVICE_REVOKED   the account cut this till off
   → 403 DEVICE_MISMATCH  the envelope names a till the token was not issued for
@@ -451,6 +453,13 @@ Postgres: `accounts`, `tenants` (a shop, id = the till's `tenant_id`), `devices`
 digest), `enrol_codes`, `sync_entries` (the raw stream, keyed by `(tenant_id, op_id)`).
 Deleting a tenant cascades to all of it — ADR-0020 §4 makes that a feature, not a support
 ticket answered with SQL.
+
+**Since v1.4.0 (ADR-0024):** the till pushes 300 ms after a committed write; a push that
+stored something pokes the shop's Supabase Realtime channel (a tag, never data); tills and
+open dashboard pages listen and pull or refresh at once, with the old timers underneath. The
+pull answer carries the shop's `directory` (till and staff NAMES only) and its `live`
+channel. One shop's ingests are serialized by an advisory lock, so the pull serves rows the
+moment they commit.
 
 **Not built yet:** the dashboard and its projections, and down-sync (ADR-0001 reserved it).
 Projections are derivable by replaying `sync_entries` in `seq` order, which is why ingest
